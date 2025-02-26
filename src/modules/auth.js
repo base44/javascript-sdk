@@ -1,0 +1,108 @@
+/**
+ * Creates the auth module for the Base44 SDK
+ * @param {import('axios').AxiosInstance} axios - Axios instance
+ * @param {string|number} appId - Application ID
+ * @param {string} serverUrl - Server URL
+ * @returns {Object} Auth module with authentication methods
+ */
+export function createAuthModule(axios, appId, serverUrl) {
+  return {
+    /**
+     * Get current user information
+     * @returns {Promise<Object>} Current user data
+     */
+    async me() {
+      return axios.get(`/apps/${appId}/entities/User/me`);
+    },
+
+    /**
+     * Update current user data
+     * @param {Object} data - Updated user data
+     * @returns {Promise<Object>} Updated user
+     */
+    async updateMe(data) {
+      return axios.put(`/apps/${appId}/entities/User/me`, data);
+    },
+
+    /**
+     * Redirects the user to the Base44 login page
+     * @param {string} nextUrl - URL to redirect to after successful login
+     * @throws {Error} When not in a browser environment
+     */
+    login(nextUrl) {
+      // This function only works in a browser environment
+      if (typeof window === 'undefined') {
+        throw new Error('Login method can only be used in a browser environment');
+      }
+
+      // If nextUrl is not provided, use the current URL
+      const redirectUrl = nextUrl || window.location.href;
+      
+      // Build the login URL
+      const loginUrl = `${serverUrl}/login?from_url=${encodeURIComponent(redirectUrl)}&app_id=${appId}`;
+      
+      // Redirect to the login page
+      window.location.href = loginUrl;
+    },
+
+    /**
+     * Logout the current user
+     * Removes the token from localStorage and optionally redirects to a URL
+     * @param {string} [redirectUrl] - Optional URL to redirect to after logout
+     * @returns {Promise<void>}
+     */
+    async logout(redirectUrl) {
+      // Remove token from axios headers
+      delete axios.defaults.headers.common['Authorization'];
+      
+      // Remove token from localStorage
+      if (typeof window !== 'undefined' && window.localStorage) {
+        try {
+          window.localStorage.removeItem('base44_access_token');
+        } catch (e) {
+          console.error('Failed to remove token from localStorage:', e);
+        }
+      }
+      
+      // Redirect if a URL is provided
+      if (redirectUrl && typeof window !== 'undefined') {
+        window.location.href = redirectUrl;
+      }
+      
+      return Promise.resolve();
+    },
+
+    /**
+     * Set authentication token
+     * @param {string} token - Auth token
+     * @param {boolean} [saveToStorage=true] - Whether to save the token to localStorage
+     */
+    setToken(token, saveToStorage = true) {
+      if (!token) return;
+      
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      
+      // Save token to localStorage if requested
+      if (saveToStorage && typeof window !== 'undefined' && window.localStorage) {
+        try {
+          window.localStorage.setItem('base44_access_token', token);
+        } catch (e) {
+          console.error('Failed to save token to localStorage:', e);
+        }
+      }
+    },
+
+    /**
+     * Verify if the current token is valid
+     * @returns {Promise<boolean>} True if token is valid
+     */
+    async isAuthenticated() {
+      try {
+        await this.me();
+        return true;
+      } catch (error) {
+        return false;
+      }
+    }
+  };
+} 
