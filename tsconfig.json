@@ -15,7 +15,8 @@
     "jsx": "react",
     "declarationMap": true,
     "sourceMap": true,
-    "emitDeclarationOnly": true
+    "emitDeclarationOnly": true,
+    "types": ["vitest"]
   },
   "include": ["src/**/*", "src/**/*.d.ts"],
   "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.test.js"]

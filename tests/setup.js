@@ -1,6 +1,7 @@
 // Load environment variables from .env file
 import dotenv from 'dotenv';
 import './utils/circular-json-handler.js';
+import { beforeAll, afterAll, test } from 'vitest';
 
 try {
   dotenv.config({ path: './tests/.env' });
@@ -14,9 +15,6 @@ try {
 } catch (err) {
   console.warn('Failed to load circular JSON handler:', err.message);
 }
-
-// Set longer timeout for tests, particularly useful for e2e tests
-jest.setTimeout(30000); // 30 seconds
 
 // Global beforeAll and afterAll hooks
 beforeAll(() => {

@@ -1,13 +1,11 @@
-const { createClient, Base44Error } = require('../../src');
-const { getTestConfig } = require('../utils/test-config');
+import { describe, test, expect, beforeAll } from 'vitest';
+import { createClient, Base44Error } from '../../src/index.ts';
+import { getTestConfig } from '../utils/test-config.js';
 
 // Get test configuration
 const config = getTestConfig();
 
-// Skip tests if SKIP_E2E_TESTS is true
-const conditionalTest = config.skipE2E ? describe.skip : describe;
-
-conditionalTest('Integration operations (E2E)', () => {
+describe('Integration operations (E2E)', () => {
   let base44;
 
   beforeAll(() => {
