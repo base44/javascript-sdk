@@ -11,7 +11,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "rollup -c && npm run copy:types",
+    "build": "tsc",
     "build:types": "tsc --emitDeclarationOnly",
     "copy:types": "cp src/types.d.ts dist/index.d.ts",
     "lint": "eslint src",

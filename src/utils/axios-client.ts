@@ -1,15 +1,26 @@
-import axios from 'axios';
+import axios from "axios";
 
 export class Base44Error extends Error {
-  constructor(message, status, code, data, originalError) {
+  status: number;
+  code: string;
+  data: any;
+  originalError: unknown;
+
+  constructor(
+    message: string,
+    status: number,
+    code: string,
+    data: any,
+    originalError: unknown
+  ) {
     super(message);
-    this.name = 'Base44Error';
+    this.name = "Base44Error";
     this.status = status;
     this.code = code;
     this.data = data;
     this.originalError = originalError;
   }
-  
+
   // Add a method to safely serialize this error without circular references
   toJSON() {
     return {
@@ -17,7 +28,7 @@ export class Base44Error extends Error {
       message: this.message,
       status: this.status,
       code: this.code,
-      data: this.data
+      data: this.data,
     };
   }
 }
@@ -27,18 +38,20 @@ export class Base44Error extends Error {
  * @param {string} prefix - Prefix for the log message
  * @param {Error} error - The error to log
  */
-function safeErrorLog(prefix, error) {
+function safeErrorLog(prefix: string, error: unknown) {
   if (error instanceof Base44Error) {
     console.error(`${prefix} ${error.status}: ${error.message}`);
     if (error.data) {
       try {
-        console.error('Error data:', JSON.stringify(error.data, null, 2));
+        console.error("Error data:", JSON.stringify(error.data, null, 2));
       } catch (e) {
-        console.error('Error data: [Cannot stringify error data]');
+        console.error("Error data: [Cannot stringify error data]");
       }
     }
   } else {
-    console.error(`${prefix} ${error.message}`);
+    console.error(
+      `${prefix} ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 }
 
@@ -47,11 +60,11 @@ function safeErrorLog(prefix, error) {
  * @param {string} serverUrl - Base server URL
  * @param {string|number} appId - Application ID
  */
-function redirectToLogin(serverUrl, appId) {
-  if (typeof window === 'undefined') {
+function redirectToLogin(serverUrl: string, appId: string) {
+  if (typeof window === "undefined") {
     return; // Can't redirect in non-browser environment
   }
-  
+
   const currentUrl = encodeURIComponent(window.location.href);
   const loginUrl = `${serverUrl}/login?from_url=${currentUrl}&app_id=${appId}`;
   window.location.href = loginUrl;
@@ -68,28 +81,39 @@ function redirectToLogin(serverUrl, appId) {
  * @param {string} options.serverUrl - Server URL (needed for login redirect)
  * @returns {import('axios').AxiosInstance} Configured axios instance
  */
-export function createAxiosClient({ baseURL, headers = {}, token, requiresAuth = false, appId, serverUrl }) {
+export function createAxiosClient({
+  baseURL,
+  headers = {},
+  token,
+  requiresAuth = false,
+  appId,
+  serverUrl,
+}: {
+  baseURL: string;
+  headers?: Record<string, string>;
+  token?: string;
+  requiresAuth?: boolean;
+  appId: string;
+  serverUrl: string;
+}) {
   const client = axios.create({
     baseURL,
     headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
+      "Content-Type": "application/json",
+      Accept: "application/json",
       ...headers,
     },
   });
 
   // Add token to requests if available
   if (token) {
-    client.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    client.defaults.headers.common["Authorization"] = `Bearer ${token}`;
   }
 
   // Add origin URL in browser environment
   client.interceptors.request.use((config) => {
-    if (typeof window !== 'undefined') {
-      config.headers = {
-        ...config.headers,
-        'X-Origin-URL': window.location.href,
-      };
+    if (typeof window !== "undefined") {
+      config.headers.set("X-Origin-URL", window.location.href);
     }
     return config;
   });
@@ -98,10 +122,11 @@ export function createAxiosClient({ baseURL, headers = {}, token, requiresAuth =
   client.interceptors.response.use(
     (response) => response.data,
     (error) => {
-      const message = error.response?.data?.message || 
-                      error.response?.data?.detail || 
-                      error.message;
-      
+      const message =
+        error.response?.data?.message ||
+        error.response?.data?.detail ||
+        error.message;
+
       const base44Error = new Base44Error(
         message,
         error.response?.status,
@@ -111,14 +136,22 @@ export function createAxiosClient({ baseURL, headers = {}, token, requiresAuth =
       );
 
       // Log errors in development
-      if (process.env.NODE_ENV !== 'production') {
-        safeErrorLog('[Base44 SDK Error]', base44Error);
+      if (process.env.NODE_ENV !== "production") {
+        safeErrorLog("[Base44 SDK Error]", base44Error);
       }
 
       // Check for 403 Forbidden (authentication required) and redirect to login if requiresAuth is true
-      console.log(requiresAuth, error.response?.status, typeof window !== 'undefined')
-      if (requiresAuth && error.response?.status === 403 && typeof window !== 'undefined') {
-        console.log('Authentication required. Redirecting to login...');
+      console.log(
+        requiresAuth,
+        error.response?.status,
+        typeof window !== "undefined"
+      );
+      if (
+        requiresAuth &&
+        error.response?.status === 403 &&
+        typeof window !== "undefined"
+      ) {
+        console.log("Authentication required. Redirecting to login...");
         // Use a slight delay to allow the error to propagate first
         setTimeout(() => {
           redirectToLogin(serverUrl, appId);
@@ -130,4 +163,4 @@ export function createAxiosClient({ baseURL, headers = {}, token, requiresAuth =
   );
 
   return client;
-} 
+}
