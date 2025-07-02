@@ -105,3 +105,7 @@ jobs:
                 await createOrUpdateComment(context.issue.number);
               }
             }
+
+permissions:
+  contents: read
+  pull-requests: write
