@@ -45,7 +45,23 @@ jobs:
             const installCmd = `npm i ${pkg.url}`;
             const badge = `[![pkg.pr.new](https://pkg.pr.new/badge/${context.repo.owner}/${context.repo.repo})](https://pkg.pr.new/~/${context.repo.owner}/${context.repo.repo})`;
             const body = `### 🚀 Package Preview Available!
-\n${badge}\n\n---\n\n**Install this PR's preview build with npm:**\n\n\sh\n${installCmd}\n\\n\n- 📦 [Preview Package on pkg.pr.new](${pkg.url})\n- 🔗 [View this commit on GitHub](https://github.com/${context.repo.owner}/${context.repo.repo}/commit/${pkg.commit})\n\n---\n<sub>Preview powered by [pkg.pr.new](https://pkg.pr.new) — try new features instantly, no NPM release needed!</sub>\n`;
+
+${badge}
+
+---
+
+**Install this PR's preview build with npm:**
+
+\`\`\`sh
+${installCmd}
+\`\`\`
+
+- 📦 [Preview Package on pkg.pr.new](${pkg.url})
+- 🔗 [View this commit on GitHub](https://github.com/${context.repo.owner}/${context.repo.repo}/commit/${pkg.commit})
+
+---
+<sub>Preview powered by [pkg.pr.new](https://pkg.pr.new) — try new features instantly, no NPM release needed!</sub>
+`;
 
             const botCommentIdentifier = '### 🚀 Package Preview Available!';
 
