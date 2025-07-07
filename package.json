@@ -3,9 +3,7 @@
   "version": "0.1.2",
   "description": "JavaScript SDK for Base44 API",
   "main": "dist/index.js",
-  "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
-  "browser": "dist/index.umd.js",
   "type": "module",
   "files": [
     "dist"
