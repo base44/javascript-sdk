@@ -3,6 +3,7 @@ import { createEntitiesModule } from "./modules/entities.js";
 import { createIntegrationsModule } from "./modules/integrations.js";
 import { createAuthModule } from "./modules/auth.js";
 import { getAccessToken } from "./utils/auth-utils.js";
+import { createFunctionsModule } from "./modules/functions.js";
 
 /**
  * Create a Base44 client instance
@@ -46,6 +47,7 @@ export function createClient(config: {
   const entities = createEntitiesModule(axiosClient, appId);
   const integrations = createIntegrationsModule(axiosClient, appId);
   const auth = createAuthModule(axiosClient, appId, serverUrl);
+  const functions = createFunctionsModule(axiosClient, appId);
 
   // Always try to get token from localStorage or URL parameters
   if (typeof window !== "undefined") {
@@ -77,6 +79,7 @@ export function createClient(config: {
     entities,
     integrations,
     auth,
+    functions,
 
     /**
      * Set authentication token for all requests
