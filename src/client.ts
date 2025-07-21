@@ -43,11 +43,24 @@ export function createClient(config: {
     serverUrl, // Pass serverUrl for login redirect
   });
 
+  const functionsAxiosClient = createAxiosClient({
+    baseURL: `${serverUrl}/api`,
+    headers: {
+      "X-App-Id": String(appId),
+      "X-Environment": env,
+    },
+    token,
+    requiresAuth,
+    appId,
+    serverUrl,
+    interceptResponses: false,
+  });
+
   // Create modules
   const entities = createEntitiesModule(axiosClient, appId);
   const integrations = createIntegrationsModule(axiosClient, appId);
   const auth = createAuthModule(axiosClient, appId, serverUrl);
-  const functions = createFunctionsModule(axiosClient, appId);
+  const functions = createFunctionsModule(functionsAxiosClient, appId);
 
   // Always try to get token from localStorage or URL parameters
   if (typeof window !== "undefined") {

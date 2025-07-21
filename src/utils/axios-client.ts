@@ -88,6 +88,7 @@ export function createAxiosClient({
   requiresAuth = false,
   appId,
   serverUrl,
+  interceptResponses = true,
 }: {
   baseURL: string;
   headers?: Record<string, string>;
@@ -95,6 +96,7 @@ export function createAxiosClient({
   requiresAuth?: boolean;
   appId: string;
   serverUrl: string;
+  interceptResponses?: boolean;
 }) {
   const client = axios.create({
     baseURL,
@@ -119,48 +121,50 @@ export function createAxiosClient({
   });
 
   // Handle responses
-  client.interceptors.response.use(
-    (response) => response.data,
-    (error) => {
-      const message =
-        error.response?.data?.message ||
-        error.response?.data?.detail ||
-        error.message;
+  if (interceptResponses) {
+    client.interceptors.response.use(
+      (response) => response.data,
+      (error) => {
+        const message =
+          error.response?.data?.message ||
+          error.response?.data?.detail ||
+          error.message;
 
-      const base44Error = new Base44Error(
-        message,
-        error.response?.status,
-        error.response?.data?.code,
-        error.response?.data,
-        error
-      );
+        const base44Error = new Base44Error(
+          message,
+          error.response?.status,
+          error.response?.data?.code,
+          error.response?.data,
+          error
+        );
 
-      // Log errors in development
-      if (process.env.NODE_ENV !== "production") {
-        safeErrorLog("[Base44 SDK Error]", base44Error);
+        // Log errors in development
+        if (process.env.NODE_ENV !== "production") {
+          safeErrorLog("[Base44 SDK Error]", base44Error);
+        }
+
+        // Check for 403 Forbidden (authentication required) and redirect to login if requiresAuth is true
+        console.log(
+          requiresAuth,
+          error.response?.status,
+          typeof window !== "undefined"
+        );
+        if (
+          requiresAuth &&
+          error.response?.status === 403 &&
+          typeof window !== "undefined"
+        ) {
+          console.log("Authentication required. Redirecting to login...");
+          // Use a slight delay to allow the error to propagate first
+          setTimeout(() => {
+            redirectToLogin(serverUrl, appId);
+          }, 100);
+        }
+
+        return Promise.reject(base44Error);
       }
-
-      // Check for 403 Forbidden (authentication required) and redirect to login if requiresAuth is true
-      console.log(
-        requiresAuth,
-        error.response?.status,
-        typeof window !== "undefined"
-      );
-      if (
-        requiresAuth &&
-        error.response?.status === 403 &&
-        typeof window !== "undefined"
-      ) {
-        console.log("Authentication required. Redirecting to login...");
-        // Use a slight delay to allow the error to propagate first
-        setTimeout(() => {
-          redirectToLogin(serverUrl, appId);
-        }, 100);
-      }
-
-      return Promise.reject(base44Error);
-    }
-  );
+    );
+  }
 
   return client;
 }
