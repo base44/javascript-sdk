@@ -1,0 +1,74 @@
+name: Package Main Publish
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  publish-main:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build package
+        run: npm run build
+
+      - name: Publish main version with pkg.pr.new
+        run: npx pkg-pr-new publish --json output.json --comment=off
+
+      - name: Comment commit with install instructions
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const output = JSON.parse(fs.readFileSync('output.json', 'utf8'));
+            if (!output.packages || output.packages.length === 0) {
+              core.setFailed('No packages published by pkg.pr.new');
+              return;
+            }
+            const pkg = output.packages[0];
+            const installCmd = `npm i ${pkg.url}`;
+            const badge = `[![pkg.pr.new](https://pkg.pr.new/badge/${context.repo.owner}/${context.repo.repo})](https://pkg.pr.new/~/${context.repo.owner}/${context.repo.repo})`;
+            const body = `### 🚀 Main Branch Package Published!
+
+            ${badge}
+
+            ---
+
+            **Install this main branch build with npm:**
+
+            \`\`\`sh
+            ${installCmd}
+            \`\`\`
+
+            - 📦 [Main Package on pkg.pr.new](${pkg.url})
+            - 🔗 [View this commit on GitHub](https://github.com/${context.repo.owner}/${context.repo.repo}/commit/${pkg.commit})
+
+            ---
+            <sub>Package powered by [pkg.pr.new](https://pkg.pr.new) — instant package publishing from your main branch!</sub>
+            `;
+
+            // Create a comment on the commit
+            await github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+              body: body,
+            });
+
+permissions:
+  contents: read
