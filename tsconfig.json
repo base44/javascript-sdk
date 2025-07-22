@@ -12,10 +12,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
-    "jsx": "react",
-    "declarationMap": true,
-    "sourceMap": true,
-    "emitDeclarationOnly": true
+    "jsx": "react"
   },
   "include": ["src/**/*", "src/**/*.d.ts"],
   "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.test.js"]

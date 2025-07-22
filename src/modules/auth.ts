@@ -1,3 +1,5 @@
+import { AxiosInstance } from "axios";
+
 /**
  * Creates the auth module for the Base44 SDK
  * @param {import('axios').AxiosInstance} axios - Axios instance
@@ -5,7 +7,11 @@
  * @param {string} serverUrl - Server URL
  * @returns {Object} Auth module with authentication methods
  */
-export function createAuthModule(axios, appId, serverUrl) {
+export function createAuthModule(
+  axios: AxiosInstance,
+  appId: string,
+  serverUrl: string
+) {
   return {
     /**
      * Get current user information
@@ -20,7 +26,7 @@ export function createAuthModule(axios, appId, serverUrl) {
      * @param {Object} data - Updated user data
      * @returns {Promise<Object>} Updated user
      */
-    async updateMe(data) {
+    async updateMe(data: Record<string, any>) {
       return axios.put(`/apps/${appId}/entities/User/me`, data);
     },
 
@@ -29,18 +35,22 @@ export function createAuthModule(axios, appId, serverUrl) {
      * @param {string} nextUrl - URL to redirect to after successful login
      * @throws {Error} When not in a browser environment
      */
-    login(nextUrl) {
+    login(nextUrl: string) {
       // This function only works in a browser environment
-      if (typeof window === 'undefined') {
-        throw new Error('Login method can only be used in a browser environment');
+      if (typeof window === "undefined") {
+        throw new Error(
+          "Login method can only be used in a browser environment"
+        );
       }
 
       // If nextUrl is not provided, use the current URL
       const redirectUrl = nextUrl || window.location.href;
-      
+
       // Build the login URL
-      const loginUrl = `${serverUrl}/login?from_url=${encodeURIComponent(redirectUrl)}&app_id=${appId}`;
-      
+      const loginUrl = `${serverUrl}/login?from_url=${encodeURIComponent(
+        redirectUrl
+      )}&app_id=${appId}`;
+
       // Redirect to the login page
       window.location.href = loginUrl;
     },
@@ -51,24 +61,24 @@ export function createAuthModule(axios, appId, serverUrl) {
      * @param {string} [redirectUrl] - Optional URL to redirect to after logout
      * @returns {Promise<void>}
      */
-    async logout(redirectUrl) {
+    async logout(redirectUrl: string) {
       // Remove token from axios headers
-      delete axios.defaults.headers.common['Authorization'];
-      
+      delete axios.defaults.headers.common["Authorization"];
+
       // Remove token from localStorage
-      if (typeof window !== 'undefined' && window.localStorage) {
+      if (typeof window !== "undefined" && window.localStorage) {
         try {
-          window.localStorage.removeItem('base44_access_token');
+          window.localStorage.removeItem("base44_access_token");
         } catch (e) {
-          console.error('Failed to remove token from localStorage:', e);
+          console.error("Failed to remove token from localStorage:", e);
         }
       }
-      
+
       // Redirect if a URL is provided
-      if (redirectUrl && typeof window !== 'undefined') {
+      if (redirectUrl && typeof window !== "undefined") {
         window.location.href = redirectUrl;
       }
-      
+
       return Promise.resolve();
     },
 
@@ -77,17 +87,21 @@ export function createAuthModule(axios, appId, serverUrl) {
      * @param {string} token - Auth token
      * @param {boolean} [saveToStorage=true] - Whether to save the token to localStorage
      */
-    setToken(token, saveToStorage = true) {
+    setToken(token: string, saveToStorage = true) {
       if (!token) return;
-      
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      
+
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
       // Save token to localStorage if requested
-      if (saveToStorage && typeof window !== 'undefined' && window.localStorage) {
+      if (
+        saveToStorage &&
+        typeof window !== "undefined" &&
+        window.localStorage
+      ) {
         try {
-          window.localStorage.setItem('base44_access_token', token);
+          window.localStorage.setItem("base44_access_token", token);
         } catch (e) {
-          console.error('Failed to save token to localStorage:', e);
+          console.error("Failed to save token to localStorage:", e);
         }
       }
     },
@@ -103,6 +117,6 @@ export function createAuthModule(axios, appId, serverUrl) {
       } catch (error) {
         return false;
       }
-    }
+    },
   };
-} 
+}

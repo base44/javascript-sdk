@@ -1,22 +1,31 @@
+import { AxiosInstance } from "axios";
+
 /**
  * Creates the entities module for the Base44 SDK
  * @param {import('axios').AxiosInstance} axios - Axios instance
  * @param {string|number} appId - Application ID
  * @returns {Object} Entities module
  */
-export function createEntitiesModule(axios, appId) {
+export function createEntitiesModule(axios: AxiosInstance, appId: string) {
   // Using Proxy to dynamically handle entity names
-  return new Proxy({}, {
-    get(target, entityName) {
-      // Don't create handlers for internal properties
-      if (typeof entityName !== 'string' || entityName === 'then' || entityName.startsWith('_')) {
-        return undefined;
-      }
+  return new Proxy(
+    {},
+    {
+      get(target, entityName) {
+        // Don't create handlers for internal properties
+        if (
+          typeof entityName !== "string" ||
+          entityName === "then" ||
+          entityName.startsWith("_")
+        ) {
+          return undefined;
+        }
 
-      // Create entity handler
-      return createEntityHandler(axios, appId, entityName);
+        // Create entity handler
+        return createEntityHandler(axios, appId, entityName);
+      },
     }
-  });
+  );
 }
 
 /**
@@ -26,7 +35,11 @@ export function createEntitiesModule(axios, appId) {
  * @param {string} entityName - Entity name
  * @returns {Object} Entity handler with CRUD methods
  */
-function createEntityHandler(axios, appId, entityName) {
+function createEntityHandler(
+  axios: AxiosInstance,
+  appId: string,
+  entityName: string
+) {
   const baseURL = `/apps/${appId}/entities/${entityName}`;
 
   return {
@@ -38,12 +51,13 @@ function createEntityHandler(axios, appId, entityName) {
      * @param {string[]} [fields] - Fields to include
      * @returns {Promise<Array>} List of entities
      */
-    async list(sort, limit, skip, fields) {
-      const params = {};
+    async list(sort: string, limit: number, skip: number, fields: string[]) {
+      const params: Record<string, string | number> = {};
       if (sort) params.sort = sort;
       if (limit) params.limit = limit;
       if (skip) params.skip = skip;
-      if (fields) params.fields = Array.isArray(fields) ? fields.join(',') : fields;
+      if (fields)
+        params.fields = Array.isArray(fields) ? fields.join(",") : fields;
 
       return axios.get(baseURL, { params });
     },
@@ -57,15 +71,22 @@ function createEntityHandler(axios, appId, entityName) {
      * @param {string[]} [fields] - Fields to include
      * @returns {Promise<Array>} Filtered entities
      */
-    async filter(query, sort, limit, skip, fields) {
-      const params = {
+    async filter(
+      query: Record<string, any>,
+      sort: string,
+      limit: number,
+      skip: number,
+      fields: string[]
+    ) {
+      const params: Record<string, string | number> = {
         q: JSON.stringify(query),
       };
-      
+
       if (sort) params.sort = sort;
       if (limit) params.limit = limit;
       if (skip) params.skip = skip;
-      if (fields) params.fields = Array.isArray(fields) ? fields.join(',') : fields;
+      if (fields)
+        params.fields = Array.isArray(fields) ? fields.join(",") : fields;
 
       return axios.get(baseURL, { params });
     },
@@ -75,7 +96,7 @@ function createEntityHandler(axios, appId, entityName) {
      * @param {string} id - Entity ID
      * @returns {Promise<Object>} Entity
      */
-    async get(id) {
+    async get(id: string) {
       return axios.get(`${baseURL}/${id}`);
     },
 
@@ -84,7 +105,7 @@ function createEntityHandler(axios, appId, entityName) {
      * @param {Object} data - Entity data
      * @returns {Promise<Object>} Created entity
      */
-    async create(data) {
+    async create(data: Record<string, any>) {
       return axios.post(baseURL, data);
     },
 
@@ -94,7 +115,7 @@ function createEntityHandler(axios, appId, entityName) {
      * @param {Object} data - Updated entity data
      * @returns {Promise<Object>} Updated entity
      */
-    async update(id, data) {
+    async update(id: string, data: Record<string, any>) {
       return axios.put(`${baseURL}/${id}`, data);
     },
 
@@ -103,7 +124,7 @@ function createEntityHandler(axios, appId, entityName) {
      * @param {string} id - Entity ID
      * @returns {Promise<void>}
      */
-    async delete(id) {
+    async delete(id: string) {
       return axios.delete(`${baseURL}/${id}`);
     },
 
@@ -112,7 +133,7 @@ function createEntityHandler(axios, appId, entityName) {
      * @param {Object} query - Delete query
      * @returns {Promise<void>}
      */
-    async deleteMany(query) {
+    async deleteMany(query: Record<string, any>) {
       return axios.delete(baseURL, { data: query });
     },
 
@@ -121,7 +142,7 @@ function createEntityHandler(axios, appId, entityName) {
      * @param {Array} data - Array of entity data
      * @returns {Promise<Array>} Created entities
      */
-    async bulkCreate(data) {
+    async bulkCreate(data: Record<string, any>[]) {
       return axios.post(`${baseURL}/bulk`, data);
     },
 
@@ -130,15 +151,15 @@ function createEntityHandler(axios, appId, entityName) {
      * @param {File} file - File to import
      * @returns {Promise<Object>} Import result
      */
-    async importEntities(file) {
+    async importEntities(file: File) {
       const formData = new FormData();
-      formData.append('file', file, file.name);
-      
+      formData.append("file", file, file.name);
+
       return axios.post(`${baseURL}/import`, formData, {
         headers: {
-          'Content-Type': 'multipart/form-data',
+          "Content-Type": "multipart/form-data",
         },
       });
-    }
+    },
   };
-} 
+}

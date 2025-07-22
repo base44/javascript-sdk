@@ -24,6 +24,4 @@ function getTestConfig() {
   return config;
 }
 
-module.exports = {
-  getTestConfig,
-}; 
+export { getTestConfig }; 

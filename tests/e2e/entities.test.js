@@ -1,11 +1,9 @@
-const { createClient, Base44Error } = require('../../src');
-const { getTestConfig } = require('../utils/test-config');
+import { describe, test, expect, beforeAll } from 'vitest';
+import { createClient, Base44Error } from '../../src/index.ts';
+import { getTestConfig } from '../utils/test-config.js';
 
 // Get test configuration
 const config = getTestConfig();
-
-// Skip tests if SKIP_E2E_TESTS is true
-const conditionalTest = config.skipE2E ? describe.skip : describe;
 
 // Helper function to safely log error information without circular references
 const logErrorSafely = (error) => {
@@ -24,7 +22,7 @@ const logErrorSafely = (error) => {
 // Default to "Todo" but allow override via environment variable
 const TEST_ENTITY = process.env.TEST_ENTITY || "Todo";
 
-conditionalTest('Entity operations (E2E)', () => {
+describe('Entity operations (E2E)', () => {
   let base44;
 
   beforeAll(() => {

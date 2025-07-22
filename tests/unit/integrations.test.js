@@ -1,5 +1,6 @@
+import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import nock from 'nock';
-import { createClient } from '../../src/index.js';
+import { createClient } from '../../src/index.ts';
 
 describe('Integrations Module', () => {
   let base44;

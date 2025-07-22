@@ -1,4 +1,5 @@
-import { createClient } from '../../src/index.js';
+import { createClient } from '../../src/index.ts';
+import { describe, test, expect } from 'vitest';
 
 describe('Client Creation', () => {
   test('should create a client with default options', () => {
@@ -34,15 +35,5 @@ describe('Client Creation', () => {
     expect(config.serverUrl).toBe('https://custom-server.com');
     expect(config.env).toBe('dev');
     expect(config.requiresAuth).toBe(true);
-  });
-  
-  test('should throw error if appId is not provided', () => {
-    expect(() => {
-      createClient({});
-    }).toThrow('appId is required');
-    
-    expect(() => {
-      createClient();
-    }).toThrow('appId is required');
   });
 }); 

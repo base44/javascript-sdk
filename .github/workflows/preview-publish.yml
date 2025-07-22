@@ -1,0 +1,111 @@
+name: Package Preview Publish
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  publish-preview:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build package
+        run: npm run build
+
+      - name: Publish preview with pkg.pr.new
+        run: npx pkg-pr-new publish --json output.json --comment=off
+
+      - name: Comment PR with install instructions
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const output = JSON.parse(fs.readFileSync('output.json', 'utf8'));
+            if (!output.packages || output.packages.length === 0) {
+              core.setFailed('No packages published by pkg.pr.new');
+              return;
+            }
+            const pkg = output.packages[0];
+            const installCmd = `npm i ${pkg.url}`;
+            const badge = `[![pkg.pr.new](https://pkg.pr.new/badge/${context.repo.owner}/${context.repo.repo})](https://pkg.pr.new/~/${context.repo.owner}/${context.repo.repo})`;
+            const body = `### 🚀 Package Preview Available!
+
+            ${badge}
+
+            ---
+
+            **Install this PR's preview build with npm:**
+
+            \`\`\`sh
+            ${installCmd}
+            \`\`\`
+
+            - 📦 [Preview Package on pkg.pr.new](${pkg.url})
+            - 🔗 [View this commit on GitHub](https://github.com/${context.repo.owner}/${context.repo.repo}/commit/${pkg.commit})
+
+            ---
+            <sub>Preview powered by [pkg.pr.new](https://pkg.pr.new) — try new features instantly, no NPM release needed!</sub>
+            `;
+
+            const botCommentIdentifier = '### 🚀 Package Preview Available!';
+
+            async function findBotComment(issueNumber) {
+              if (!issueNumber) return null;
+              const comments = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+              });
+              return comments.data.find((comment) =>
+                comment.body.includes(botCommentIdentifier)
+              );
+            }
+
+            async function createOrUpdateComment(issueNumber) {
+              if (!issueNumber) {
+                console.log('No issue number provided. Cannot post or update comment.');
+                return;
+              }
+
+              const existingComment = await findBotComment(issueNumber);
+              if (existingComment) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existingComment.id,
+                  body: body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  issue_number: issueNumber,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: body,
+                });
+              }
+            }
+
+            if (context.eventName === 'pull_request') {
+              if (context.issue.number) {
+                await createOrUpdateComment(context.issue.number);
+              }
+            }
+
+permissions:
+  contents: read
+  pull-requests: write

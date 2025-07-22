@@ -1,8 +1,9 @@
-import { createAxiosClient } from './utils/axios-client';
-import { createEntitiesModule } from './modules/entities';
-import { createIntegrationsModule } from './modules/integrations';
-import { createAuthModule } from './modules/auth';
-import { getAccessToken } from './utils/auth-utils';
+import { createAxiosClient } from "./utils/axios-client.js";
+import { createEntitiesModule } from "./modules/entities.js";
+import { createIntegrationsModule } from "./modules/integrations.js";
+import { createAuthModule } from "./modules/auth.js";
+import { getAccessToken } from "./utils/auth-utils.js";
+import { createFunctionsModule } from "./modules/functions.js";
 
 /**
  * Create a Base44 client instance
@@ -14,15 +15,17 @@ import { getAccessToken } from './utils/auth-utils';
  * @param {boolean} [config.requiresAuth=false] - Whether the app requires authentication
  * @returns {Object} Base44 client instance
  */
-export function createClient(config) {
-  if (!config || !config.appId) {
-    throw new Error('appId is required');
-  }
-
+export function createClient(config: {
+  serverUrl?: string;
+  appId: string;
+  env?: string;
+  token?: string;
+  requiresAuth?: boolean;
+}) {
   const {
-    serverUrl = 'https://base44.app',
+    serverUrl = "https://base44.app",
     appId,
-    env = 'prod',
+    env = "prod",
     token,
     requiresAuth = false,
   } = config;
@@ -31,22 +34,36 @@ export function createClient(config) {
   const axiosClient = createAxiosClient({
     baseURL: `${serverUrl}/api`,
     headers: {
-      'X-App-Id': String(appId),
-      'X-Environment': env,
+      "X-App-Id": String(appId),
+      "X-Environment": env,
     },
     token,
-    requiresAuth,  // Pass requiresAuth to axios client
-    appId,         // Pass appId for login redirect
-    serverUrl      // Pass serverUrl for login redirect
+    requiresAuth, // Pass requiresAuth to axios client
+    appId, // Pass appId for login redirect
+    serverUrl, // Pass serverUrl for login redirect
+  });
+
+  const functionsAxiosClient = createAxiosClient({
+    baseURL: `${serverUrl}/api`,
+    headers: {
+      "X-App-Id": String(appId),
+      "X-Environment": env,
+    },
+    token,
+    requiresAuth,
+    appId,
+    serverUrl,
+    interceptResponses: false,
   });
 
   // Create modules
   const entities = createEntitiesModule(axiosClient, appId);
   const integrations = createIntegrationsModule(axiosClient, appId);
   const auth = createAuthModule(axiosClient, appId, serverUrl);
+  const functions = createFunctionsModule(functionsAxiosClient, appId);
 
   // Always try to get token from localStorage or URL parameters
-  if (typeof window !== 'undefined') {
+  if (typeof window !== "undefined") {
     // Get token from URL or localStorage
     const accessToken = token || getAccessToken();
     if (accessToken) {
@@ -55,7 +72,7 @@ export function createClient(config) {
   }
 
   // If authentication is required, verify token and redirect to login if needed
-  if (requiresAuth && typeof window !== 'undefined') {
+  if (requiresAuth && typeof window !== "undefined") {
     // We perform this check asynchronously to not block client creation
     setTimeout(async () => {
       try {
@@ -64,7 +81,7 @@ export function createClient(config) {
           auth.login(window.location.href);
         }
       } catch (error) {
-        console.error('Authentication check failed:', error);
+        console.error("Authentication check failed:", error);
         auth.login(window.location.href);
       }
     }, 0);
@@ -75,15 +92,16 @@ export function createClient(config) {
     entities,
     integrations,
     auth,
-    
+    functions,
+
     /**
      * Set authentication token for all requests
      * @param {string} newToken - New auth token
      */
-    setToken(newToken) {
+    setToken(newToken: string) {
       auth.setToken(newToken);
     },
-    
+
     /**
      * Get current configuration
      * @returns {Object} Current configuration
@@ -93,8 +111,8 @@ export function createClient(config) {
         serverUrl,
         appId,
         env,
-        requiresAuth
+        requiresAuth,
       };
-    }
+    },
   };
-} 
+}
