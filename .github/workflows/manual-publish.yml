@@ -1,0 +1,127 @@
+name: Manual Package Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (e.g., 1.0.0, patch, minor, major)"
+        required: true
+        default: "patch"
+        type: string
+      npm_tag:
+        description: "NPM tag to publish with (e.g., latest, beta, alpha)"
+        required: true
+        default: "latest"
+        type: string
+      dry_run:
+        description: "Run in dry-run mode (no actual publish)"
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build package
+        run: npm run build
+
+      - name: Check if version needs to be bumped
+        id: check-version
+        run: |
+          if [[ "${{ github.event.inputs.version }}" =~ ^(patch|minor|major)$ ]]; then
+            echo "bump_version=true" >> $GITHUB_OUTPUT
+            echo "version_type=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "bump_version=false" >> $GITHUB_OUTPUT
+            echo "version_type=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Bump version
+        if: steps.check-version.outputs.bump_version == 'true'
+        run: |
+          npm version ${{ steps.check-version.outputs.version_type }} --no-git-tag-version
+          echo "NEW_VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_ENV
+
+      - name: Set version manually
+        if: steps.check-version.outputs.bump_version == 'false'
+        run: |
+          npm version ${{ github.event.inputs.version }} --no-git-tag-version
+          echo "NEW_VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_ENV
+
+      - name: Show package info
+        run: |
+          echo "Package name: $(node -p "require('./package.json').name")"
+          echo "Version: ${{ env.NEW_VERSION }}"
+          echo "NPM tag: ${{ github.event.inputs.npm_tag }}"
+          echo "Dry run: ${{ github.event.inputs.dry_run }}"
+
+      - name: Publish to NPM
+        if: github.event.inputs.dry_run == 'false'
+        run: |
+          npm publish --tag ${{ github.event.inputs.npm_tag }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Dry run publish
+        if: github.event.inputs.dry_run == 'true'
+        run: |
+          npm publish --dry-run --tag ${{ github.event.inputs.npm_tag }}
+
+      - name: Create Git tag
+        if: github.event.inputs.dry_run == 'false'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add package.json package-lock.json
+          git commit -m "chore: bump version to ${{ env.NEW_VERSION }}"
+          git tag v${{ env.NEW_VERSION }}
+          git push origin HEAD:${{ github.ref }}
+          git push origin v${{ env.NEW_VERSION }}
+
+      - name: Create Release
+        if: github.event.inputs.dry_run == 'false'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ env.NEW_VERSION }}
+          release_name: Release v${{ env.NEW_VERSION }}
+          body: |
+            ## What's Changed
+
+            This release includes the latest updates to the Base44 JavaScript SDK.
+
+            ### Installation
+
+            ```bash
+            npm install @base44/sdk@${{ github.event.inputs.npm_tag }}
+            ```
+
+            ### Version: ${{ env.NEW_VERSION }}
+            ### NPM Tag: ${{ github.event.inputs.npm_tag }}
+          draft: false
+          prerelease: false
+
+permissions:
+  contents: write
+  packages: write
