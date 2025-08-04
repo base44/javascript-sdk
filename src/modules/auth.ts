@@ -58,10 +58,10 @@ export function createAuthModule(
     /**
      * Logout the current user
      * Removes the token from localStorage and optionally redirects to a URL
-     * @param {string} [redirectUrl] - Optional URL to redirect to after logout
+     * @param redirectUrl - Optional URL to redirect to after logout
      * @returns {Promise<void>}
      */
-    async logout(redirectUrl: string) {
+    async logout(redirectUrl?: string) {
       // Remove token from axios headers
       delete axios.defaults.headers.common["Authorization"];
 
@@ -103,6 +103,47 @@ export function createAuthModule(
         } catch (e) {
           console.error("Failed to save token to localStorage:", e);
         }
+      }
+    },
+
+    /**
+     * Login via username and password
+     * @param email - User email
+     * @param password - User password
+     * @param turnstileToken - Optional Turnstile captcha token
+     * @returns Login response with access_token and user
+     */
+    async loginViaUsernamePassword(
+      email: string,
+      password: string,
+      turnstileToken?: string
+    ) {
+      try {
+        const response: { access_token: string; user: any } = await axios.post(
+          `/apps/${appId}/auth/login`,
+          {
+            email,
+            password,
+            ...(turnstileToken && { turnstile_token: turnstileToken }),
+          }
+        );
+
+        const { access_token, user } = response;
+
+        if (access_token) {
+          this.setToken(access_token);
+        }
+
+        return {
+          access_token,
+          user,
+        };
+      } catch (error: any) {
+        // Handle authentication errors and cleanup
+        if (error.response?.status === 401) {
+          await this.logout();
+        }
+        throw error;
       }
     },
 
