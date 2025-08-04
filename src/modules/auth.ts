@@ -119,7 +119,7 @@ export function createAuthModule(
       turnstileToken?: string
     ) {
       try {
-        const response = await axios.post("/auth/login", {
+        const response = await axios.post(`/apps/${appId}/auth/login`, {
           email,
           password,
           ...(turnstileToken && { turnstile_token: turnstileToken }),
