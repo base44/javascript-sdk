@@ -119,13 +119,16 @@ export function createAuthModule(
       turnstileToken?: string
     ) {
       try {
-        const response = await axios.post(`/apps/${appId}/auth/login`, {
-          email,
-          password,
-          ...(turnstileToken && { turnstile_token: turnstileToken }),
-        });
+        const response: { access_token: string; user: any } = await axios.post(
+          `/apps/${appId}/auth/login`,
+          {
+            email,
+            password,
+            ...(turnstileToken && { turnstile_token: turnstileToken }),
+          }
+        );
 
-        const { access_token, user } = response.data;
+        const { access_token, user } = response;
 
         if (access_token) {
           this.setToken(access_token);
