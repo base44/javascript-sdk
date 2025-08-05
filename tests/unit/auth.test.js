@@ -149,7 +149,7 @@ describe('Auth Module', () => {
       
       // Verify the redirect URL was set correctly
       expect(mockLocation.href).toBe(
-        `${serverUrl}/login?from_url=${encodeURIComponent(nextUrl)}&app_id=${appId}`
+        `/login?from_url=${encodeURIComponent(nextUrl)}`
       );
       
       // Restore window
@@ -169,7 +169,7 @@ describe('Auth Module', () => {
       
       // Verify the redirect URL uses current URL
       expect(mockLocation.href).toBe(
-        `${serverUrl}/login?from_url=${encodeURIComponent(currentUrl)}&app_id=${appId}`
+        `/login?from_url=${encodeURIComponent(currentUrl)}`
       );
       
       // Restore window
@@ -192,7 +192,7 @@ describe('Auth Module', () => {
       expect(scope.isDone()).toBe(true);
       
       // Call logout
-      await base44.auth.logout();
+      base44.auth.logout();
       
       // Mock another me() call to verify no Authorization header is sent
       scope.get(`/api/apps/${appId}/entities/User/me`)
@@ -214,7 +214,10 @@ describe('Auth Module', () => {
       };
       const originalWindow = global.window;
       global.window = {
-        localStorage: mockLocalStorage
+        localStorage: mockLocalStorage,
+        location: {
+          reload: vi.fn()
+        }
       };
       
       // Set a token to localStorage first
@@ -222,7 +225,7 @@ describe('Auth Module', () => {
       expect(mockLocalStorage.setItem).toHaveBeenCalledWith('base44_access_token', 'test-token');
       
       // Call logout
-      await base44.auth.logout();
+      base44.auth.logout();
       
       // Verify token was removed from localStorage
       expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('base44_access_token');
@@ -241,11 +244,14 @@ describe('Auth Module', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const originalWindow = global.window;
       global.window = {
-        localStorage: mockLocalStorage
+        localStorage: mockLocalStorage,
+        location: {
+          reload: vi.fn()
+        }
       };
       
       // Call logout - should not throw
-      await expect(base44.auth.logout()).resolves.toBeUndefined();
+      base44.auth.logout();
       
       // Verify error was logged
       expect(consoleSpy).toHaveBeenCalledWith('Failed to remove token from localStorage:', expect.any(Error));
@@ -264,10 +270,30 @@ describe('Auth Module', () => {
       };
       
       const redirectUrl = 'https://example.com/logout-success';
-      await base44.auth.logout(redirectUrl);
+      base44.auth.logout(redirectUrl);
       
       // Verify redirect
       expect(mockLocation.href).toBe(redirectUrl);
+      
+      // Restore window
+      global.window = originalWindow;
+    });
+    
+    test('should reload page when no redirect URL is provided', async () => {
+      // Mock window object with reload function
+      const mockReload = vi.fn();
+      const originalWindow = global.window;
+      global.window = {
+        location: {
+          reload: mockReload
+        }
+      };
+      
+      // Call logout without redirect URL
+      base44.auth.logout();
+      
+      // Verify page reload was called
+      expect(mockReload).toHaveBeenCalledTimes(1);
       
       // Restore window
       global.window = originalWindow;

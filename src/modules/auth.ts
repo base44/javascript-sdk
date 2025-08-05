@@ -31,7 +31,7 @@ export function createAuthModule(
     },
 
     /**
-     * Redirects the user to the Base44 login page
+     * Redirects the user to the app's login page
      * @param {string} nextUrl - URL to redirect to after successful login
      * @throws {Error} When not in a browser environment
      */
@@ -47,9 +47,7 @@ export function createAuthModule(
       const redirectUrl = nextUrl || window.location.href;
 
       // Build the login URL
-      const loginUrl = `${serverUrl}/login?from_url=${encodeURIComponent(
-        redirectUrl
-      )}&app_id=${appId}`;
+      const loginUrl = `/login?from_url=${encodeURIComponent(redirectUrl)}`;
 
       // Redirect to the login page
       window.location.href = loginUrl;
@@ -57,11 +55,11 @@ export function createAuthModule(
 
     /**
      * Logout the current user
-     * Removes the token from localStorage and optionally redirects to a URL
-     * @param redirectUrl - Optional URL to redirect to after logout
+     * Removes the token from localStorage and optionally redirects to a URL or reloads the page
+     * @param redirectUrl - Optional URL to redirect to after logout. Reloads the page if not provided
      * @returns {Promise<void>}
      */
-    async logout(redirectUrl?: string) {
+    logout(redirectUrl?: string) {
       // Remove token from axios headers
       delete axios.defaults.headers.common["Authorization"];
 
@@ -75,11 +73,13 @@ export function createAuthModule(
       }
 
       // Redirect if a URL is provided
-      if (redirectUrl && typeof window !== "undefined") {
-        window.location.href = redirectUrl;
+      if (typeof window !== "undefined") {
+        if (redirectUrl) {
+          window.location.href = redirectUrl;
+        } else {
+          window.location.reload();
+        }
       }
-
-      return Promise.resolve();
     },
 
     /**
