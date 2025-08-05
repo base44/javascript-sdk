@@ -214,7 +214,10 @@ describe('Auth Module', () => {
       };
       const originalWindow = global.window;
       global.window = {
-        localStorage: mockLocalStorage
+        localStorage: mockLocalStorage,
+        location: {
+          reload: vi.fn()
+        }
       };
       
       // Set a token to localStorage first
@@ -241,7 +244,10 @@ describe('Auth Module', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const originalWindow = global.window;
       global.window = {
-        localStorage: mockLocalStorage
+        localStorage: mockLocalStorage,
+        location: {
+          reload: vi.fn()
+        }
       };
       
       // Call logout - should not throw
@@ -268,6 +274,26 @@ describe('Auth Module', () => {
       
       // Verify redirect
       expect(mockLocation.href).toBe(redirectUrl);
+      
+      // Restore window
+      global.window = originalWindow;
+    });
+    
+    test('should reload page when no redirect URL is provided', async () => {
+      // Mock window object with reload function
+      const mockReload = vi.fn();
+      const originalWindow = global.window;
+      global.window = {
+        location: {
+          reload: mockReload
+        }
+      };
+      
+      // Call logout without redirect URL
+      await base44.auth.logout();
+      
+      // Verify page reload was called
+      expect(mockReload).toHaveBeenCalledTimes(1);
       
       // Restore window
       global.window = originalWindow;

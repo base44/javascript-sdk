@@ -57,8 +57,8 @@ export function createAuthModule(
 
     /**
      * Logout the current user
-     * Removes the token from localStorage and optionally redirects to a URL
-     * @param redirectUrl - Optional URL to redirect to after logout
+     * Removes the token from localStorage and optionally redirects to a URL or reloads the page
+     * @param redirectUrl - Optional URL to redirect to after logout. Reloads the page if not provided
      * @returns {Promise<void>}
      */
     async logout(redirectUrl?: string) {
@@ -75,11 +75,13 @@ export function createAuthModule(
       }
 
       // Redirect if a URL is provided
-      if (redirectUrl && typeof window !== "undefined") {
-        window.location.href = redirectUrl;
+      if (typeof window !== "undefined") {
+        if (redirectUrl) {
+          window.location.href = redirectUrl;
+        } else {
+          window.location.reload();
+        }
       }
-
-      return Promise.resolve();
     },
 
     /**
