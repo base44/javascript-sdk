@@ -31,7 +31,7 @@ export function createAuthModule(
     },
 
     /**
-     * Redirects the user to the Base44 login page
+     * Redirects the user to the app's login page
      * @param {string} nextUrl - URL to redirect to after successful login
      * @throws {Error} When not in a browser environment
      */
@@ -47,9 +47,7 @@ export function createAuthModule(
       const redirectUrl = nextUrl || window.location.href;
 
       // Build the login URL
-      const loginUrl = `${serverUrl}/login?from_url=${encodeURIComponent(
-        redirectUrl
-      )}&app_id=${appId}`;
+      const loginUrl = `/login?from_url=${encodeURIComponent(redirectUrl)}`;
 
       // Redirect to the login page
       window.location.href = loginUrl;
