@@ -32,7 +32,7 @@ export function createClient(config: {
 
   // Create the base axios client
   const axiosClient = createAxiosClient({
-    baseURL: `${serverUrl}/api`,
+    baseURL: `${serverUrl.endsWith("/api") ? serverUrl : `${serverUrl}/api`}`,
     headers: {
       "X-App-Id": String(appId),
       "X-Environment": env,
@@ -44,7 +44,7 @@ export function createClient(config: {
   });
 
   const functionsAxiosClient = createAxiosClient({
-    baseURL: `${serverUrl}/api`,
+    baseURL: `${serverUrl.endsWith("/api") ? serverUrl : `${serverUrl}/api`}`,
     headers: {
       "X-App-Id": String(appId),
       "X-Environment": env,
