@@ -192,7 +192,7 @@ describe('Auth Module', () => {
       expect(scope.isDone()).toBe(true);
       
       // Call logout
-      await base44.auth.logout();
+      base44.auth.logout();
       
       // Mock another me() call to verify no Authorization header is sent
       scope.get(`/api/apps/${appId}/entities/User/me`)
@@ -225,7 +225,7 @@ describe('Auth Module', () => {
       expect(mockLocalStorage.setItem).toHaveBeenCalledWith('base44_access_token', 'test-token');
       
       // Call logout
-      await base44.auth.logout();
+      base44.auth.logout();
       
       // Verify token was removed from localStorage
       expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('base44_access_token');
@@ -251,7 +251,7 @@ describe('Auth Module', () => {
       };
       
       // Call logout - should not throw
-      await expect(base44.auth.logout()).resolves.toBeUndefined();
+      base44.auth.logout();
       
       // Verify error was logged
       expect(consoleSpy).toHaveBeenCalledWith('Failed to remove token from localStorage:', expect.any(Error));
@@ -270,7 +270,7 @@ describe('Auth Module', () => {
       };
       
       const redirectUrl = 'https://example.com/logout-success';
-      await base44.auth.logout(redirectUrl);
+      base44.auth.logout(redirectUrl);
       
       // Verify redirect
       expect(mockLocation.href).toBe(redirectUrl);
@@ -290,7 +290,7 @@ describe('Auth Module', () => {
       };
       
       // Call logout without redirect URL
-      await base44.auth.logout();
+      base44.auth.logout();
       
       // Verify page reload was called
       expect(mockReload).toHaveBeenCalledTimes(1);
