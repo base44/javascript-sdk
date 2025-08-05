@@ -59,7 +59,7 @@ export function createAuthModule(
      * @param redirectUrl - Optional URL to redirect to after logout. Reloads the page if not provided
      * @returns {Promise<void>}
      */
-    async logout(redirectUrl?: string) {
+    logout(redirectUrl?: string) {
       // Remove token from axios headers
       delete axios.defaults.headers.common["Authorization"];
 
