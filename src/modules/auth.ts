@@ -45,7 +45,7 @@ export function createAuthModule(
      * @param {string} nextUrl - URL to redirect to after successful login
      * @throws {Error} When not in a browser environment or when using API key authentication
      */
-    login(nextUrl: string) {
+    redirectToLogin(nextUrl: string) {
       if (isApiKeyAuth) {
         throw new Error("The .login() method cannot be used with API key authentication. API keys do not require user login flows.");
       }
