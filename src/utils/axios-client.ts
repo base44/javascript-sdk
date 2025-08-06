@@ -76,6 +76,7 @@ function redirectToLogin(serverUrl: string, appId: string) {
  * @param {string} options.baseURL - Base URL for all requests
  * @param {Object} options.headers - Additional headers
  * @param {string} options.token - Auth token
+ * @param {string} options.apiKey - API key
  * @param {boolean} options.requiresAuth - Whether the application requires authentication
  * @param {string|number} options.appId - Application ID (needed for login redirect)
  * @param {string} options.serverUrl - Server URL (needed for login redirect)
@@ -85,6 +86,7 @@ export function createAxiosClient({
   baseURL,
   headers = {},
   token,
+  apiKey,
   requiresAuth = false,
   appId,
   serverUrl,
@@ -93,6 +95,7 @@ export function createAxiosClient({
   baseURL: string;
   headers?: Record<string, string>;
   token?: string;
+  apiKey?: string;
   requiresAuth?: boolean;
   appId: string;
   serverUrl: string;
@@ -107,9 +110,11 @@ export function createAxiosClient({
     },
   });
 
-  // Add token to requests if available
+  // Add authentication headers
   if (token) {
     client.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+  } else if (apiKey) {
+    client.defaults.headers.common["api_key"] = apiKey;
   }
 
   // Add origin URL in browser environment

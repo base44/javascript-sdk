@@ -6,27 +6,62 @@ import { getAccessToken } from "./utils/auth-utils.js";
 import { createFunctionsModule } from "./modules/functions.js";
 
 /**
+ * Base configuration shared by both authentication methods
+ */
+type BaseClientConfig = {
+  serverUrl?: string;
+  appId: string;
+  env?: string;
+  requiresAuth?: boolean;
+};
+
+/**
+ * Configuration with token authentication
+ */
+type TokenAuthConfig = BaseClientConfig & {
+  token: string;
+  apiKey?: never;
+};
+
+/**
+ * Configuration with API key authentication
+ */
+type ApiKeyAuthConfig = BaseClientConfig & {
+  apiKey: string;
+  token?: never;
+};
+
+/**
+ * Configuration without authentication
+ */
+type NoAuthConfig = BaseClientConfig & {
+  token?: never;
+  apiKey?: never;
+};
+
+/**
+ * Client configuration - supports token OR API key authentication (mutually exclusive)
+ */
+type ClientConfig = TokenAuthConfig | ApiKeyAuthConfig | NoAuthConfig;
+
+/**
  * Create a Base44 client instance
  * @param {Object} config - Client configuration
  * @param {string} [config.serverUrl='https://base44.app'] - API server URL
  * @param {string|number} config.appId - Application ID
  * @param {string} [config.env='prod'] - Environment ('prod' or 'dev')
- * @param {string} [config.token] - Authentication token
+ * @param {string} [config.token] - Authentication token (mutually exclusive with apiKey)
+ * @param {string} [config.apiKey] - API key (mutually exclusive with token)
  * @param {boolean} [config.requiresAuth=false] - Whether the app requires authentication
  * @returns {Object} Base44 client instance
  */
-export function createClient(config: {
-  serverUrl?: string;
-  appId: string;
-  env?: string;
-  token?: string;
-  requiresAuth?: boolean;
-}) {
+export function createClient(config: ClientConfig) {
   const {
     serverUrl = "https://base44.app",
     appId,
     env = "prod",
     token,
+    apiKey,
     requiresAuth = false,
   } = config;
 
@@ -38,6 +73,7 @@ export function createClient(config: {
       "X-Environment": env,
     },
     token,
+    apiKey,
     requiresAuth, // Pass requiresAuth to axios client
     appId, // Pass appId for login redirect
     serverUrl, // Pass serverUrl for login redirect
@@ -50,6 +86,7 @@ export function createClient(config: {
       "X-Environment": env,
     },
     token,
+    apiKey,
     requiresAuth,
     appId,
     serverUrl,
@@ -59,11 +96,11 @@ export function createClient(config: {
   // Create modules
   const entities = createEntitiesModule(axiosClient, appId);
   const integrations = createIntegrationsModule(axiosClient, appId);
-  const auth = createAuthModule(axiosClient, appId, serverUrl);
+  const auth = createAuthModule(axiosClient, appId, serverUrl, !!apiKey);
   const functions = createFunctionsModule(functionsAxiosClient, appId);
 
-  // Always try to get token from localStorage or URL parameters
-  if (typeof window !== "undefined") {
+  // Always try to get token from localStorage or URL parameters (only for token auth)
+  if (typeof window !== "undefined" && !apiKey) {
     // Get token from URL or localStorage
     const accessToken = token || getAccessToken();
     if (accessToken) {
@@ -71,8 +108,8 @@ export function createClient(config: {
     }
   }
 
-  // If authentication is required, verify token and redirect to login if needed
-  if (requiresAuth && typeof window !== "undefined") {
+  // If authentication is required, verify token and redirect to login if needed (only for token auth)
+  if (requiresAuth && typeof window !== "undefined" && !apiKey) {
     // We perform this check asynchronously to not block client creation
     setTimeout(async () => {
       try {
