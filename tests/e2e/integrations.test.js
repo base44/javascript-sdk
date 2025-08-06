@@ -54,14 +54,10 @@ describe('Integration operations (E2E)', () => {
       // If we get here, the test should fail
       fail('Expected an error but none was thrown');
     } catch (error) {
-      // Expect a Base44Error
+      // Expect a Base44Error with appropriate status
       expect(error).toBeInstanceOf(Base44Error);
-      // Status may be undefined for network errors, or >= 400 for HTTP errors
-      if (error.status !== undefined) {
-        expect(error.status).toBeGreaterThanOrEqual(400);
-      }
-      // At minimum, we expect the error to be thrown
-      expect(error.message).toBeDefined();
+      // Typically a 404 for not found, but may vary
+      expect(error.status).toBeGreaterThanOrEqual(400);
     }
   });
 }); 
