@@ -22,11 +22,11 @@ describe('API Key Authentication', () => {
     // Mock a request to verify the API key header is sent
     const scope = nock(baseURL)
       .matchHeader('api_key', testApiKey)
-      .get('/api/apps/test-app-id/entities/TestEntity')
+      .get('/api/apps/test-app-id/entities/TestEntity/test-id')
       .reply(200, { data: 'test response' });
 
     try {
-      await client.entities.get('TestEntity');
+      await client.entities.TestEntity.get('test-id');
     } catch (error) {
       // The request might fail due to other reasons, but we're testing the header
     }
@@ -37,7 +37,7 @@ describe('API Key Authentication', () => {
 
   test('should not send Authorization header when using API key', async () => {
     const scope = nock(baseURL)
-      .get('/api/apps/test-app-id/entities/TestEntity')
+      .get('/api/apps/test-app-id/entities/TestEntity/test-id')
       .reply(function() {
         // Verify Authorization header is not present
         expect(this.req.headers.authorization).toBeUndefined();
@@ -47,7 +47,7 @@ describe('API Key Authentication', () => {
       });
 
     try {
-      await client.entities.get('TestEntity');
+      await client.entities.TestEntity.get('test-id');
     } catch (error) {
       // The request might fail due to other reasons, but we're testing the header
     }
