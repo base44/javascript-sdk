@@ -6,43 +6,22 @@ import { getAccessToken } from "./utils/auth-utils.js";
 import { createFunctionsModule } from "./modules/functions.js";
 
 /**
- * Base configuration shared by both authentication methods
+ * Client configuration - supports token OR API key authentication (mutually exclusive)
  */
-type BaseClientConfig = {
+type ClientConfig = {
   serverUrl?: string;
   appId: string;
   env?: string;
   requiresAuth?: boolean;
-};
-
-/**
- * Configuration with token authentication
- */
-type TokenAuthConfig = BaseClientConfig & {
-  token: string;
-  apiKey?: never;
-};
-
-/**
- * Configuration with API key authentication
- */
-type ApiKeyAuthConfig = BaseClientConfig & {
-  apiKey: string;
-  token?: never;
-};
-
-/**
- * Configuration without authentication
- */
-type NoAuthConfig = BaseClientConfig & {
-  token?: never;
-  apiKey?: never;
-};
-
-/**
- * Client configuration - supports token OR API key authentication (mutually exclusive)
- */
-type ClientConfig = TokenAuthConfig | ApiKeyAuthConfig | NoAuthConfig;
+} & (
+  | {}
+  | {
+      apiKey: string;
+    }
+  | {
+      token: string;
+    }
+);
 
 /**
  * Create a Base44 client instance
@@ -60,10 +39,11 @@ export function createClient(config: ClientConfig) {
     serverUrl = "https://base44.app",
     appId,
     env = "prod",
-    token,
-    apiKey,
     requiresAuth = false,
   } = config;
+
+  const apiKey = "apiKey" in config ? config.apiKey : undefined;
+  const token = "token" in config ? config.token : undefined;
 
   // Create the base axios client
   const axiosClient = createAxiosClient({

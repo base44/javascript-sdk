@@ -7,6 +7,7 @@ export default defineConfig({
     setupFiles: ["./tests/setup.js"],
     include: ["tests/**/*.test.js", "tests/**/*.test.ts"],
     typecheck: {
+      enabled: true,
       include: ["tests/**/*.test-d.ts"],
     },
     coverage: {
