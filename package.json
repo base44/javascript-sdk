@@ -11,11 +11,15 @@
   "scripts": {
     "build": "tsc",
     "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
     "test:e2e": "vitest run tests/e2e",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "prepare": "husky",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
@@ -28,7 +32,10 @@
     "@vitest/coverage-v8": "^1.0.0",
     "dotenv": "^16.3.1",
     "eslint": "^8.54.0",
+    "husky": "^9.0.0",
+    "lint-staged": "^15.0.0",
     "nock": "^13.4.0",
+    "prettier": "^3.0.0",
     "typescript": "^5.3.2"
   },
   "keywords": [
@@ -46,5 +53,13 @@
     "url": "https://github.com/base44/sdk/issues"
   },
   "homepage": "https://github.com/base44/sdk#readme",
-  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,json,css,md}": [
+      "prettier --write"
+    ],
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix"
+    ]
+  }
 }
