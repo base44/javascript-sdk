@@ -78,11 +78,11 @@ export function createClient(config: {
       try {
         const isAuthenticated = await auth.isAuthenticated();
         if (!isAuthenticated) {
-          auth.login(window.location.href);
+          auth.redirectToLogin(window.location.href);
         }
       } catch (error) {
         console.error("Authentication check failed:", error);
-        auth.login(window.location.href);
+        auth.redirectToLogin(window.location.href);
       }
     }, 0);
   }
