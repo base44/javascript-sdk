@@ -35,7 +35,7 @@ export function createAuthModule(
      * @param {string} nextUrl - URL to redirect to after successful login
      * @throws {Error} When not in a browser environment
      */
-    login(nextUrl: string) {
+    redirectToLogin(nextUrl: string) {
       // This function only works in a browser environment
       if (typeof window === "undefined") {
         throw new Error(

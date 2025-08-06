@@ -129,7 +129,7 @@ describe('Auth Module', () => {
       delete global.window;
       
       expect(() => {
-        base44.auth.login('/dashboard');
+        base44.auth.redirectToLogin('/dashboard');
       }).toThrow('Login method can only be used in a browser environment');
       
       // Restore window
@@ -145,7 +145,7 @@ describe('Auth Module', () => {
       };
       
       const nextUrl = 'https://example.com/dashboard';
-      base44.auth.login(nextUrl);
+      base44.auth.redirectToLogin(nextUrl);
       
       // Verify the redirect URL was set correctly
       expect(mockLocation.href).toBe(
@@ -165,7 +165,7 @@ describe('Auth Module', () => {
         location: mockLocation
       };
       
-      base44.auth.login();
+      base44.auth.redirectToLogin();
       
       // Verify the redirect URL uses current URL
       expect(mockLocation.href).toBe(
