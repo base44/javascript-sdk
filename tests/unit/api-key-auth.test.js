@@ -68,9 +68,9 @@ describe('API Key Authentication', () => {
       );
     });
 
-    test('auth.login() should throw error with API key', () => {
-      expect(() => client.auth.login('/')).toThrow(
-        'The .login() method cannot be used with API key authentication. API keys do not require user login flows.'
+    test('auth.redirectToLogin() should throw error with API key', () => {
+      expect(() => client.auth.redirectToLogin('/')).toThrow(
+        'The .redirectToLogin() method cannot be used with API key authentication. API keys do not require user login flows.'
       );
     });
 

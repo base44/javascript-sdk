@@ -47,7 +47,7 @@ export function createAuthModule(
      */
     redirectToLogin(nextUrl: string) {
       if (isApiKeyAuth) {
-        throw new Error("The .login() method cannot be used with API key authentication. API keys do not require user login flows.");
+        throw new Error("The .redirectToLogin() method cannot be used with API key authentication. API keys do not require user login flows.");
       }
       
       // This function only works in a browser environment
