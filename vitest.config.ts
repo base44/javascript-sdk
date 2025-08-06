@@ -6,6 +6,9 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./tests/setup.js"],
     include: ["tests/**/*.test.js", "tests/**/*.test.ts"],
+    typecheck: {
+      include: ["tests/**/*.test-d.ts"],
+    },
     coverage: {
       reporter: ["text", "json", "html"],
     },

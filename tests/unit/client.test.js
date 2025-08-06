@@ -35,6 +35,9 @@ describe('Client Creation', () => {
     expect(config.serverUrl).toBe('https://custom-server.com');
     expect(config.env).toBe('dev');
     expect(config.requiresAuth).toBe(true);
+    // Ensure token is not exposed in config
+    expect(config).not.toHaveProperty('token');
+    expect(config.token).toBeUndefined();
   });
 
   test('should create a client with API key', () => {
@@ -53,5 +56,8 @@ describe('Client Creation', () => {
     expect(config.serverUrl).toBe('https://base44.app');
     expect(config.env).toBe('prod');
     expect(config.requiresAuth).toBe(false);
+    // Ensure API key is not exposed in config
+    expect(config).not.toHaveProperty('apiKey');
+    expect(config.apiKey).toBeUndefined();
   });
 }); 
