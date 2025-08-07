@@ -1,7 +1,7 @@
 // Load environment variables from .env file
 import dotenv from 'dotenv';
 import './utils/circular-json-handler.js';
-import { beforeAll, afterAll, test } from 'vitest';
+import { beforeAll, afterAll } from 'vitest';
 
 try {
   dotenv.config({ path: './tests/.env' });
@@ -12,7 +12,7 @@ try {
 // Load circular JSON reference handler to prevent errors in Jest
 try {
   console.log('Loaded circular JSON reference handler');
-} catch (err) {
+} catch (err: any) {
   console.warn('Failed to load circular JSON handler:', err.message);
 }
 
@@ -25,4 +25,4 @@ beforeAll(() => {
 afterAll(() => {
   console.log('Completed Base44 SDK tests');
   // Add any global teardown here
-}); 
+});

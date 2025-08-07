@@ -1,10 +1,11 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import nock from 'nock';
-import { createClient } from '../../src/index.ts';
+import { createClient } from '../../src/index.js';
+import type { Base44Client } from '../../src/client.js';
 
 describe('Integrations Module', () => {
-  let base44;
-  let scope;
+  let base44: Base44Client;
+  let scope: nock.Scope;
   const appId = 'test-app-id';
   const serverUrl = 'https://base44.app';
   
@@ -36,7 +37,7 @@ describe('Integrations Module', () => {
       .reply(200, { success: true, messageId: '123456' });
       
     // Call the API
-    const result = await base44.integrations.Core.SendEmail(emailParams);
+    const result = await (base44.integrations as any).Core.SendEmail(emailParams);
     
     // Verify the response
     expect(result.success).toBe(true);
@@ -57,7 +58,7 @@ describe('Integrations Module', () => {
       .reply(200, { success: true, result: 'custom result' });
       
     // Call the API
-    const result = await base44.integrations.CustomPackage.CustomEndpoint(customParams);
+    const result = await (base44.integrations as any).CustomPackage.CustomEndpoint(customParams);
     
     // Verify the response
     expect(result.success).toBe(true);
@@ -70,7 +71,7 @@ describe('Integrations Module', () => {
   test('Integration should handle file uploads correctly', async () => {
     // Mock a file
     const mockFile = new Blob(['file content'], { type: 'text/plain' });
-    mockFile.name = 'test.txt';
+    (mockFile as any).name = 'test.txt';
     
     const uploadParams = {
       file: mockFile,
@@ -83,7 +84,7 @@ describe('Integrations Module', () => {
       .reply(200, { success: true, fileId: 'file123' });
       
     // Call the API
-    const result = await base44.integrations.Core.UploadFile(uploadParams);
+    const result = await (base44.integrations as any).Core.UploadFile(uploadParams);
     
     // Verify the response
     expect(result.success).toBe(true);
@@ -96,7 +97,7 @@ describe('Integrations Module', () => {
   test('Integration should throw error with string parameters', async () => {
     // Expect error when trying to call with a string instead of object
     await expect(async () => {
-      await base44.integrations.Core.SendEmail('invalid string parameter');
+      await (base44.integrations as any).Core.SendEmail('invalid string parameter' as any);
     }).rejects.toThrow('Integration SendEmail must receive an object with named parameters');
   });
   
@@ -108,7 +109,7 @@ describe('Integrations Module', () => {
       .reply(400, { detail: 'Invalid parameters', code: 'INVALID_PARAMS' });
       
     // Call the API and expect an error
-    await expect(base44.integrations.Core.SendEmail(params))
+    await expect((base44.integrations as any).Core.SendEmail(params))
       .rejects.toMatchObject({
         status: 400,
         name: 'Base44Error',
@@ -119,4 +120,4 @@ describe('Integrations Module', () => {
     // Verify all mocks were called
     expect(scope.isDone()).toBe(true);
   });
-}); 
+});

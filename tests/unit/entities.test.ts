@@ -1,10 +1,11 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import nock from 'nock';
-import { createClient } from '../../src/index.ts';
+import { createClient } from '../../src/index.js';
+import type { Base44Client } from '../../src/client.js';
 
 describe('Entities Module', () => {
-  let base44;
-  let scope;
+  let base44: Base44Client;
+  let scope: nock.Scope;
   const appId = 'test-app-id';
   const serverUrl = 'https://api.base44.com';
   
@@ -20,7 +21,7 @@ describe('Entities Module', () => {
     
     // Enable request debugging for Nock
     nock.disableNetConnect();
-    nock.emitter.on('no match', (req) => {
+    nock.emitter.on('no match', (req: any) => {
       console.log(`Nock: No match for ${req.method} ${req.path}`);
       console.log('Headers:', req.getHeaders());
     });
@@ -46,7 +47,7 @@ describe('Entities Module', () => {
       });
       
     // Call the API
-    const result = await base44.entities.Todo.list('title', 10, 0, ['id', 'title']);
+    const result = await (base44.entities as any).Todo.list('title', 10, 0, ['id', 'title']);
     
     // Verify the response
     expect(result.items).toHaveLength(2);
@@ -62,7 +63,7 @@ describe('Entities Module', () => {
     
     // Mock the API response
     scope.get(`/api/apps/${appId}/entities/Todo`)
-      .query(query => {
+      .query((query: any) => {
         // Verify the query contains our filter
         const parsedQ = JSON.parse(query.q);
         return parsedQ.completed === true;
@@ -75,7 +76,7 @@ describe('Entities Module', () => {
       });
       
     // Call the API
-    const result = await base44.entities.Todo.filter(filterQuery);
+    const result = await (base44.entities as any).Todo.filter(filterQuery);
     
     // Verify the response
     expect(result.items).toHaveLength(1);
@@ -97,7 +98,7 @@ describe('Entities Module', () => {
       });
       
     // Call the API
-    const todo = await base44.entities.Todo.get(todoId);
+    const todo = await (base44.entities as any).Todo.get(todoId);
     
     // Verify the response
     expect(todo.id).toBe(todoId);
@@ -121,7 +122,7 @@ describe('Entities Module', () => {
       });
       
     // Call the API
-    const todo = await base44.entities.Todo.create(newTodo);
+    const todo = await (base44.entities as any).Todo.create(newTodo);
     
     // Verify the response
     expect(todo.id).toBe('123');
@@ -146,7 +147,7 @@ describe('Entities Module', () => {
       });
       
     // Call the API
-    const todo = await base44.entities.Todo.update(todoId, updates);
+    const todo = await (base44.entities as any).Todo.update(todoId, updates);
     
     // Verify the response
     expect(todo.id).toBe(todoId);
@@ -165,9 +166,9 @@ describe('Entities Module', () => {
       .reply(204);
       
     // Call the API
-    await base44.entities.Todo.delete(todoId);
+    await (base44.entities as any).Todo.delete(todoId);
     
     // Verify all mocks were called
     expect(scope.isDone()).toBe(true);
   });
-}); 
+});

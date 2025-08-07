@@ -15,6 +15,8 @@ import { createFunctionsModule } from "./modules/functions.js";
  * @param {boolean} [config.requiresAuth=false] - Whether the app requires authentication
  * @returns {Object} Base44 client instance
  */
+export type Base44Client = ReturnType<typeof createClient>;
+
 export function createClient(config: {
   serverUrl?: string;
   appId: string;

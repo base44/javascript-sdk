@@ -1,6 +1,10 @@
 // Import the SDK and types
 import { createClient, Base44Error } from '../src';
-import type { Entity, Base44Client } from '../src/types';
+// Define basic types
+interface Entity {
+  id?: string;
+  [key: string]: any;
+}
 
 // Define a Todo interface extending the base Entity
 interface Todo extends Entity {
@@ -14,7 +18,7 @@ interface Todo extends Entity {
 async function typescriptExample(): Promise<void> {
   try {
     // Create a typed client instance
-    const base44: Base44Client = createClient({
+    const base44 = createClient({
       appId: 'your-app-id',
     });
 
@@ -32,11 +36,11 @@ async function typescriptExample(): Promise<void> {
     console.log('Current user name:', me.name);
 
     // List all todos with typed response
-    const todos: Todo[] = await base44.entities.Todo.list() as Todo[];
+    const todos: Todo[] = await (base44.entities as any).Todo.list() as Todo[];
     console.log('Total todos:', todos.length);
 
     // Filter high priority todos
-    const highPriorityTodos: Todo[] = await base44.entities.Todo.filter({
+    const highPriorityTodos: Todo[] = await (base44.entities as any).Todo.filter({
       priority: 'high'
     }) as Todo[];
     console.log('High priority todos:', highPriorityTodos.length);
@@ -48,11 +52,11 @@ async function typescriptExample(): Promise<void> {
       priority: 'high'
     };
     
-    const newTodo: Todo = await base44.entities.Todo.create(todoData) as Todo;
+    const newTodo: Todo = await (base44.entities as any).Todo.create(todoData) as Todo;
     console.log('Created todo:', newTodo.title);
 
     // Update the todo with partial data
-    const updatedTodo: Todo = await base44.entities.Todo.update(
+    const updatedTodo: Todo = await (base44.entities as any).Todo.update(
       newTodo.id, 
       { completed: true }
     ) as Todo;
@@ -72,11 +76,11 @@ async function typescriptExample(): Promise<void> {
       body: 'This email was sent using TypeScript with the Base44 SDK'
     };
     
-    const emailResult = await base44.integrations.Core.SendEmail(emailParams);
+    const emailResult = await (base44.integrations as any).Core.SendEmail(emailParams);
     console.log('Email sent:', !!emailResult);
 
     // Delete the todo
-    await base44.entities.Todo.delete(newTodo.id);
+    await (base44.entities as any).Todo.delete(newTodo.id);
     console.log('Todo deleted');
 
   } catch (error) {

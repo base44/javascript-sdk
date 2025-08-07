@@ -9,16 +9,12 @@ const originalStringify = JSON.stringify;
 
 /**
  * A replacement for JSON.stringify that handles circular references
- * @param {any} obj - The object to stringify
- * @param {Function|Array} replacer - A function or array used to filter properties
- * @param {number|string} space - Indentation spacing
- * @returns {string} The stringified object
  */
-function safeStringify(obj, replacer, space) {
+function safeStringify(obj: any, replacer?: ((key: string, value: any) => any) | Array<string | number> | null, space?: string | number): string {
   try {
     // First try normal stringify
-    return originalStringify(obj, replacer, space);
-  } catch (err) {
+    return originalStringify(obj, replacer as any, space);
+  } catch (err: any) {
     if (err.message && err.message.includes('circular')) {
       // We have a circular reference, use a replacer that handles circular refs
       const seen = new WeakSet();
@@ -53,4 +49,4 @@ function safeStringify(obj, replacer, space) {
 // Patch JSON.stringify globally
 JSON.stringify = safeStringify;
 
-export { safeStringify }; 
+export { safeStringify };

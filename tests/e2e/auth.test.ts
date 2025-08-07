@@ -1,18 +1,18 @@
 import { describe, test, expect, beforeAll } from 'vitest';
-import { createClient, Base44Error } from '../../src/index.ts';
-import { getTestConfig } from '../utils/test-config.js';
+import { createClient, Base44Error } from '../../src/index.js';
+import { getTestConfig, type TestConfig } from '../utils/test-config.js';
 
 // Get test configuration
-const config = getTestConfig();
+const config: TestConfig = getTestConfig();
 
 describe('Auth operations (E2E)', () => {
-  let base44;
+  let base44: ReturnType<typeof createClient>;
 
   beforeAll(() => {
     // Initialize the SDK client
     base44 = createClient({
       serverUrl: config.serverUrl,
-      appId: config.appId,
+      appId: config.appId!,
     });
   });
 
@@ -61,7 +61,7 @@ describe('Auth operations (E2E)', () => {
       expect(me).toBeTruthy();
       expect(me).toHaveProperty('id');
       // Check for other user properties depending on your User entity structure
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof Base44Error) {
         console.error(`API Error: ${error.status} - ${error.message}`);
       }

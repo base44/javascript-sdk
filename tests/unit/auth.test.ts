@@ -1,10 +1,11 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import nock from 'nock';
-import { createClient } from '../../src/index.ts';
+import { createClient } from '../../src/index.js';
+import type { Base44Client } from '../../src/client.js';
 
 describe('Auth Module', () => {
-  let base44;
-  let scope;
+  let base44: Base44Client;
+  let scope: nock.Scope;
   const appId = 'test-app-id';
   const serverUrl = 'https://api.base44.com';
   
@@ -52,7 +53,7 @@ describe('Auth Module', () => {
         .reply(200, mockUser);
         
       // Call the API
-      const result = await base44.auth.me();
+      const result = await base44.auth.me() as any;
       
       // Verify the response - auth methods return data directly, not wrapped
       expect(result).toEqual(mockUser);
@@ -94,7 +95,7 @@ describe('Auth Module', () => {
         .reply(200, updatedUser);
         
       // Call the API
-      const result = await base44.auth.updateMe(updateData);
+      const result = await base44.auth.updateMe(updateData) as any;
       
       // Verify the response - auth methods return data directly, not wrapped
       expect(result).toEqual(updatedUser);
@@ -125,22 +126,22 @@ describe('Auth Module', () => {
   describe('login()', () => {
     test('should throw error when not in browser environment', () => {
       // Mock window as undefined to simulate non-browser environment
-      const originalWindow = global.window;
-      delete global.window;
+      const originalWindow = (global as any).window;
+      delete (global as any).window;
       
       expect(() => {
         base44.auth.redirectToLogin('/dashboard');
       }).toThrow('Login method can only be used in a browser environment');
       
       // Restore window
-      global.window = originalWindow;
+      (global as any).window = originalWindow;
     });
     
     test('should redirect to login page with correct URL in browser environment', () => {
       // Mock window object
       const mockLocation = { href: '' };
-      const originalWindow = global.window;
-      global.window = {
+      const originalWindow = (global as any).window;
+      (global as any).window = {
         location: mockLocation
       };
       
@@ -153,19 +154,19 @@ describe('Auth Module', () => {
       );
       
       // Restore window
-      global.window = originalWindow;
+      (global as any).window = originalWindow;
     });
     
     test('should use current URL when nextUrl is not provided', () => {
       // Mock window object
       const currentUrl = 'https://example.com/current-page';
       const mockLocation = { href: currentUrl };
-      const originalWindow = global.window;
-      global.window = {
+      const originalWindow = (global as any).window;
+      (global as any).window = {
         location: mockLocation
       };
       
-      base44.auth.redirectToLogin();
+      base44.auth.redirectToLogin('');
       
       // Verify the redirect URL uses current URL
       expect(mockLocation.href).toBe(
@@ -173,7 +174,7 @@ describe('Auth Module', () => {
       );
       
       // Restore window
-      global.window = originalWindow;
+      (global as any).window = originalWindow;
     });
   });
   
@@ -212,8 +213,8 @@ describe('Auth Module', () => {
         setItem: vi.fn(),
         clear: vi.fn()
       };
-      const originalWindow = global.window;
-      global.window = {
+      const originalWindow = (global as any).window;
+      (global as any).window = {
         localStorage: mockLocalStorage,
         location: {
           reload: vi.fn()
@@ -231,7 +232,7 @@ describe('Auth Module', () => {
       expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('base44_access_token');
       
       // Restore window
-      global.window = originalWindow;
+      (global as any).window = originalWindow;
     });
     
     test('should handle localStorage errors gracefully', async () => {
@@ -242,8 +243,8 @@ describe('Auth Module', () => {
         })
       };
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      const originalWindow = global.window;
-      global.window = {
+      const originalWindow = (global as any).window;
+      (global as any).window = {
         localStorage: mockLocalStorage,
         location: {
           reload: vi.fn()
@@ -258,14 +259,14 @@ describe('Auth Module', () => {
       
       // Restore
       consoleSpy.mockRestore();
-      global.window = originalWindow;
+      (global as any).window = originalWindow;
     });
     
     test('should redirect to specified URL after logout', async () => {
       // Mock window object
       const mockLocation = { href: '' };
-      const originalWindow = global.window;
-      global.window = {
+      const originalWindow = (global as any).window;
+      (global as any).window = {
         location: mockLocation
       };
       
@@ -276,14 +277,14 @@ describe('Auth Module', () => {
       expect(mockLocation.href).toBe(redirectUrl);
       
       // Restore window
-      global.window = originalWindow;
+      (global as any).window = originalWindow;
     });
     
     test('should reload page when no redirect URL is provided', async () => {
       // Mock window object with reload function
       const mockReload = vi.fn();
-      const originalWindow = global.window;
-      global.window = {
+      const originalWindow = (global as any).window;
+      (global as any).window = {
         location: {
           reload: mockReload
         }
@@ -296,7 +297,7 @@ describe('Auth Module', () => {
       expect(mockReload).toHaveBeenCalledTimes(1);
       
       // Restore window
-      global.window = originalWindow;
+      (global as any).window = originalWindow;
     });
   });
   
@@ -324,8 +325,8 @@ describe('Auth Module', () => {
         removeItem: vi.fn(),
         clear: vi.fn()
       };
-      const originalWindow = global.window;
-      global.window = {
+      const originalWindow = (global as any).window;
+      (global as any).window = {
         localStorage: mockLocalStorage
       };
       
@@ -336,7 +337,7 @@ describe('Auth Module', () => {
       expect(mockLocalStorage.setItem).toHaveBeenCalledWith('base44_access_token', token);
       
       // Restore window
-      global.window = originalWindow;
+      (global as any).window = originalWindow;
     });
     
     test('should not save token to localStorage when not requested', () => {
@@ -347,8 +348,8 @@ describe('Auth Module', () => {
         removeItem: vi.fn(),
         clear: vi.fn()
       };
-      const originalWindow = global.window;
-      global.window = {
+      const originalWindow = (global as any).window;
+      (global as any).window = {
         localStorage: mockLocalStorage
       };
       
@@ -359,7 +360,7 @@ describe('Auth Module', () => {
       expect(mockLocalStorage.setItem).not.toHaveBeenCalled();
       
       // Restore window
-      global.window = originalWindow;
+      (global as any).window = originalWindow;
     });
     
     test('should handle empty token gracefully', async () => {
@@ -383,8 +384,8 @@ describe('Auth Module', () => {
         })
       };
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      const originalWindow = global.window;
-      global.window = {
+      const originalWindow = (global as any).window;
+      (global as any).window = {
         localStorage: mockLocalStorage
       };
       
@@ -396,7 +397,7 @@ describe('Auth Module', () => {
       
       // Restore
       consoleSpy.mockRestore();
-      global.window = originalWindow;
+      (global as any).window = originalWindow;
     });
   });
   
@@ -573,4 +574,4 @@ describe('Auth Module', () => {
       expect(scope.isDone()).toBe(true);
     });
   });
-}); 
+});

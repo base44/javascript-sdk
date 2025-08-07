@@ -1,12 +1,12 @@
 import { describe, test, expect, beforeAll } from 'vitest';
-import { createClient, Base44Error } from '../../src/index.ts';
-import { getTestConfig } from '../utils/test-config.js';
+import { createClient, Base44Error } from '../../src/index.js';
+import { getTestConfig, type TestConfig } from '../utils/test-config.js';
 
 // Get test configuration
-const config = getTestConfig();
+const config: TestConfig = getTestConfig();
 
 // Helper function to safely log error information without circular references
-const logErrorSafely = (error) => {
+const logErrorSafely = (error: any) => {
   if (error instanceof Base44Error) {
     console.error(`API Error: ${error.status} - ${error.message}`);
     if (error.data) {
@@ -20,16 +20,16 @@ const logErrorSafely = (error) => {
 
 // Define a test entity name - this should be configured in your Base44 app
 // Default to "Todo" but allow override via environment variable
-const TEST_ENTITY = process.env.TEST_ENTITY || "Todo";
+const TEST_ENTITY: string = process.env.TEST_ENTITY || "Todo";
 
 describe('Entity operations (E2E)', () => {
-  let base44;
+  let base44: ReturnType<typeof createClient>;
 
   beforeAll(() => {
     // Initialize the SDK client
     base44 = createClient({
       serverUrl: config.serverUrl,
-      appId: config.appId,
+      appId: config.appId!,
     });
 
     // Set the authentication token
@@ -48,7 +48,7 @@ describe('Entity operations (E2E)', () => {
     }
 
     // Filter entities, limit to 10 items
-    const items = await base44.entities[TEST_ENTITY].filter({}, 10);
+    const items = await (base44.entities as any)[TEST_ENTITY].filter({}, 10);
 
     // Assertions
     expect(Array.isArray(items)).toBe(true);
@@ -59,7 +59,7 @@ describe('Entity operations (E2E)', () => {
     }
     
     // Check that each item has an id
-    items.forEach(item => {
+    items.forEach((item: any) => {
       expect(item).toHaveProperty('id');
     });
   });
@@ -71,11 +71,11 @@ describe('Entity operations (E2E)', () => {
       return;
     }
 
-    const item = await base44.entities[TEST_ENTITY].get(config.testEntityId);
+    const item = await (base44.entities as any)[TEST_ENTITY].get(config.testEntityId!);
     
     // Assertions
     expect(item).toBeTruthy();
-    expect(item.id).toBe(config.testEntityId);
+    expect(item.id).toBe(config.testEntityId!);
   });
 
   test('should be able to perform full CRUD operations on an entity', async () => {
@@ -86,11 +86,11 @@ describe('Entity operations (E2E)', () => {
     }
 
     // Create a unique identifier for test item
-    const testTitle = `Test Item ${Date.now()}`;
-    let createdItem;
+    const testTitle: string = `Test Item ${Date.now()}`;
+    let createdItem: any;
 
     // Create a new item - using generic properties that might work with most entities
-    createdItem = await base44.entities[TEST_ENTITY].create({
+    createdItem = await (base44.entities as any)[TEST_ENTITY].create({
       name: testTitle,
       title: testTitle,
       description: "Created during e2e testing",
@@ -102,7 +102,7 @@ describe('Entity operations (E2E)', () => {
     expect(createdItem).toHaveProperty('id');
     
     // Try to update one of the common properties
-    const updateData = {};
+    const updateData: any = {};
     if ('completed' in createdItem) {
       updateData.completed = true;
     } else if ('active' in createdItem) {
@@ -111,20 +111,20 @@ describe('Entity operations (E2E)', () => {
       updateData.description = "Updated during e2e testing";
     }
     
-    const updatedItem = await base44.entities[TEST_ENTITY].update(createdItem.id, updateData);
+    const updatedItem = await (base44.entities as any)[TEST_ENTITY].update(createdItem.id, updateData);
 
     // Verify item was updated
     expect(updatedItem.id).toBe(createdItem.id);
     
     // Get the item
-    const retrievedItem = await base44.entities[TEST_ENTITY].get(createdItem.id);
+    const retrievedItem = await (base44.entities as any)[TEST_ENTITY].get(createdItem.id);
     
     // Verify item can be retrieved
     expect(retrievedItem.id).toBe(createdItem.id);
 
     // Cleanup: Delete the item we created
     if (createdItem && createdItem.id) {
-      await base44.entities[TEST_ENTITY].delete(createdItem.id);
+      await (base44.entities as any)[TEST_ENTITY].delete(createdItem.id);
       console.log(`Successfully deleted test ${TEST_ENTITY}`);
     }
   });
@@ -138,10 +138,10 @@ describe('Entity operations (E2E)', () => {
     
     try {
       // This should fail with a 404 error since NonExistentEntity doesn't exist
-      await base44.entities.NonExistentEntity.list();
+      await (base44.entities as any).NonExistentEntity.list();
       // If we get here, the test should fail because we expected an error
-      fail('Expected an error but none was thrown');
-    } catch (error) {
+      throw new Error('Expected an error but none was thrown');
+    } catch (error: any) {
       // This is the expected behavior - verify it's the right kind of error
       expect(error).toBeTruthy();
       if (error instanceof Base44Error) {
@@ -149,7 +149,7 @@ describe('Entity operations (E2E)', () => {
         console.log(`Test passed: Received expected 404 error for non-existent entity`);
       } else {
         // If it's not a Base44Error, we still want to fail
-        fail(`Expected a Base44Error but got: ${error}`);
+        throw new Error(`Expected a Base44Error but got: ${error}`);
       }
     }
   });

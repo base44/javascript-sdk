@@ -1,18 +1,18 @@
 import { describe, test, expect, beforeAll } from 'vitest';
-import { createClient, Base44Error } from '../../src/index.ts';
-import { getTestConfig } from '../utils/test-config.js';
+import { createClient, Base44Error } from '../../src/index.js';
+import { getTestConfig, type TestConfig } from '../utils/test-config.js';
 
 // Get test configuration
-const config = getTestConfig();
+const config: TestConfig = getTestConfig();
 
 describe('Integration operations (E2E)', () => {
-  let base44;
+  let base44: ReturnType<typeof createClient>;
 
   beforeAll(() => {
     // Initialize the SDK client
     base44 = createClient({
       serverUrl: config.serverUrl,
-      appId: config.appId,
+      appId: config.appId!,
     });
 
     // Set the authentication token
@@ -30,7 +30,7 @@ describe('Integration operations (E2E)', () => {
     }
 
     try {
-      const result = await base44.integrations.Core.SendEmail({
+      const result = await (base44.integrations as any).Core.SendEmail({
         to: process.env.TEST_EMAIL,
         subject: 'Test Email from Base44 SDK Tests',
         body: 'This is a test email sent from the Base44 SDK E2E tests.',
@@ -39,7 +39,7 @@ describe('Integration operations (E2E)', () => {
       // Assertions
       expect(result).toBeTruthy();
       // Add more specific assertions based on your API's response format
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof Base44Error) {
         console.error(`API Error: ${error.status} - ${error.message}`);
       }
@@ -50,10 +50,10 @@ describe('Integration operations (E2E)', () => {
   // This is a safer test that doesn't perform destructive operations
   test('should handle non-existent integration gracefully', async () => {
     try {
-      await base44.integrations.NonExistentPackage.NonExistentEndpoint({});
+      await (base44.integrations as any).NonExistentPackage.NonExistentEndpoint({});
       // If we get here, the test should fail
-      fail('Expected an error but none was thrown');
-    } catch (error) {
+      throw new Error('Expected an error but none was thrown');
+    } catch (error: any) {
       // Expect a Base44Error with appropriate status
       expect(error).toBeInstanceOf(Base44Error);
       // Typically a 404 for not found, but may vary

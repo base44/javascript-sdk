@@ -1,10 +1,10 @@
 import { describe, test, expect, beforeEach, afterEach } from "vitest";
 import nock from "nock";
-import { createClient } from "../../src/index.ts";
+import { createClient } from "../../src/index.js";
 
 describe("Functions Module", () => {
   let base44: ReturnType<typeof createClient>;
-  let scope;
+  let scope: nock.Scope;
   const appId = "test-app-id";
   const serverUrl = "https://api.base44.com";
 

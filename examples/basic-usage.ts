@@ -1,8 +1,8 @@
 // Import the SDK
-import { createClient, Base44Error } from '../src';
+import { createClient, Base44Error } from '../src/index.js';
 
 // Example async function
-async function exampleUsage() {
+async function exampleUsage(): Promise<void> {
   try {
     // Create a client instance
     const base44 = createClient({
@@ -31,11 +31,11 @@ async function exampleUsage() {
 
     // Working with entities
     // List all Todo items
-    const todos = await base44.entities.Todo.list();
+    const todos = await (base44.entities as any).Todo.list();
     console.log('Todo items:', todos);
 
     // Create a new Todo
-    const newTodo = await base44.entities.Todo.create({
+    const newTodo = await (base44.entities as any).Todo.create({
       title: 'Try Base44 SDK',
       completed: false,
       priority: 'high'
@@ -43,20 +43,20 @@ async function exampleUsage() {
     console.log('New Todo created:', newTodo);
 
     // Update the Todo
-    const updatedTodo = await base44.entities.Todo.update(newTodo.id, {
+    const updatedTodo = await (base44.entities as any).Todo.update(newTodo.id, {
       completed: true
     });
     console.log('Todo updated:', updatedTodo);
 
     // Filter Todos
-    const highPriorityTodos = await base44.entities.Todo.filter({
+    const highPriorityTodos = await (base44.entities as any).Todo.filter({
       priority: 'high',
       completed: false
     });
     console.log('High priority incomplete Todos:', highPriorityTodos);
 
     // Using integrations
-    const emailResult = await base44.integrations.Core.SendEmail({
+    const emailResult = await (base44.integrations as any).Core.SendEmail({
       to: 'example@example.com',
       subject: 'Testing Base44 SDK',
       body: 'This is a test email from the Base44 SDK example'
@@ -64,10 +64,10 @@ async function exampleUsage() {
     console.log('Email sent:', emailResult);
 
     // Clean up - delete the Todo we created
-    await base44.entities.Todo.delete(newTodo.id);
+    await (base44.entities as any).Todo.delete(newTodo.id);
     console.log('Todo deleted');
 
-  } catch (error) {
+  } catch (error: any) {
     if (error instanceof Base44Error) {
       console.error('Base44 API Error:');
       console.error(`Status: ${error.status}`);
@@ -83,4 +83,4 @@ async function exampleUsage() {
 }
 
 // Run the example
-exampleUsage(); 
+exampleUsage();

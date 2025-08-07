@@ -1,14 +1,26 @@
 /**
- * Load test configuration from environment variables
- * @returns {Object} Configuration for tests
+ * Test configuration interface
  */
-function getTestConfig() {
-  const config = {
+interface TestConfig {
+  serverUrl: string;
+  appId?: string;
+  token?: string;
+  skipE2E: boolean;
+  todoId?: string;
+  testEntityId?: string;
+}
+
+/**
+ * Load test configuration from environment variables
+ */
+function getTestConfig(): TestConfig {
+  const config: TestConfig = {
     serverUrl: process.env.BASE44_SERVER_URL || 'https://api.base44.com',
     appId: process.env.BASE44_APP_ID,
     token: process.env.BASE44_AUTH_TOKEN,
     skipE2E: process.env.SKIP_E2E_TESTS === 'true',
     todoId: process.env.TEST_TODO_ID || undefined,
+    testEntityId: process.env.TEST_ENTITY_ID || undefined,
   };
 
   // Validate required config
@@ -24,4 +36,4 @@ function getTestConfig() {
   return config;
 }
 
-export { getTestConfig }; 
+export { getTestConfig, type TestConfig };

@@ -1,9 +1,10 @@
-import { createClient } from '../../src/index.ts';
+import { createClient } from '../../src/index.js';
 import { describe, test, expect } from 'vitest';
+import type { Base44Client } from '../../src/client.js';
 
 describe('Client Creation', () => {
   test('should create a client with default options', () => {
-    const client = createClient({
+    const client: Base44Client = createClient({
       appId: 'test-app-id',
     });
     
@@ -20,7 +21,7 @@ describe('Client Creation', () => {
   });
   
   test('should create a client with custom options', () => {
-    const client = createClient({
+    const client: Base44Client = createClient({
       appId: 'test-app-id',
       serverUrl: 'https://custom-server.com',
       env: 'dev',
@@ -36,4 +37,4 @@ describe('Client Creation', () => {
     expect(config.env).toBe('dev');
     expect(config.requiresAuth).toBe(true);
   });
-}); 
+});
