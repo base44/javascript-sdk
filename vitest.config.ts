@@ -9,6 +9,7 @@ export default defineConfig({
     typecheck: {
       enabled: true,
       include: ["tests/**/*.test-d.ts"],
+      tsconfig: "./tsconfig.tests.json",
     },
     coverage: {
       reporter: ["text", "json", "html"],
