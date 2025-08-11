@@ -54,6 +54,7 @@ describe("Functions Module", () => {
     const result = await base44.functions.invoke(functionName, functionData);
 
     // Verify the response
+    expect(result.error).toBeNull();
     expect(result.data.success).toBe(true);
     expect(result.data.messageId).toBe("msg-456");
 
@@ -77,6 +78,7 @@ describe("Functions Module", () => {
     const result = await base44.functions.invoke(functionName, {});
 
     // Verify the response
+    expect(result.error).toBeNull();
     expect(result.data.status).toBe("healthy");
 
     // Verify all mocks were called
@@ -115,6 +117,7 @@ describe("Functions Module", () => {
     const result = await base44.functions.invoke(functionName, functionData);
 
     // Verify the response
+    expect(result.error).toBeNull();
     expect(result.data.processed).toBe(true);
 
     // Verify all mocks were called
@@ -150,6 +153,7 @@ describe("Functions Module", () => {
     const result = await base44.functions.invoke(functionName, functionData);
 
     // Verify the response
+    expect(result.error).toBeNull();
     expect(result.data.fileId).toBe("file-789");
     expect(result.data.filename).toBe("test.txt");
 
@@ -187,6 +191,7 @@ describe("Functions Module", () => {
     const result = await base44.functions.invoke(functionName, functionData);
 
     // Verify the response
+    expect(result.error).toBeNull();
     expect(result.data.documentId).toBe("doc-123");
     expect(result.data.processed).toBe(true);
 
@@ -215,6 +220,7 @@ describe("Functions Module", () => {
     const result = await base44.functions.invoke(functionName, formData);
 
     // Verify the response
+    expect(result.error).toBeNull();
     expect(result.data.formId).toBe("form-456");
     expect(result.data.submitted).toBe(true);
 
@@ -252,6 +258,7 @@ describe("Functions Module", () => {
     const result = await base44.functions.invoke(functionName, functionData);
 
     // Verify the response
+    expect(result.error).toBeNull();
     expect(result.data.processed).toBe(true);
 
     // Verify all mocks were called
@@ -273,10 +280,11 @@ describe("Functions Module", () => {
         code: "INTERNAL_ERROR",
       });
 
-    // Call the function and expect it to throw
-    await expect(
-      base44.functions.invoke(functionName, functionData)
-    ).rejects.toThrow();
+    // Call the function and expect error to be returned
+    const result = await base44.functions.invoke(functionName, functionData);
+    
+    expect(result.data).toBeNull();
+    expect(result.error).toBeDefined();
 
     // Verify all mocks were called
     expect(scope.isDone()).toBe(true);
@@ -297,10 +305,11 @@ describe("Functions Module", () => {
         code: "FUNCTION_NOT_FOUND",
       });
 
-    // Call the function and expect it to throw
-    await expect(
-      base44.functions.invoke(functionName, functionData)
-    ).rejects.toThrow();
+    // Call the function and expect error to be returned
+    const result = await base44.functions.invoke(functionName, functionData);
+    
+    expect(result.data).toBeNull();
+    expect(result.error).toBeDefined();
 
     // Verify all mocks were called
     expect(scope.isDone()).toBe(true);
@@ -328,6 +337,7 @@ describe("Functions Module", () => {
     const result = await base44.functions.invoke(functionName, functionData);
 
     // Verify the response
+    expect(result.error).toBeNull();
     expect(result.data.received).toBe(true);
 
     // Verify all mocks were called
@@ -355,6 +365,7 @@ describe("Functions Module", () => {
     const result = await base44.functions.invoke(functionName, functionData);
 
     // Verify the response
+    expect(result.error).toBeNull();
     expect(result.data.processed).toBe(true);
     expect(result.data.count).toBe(3);
 
@@ -381,6 +392,7 @@ describe("Functions Module", () => {
     const result = await base44.functions.invoke(functionName, functionData);
 
     // Verify the response
+    expect(result.error).toBeNull();
     expect(result.data.success).toBe(true);
 
     // Verify all mocks were called
@@ -403,7 +415,34 @@ describe("Functions Module", () => {
     const result = await base44.functions.invoke(functionName, formData);
 
     // Verify the response
+    expect(result.error).toBeNull();
     expect(result.data.success).toBe(true);
+
+    // Verify all mocks were called
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test("should handle 500 errors and return error in error field", async () => {
+    const functionName = "serverErrorFunction";
+    const functionData = {
+      param: "value",
+    };
+
+    // Mock the API 500 response
+    scope
+      .post(`/api/apps/${appId}/functions/${functionName}`, functionData)
+      .matchHeader("Content-Type", "application/json")
+      .reply(500, {
+        error: "Internal server error",
+        code: "INTERNAL_ERROR",
+        details: "Something went wrong on the server",
+      });
+
+    // Call the function and expect error to be returned
+    const result = await base44.functions.invoke(functionName, functionData);
+    
+    expect(result.data).toBeNull();
+    expect(result.error).toBeDefined();
 
     // Verify all mocks were called
     expect(scope.isDone()).toBe(true);

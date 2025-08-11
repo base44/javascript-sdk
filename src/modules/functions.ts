@@ -41,11 +41,17 @@ export function createFunctionsModule(axios: AxiosInstance, appId: string) {
         contentType = "application/json";
       }
 
-      return axios.post(
-        `/apps/${appId}/functions/${functionName}`,
-        formData || data,
-        { headers: { "Content-Type": contentType } }
-      );
+      try {
+        const response = await axios.post(
+          `/apps/${appId}/functions/${functionName}`,
+          formData || data,
+          { headers: { "Content-Type": contentType } }
+        );
+        return { data: response.data, error: null };
+      } catch (error) {
+        // Return error in the expected format instead of throwing
+        return { data: null, error: error };
+      }
     },
   };
 }
