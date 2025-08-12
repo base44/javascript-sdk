@@ -10,7 +10,8 @@ import { AxiosInstance } from "axios";
 export function createAuthModule(
   axios: AxiosInstance,
   appId: string,
-  serverUrl: string
+  serverUrl: string,
+  additionalAxiosClients: AxiosInstance[] = []
 ) {
   return {
     /**
@@ -67,8 +68,13 @@ export function createAuthModule(
      * @returns {Promise<void>}
      */
     logout(redirectUrl?: string) {
-      // Remove token from axios headers
+      // Remove token from main axios client headers
       delete axios.defaults.headers.common["Authorization"];
+      
+      // Remove token from all additional axios clients
+      additionalAxiosClients.forEach(client => {
+        delete client.defaults.headers.common["Authorization"];
+      });
 
       // Remove token from localStorage
       if (typeof window !== "undefined" && window.localStorage) {
@@ -97,7 +103,13 @@ export function createAuthModule(
     setToken(token: string, saveToStorage = true) {
       if (!token) return;
 
+      // Set token on main axios client
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      
+      // Set token on all additional axios clients (like functions client)
+      additionalAxiosClients.forEach(client => {
+        client.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      });
 
       // Save token to localStorage if requested
       if (

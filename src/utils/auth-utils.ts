@@ -48,7 +48,7 @@ export function getAccessToken(
           const newUrl = `${window.location.pathname}${
             urlParams.toString() ? `?${urlParams.toString()}` : ""
           }${window.location.hash}`;
-          window.history.replaceState({}, document.title, newUrl);
+          window.history.replaceState({}, typeof document !== "undefined" ? document.title : "", newUrl);
         }
 
         return token;

@@ -59,16 +59,19 @@ export function createClient(config: {
   // Create modules
   const entities = createEntitiesModule(axiosClient, appId);
   const integrations = createIntegrationsModule(axiosClient, appId);
-  const auth = createAuthModule(axiosClient, appId, serverUrl);
+  const auth = createAuthModule(axiosClient, appId, serverUrl, [functionsAxiosClient]);
   const functions = createFunctionsModule(functionsAxiosClient, appId);
 
-  // Always try to get token from localStorage or URL parameters
+  // Set token if provided directly or get from localStorage/URL parameters
   if (typeof window !== "undefined") {
     // Get token from URL or localStorage
     const accessToken = token || getAccessToken();
     if (accessToken) {
       auth.setToken(accessToken);
     }
+  } else if (token) {
+    // If no window available (like in tests), still set the token if provided
+    auth.setToken(token, false);
   }
 
   // If authentication is required, verify token and redirect to login if needed
