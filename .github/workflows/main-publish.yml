@@ -27,8 +27,33 @@ jobs:
       - name: Build package
         run: npm run build
 
-      - name: Publish main version with pkg.pr.new
-        run: npx pkg-pr-new publish --json output.json --comment=off
+      - name: Generate preview package name and version
+        id: preview_info
+        run: |
+          COMMIT_HASH="${{ github.sha }}"
+          SHORT_COMMIT="${COMMIT_HASH:0:7}"
+          PREVIEW_VERSION="commit-$SHORT_COMMIT"
+
+          echo "version=$PREVIEW_VERSION" >> $GITHUB_OUTPUT
+          echo "package_name=@base44/preview-sdk" >> $GITHUB_OUTPUT
+          echo "full_package=@base44/preview-sdk@$PREVIEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update package.json for preview
+        run: |
+          # Create a backup of original package.json
+          cp package.json package.json.bak
+
+          # Update name and version for preview
+          npm pkg set name="${{ steps.preview_info.outputs.package_name }}"
+          npm pkg set version="${{ steps.preview_info.outputs.version }}"
+
+      - name: Publish preview package
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Restore original package.json
+        run: mv package.json.bak package.json
 
 permissions:
   contents: read

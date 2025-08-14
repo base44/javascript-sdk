@@ -20,6 +20,7 @@ jobs:
         with:
           node-version: 20
           cache: "npm"
+          registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
         run: npm install
@@ -27,25 +28,47 @@ jobs:
       - name: Build package
         run: npm run build
 
-      - name: Publish preview with pkg.pr.new
-        run: npx pkg-pr-new publish --json output.json --comment=off
+      - name: Generate preview package name and version
+        id: preview_info
+        run: |
+          PR_NUMBER="${{ github.event.number }}"
+          COMMIT_HASH="${{ github.sha }}"
+          SHORT_COMMIT="${COMMIT_HASH:0:7}"
+
+          if [ ! -z "$PR_NUMBER" ]; then
+            PREVIEW_VERSION="pr-$PR_NUMBER"
+          else
+            PREVIEW_VERSION="commit-$SHORT_COMMIT"
+          fi
+
+          echo "version=$PREVIEW_VERSION" >> $GITHUB_OUTPUT
+          echo "package_name=@base44/preview-sdk" >> $GITHUB_OUTPUT
+          echo "full_package=@base44/preview-sdk@$PREVIEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update package.json for preview
+        run: |
+          # Create a backup of original package.json
+          cp package.json package.json.bak
+
+          # Update name and version for preview
+          npm pkg set name="${{ steps.preview_info.outputs.package_name }}"
+          npm pkg set version="${{ steps.preview_info.outputs.version }}"
+
+      - name: Publish preview package
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Restore original package.json
+        run: mv package.json.bak package.json
 
       - name: Comment PR with install instructions
         uses: actions/github-script@v6
         with:
           script: |
-            const fs = require('fs');
-            const output = JSON.parse(fs.readFileSync('output.json', 'utf8'));
-            if (!output.packages || output.packages.length === 0) {
-              core.setFailed('No packages published by pkg.pr.new');
-              return;
-            }
-            const pkg = output.packages[0];
-            const installCmd = `npm i ${pkg.url}`;
-            const badge = `[![pkg.pr.new](https://pkg.pr.new/badge/${context.repo.owner}/${context.repo.repo})](https://pkg.pr.new/~/${context.repo.owner}/${context.repo.repo})`;
+            const fullPackage = '${{ steps.preview_info.outputs.full_package }}';
+            const installCmd = `npm i ${fullPackage}`;
             const body = `### 🚀 Package Preview Available!
-
-            ${badge}
 
             ---
 
@@ -55,11 +78,11 @@ jobs:
             ${installCmd}
             \`\`\`
 
-            - 📦 [Preview Package on pkg.pr.new](${pkg.url})
-            - 🔗 [View this commit on GitHub](https://github.com/${context.repo.owner}/${context.repo.repo}/commit/${pkg.commit})
+            - 📦 **Preview Package**: \`${fullPackage}\`
+            - 🔗 [View this commit on GitHub](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
 
             ---
-            <sub>Preview powered by [pkg.pr.new](https://pkg.pr.new) — try new features instantly, no NPM release needed!</sub>
+            <sub>Preview published to npm registry — try new features instantly!</sub>
             `;
 
             const botCommentIdentifier = '### 🚀 Package Preview Available!';
