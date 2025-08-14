@@ -10,44 +10,41 @@ import { createFunctionsModule } from "./modules/functions.js";
  * @param {Object} config - Client configuration
  * @param {string} [config.serverUrl='https://base44.app'] - API server URL
  * @param {string|number} config.appId - Application ID
- * @param {string} [config.env='prod'] - Environment ('prod' or 'dev')
  * @param {string} [config.token] - Authentication token
+ * @param {string} [config.serviceToken] - Service role authentication token
  * @param {boolean} [config.requiresAuth=false] - Whether the app requires authentication
  * @returns {Object} Base44 client instance
  */
 export function createClient(config: {
   serverUrl?: string;
   appId: string;
-  env?: string;
   token?: string;
+  serviceToken?: string;
   requiresAuth?: boolean;
 }) {
   const {
     serverUrl = "https://base44.app",
     appId,
-    env = "prod",
     token,
+    serviceToken,
     requiresAuth = false,
   } = config;
 
-  // Create the base axios client
   const axiosClient = createAxiosClient({
     baseURL: `${serverUrl}/api`,
     headers: {
       "X-App-Id": String(appId),
-      "X-Environment": env,
     },
     token,
-    requiresAuth, // Pass requiresAuth to axios client
-    appId, // Pass appId for login redirect
-    serverUrl, // Pass serverUrl for login redirect
+    requiresAuth,
+    appId,
+    serverUrl,
   });
 
   const functionsAxiosClient = createAxiosClient({
     baseURL: `${serverUrl}/api`,
     headers: {
       "X-App-Id": String(appId),
-      "X-Environment": env,
     },
     token,
     requiresAuth,
@@ -56,18 +53,46 @@ export function createClient(config: {
     interceptResponses: false,
   });
 
-  // Create modules
-  const entities = createEntitiesModule(axiosClient, appId);
-  const integrations = createIntegrationsModule(axiosClient, appId);
-  const auth = createAuthModule(axiosClient, appId, serverUrl);
-  const functions = createFunctionsModule(functionsAxiosClient, appId);
+  const serviceRoleAxiosClient = createAxiosClient({
+    baseURL: `${serverUrl}/api`,
+    headers: {
+      "X-App-Id": String(appId),
+    },
+    token: serviceToken,
+    serverUrl,
+    appId,
+  });
+
+  const serviceRoleFunctionsAxiosClient = createAxiosClient({
+    baseURL: `${serverUrl}/api`,
+    headers: {
+      "X-App-Id": String(appId),
+    },
+    token: serviceToken,
+    serverUrl,
+    appId,
+    interceptResponses: false,
+  });
+
+  const userModules = {
+    entities: createEntitiesModule(axiosClient, appId),
+    integrations: createIntegrationsModule(axiosClient, appId),
+    auth: createAuthModule(axiosClient, functionsAxiosClient, appId),
+    functions: createFunctionsModule(functionsAxiosClient, appId),
+  };
+
+  const serviceRoleModules = {
+    entities: createEntitiesModule(serviceRoleAxiosClient, appId),
+    integrations: createIntegrationsModule(serviceRoleAxiosClient, appId),
+    functions: createFunctionsModule(serviceRoleFunctionsAxiosClient, appId),
+  };
 
   // Always try to get token from localStorage or URL parameters
   if (typeof window !== "undefined") {
     // Get token from URL or localStorage
     const accessToken = token || getAccessToken();
     if (accessToken) {
-      auth.setToken(accessToken);
+      userModules.auth.setToken(accessToken);
     }
   }
 
@@ -76,30 +101,27 @@ export function createClient(config: {
     // We perform this check asynchronously to not block client creation
     setTimeout(async () => {
       try {
-        const isAuthenticated = await auth.isAuthenticated();
+        const isAuthenticated = await userModules.auth.isAuthenticated();
         if (!isAuthenticated) {
-          auth.redirectToLogin(window.location.href);
+          userModules.auth.redirectToLogin(window.location.href);
         }
       } catch (error) {
         console.error("Authentication check failed:", error);
-        auth.redirectToLogin(window.location.href);
+        userModules.auth.redirectToLogin(window.location.href);
       }
     }, 0);
   }
 
   // Assemble and return the client
-  return {
-    entities,
-    integrations,
-    auth,
-    functions,
+  const client = {
+    ...userModules,
 
     /**
      * Set authentication token for all requests
      * @param {string} newToken - New auth token
      */
     setToken(newToken: string) {
-      auth.setToken(newToken);
+      userModules.auth.setToken(newToken);
     },
 
     /**
@@ -110,9 +132,61 @@ export function createClient(config: {
       return {
         serverUrl,
         appId,
-        env,
         requiresAuth,
       };
     },
+
+    /**
+     * Access service role modules - throws error if no service token was provided
+     * @throws {Error} When accessed without a service token
+     */
+    get asServiceRole() {
+      if (!serviceToken) {
+        throw new Error('Service token is required to use asServiceRole. Please provide a serviceToken when creating the client.');
+      }
+      return serviceRoleModules;
+    }
   };
+
+  return client;
+}
+
+export function createClientFromRequest(request: Request) {
+  const authHeader = request.headers.get("Authorization");
+  const serviceRoleAuthHeader = request.headers.get(
+    "Base44-Service-Authorization"
+  );
+  const appId = request.headers.get("Base44-App-Id");
+  const serverUrlHeader = request.headers.get("Base44-Api-Url");
+
+  if (!appId) {
+    throw new Error(
+      "Base44-App-Id header is required, but is was not found on the request"
+    );
+  }
+
+  // Validate authorization header formats
+  let serviceRoleToken: string | undefined;
+  let userToken: string | undefined;
+
+  if (serviceRoleAuthHeader !== null) {
+    if (serviceRoleAuthHeader === '' || !serviceRoleAuthHeader.startsWith('Bearer ') || serviceRoleAuthHeader.split(' ').length !== 2) {
+      throw new Error('Invalid authorization header format. Expected "Bearer <token>"');
+    }
+    serviceRoleToken = serviceRoleAuthHeader.split(' ')[1];
+  }
+
+  if (authHeader !== null) {
+    if (authHeader === '' || !authHeader.startsWith('Bearer ') || authHeader.split(' ').length !== 2) {
+      throw new Error('Invalid authorization header format. Expected "Bearer <token>"');
+    }
+    userToken = authHeader.split(' ')[1];
+  }
+
+  return createClient({
+    serverUrl: serverUrlHeader || "https://base44.app",
+    appId,
+    token: userToken,
+    serviceToken: serviceRoleToken,
+  });
 }

@@ -20,10 +20,10 @@ import { createClient } from '@base44/sdk';
 // Create a client instance
 const base44 = createClient({
   serverUrl: 'https://base44.app', // Optional, defaults to 'https://base44.app'
-  appId: 'your-app-id',  // Required
-  env: 'prod',           // Optional, defaults to 'prod'
-  token: 'your-token',   // Optional
-  autoInitAuth: true,    // Optional, defaults to true - auto-detects tokens from URL or localStorage
+  appId: 'your-app-id',            // Required
+  token: 'your-user-token',        // Optional, for user authentication
+  serviceToken: 'your-service-token', // Optional, for service role authentication
+  autoInitAuth: true,              // Optional, defaults to true - auto-detects tokens from URL or localStorage
 });
 ```
 
@@ -61,6 +61,77 @@ const newProducts = await base44.entities.Product.bulkCreate([
   { name: 'Product 1', price: 19.99 },
   { name: 'Product 2', price: 29.99 }
 ]);
+```
+
+### Service Role Authentication
+
+Service role authentication allows server-side applications to perform operations with elevated privileges. This is useful for administrative tasks, background jobs, and server-to-server communication.
+
+```javascript
+import { createClient } from '@base44/sdk';
+
+// Create a client with service role token
+const base44 = createClient({
+  appId: 'your-app-id',
+  token: 'user-token',              // For user operations
+  serviceToken: 'service-token'     // For service role operations
+});
+
+// User operations (uses user token)
+const userEntities = await base44.entities.User.list();
+
+// Service role operations (uses service token)
+const allEntities = await base44.asServiceRole.entities.User.list();
+
+// Service role has access to:
+// - base44.asServiceRole.entities
+// - base44.asServiceRole.integrations
+// - base44.asServiceRole.functions
+// Note: Service role does NOT have access to auth module for security
+
+// If no service token is provided, accessing asServiceRole throws an error
+const clientWithoutService = createClient({ appId: 'your-app-id' });
+try {
+  await clientWithoutService.asServiceRole.entities.User.list();
+} catch (error) {
+  // Error: Service token is required to use asServiceRole
+}
+```
+
+### Server-Side Usage
+
+For server-side applications, you can create a client from incoming HTTP requests:
+
+```javascript
+import { createClientFromRequest } from '@base44/sdk';
+
+// In your server handler (Express, Next.js, etc.)
+app.get('/api/data', async (req, res) => {
+  try {
+    // Extract client configuration from request headers
+    const base44 = createClientFromRequest(req);
+    
+    // Headers used:
+    // - Authorization: Bearer <user-token>
+    // - Base44-Service-Authorization: Bearer <service-token>
+    // - Base44-App-Id: <app-id>
+    // - Base44-Api-Url: <custom-api-url> (optional)
+    
+    // Use appropriate authentication based on available tokens
+    let data;
+    if (base44.asServiceRole) {
+      // Service token available - use elevated privileges
+      data = await base44.asServiceRole.entities.SensitiveData.list();
+    } else {
+      // Only user token available - use user permissions
+      data = await base44.entities.PublicData.list();
+    }
+    
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 ```
 
 ### Working with Integrations
@@ -103,7 +174,7 @@ import { getAccessToken } from '@base44/sdk/utils/auth-utils';
 // Create a client with authentication
 const base44 = createClient({
   appId: 'your-app-id',
-  accessToken: getAccessToken() // Automatically retrieves token from localStorage or URL
+  token: getAccessToken() // Automatically retrieves token from localStorage or URL
 });
 
 // Check authentication status
@@ -167,7 +238,7 @@ function AuthProvider({ children }) {
   const [client] = useState(() => 
     createClient({ 
       appId: 'your-app-id', 
-      accessToken: getAccessToken()
+      token: getAccessToken()
     })
   );
 
@@ -347,6 +418,24 @@ async function fetchProducts() {
   }
 }
 
+// Service role operations with TypeScript
+async function adminOperations() {
+  const base44 = createClient({
+    appId: 'your-app-id',
+    serviceToken: 'service-token'
+  });
+
+  // TypeScript knows asServiceRole requires a service token
+  try {
+    const allUsers: Entity[] = await base44.asServiceRole.entities.User.list();
+    console.log(`Total users: ${allUsers.length}`);
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error(error.message); // Service token is required to use asServiceRole
+    }
+  }
+}
+
 // Authentication with TypeScript
 async function handleAuth(auth: AuthModule) {
   // Check authentication
@@ -454,6 +543,25 @@ try {
     console.error('Unexpected error:', error);
   }
 }
+```
+
+## Functions
+
+The SDK supports invoking custom functions:
+
+```javascript
+// Invoke a function without parameters
+const result = await base44.functions.myFunction();
+
+// Invoke a function with parameters
+const result = await base44.functions.calculateTotal({
+  items: ['item1', 'item2'],
+  discount: 0.1
+});
+
+// Functions are automatically authenticated with the user token
+// Service role can also invoke functions
+const serviceResult = await base44.asServiceRole.functions.adminFunction();
 ```
 
 ## Testing

@@ -9,8 +9,8 @@ import { AxiosInstance } from "axios";
  */
 export function createAuthModule(
   axios: AxiosInstance,
-  appId: string,
-  serverUrl: string
+  functionsAxiosClient: AxiosInstance,
+  appId: string
 ) {
   return {
     /**
@@ -98,6 +98,9 @@ export function createAuthModule(
       if (!token) return;
 
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      functionsAxiosClient.defaults.headers.common[
+        "Authorization"
+      ] = `Bearer ${token}`;
 
       // Save token to localStorage if requested
       if (
