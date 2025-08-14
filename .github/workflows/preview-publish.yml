@@ -20,6 +20,7 @@ jobs:
         with:
           node-version: 20
           cache: "npm"
+          registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
         run: npm install
@@ -27,25 +28,108 @@ jobs:
       - name: Build package
         run: npm run build
 
-      - name: Publish preview with pkg.pr.new
-        run: npx pkg-pr-new publish --json output.json --comment=off
+      - name: Generate preview package name and version
+        id: preview_info
+        run: |
+          PR_NUMBER="${{ github.event.number }}"
+          COMMIT_HASH="${{ github.sha }}"
+          SHORT_COMMIT="${COMMIT_HASH:0:7}"
+
+          # Get current version from package.json
+          BASE_VERSION=$(node -p "require('./package.json').version")
+
+          if [ ! -z "$PR_NUMBER" ]; then
+            # Format: 0.3.0-pr.123.abc1234 (valid semver prerelease)
+            PREVIEW_VERSION="$BASE_VERSION-pr.$PR_NUMBER.$SHORT_COMMIT"
+          else
+            # Format: 0.3.0-dev.abc1234 (valid semver prerelease)
+            PREVIEW_VERSION="$BASE_VERSION-dev.$SHORT_COMMIT"
+          fi
+
+          echo "version=$PREVIEW_VERSION" >> $GITHUB_OUTPUT
+          echo "package_name=@base44-preview/sdk" >> $GITHUB_OUTPUT
+          echo "full_package=@base44-preview/sdk@$PREVIEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update package.json for preview
+        run: |
+          # Create a backup of original package.json
+          cp package.json package.json.bak
+
+          # Get the official package name for safety checks
+          OFFICIAL_PACKAGE=$(node -p "require('./package.json').name")
+          PREVIEW_PACKAGE="${{ steps.preview_info.outputs.package_name }}"
+
+          echo "Official package: $OFFICIAL_PACKAGE"
+          echo "Preview package: $PREVIEW_PACKAGE"
+
+          # Safety check: Ensure we're not accidentally using the official package name
+          if [ "$PREVIEW_PACKAGE" = "$OFFICIAL_PACKAGE" ]; then
+            echo "❌ ERROR: Preview package name matches official package name!"
+            echo "This would overwrite the official package. Aborting."
+            exit 1
+          fi
+
+          # Update name with error handling
+          if ! npm pkg set name="$PREVIEW_PACKAGE"; then
+            echo "❌ ERROR: Failed to set package name to $PREVIEW_PACKAGE"
+            exit 1
+          fi
+
+          # Update version with error handling
+          if ! npm pkg set version="${{ steps.preview_info.outputs.version }}"; then
+            echo "❌ ERROR: Failed to set package version to ${{ steps.preview_info.outputs.version }}"
+            exit 1
+          fi
+
+          echo "✅ Package.json updated successfully"
+
+      - name: Final safety check before publish
+        run: |
+          # Double-check package name one more time before publishing
+          CURRENT_PACKAGE_NAME=$(node -p "require('./package.json').name")
+          OFFICIAL_PACKAGE=$(jq -r '.name' package.json.bak)
+
+          echo "About to publish: $CURRENT_PACKAGE_NAME"
+
+          if [ "$CURRENT_PACKAGE_NAME" = "$OFFICIAL_PACKAGE" ]; then
+            echo "❌ CRITICAL ERROR: About to publish to official package name!"
+            echo "This is not allowed. Check the workflow configuration."
+            exit 1
+          fi
+
+          echo "✅ Safety check passed. Package name is safe to publish."
+
+      - name: Publish preview package
+        run: |
+          if npm publish --tag preview; then
+            echo "✅ Package published successfully"
+          else
+            echo "❌ Package publish failed"
+            exit 1
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Restore original package.json
+        if: always()
+        run: |
+          if [ -f package.json.bak ]; then
+            mv package.json.bak package.json
+            echo "✅ Original package.json restored"
+          else
+            echo "❌ WARNING: Backup file package.json.bak not found"
+            echo "This could indicate an earlier step failed"
+          fi
 
       - name: Comment PR with install instructions
         uses: actions/github-script@v6
         with:
           script: |
-            const fs = require('fs');
-            const output = JSON.parse(fs.readFileSync('output.json', 'utf8'));
-            if (!output.packages || output.packages.length === 0) {
-              core.setFailed('No packages published by pkg.pr.new');
-              return;
-            }
-            const pkg = output.packages[0];
-            const installCmd = `npm i ${pkg.url}`;
-            const badge = `[![pkg.pr.new](https://pkg.pr.new/badge/${context.repo.owner}/${context.repo.repo})](https://pkg.pr.new/~/${context.repo.owner}/${context.repo.repo})`;
-            const body = `### 🚀 Package Preview Available!
+            const fullPackage = '${{ steps.preview_info.outputs.full_package }}';
+            const installCmd = `npm i ${fullPackage}`;
+            const aliasInstallCmd = `npm i "@base44/sdk@npm:${fullPackage}"`;
 
-            ${badge}
+            const body = `### 🚀 Package Preview Available!
 
             ---
 
@@ -55,12 +139,27 @@ jobs:
             ${installCmd}
             \`\`\`
 
-            - 📦 [Preview Package on pkg.pr.new](${pkg.url})
-            - 🔗 [View this commit on GitHub](https://github.com/${context.repo.owner}/${context.repo.repo}/commit/${pkg.commit})
+            **Prefer not to change any import paths? Install using npm alias so your code still imports \`@base44/sdk\`:**
+
+            \`\`\`sh
+            ${aliasInstallCmd}
+            \`\`\`
+
+            Or add it to your \`package.json\` dependencies:
+
+            \`\`\`json
+            {
+              "dependencies": {
+                "@base44/sdk": "npm:${fullPackage}"
+              }
+            }
+            \`\`\`
+
+            - 📦 **Preview Package**: \`${fullPackage}\`
+            - 🔗 [View this commit on GitHub](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
 
             ---
-            <sub>Preview powered by [pkg.pr.new](https://pkg.pr.new) — try new features instantly, no NPM release needed!</sub>
-            `;
+            <sub>Preview published to npm registry — try new features instantly!</sub>`;
 
             const botCommentIdentifier = '### 🚀 Package Preview Available!';
 
