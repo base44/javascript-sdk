@@ -35,10 +35,15 @@ jobs:
           COMMIT_HASH="${{ github.sha }}"
           SHORT_COMMIT="${COMMIT_HASH:0:7}"
 
+          # Get current version from package.json
+          BASE_VERSION=$(node -p "require('./package.json').version")
+
           if [ ! -z "$PR_NUMBER" ]; then
-            PREVIEW_VERSION="pr-$PR_NUMBER"
+            # Format: 0.3.0-pr.123.abc1234 (valid semver prerelease)
+            PREVIEW_VERSION="$BASE_VERSION-pr.$PR_NUMBER.$SHORT_COMMIT"
           else
-            PREVIEW_VERSION="commit-$SHORT_COMMIT"
+            # Format: 0.3.0-dev.abc1234 (valid semver prerelease)
+            PREVIEW_VERSION="$BASE_VERSION-dev.$SHORT_COMMIT"
           fi
 
           echo "version=$PREVIEW_VERSION" >> $GITHUB_OUTPUT

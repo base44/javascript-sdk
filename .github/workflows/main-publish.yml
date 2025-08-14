@@ -32,7 +32,12 @@ jobs:
         run: |
           COMMIT_HASH="${{ github.sha }}"
           SHORT_COMMIT="${COMMIT_HASH:0:7}"
-          PREVIEW_VERSION="commit-$SHORT_COMMIT"
+
+          # Get current version from package.json
+          BASE_VERSION=$(node -p "require('./package.json').version")
+
+          # Format: 0.3.0-dev.abc1234 (valid semver prerelease)
+          PREVIEW_VERSION="$BASE_VERSION-dev.$SHORT_COMMIT"
 
           echo "version=$PREVIEW_VERSION" >> $GITHUB_OUTPUT
           echo "package_name=@base44/preview-sdk" >> $GITHUB_OUTPUT
