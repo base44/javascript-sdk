@@ -82,21 +82,21 @@ jobs:
 
           echo "✅ Package.json updated successfully"
 
-          - name: Final safety check before publish
-          run: |
-            # Double-check package name one more time before publishing
-            CURRENT_PACKAGE_NAME=$(node -p "require('./package.json').name")
-            OFFICIAL_PACKAGE="@base44/sdk"
-            
-            echo "About to publish: $CURRENT_PACKAGE_NAME"
-            
-            if [ "$CURRENT_PACKAGE_NAME" = "$OFFICIAL_PACKAGE" ]; then
-              echo "❌ CRITICAL ERROR: About to publish to official package name!"
-              echo "This is not allowed. Check the workflow configuration."
-              exit 1
-            fi
-            
-            echo "✅ Safety check passed. Package name is safe to publish."
+      - name: Final safety check before publish
+        run: |
+          # Double-check package name one more time before publishing
+          CURRENT_PACKAGE_NAME=$(node -p "require('./package.json').name")
+          OFFICIAL_PACKAGE="@base44/sdk"
+
+          echo "About to publish: $CURRENT_PACKAGE_NAME"
+
+          if [ "$CURRENT_PACKAGE_NAME" = "$OFFICIAL_PACKAGE" ]; then
+            echo "❌ CRITICAL ERROR: About to publish to official package name!"
+            echo "This is not allowed. Check the workflow configuration."
+            exit 1
+          fi
+
+          echo "✅ Safety check passed. Package name is safe to publish."
 
       - name: Publish preview package
         run: |
