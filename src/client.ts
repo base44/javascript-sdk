@@ -165,8 +165,23 @@ export function createClientFromRequest(request: Request) {
     );
   }
 
-  const serviceRoleToken = serviceRoleAuthHeader?.split(" ")[1];
-  const userToken = authHeader?.split(" ")[1];
+  // Validate authorization header formats
+  let serviceRoleToken: string | undefined;
+  let userToken: string | undefined;
+
+  if (serviceRoleAuthHeader !== null) {
+    if (serviceRoleAuthHeader === '' || !serviceRoleAuthHeader.startsWith('Bearer ') || serviceRoleAuthHeader.split(' ').length !== 2) {
+      throw new Error('Invalid authorization header format. Expected "Bearer <token>"');
+    }
+    serviceRoleToken = serviceRoleAuthHeader.split(' ')[1];
+  }
+
+  if (authHeader !== null) {
+    if (authHeader === '' || !authHeader.startsWith('Bearer ') || authHeader.split(' ').length !== 2) {
+      throw new Error('Invalid authorization header format. Expected "Bearer <token>"');
+    }
+    userToken = authHeader.split(' ')[1];
+  }
 
   return createClient({
     serverUrl: serverUrlHeader || "https://base44.app",
