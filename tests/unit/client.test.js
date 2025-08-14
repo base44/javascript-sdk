@@ -17,6 +17,9 @@ describe('Client Creation', () => {
     expect(config.appId).toBe('test-app-id');
     expect(config.serverUrl).toBe('https://base44.app');
     expect(config.requiresAuth).toBe(false);
+    
+    // Should throw error when accessing asServiceRole without service token
+    expect(() => client.asServiceRole).toThrow('Service token is required to use asServiceRole. Please provide a serviceToken when creating the client.');
   });
   
   test('should create a client with custom options', () => {
@@ -70,6 +73,18 @@ describe('Client Creation', () => {
     expect(client.asServiceRole.integrations).toBeDefined();
     expect(client.asServiceRole.functions).toBeDefined();
     expect(client.asServiceRole.auth).toBeUndefined();
+  });
+
+  test('should throw error when accessing asServiceRole multiple times without service token', () => {
+    const client = createClient({
+      appId: 'test-app-id',
+      token: 'user-token-123',
+    });
+    
+    // Should throw error every time asServiceRole is accessed
+    expect(() => client.asServiceRole).toThrow('Service token is required to use asServiceRole. Please provide a serviceToken when creating the client.');
+    expect(() => client.asServiceRole).toThrow('Service token is required to use asServiceRole. Please provide a serviceToken when creating the client.');
+    expect(() => client.asServiceRole.entities).toThrow('Service token is required to use asServiceRole. Please provide a serviceToken when creating the client.');
   });
 });
 
@@ -139,7 +154,8 @@ describe('createClientFromRequest', () => {
     
     expect(client).toBeDefined();
     expect(client.auth).toBeDefined();
-    expect(client.asServiceRole).toBeDefined();
+    // asServiceRole should throw error when accessed without service token
+    expect(() => client.asServiceRole).toThrow('Service token is required to use asServiceRole. Please provide a serviceToken when creating the client.');
   });
 
   test('should create client with only service token', () => {
@@ -198,7 +214,8 @@ describe('createClientFromRequest', () => {
     expect(client).toBeDefined();
     // Client should still be created even with malformed headers
     expect(client.entities).toBeDefined();
-    expect(client.asServiceRole).toBeDefined();
+    // asServiceRole should throw error when accessed without valid service token (malformed doesn't count)
+    expect(() => client.asServiceRole).toThrow('Service token is required to use asServiceRole. Please provide a serviceToken when creating the client.');
   });
 
   test('should handle empty authorization headers', () => {
@@ -219,7 +236,8 @@ describe('createClientFromRequest', () => {
     
     expect(client).toBeDefined();
     expect(client.entities).toBeDefined();
-    expect(client.asServiceRole).toBeDefined();
+    // asServiceRole should throw error when accessed without service token (empty doesn't count)
+    expect(() => client.asServiceRole).toThrow('Service token is required to use asServiceRole. Please provide a serviceToken when creating the client.');
   });
 });
 
@@ -251,18 +269,14 @@ describe('Service Role API', () => {
     expect(client.functions).not.toBe(client.asServiceRole.functions);
   });
 
-  test('should work without service token', () => {
+  test('should throw error when accessing asServiceRole without service token', () => {
     const client = createClient({
       appId: 'test-app-id',
       token: 'user-token-123',
     });
 
-    // Service role should still exist but without token
-    expect(client.asServiceRole).toBeDefined();
-    expect(client.asServiceRole.entities).toBeDefined();
-    expect(client.asServiceRole.integrations).toBeDefined();
-    expect(client.asServiceRole.functions).toBeDefined();
-    expect(client.asServiceRole.auth).toBeUndefined();
+    // Service role should throw error when accessed without token
+    expect(() => client.asServiceRole).toThrow('Service token is required to use asServiceRole. Please provide a serviceToken when creating the client.');
   });
 });
 
@@ -459,7 +473,7 @@ describe('Service Role Authorization Headers', () => {
     expect(scope.isDone()).toBe(true);
   });
 
-  test('should work without authorization header for service role when no service token is provided', async () => {
+  test('should throw error when accessing asServiceRole without service token', async () => {
     const userToken = 'user-only-token-123';
     
     const client = createClient({
@@ -469,18 +483,7 @@ describe('Service Role Authorization Headers', () => {
       // No serviceToken provided
     });
 
-    // Mock service role request without authorization header (since no service token)
-    scope.get(`/api/apps/${appId}/entities/PublicData`)
-      .matchHeader('Authorization', (val) => !val) // Should not have Authorization header
-      .reply(200, { items: [{ id: 'public1', data: 'service role public' }], total: 1 });
-
-    // Make request using service role (should work without service token)
-    const result = await client.asServiceRole.entities.PublicData.list();
-
-    // Verify response
-    expect(result.items[0].data).toBe('service role public');
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    // Should throw error when accessing asServiceRole without service token
+    expect(() => client.asServiceRole).toThrow('Service token is required to use asServiceRole. Please provide a serviceToken when creating the client.');
   });
 }); 

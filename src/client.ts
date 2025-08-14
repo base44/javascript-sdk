@@ -113,9 +113,8 @@ export function createClient(config: {
   }
 
   // Assemble and return the client
-  return {
+  const client = {
     ...userModules,
-    asServiceRole: serviceRoleModules,
 
     /**
      * Set authentication token for all requests
@@ -136,7 +135,20 @@ export function createClient(config: {
         requiresAuth,
       };
     },
+
+    /**
+     * Access service role modules - throws error if no service token was provided
+     * @throws {Error} When accessed without a service token
+     */
+    get asServiceRole() {
+      if (!serviceToken) {
+        throw new Error('Service token is required to use asServiceRole. Please provide a serviceToken when creating the client.');
+      }
+      return serviceRoleModules;
+    }
   };
+
+  return client;
 }
 
 export function createClientFromRequest(request: Request) {
