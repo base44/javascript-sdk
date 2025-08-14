@@ -115,7 +115,7 @@ export function createClient(config: {
   // Assemble and return the client
   return {
     ...userModules,
-    asService: serviceRoleModules,
+    asServiceRole: serviceRoleModules,
 
     /**
      * Set authentication token for all requests
