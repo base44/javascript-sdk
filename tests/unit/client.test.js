@@ -1,5 +1,6 @@
 import { createClient, createClientFromRequest } from '../../src/index.ts';
-import { describe, test, expect } from 'vitest';
+import { describe, test, expect, beforeEach, afterEach } from 'vitest';
+import nock from 'nock';
 
 describe('Client Creation', () => {
   test('should create a client with default options', () => {
@@ -262,5 +263,224 @@ describe('Service Role API', () => {
     expect(client.asServiceRole.integrations).toBeDefined();
     expect(client.asServiceRole.functions).toBeDefined();
     expect(client.asServiceRole.auth).toBeUndefined();
+  });
+});
+
+describe('Service Role Authorization Headers', () => {
+  
+  let scope;
+  const appId = 'test-app-id';
+  const serverUrl = 'https://api.base44.com';
+  
+  beforeEach(() => {
+    // Create a nock scope for mocking API calls
+    scope = nock(serverUrl);
+    
+    // Enable request debugging for Nock
+    nock.disableNetConnect();
+    nock.emitter.on('no match', (req) => {
+      console.log(`Nock: No match for ${req.method} ${req.path}`);
+      console.log('Headers:', req.getHeaders());
+    });
+  });
+  
+  afterEach(() => {
+    // Clean up any pending mocks
+    nock.cleanAll();
+    nock.emitter.removeAllListeners('no match');
+    nock.enableNetConnect();
+  });
+
+  test('should use user token for regular client operations and service token for service role operations', async () => {
+    const userToken = 'user-token-123';
+    const serviceToken = 'service-token-456';
+    
+    const client = createClient({
+      serverUrl,
+      appId,
+      token: userToken,
+      serviceToken: serviceToken,
+    });
+
+    // Mock user entities request (should use user token)
+    scope.get(`/api/apps/${appId}/entities/Todo`)
+      .matchHeader('Authorization', `Bearer ${userToken}`)
+      .reply(200, { items: [], total: 0 });
+
+    // Mock service role entities request (should use service token)
+    scope.get(`/api/apps/${appId}/entities/Todo`)
+      .matchHeader('Authorization', `Bearer ${serviceToken}`)
+      .reply(200, { items: [], total: 0 });
+
+    // Make requests
+    await client.entities.Todo.list();
+    await client.asServiceRole.entities.Todo.list();
+
+    // Verify all mocks were called
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test('should use service token for service role entities operations', async () => {
+    const serviceToken = 'service-token-only-123';
+    
+    const client = createClient({
+      serverUrl,
+      appId,
+      serviceToken: serviceToken,
+    });
+
+    // Mock service role entities request
+    scope.get(`/api/apps/${appId}/entities/User/123`)
+      .matchHeader('Authorization', `Bearer ${serviceToken}`)
+      .reply(200, { id: '123', name: 'Test User' });
+
+    // Make request
+    const result = await client.asServiceRole.entities.User.get('123');
+
+    // Verify response
+    expect(result.id).toBe('123');
+    expect(result.name).toBe('Test User');
+
+    // Verify all mocks were called
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test('should use service token for service role integrations operations', async () => {
+    const serviceToken = 'service-token-integration-456';
+    
+    const client = createClient({
+      serverUrl,
+      appId,
+      serviceToken: serviceToken,
+    });
+
+    // Mock service role integrations request
+    scope.post(`/api/apps/${appId}/integration-endpoints/Core/SendEmail`)
+      .matchHeader('Authorization', `Bearer ${serviceToken}`)
+      .reply(200, { success: true, messageId: '123' });
+
+    // Make request
+    const result = await client.asServiceRole.integrations.Core.SendEmail({ 
+      to: 'test@example.com',
+      subject: 'Test',
+      body: 'Test message'
+    });
+
+    // Verify response
+    expect(result.success).toBe(true);
+    expect(result.messageId).toBe('123');
+
+    // Verify all mocks were called
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test('should use service token for service role functions operations', async () => {
+    const serviceToken = 'service-token-functions-789';
+    
+    const client = createClient({
+      serverUrl,
+      appId,
+      serviceToken: serviceToken,
+    });
+
+    // Mock service role functions request
+    scope.post(`/api/apps/${appId}/functions/testFunction`, { param: 'test' })
+      .matchHeader('Authorization', `Bearer ${serviceToken}`)
+      .reply(200, { result: 'function executed' });
+
+    // Make request
+    const result = await client.asServiceRole.functions.invoke('testFunction', { 
+      param: 'test' 
+    });
+
+    // Verify response
+    expect(result.data.result).toBe('function executed');
+
+    // Verify all mocks were called
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test('should use user token for regular operations when both tokens are present', async () => {
+    const userToken = 'user-token-regular-123';
+    const serviceToken = 'service-token-regular-456';
+    
+    const client = createClient({
+      serverUrl,
+      appId,
+      token: userToken,
+      serviceToken: serviceToken,
+    });
+
+    // Mock regular user entities request (should use user token)
+    scope.get(`/api/apps/${appId}/entities/Task`)
+      .matchHeader('Authorization', `Bearer ${userToken}`)
+      .reply(200, { items: [{ id: 'task1', title: 'User Task' }], total: 1 });
+
+    // Mock regular integrations request (should use user token)
+    scope.post(`/api/apps/${appId}/integration-endpoints/Core/SendEmail`)
+      .matchHeader('Authorization', `Bearer ${userToken}`)
+      .reply(200, { success: true, messageId: 'email123' });
+
+    // Make requests using regular client (not service role)
+    const taskResult = await client.entities.Task.list();
+    const emailResult = await client.integrations.Core.SendEmail({
+      to: 'user@example.com',
+      subject: 'User Test',
+      body: 'User message'
+    });
+
+    // Verify responses
+    expect(taskResult.items[0].title).toBe('User Task');
+    expect(emailResult.success).toBe(true);
+    expect(emailResult.messageId).toBe('email123');
+
+    // Verify all mocks were called
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test('should work without authorization header when no tokens are provided', async () => {
+    const client = createClient({
+      serverUrl,
+      appId,
+    });
+
+    // Mock request without authorization header
+    scope.get(`/api/apps/${appId}/entities/PublicData`)
+      .matchHeader('Authorization', (val) => !val) // Should not have Authorization header
+      .reply(200, { items: [{ id: 'public1', data: 'public' }], total: 1 });
+
+    // Make request
+    const result = await client.entities.PublicData.list();
+
+    // Verify response
+    expect(result.items[0].data).toBe('public');
+
+    // Verify all mocks were called
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test('should work without authorization header for service role when no service token is provided', async () => {
+    const userToken = 'user-only-token-123';
+    
+    const client = createClient({
+      serverUrl,
+      appId,
+      token: userToken,
+      // No serviceToken provided
+    });
+
+    // Mock service role request without authorization header (since no service token)
+    scope.get(`/api/apps/${appId}/entities/PublicData`)
+      .matchHeader('Authorization', (val) => !val) // Should not have Authorization header
+      .reply(200, { items: [{ id: 'public1', data: 'service role public' }], total: 1 });
+
+    // Make request using service role (should work without service token)
+    const result = await client.asServiceRole.entities.PublicData.list();
+
+    // Verify response
+    expect(result.items[0].data).toBe('service role public');
+
+    // Verify all mocks were called
+    expect(scope.isDone()).toBe(true);
   });
 }); 
