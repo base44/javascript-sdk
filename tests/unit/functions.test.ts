@@ -408,4 +408,39 @@ describe("Functions Module", () => {
     // Verify all mocks were called
     expect(scope.isDone()).toBe(true);
   });
+
+  test("should send user token as Authorization header when invoking functions", async () => {
+    const functionName = "testAuth";
+    const userToken = "user-test-token";
+    const functionData = {
+      test: "data",
+    };
+
+    // Create client with user token
+    const authenticatedBase44 = createClient({
+      serverUrl,
+      appId,
+      token: userToken,
+    });
+
+    // Mock the API response, verifying the Authorization header
+    scope
+      .post(`/api/apps/${appId}/functions/${functionName}`, functionData)
+      .matchHeader("Content-Type", "application/json")
+      .matchHeader("Authorization", `Bearer ${userToken}`)
+      .reply(200, {
+        success: true,
+        authenticated: true,
+      });
+
+    // Call the function
+    const result = await authenticatedBase44.functions.invoke(functionName, functionData);
+
+    // Verify the response
+    expect(result.data.success).toBe(true);
+    expect(result.data.authenticated).toBe(true);
+
+    // Verify all mocks were called
+    expect(scope.isDone()).toBe(true);
+  });
 });

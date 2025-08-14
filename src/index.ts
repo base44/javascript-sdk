@@ -1,4 +1,4 @@
-import { createClient } from "./client.js";
+import { createClient, createClientFromRequest } from "./client.js";
 import { Base44Error } from "./utils/axios-client.js";
 import {
   getAccessToken,
@@ -9,8 +9,8 @@ import {
 
 export {
   createClient,
+  createClientFromRequest,
   Base44Error,
-  // Export auth utilities for easier access
   getAccessToken,
   saveAccessToken,
   removeAccessToken,
