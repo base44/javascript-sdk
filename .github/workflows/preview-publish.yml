@@ -87,7 +87,7 @@ jobs:
         run: |
           # Double-check package name one more time before publishing
           CURRENT_PACKAGE_NAME=$(node -p "require('./package.json').name")
-          OFFICIAL_PACKAGE=$(node -p "require('./package.json.bak').name")
+          OFFICIAL_PACKAGE=$(jq -r '.name' package.json.bak)
 
           echo "About to publish: $CURRENT_PACKAGE_NAME"
 
