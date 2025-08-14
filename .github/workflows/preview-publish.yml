@@ -127,7 +127,8 @@ jobs:
           script: |
             const fullPackage = '${{ steps.preview_info.outputs.full_package }}';
             const installCmd = `npm i ${fullPackage}`;
-             const aliasInstallCmd = `npm i "@base44/sdk@npm:${fullPackage}"`;
+            const aliasInstallCmd = `npm i "@base44/sdk@npm:${fullPackage}"`;
+
             const body = `### 🚀 Package Preview Available!
 
             ---
@@ -138,28 +139,27 @@ jobs:
             ${installCmd}
             \`\`\`
 
-             **Prefer not to change any import paths? Install using npm alias so your code still imports \\`@base44/sdk\\`:**
+            **Prefer not to change any import paths? Install using npm alias so your code still imports \`@base44/sdk\`:**
 
-             \`\`\`sh
-             ${aliasInstallCmd}
-             \`\`\`
+            \`\`\`sh
+            ${aliasInstallCmd}
+            \`\`\`
 
-             Or add it to your \`package.json\` dependencies:
+            Or add it to your \`package.json\` dependencies:
 
-             \`\`\`json
-             {
-               "dependencies": {
-                 "@base44/sdk": "npm:${fullPackage}"
-               }
-             }
-             \`\`\`
+            \`\`\`json
+            {
+              "dependencies": {
+                "@base44/sdk": "npm:${fullPackage}"
+              }
+            }
+            \`\`\`
 
             - 📦 **Preview Package**: \`${fullPackage}\`
             - 🔗 [View this commit on GitHub](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
 
             ---
-            <sub>Preview published to npm registry — try new features instantly!</sub>
-            `;
+            <sub>Preview published to npm registry — try new features instantly!</sub>`;
 
             const botCommentIdentifier = '### 🚀 Package Preview Available!';
 
