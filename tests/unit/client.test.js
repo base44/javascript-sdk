@@ -15,7 +15,6 @@ describe('Client Creation', () => {
     const config = client.getConfig();
     expect(config.appId).toBe('test-app-id');
     expect(config.serverUrl).toBe('https://base44.app');
-    expect(config.env).toBe('prod');
     expect(config.requiresAuth).toBe(false);
   });
   
@@ -23,7 +22,6 @@ describe('Client Creation', () => {
     const client = createClient({
       appId: 'test-app-id',
       serverUrl: 'https://custom-server.com',
-      env: 'dev',
       requiresAuth: true,
       token: 'test-token',
     });
@@ -33,7 +31,6 @@ describe('Client Creation', () => {
     const config = client.getConfig();
     expect(config.appId).toBe('test-app-id');
     expect(config.serverUrl).toBe('https://custom-server.com');
-    expect(config.env).toBe('dev');
     expect(config.requiresAuth).toBe(true);
   });
 }); 
