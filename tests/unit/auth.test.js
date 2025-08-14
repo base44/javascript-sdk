@@ -400,7 +400,7 @@ describe('Auth Module', () => {
     });
   });
   
-  describe('loginViaUsernamePassword()', () => {
+  describe('loginViaEmailPassword()', () => {
     test('should login successfully with email and password', async () => {
       const loginData = {
         email: 'test@example.com',
@@ -421,7 +421,7 @@ describe('Auth Module', () => {
         .reply(200, mockResponse);
         
       // Call the API
-      const result = await base44.auth.loginViaUsernamePassword(
+      const result = await base44.auth.loginViaEmailPassword(
         loginData.email,
         loginData.password
       );
@@ -462,7 +462,7 @@ describe('Auth Module', () => {
         .reply(200, mockResponse);
         
       // Call the API
-      const result = await base44.auth.loginViaUsernamePassword(
+      const result = await base44.auth.loginViaEmailPassword(
         loginData.email,
         loginData.password,
         loginData.turnstile_token
@@ -495,7 +495,7 @@ describe('Auth Module', () => {
       
       // Call the API and expect an error
       await expect(
-        base44.auth.loginViaUsernamePassword(loginData.email, loginData.password)
+        base44.auth.loginViaEmailPassword(loginData.email, loginData.password)
       ).rejects.toThrow();
       
       // Verify all mocks were called
@@ -514,7 +514,7 @@ describe('Auth Module', () => {
         
       // Call the API and expect an error
       await expect(
-        base44.auth.loginViaUsernamePassword(loginData.email, loginData.password)
+        base44.auth.loginViaEmailPassword(loginData.email, loginData.password)
       ).rejects.toThrow();
       
       // Verify all mocks were called
