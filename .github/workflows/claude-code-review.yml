@@ -13,8 +13,10 @@ on:
 jobs:
   claude-review:
     if: |
-      !contains(github.event.pull_request.head.commit.author.name, 'Claude') &&
-      !contains(github.event.pull_request.head.commit.author.email, 'noreply@anthropic.com') &&
+      github.actor != 'github-actions[bot]' && 
+      github.actor != 'claude-code[bot]' &&
+      github.actor != 'claude[bot]' &&
+      github.actor != 'claude' &&
       github.event.pull_request.head.commit.parents[1] == null
 
     runs-on: ubuntu-latest
