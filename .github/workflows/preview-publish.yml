@@ -20,7 +20,6 @@ jobs:
         with:
           node-version: 20
           cache: "npm"
-          registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
         run: npm install
@@ -55,17 +54,70 @@ jobs:
           # Create a backup of original package.json
           cp package.json package.json.bak
 
-          # Update name and version for preview
-          npm pkg set name="${{ steps.preview_info.outputs.package_name }}"
-          npm pkg set version="${{ steps.preview_info.outputs.version }}"
+          # Get the official package name for safety checks
+          OFFICIAL_PACKAGE=$(node -p "require('./package.json').name")
+          PREVIEW_PACKAGE="${{ steps.preview_info.outputs.package_name }}"
+
+          echo "Official package: $OFFICIAL_PACKAGE"
+          echo "Preview package: $PREVIEW_PACKAGE"
+
+          # Safety check: Ensure we're not accidentally using the official package name
+          if [ "$PREVIEW_PACKAGE" = "$OFFICIAL_PACKAGE" ]; then
+            echo "❌ ERROR: Preview package name matches official package name!"
+            echo "This would overwrite the official package. Aborting."
+            exit 1
+          fi
+
+          # Update name with error handling
+          if ! npm pkg set name="$PREVIEW_PACKAGE"; then
+            echo "❌ ERROR: Failed to set package name to $PREVIEW_PACKAGE"
+            exit 1
+          fi
+
+          # Update version with error handling
+          if ! npm pkg set version="${{ steps.preview_info.outputs.version }}"; then
+            echo "❌ ERROR: Failed to set package version to ${{ steps.preview_info.outputs.version }}"
+            exit 1
+          fi
+
+          echo "✅ Package.json updated successfully"
+
+          - name: Final safety check before publish
+          run: |
+            # Double-check package name one more time before publishing
+            CURRENT_PACKAGE_NAME=$(node -p "require('./package.json').name")
+            OFFICIAL_PACKAGE="@base44/sdk"
+            
+            echo "About to publish: $CURRENT_PACKAGE_NAME"
+            
+            if [ "$CURRENT_PACKAGE_NAME" = "$OFFICIAL_PACKAGE" ]; then
+              echo "❌ CRITICAL ERROR: About to publish to official package name!"
+              echo "This is not allowed. Check the workflow configuration."
+              exit 1
+            fi
+            
+            echo "✅ Safety check passed. Package name is safe to publish."
 
       - name: Publish preview package
-        run: npm publish
+        run: |
+          if npm publish; then
+            echo "✅ Package published successfully"
+          else
+            echo "❌ Package publish failed"
+            exit 1
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Restore original package.json
-        run: mv package.json.bak package.json
+        run: |
+          if [ -f package.json.bak ]; then
+            mv package.json.bak package.json
+            echo "✅ Original package.json restored"
+          else
+            echo "❌ WARNING: Backup file package.json.bak not found"
+            echo "This could indicate an earlier step failed"
+          fi
 
       - name: Comment PR with install instructions
         uses: actions/github-script@v6
@@ -73,6 +125,7 @@ jobs:
           script: |
             const fullPackage = '${{ steps.preview_info.outputs.full_package }}';
             const installCmd = `npm i ${fullPackage}`;
+             const aliasInstallCmd = `npm i "@base44/sdk@npm:${fullPackage}"`;
             const body = `### 🚀 Package Preview Available!
 
             ---
@@ -82,6 +135,22 @@ jobs:
             \`\`\`sh
             ${installCmd}
             \`\`\`
+
+             **Prefer not to change any import paths? Install using npm alias so your code still imports \\`@base44/sdk\\`:**
+
+             \`\`\`sh
+             ${aliasInstallCmd}
+             \`\`\`
+
+             Or add it to your \`package.json\` dependencies:
+
+             \`\`\`json
+             {
+               "dependencies": {
+                 "@base44/sdk": "npm:${fullPackage}"
+               }
+             }
+             \`\`\`
 
             - 📦 **Preview Package**: \`${fullPackage}\`
             - 🔗 [View this commit on GitHub](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
