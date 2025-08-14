@@ -20,6 +20,7 @@ jobs:
         with:
           node-version: 20
           cache: "npm"
+          registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
         run: npm install
@@ -46,8 +47,8 @@ jobs:
           fi
 
           echo "version=$PREVIEW_VERSION" >> $GITHUB_OUTPUT
-          echo "package_name=@base44/preview-sdk" >> $GITHUB_OUTPUT
-          echo "full_package=@base44/preview-sdk@$PREVIEW_VERSION" >> $GITHUB_OUTPUT
+          echo "package_name=@base44-preview/sdk" >> $GITHUB_OUTPUT
+          echo "full_package=@base44-preview/sdk@$PREVIEW_VERSION" >> $GITHUB_OUTPUT
 
       - name: Update package.json for preview
         run: |
@@ -86,7 +87,7 @@ jobs:
         run: |
           # Double-check package name one more time before publishing
           CURRENT_PACKAGE_NAME=$(node -p "require('./package.json').name")
-          OFFICIAL_PACKAGE="@base44/sdk"
+          OFFICIAL_PACKAGE=$(node -p "require('./package.json.bak').name")
 
           echo "About to publish: $CURRENT_PACKAGE_NAME"
 
@@ -100,7 +101,7 @@ jobs:
 
       - name: Publish preview package
         run: |
-          if npm publish; then
+          if npm publish --tag preview; then
             echo "✅ Package published successfully"
           else
             echo "❌ Package publish failed"
@@ -110,6 +111,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Restore original package.json
+        if: always()
         run: |
           if [ -f package.json.bak ]; then
             mv package.json.bak package.json
