@@ -123,7 +123,7 @@ export function createAuthModule(
      * @param turnstileToken - Optional Turnstile captcha token
      * @returns Login response with access_token and user
      */
-    async loginViaUsernamePassword(
+    async loginViaEmailPassword(
       email: string,
       password: string,
       turnstileToken?: string
