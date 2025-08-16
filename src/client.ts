@@ -2,6 +2,7 @@ import { createAxiosClient } from "./utils/axios-client.js";
 import { createEntitiesModule } from "./modules/entities.js";
 import { createIntegrationsModule } from "./modules/integrations.js";
 import { createAuthModule } from "./modules/auth.js";
+import { createSsoModule } from "./modules/sso.js";
 import { getAccessToken } from "./utils/auth-utils.js";
 import { createFunctionsModule } from "./modules/functions.js";
 
@@ -84,8 +85,8 @@ export function createClient(config: {
   const serviceRoleModules = {
     entities: createEntitiesModule(serviceRoleAxiosClient, appId),
     integrations: createIntegrationsModule(serviceRoleAxiosClient, appId),
+    sso: createSsoModule(serviceRoleAxiosClient, appId),
     functions: createFunctionsModule(serviceRoleFunctionsAxiosClient, appId),
-    auth: createAuthModule(axiosClient, functionsAxiosClient, appId),
   };
 
   // Always try to get token from localStorage or URL parameters
