@@ -22,10 +22,12 @@ export function createAuthModule(
     },
     /**
      * Get current user sso access token
+     * @param {string} userid - User ID to include as path parameter
      * @returns {Promise<Object>} Current user sso access_token
      */
-    async getSsoAccessToken() {
-      return axios.get(`/apps/${appId}/auth/sso/accesstoken`);
+    async getSsoAccessToken(userid: string) {
+      const url = `/apps/${appId}/auth/sso/accesstoken/${userid}`;
+      return axios.get(url);
     },
 
     /**
