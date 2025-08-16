@@ -85,6 +85,7 @@ export function createClient(config: {
     entities: createEntitiesModule(serviceRoleAxiosClient, appId),
     integrations: createIntegrationsModule(serviceRoleAxiosClient, appId),
     functions: createFunctionsModule(serviceRoleFunctionsAxiosClient, appId),
+    auth: createAuthModule(axiosClient, functionsAxiosClient, appId),
   };
 
   // Always try to get token from localStorage or URL parameters
