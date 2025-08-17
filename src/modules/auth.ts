@@ -21,14 +21,6 @@ export function createAuthModule(
       return axios.get(`/apps/${appId}/entities/User/me`);
     },
     /**
-     * Get current user sso access token
-     * @returns {Promise<Object>} Current user sso access_token
-     */
-    async getSsoAccessToken() {
-      return axios.get(`/apps/${appId}/auth/sso/accesstoken`);
-    },
-
-    /**
      * Update current user data
      * @param {Object} data - Updated user data
      * @returns {Promise<Object>} Updated user
