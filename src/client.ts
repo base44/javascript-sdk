@@ -85,7 +85,7 @@ export function createClient(config: {
   const serviceRoleModules = {
     entities: createEntitiesModule(serviceRoleAxiosClient, appId),
     integrations: createIntegrationsModule(serviceRoleAxiosClient, appId),
-    sso: createSsoModule(serviceRoleAxiosClient, appId),
+    sso: createSsoModule(serviceRoleAxiosClient, appId, token),
     functions: createFunctionsModule(serviceRoleFunctionsAxiosClient, appId),
   };
 
