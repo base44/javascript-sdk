@@ -229,6 +229,7 @@ describe('Auth Module', () => {
       
       // Verify token was removed from localStorage
       expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('base44_access_token');
+      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('token');
       
       // Restore window
       global.window = originalWindow;
