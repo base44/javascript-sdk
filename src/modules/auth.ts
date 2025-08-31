@@ -66,6 +66,8 @@ export function createAuthModule(
       if (typeof window !== "undefined" && window.localStorage) {
         try {
           window.localStorage.removeItem("base44_access_token");
+          // Remove "token" that is set by the built-in SDK of platform version 2
+          window.localStorage.removeItem("token");
         } catch (e) {
           console.error("Failed to remove token from localStorage:", e);
         }
