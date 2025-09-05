@@ -5,6 +5,7 @@ import { createAuthModule } from "./modules/auth.js";
 import { createSsoModule } from "./modules/sso.js";
 import { getAccessToken } from "./utils/auth-utils.js";
 import { createFunctionsModule } from "./modules/functions.js";
+import { createAgentsModule, AgentsModuleConfig } from "./modules/agents.js";
 
 /**
  * Create a Base44 client instance
@@ -14,6 +15,7 @@ import { createFunctionsModule } from "./modules/functions.js";
  * @param {string} [config.token] - Authentication token
  * @param {string} [config.serviceToken] - Service role authentication token
  * @param {boolean} [config.requiresAuth=false] - Whether the app requires authentication
+ * @param {AgentsModuleConfig} [config.agents] - Configuration for agents module
  * @returns {Object} Base44 client instance
  */
 export function createClient(config: {
@@ -22,6 +24,7 @@ export function createClient(config: {
   token?: string;
   serviceToken?: string;
   requiresAuth?: boolean;
+  agents?: AgentsModuleConfig;
 }) {
   const {
     serverUrl = "https://base44.app",
@@ -29,6 +32,7 @@ export function createClient(config: {
     token,
     serviceToken,
     requiresAuth = false,
+    agents = {},
   } = config;
 
   const axiosClient = createAxiosClient({
@@ -80,6 +84,7 @@ export function createClient(config: {
     integrations: createIntegrationsModule(axiosClient, appId),
     auth: createAuthModule(axiosClient, functionsAxiosClient, appId),
     functions: createFunctionsModule(functionsAxiosClient, appId),
+    agents: createAgentsModule(axiosClient, appId, agents),
   };
 
   const serviceRoleModules = {
@@ -87,6 +92,7 @@ export function createClient(config: {
     integrations: createIntegrationsModule(serviceRoleAxiosClient, appId),
     sso: createSsoModule(serviceRoleAxiosClient, appId, token),
     functions: createFunctionsModule(serviceRoleFunctionsAxiosClient, appId),
+    agents: createAgentsModule(serviceRoleAxiosClient, appId, agents),
   };
 
   // Always try to get token from localStorage or URL parameters
@@ -144,10 +150,12 @@ export function createClient(config: {
      */
     get asServiceRole() {
       if (!serviceToken) {
-        throw new Error('Service token is required to use asServiceRole. Please provide a serviceToken when creating the client.');
+        throw new Error(
+          "Service token is required to use asServiceRole. Please provide a serviceToken when creating the client."
+        );
       }
       return serviceRoleModules;
-    }
+    },
   };
 
   return client;
@@ -172,17 +180,29 @@ export function createClientFromRequest(request: Request) {
   let userToken: string | undefined;
 
   if (serviceRoleAuthHeader !== null) {
-    if (serviceRoleAuthHeader === '' || !serviceRoleAuthHeader.startsWith('Bearer ') || serviceRoleAuthHeader.split(' ').length !== 2) {
-      throw new Error('Invalid authorization header format. Expected "Bearer <token>"');
+    if (
+      serviceRoleAuthHeader === "" ||
+      !serviceRoleAuthHeader.startsWith("Bearer ") ||
+      serviceRoleAuthHeader.split(" ").length !== 2
+    ) {
+      throw new Error(
+        'Invalid authorization header format. Expected "Bearer <token>"'
+      );
     }
-    serviceRoleToken = serviceRoleAuthHeader.split(' ')[1];
+    serviceRoleToken = serviceRoleAuthHeader.split(" ")[1];
   }
 
   if (authHeader !== null) {
-    if (authHeader === '' || !authHeader.startsWith('Bearer ') || authHeader.split(' ').length !== 2) {
-      throw new Error('Invalid authorization header format. Expected "Bearer <token>"');
+    if (
+      authHeader === "" ||
+      !authHeader.startsWith("Bearer ") ||
+      authHeader.split(" ").length !== 2
+    ) {
+      throw new Error(
+        'Invalid authorization header format. Expected "Bearer <token>"'
+      );
     }
-    userToken = authHeader.split(' ')[1];
+    userToken = authHeader.split(" ")[1];
   }
 
   return createClient({

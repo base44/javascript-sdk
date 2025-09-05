@@ -7,6 +7,16 @@ import {
   getLoginUrl,
 } from "./utils/auth-utils.js";
 
+export type {
+  Message,
+  AgentConversation,
+  CreateConversationPayload,
+  UpdateConversationPayload,
+  FilterParams,
+  AgentsModuleConfig,
+  AgentsModule,
+} from "./modules/agents.js";
+
 export {
   createClient,
   createClientFromRequest,
