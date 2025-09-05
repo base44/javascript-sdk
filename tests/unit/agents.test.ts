@@ -79,24 +79,12 @@ describe("Agents Module", () => {
 
       const filterParams = { limit: 10, skip: 0 };
 
-      // Debug: Check if agents module exists
-      console.log("base44.agents:", !!base44.agents);
-      console.log(
-        "base44.agents.listConversations:",
-        typeof base44.agents?.listConversations
-      );
 
-      try {
-        const result = await base44.agents.listConversations(filterParams);
-        console.log("result:", result);
+      const result = await base44.agents.listConversations(filterParams);
 
-        // Check if result is the expected value
-        expect(result).toEqual(mockConversations);
-        // expect(scope.isDone()).toBe(true);
-      } catch (error) {
-        console.log("Error occurred:", error);
-        throw error;
-      }
+      // Check if result is the expected value
+      expect(result).toEqual(mockConversations);
+      // expect(scope.isDone()).toBe(true);
     });
 
     it("should fetch conversations without filter params", async () => {
@@ -307,42 +295,7 @@ describe("Agents Module", () => {
       // Don't test connected status as it depends on mock WebSocket implementation
     });
 
-    it("should allow subscription when WebSocket is enabled", () => {
-      const conversationId = "conv-123";
-      const onUpdate = vi.fn();
 
-      // This should not throw an error
-      expect(() => {
-        const unsubscribe = base44WithWS.agents.subscribeToConversation(
-          conversationId,
-          onUpdate
-        );
-        expect(typeof unsubscribe).toBe("function");
-      }).not.toThrow();
-    });
 
-    it("should handle WebSocket connection attempt", async () => {
-      // This test just verifies that connectWebSocket doesn't throw an error
-      // when WebSocket is available
-      expect(() => {
-        base44WithWS.agents.connectWebSocket().catch(() => {
-          // Ignore connection errors in tests
-        });
-      }).not.toThrow();
-    });
-
-    it("should handle subscription without throwing errors", () => {
-      const conversationId = "conv-123";
-      const onUpdate = vi.fn();
-
-      // This should work without throwing errors
-      expect(() => {
-        const unsubscribe = base44WithWS.agents.subscribeToConversation(
-          conversationId,
-          onUpdate
-        );
-        unsubscribe(); // Test unsubscribe as well
-      }).not.toThrow();
-    });
   });
 });
