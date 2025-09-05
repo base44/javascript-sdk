@@ -243,7 +243,7 @@ export function createAgentsModule(
           params: filterParams,
         }
       );
-      return response.data;
+      return response as unknown as AgentConversation[];
     },
 
     /**
@@ -253,7 +253,7 @@ export function createAgentsModule(
       const response = await axiosClient.get(
         `/apps/${appId}/agents/conversations/${conversationId}`
       );
-      return response.data;
+      return response as unknown as AgentConversation;
     },
 
     /**
@@ -266,7 +266,7 @@ export function createAgentsModule(
         `/apps/${appId}/agents/conversations`,
         payload
       );
-      return response.data;
+      return response as unknown as AgentConversation;
     },
 
     /**
@@ -280,7 +280,7 @@ export function createAgentsModule(
         `/apps/${appId}/agents/conversations/${conversationId}`,
         payload
       );
-      return response.data;
+      return response as unknown as AgentConversation;
     },
 
     /**
@@ -302,7 +302,7 @@ export function createAgentsModule(
         `/apps/${appId}/agents/conversations/${conversationId}/messages`,
         message
       );
-      return response.data;
+      return response as unknown as Message;
     },
 
     /**

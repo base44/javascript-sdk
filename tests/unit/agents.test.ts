@@ -153,7 +153,10 @@ describe("Agents Module", () => {
       };
 
       scope
-        .post(`/api/apps/${appId}/agents/conversations`, payload)
+        .post(
+          `/api/apps/${appId}/agents/conversations`,
+          payload as Record<string, any>
+        )
         .reply(200, mockConversation);
 
       const result = await base44.agents.createConversation(payload);
