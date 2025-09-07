@@ -1,6 +1,6 @@
-import { AxiosInstance } from "axios";
 import { RoomsSocket, RoomsSocketConfig } from "../utils/socket-utils";
 import { createAxiosClient } from "../utils/axios-client";
+import { AgentConversation, AgentMessage } from "./agents.types";
 
 export type AgentsModuleConfig = {
   serverUrl: string;
@@ -10,11 +10,11 @@ export type AgentsModuleConfig = {
 
 export function createAgentsModule({
   appId,
-	serverUrl,
-	token,
+  serverUrl,
+  token,
 }: AgentsModuleConfig) {
   let currentConversation: any = null;
-	const socketConfig: RoomsSocketConfig = {
+  const socketConfig: RoomsSocketConfig = {
     serverUrl,
     mountPath: "/ws-user-apps/socket.io/",
     transports: ["websocket"],
@@ -24,18 +24,18 @@ export function createAgentsModule({
     },
   };
 
-	const axiosConfig: AgentsModuleConfig = {
-		serverUrl,
-		appId,
-		token,
-	};
+  const axiosConfig: AgentsModuleConfig = {
+    serverUrl,
+    appId,
+    token,
+  };
 
-	let axios = createAgentsAxiosClient({
-		serverUrl,
-		appId,
-		token,
-	});
-	
+  let axios = createAgentsAxiosClient({
+    serverUrl,
+    appId,
+    token,
+  });
+
   const roomSocket = RoomsSocket({
     config: socketConfig,
   });
@@ -46,19 +46,23 @@ export function createAgentsModule({
   };
 
   const getConversations = () => {
-    return axios.get(`/conversations`);
+    return axios.get<any, AgentConversation[]>(`/conversations`);
   };
 
   const getConversation = (conversationId: string) => {
-    return axios.get(`/conversations/${conversationId}`);
+    return axios.get<any, AgentConversation | undefined>(
+      `/conversations/${conversationId}`
+    );
   };
 
   const listConversations = (filterParams: any) => {
-    return axios.get(`/conversations`, { params: filterParams });
+    return axios.get<any, AgentConversation[]>(`/conversations`, {
+      params: filterParams,
+    });
   };
 
   const createConversation = (conversation: any) => {
-    return axios.post(`/conversations`, conversation);
+    return axios.post<any, AgentConversation>(`/conversations`, conversation);
   };
 
   const addMessage = (conversation: any, message: any) => {
@@ -75,7 +79,10 @@ export function createAgentsModule({
       room: `/agent-conversations/${conversation.id}`,
       data: JSON.stringify(conversation),
     });
-    return axios.post(`/conversations/${conversation.id}/messages`, message);
+    return axios.post<any, AgentMessage>(
+      `/conversations/${conversation.id}/messages`,
+      message
+    );
   };
 
   const subscribeToConversation = (conversationId: string, onUpdate: any) => {
@@ -115,8 +122,8 @@ function createAgentsAxiosClient({
     appId,
     serverUrl,
     token,
-    interceptResponses: false,
-		headers: {
+    interceptResponses: true,
+    headers: {
       "X-App-Id": String(appId),
     },
   });
