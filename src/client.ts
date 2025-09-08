@@ -108,6 +108,9 @@ export function createClient(config: {
       socket,
       appId,
     }),
+    cleanup: () => {
+      socket.disconnect();
+    },
   };
 
   const serviceRoleModules = {
@@ -120,6 +123,9 @@ export function createClient(config: {
       socket,
       appId,
     }),
+    cleanup: () => {
+      socket.disconnect();
+    },
   };
 
   // Always try to get token from localStorage or URL parameters
@@ -128,9 +134,6 @@ export function createClient(config: {
     const accessToken = token || getAccessToken();
     if (accessToken) {
       userModules.auth.setToken(accessToken);
-      socket.updateConfig({
-        token: accessToken,
-      });
     }
   }
 

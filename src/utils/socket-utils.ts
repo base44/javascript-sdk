@@ -1,4 +1,5 @@
 import { Socket, io } from "socket.io-client";
+import { getAccessToken } from "./auth-utils.js";
 
 export type RoomsSocketConfig = {
   serverUrl: string;
@@ -15,6 +16,7 @@ type RoomsSocketEventsMap = {
   listen: {
     connect: () => void;
     update_model: (msg: { room: string; data: TJsonStr }) => void;
+    error: (error: Error) => void;
   };
   emit: {
     join: (room: string) => void;
@@ -30,28 +32,37 @@ type THandler<E extends TEvent> = (
 
 function initializeSocket(
   config: RoomsSocketConfig,
-  handlers: {
+  handlers: Partial<{
     [k in TEvent]: (
       ...args: Parameters<RoomsSocketEventsMap["listen"][k]>
     ) => void;
-  }
+  }>
 ) {
   const socket = io(config.serverUrl, {
     path: config.mountPath,
     transports: config.transports,
     query: {
-      appId: config.appId,
-      token: config.token,
+      app_id: config.appId,
+      token: config.token ?? getAccessToken(),
     },
   }) as Socket<RoomsSocketEventsMap["listen"], RoomsSocketEventsMap["emit"]>;
 
   socket.on("connect", () => {
     console.log("connect", socket.id);
-    handlers.connect();
+    handlers.connect?.();
   });
 
   socket.on("update_model", (msg) => {
-    handlers.update_model(msg);
+    handlers.update_model?.(msg);
+  });
+
+  socket.on("error", (error) => {
+    handlers.error?.(error);
+  });
+
+  socket.on("connect_error", (error) => {
+    console.error("connect_error", error);
+    handlers.error?.(error);
   });
 
   return socket;
@@ -61,7 +72,7 @@ export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
   let currentConfig = { ...config };
   const roomsToListeners: Record<
     TSocketRoom,
-    { [k in TEvent]: THandler<k> }[]
+    Partial<{ [k in TEvent]: THandler<k> }>[]
   > = {};
 
   const handlers: { [k in TEvent]: THandler<k> } = {
@@ -69,16 +80,20 @@ export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
       Object.keys(roomsToListeners).forEach((room) => {
         joinRoom(room);
         getListeners(room)?.forEach(({ connect: connectHandler }) => {
-          connectHandler();
+          connectHandler?.();
         });
       });
     },
     update_model: (msg) => {
       if (roomsToListeners[msg.room]) {
         getListeners(msg.room)?.forEach(({ update_model }) => {
-          update_model(msg);
+          update_model?.(msg);
         });
       }
+    },
+    error: (error) => {
+      console.error("error", error);
+      handlers.error?.(error);
     },
   };
 
@@ -117,7 +132,7 @@ export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
 
   const subscribeToRoom = (
     room: TSocketRoom,
-    handlers: { [k in TEvent]: THandler<k> }
+    handlers: Partial<{ [k in TEvent]: THandler<k> }>
   ) => {
     if (!roomsToListeners[room]) {
       joinRoom(room);
