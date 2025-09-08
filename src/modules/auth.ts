@@ -91,6 +91,7 @@ export function createAuthModule(
     setToken(token: string, saveToStorage = true) {
       if (!token) return;
 
+      // handle token change for axios clients
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
       functionsAxiosClient.defaults.headers.common[
         "Authorization"

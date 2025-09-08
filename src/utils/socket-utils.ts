@@ -4,7 +4,8 @@ export type RoomsSocketConfig = {
   serverUrl: string;
   mountPath: string;
   transports: string[];
-  query: { appId: string; token?: string };
+  appId: string;
+  token?: string;
 };
 
 export type TSocketRoom = string;
@@ -13,7 +14,7 @@ export type TJsonStr = string;
 type RoomsSocketEventsMap = {
   listen: {
     connect: () => void;
-    update_model: (msg: { room: string; data: TJsonStr; }) => void;
+    update_model: (msg: { room: string; data: TJsonStr }) => void;
   };
   emit: {
     join: (room: string) => void;
@@ -38,7 +39,10 @@ function initializeSocket(
   const socket = io(config.serverUrl, {
     path: config.mountPath,
     transports: config.transports,
-    query: config.query,
+    query: {
+      appId: config.appId,
+      token: config.token,
+    },
   }) as Socket<RoomsSocketEventsMap["listen"], RoomsSocketEventsMap["emit"]>;
 
   socket.on("connect", () => {
@@ -54,6 +58,7 @@ function initializeSocket(
 }
 
 export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
+  let currentConfig = { ...config };
   const roomsToListeners: Record<
     TSocketRoom,
     { [k in TEvent]: THandler<k> }[]
@@ -80,14 +85,22 @@ export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
   let socket = initializeSocket(config, handlers);
 
   function cleanup() {
+    disconnect();
+  }
+
+  function disconnect() {
     if (socket) {
       socket.disconnect();
     }
   }
 
-  function updateConfig(config: RoomsSocketConfig) {
+  function updateConfig(config: Partial<RoomsSocketConfig>) {
     cleanup();
-    socket = initializeSocket(config, handlers);
+    currentConfig = {
+      ...currentConfig,
+      ...config,
+    };
+    socket = initializeSocket(currentConfig, handlers);
   }
 
   function joinRoom(room: string) {
@@ -121,9 +134,10 @@ export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
   };
 
   return {
-    socket: Object.freeze(socket),
+    socket,
     subscribeToRoom,
     updateConfig,
-		handlers,
+    handlers,
+    disconnect,
   };
 }

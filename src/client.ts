@@ -6,6 +6,11 @@ import { createSsoModule } from "./modules/sso.js";
 import { getAccessToken } from "./utils/auth-utils.js";
 import { createFunctionsModule } from "./modules/functions.js";
 import { createAgentsModule } from "./modules/agents.js";
+import { RoomsSocket, RoomsSocketConfig } from "./utils/socket-utils.js";
+
+export type CreateClientOptions = {
+  onError?: (error: Error) => void;
+};
 
 /**
  * Create a Base44 client instance
@@ -23,6 +28,7 @@ export function createClient(config: {
   token?: string;
   serviceToken?: string;
   requiresAuth?: boolean;
+  options?: CreateClientOptions;
 }) {
   const {
     serverUrl = "https://base44.app",
@@ -30,7 +36,20 @@ export function createClient(config: {
     token,
     serviceToken,
     requiresAuth = false,
+    options,
   } = config;
+
+  const socketConfig: RoomsSocketConfig = {
+    serverUrl,
+    mountPath: "/ws-user-apps/socket.io/",
+    transports: ["websocket"],
+    appId,
+    token,
+  };
+
+  const socket = RoomsSocket({
+    config: socketConfig,
+  });
 
   const axiosClient = createAxiosClient({
     baseURL: `${serverUrl}/api`,
@@ -41,6 +60,7 @@ export function createClient(config: {
     requiresAuth,
     appId,
     serverUrl,
+    onError: options?.onError,
   });
 
   const functionsAxiosClient = createAxiosClient({
@@ -53,6 +73,7 @@ export function createClient(config: {
     appId,
     serverUrl,
     interceptResponses: false,
+    onError: options?.onError,
   });
 
   const serviceRoleAxiosClient = createAxiosClient({
@@ -63,6 +84,7 @@ export function createClient(config: {
     token: serviceToken,
     serverUrl,
     appId,
+    onError: options?.onError,
   });
 
   const serviceRoleFunctionsAxiosClient = createAxiosClient({
@@ -82,9 +104,9 @@ export function createClient(config: {
     auth: createAuthModule(axiosClient, functionsAxiosClient, appId),
     functions: createFunctionsModule(functionsAxiosClient, appId),
     agents: createAgentsModule({
-      serverUrl,
+      axios: axiosClient,
+      socket,
       appId,
-      token,
     }),
   };
 
@@ -94,9 +116,9 @@ export function createClient(config: {
     sso: createSsoModule(serviceRoleAxiosClient, appId, token),
     functions: createFunctionsModule(serviceRoleFunctionsAxiosClient, appId),
     agents: createAgentsModule({
-      serverUrl,
+      axios: serviceRoleAxiosClient,
+      socket,
       appId,
-      token: serviceToken,
     }),
   };
 
@@ -106,7 +128,7 @@ export function createClient(config: {
     const accessToken = token || getAccessToken();
     if (accessToken) {
       userModules.auth.setToken(accessToken);
-      userModules.agents.updateConfig({
+      socket.updateConfig({
         token: accessToken,
       });
     }
@@ -138,6 +160,9 @@ export function createClient(config: {
      */
     setToken(newToken: string) {
       userModules.auth.setToken(newToken);
+      socket.updateConfig({
+        token: newToken,
+      });
     },
 
     /**

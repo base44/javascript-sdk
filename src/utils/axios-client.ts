@@ -89,6 +89,7 @@ export function createAxiosClient({
   appId,
   serverUrl,
   interceptResponses = true,
+  onError,
 }: {
   baseURL: string;
   headers?: Record<string, string>;
@@ -97,6 +98,7 @@ export function createAxiosClient({
   appId: string;
   serverUrl: string;
   interceptResponses?: boolean;
+  onError?: (error: Error) => void;
 }) {
   const client = axios.create({
     baseURL,
@@ -160,6 +162,8 @@ export function createAxiosClient({
             redirectToLogin(serverUrl, appId);
           }, 100);
         }
+
+        onError?.(base44Error);
 
         return Promise.reject(base44Error);
       }
