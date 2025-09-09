@@ -466,7 +466,7 @@ describe('Auth Module', () => {
       const result = await base44.auth.loginViaEmailPassword(
         loginData.email,
         loginData.password,
-        loginData.turnstile_token
+        { turnstileToken: loginData.turnstile_token }
       );
       
       // Verify the response
@@ -478,6 +478,86 @@ describe('Auth Module', () => {
         .reply(200, { id: 'user-123', email: 'test@example.com' });
       
       await base44.auth.me();
+      expect(scope.isDone()).toBe(true);
+    });
+    
+    test('should login with fromUrl option when provided', async () => {
+      const loginData = {
+        email: 'test@example.com',
+        password: 'password123'
+      };
+      
+      const expectedPayload = {
+        email: 'test@example.com',
+        password: 'password123',
+        from_url: 'https://example.com/dashboard'
+      };
+      
+      const mockResponse = {
+        access_token: 'test-access-token',
+        user: {
+          id: 'user-123',
+          email: 'test@example.com'
+        }
+      };
+      
+      // Mock the API response
+      scope.post(`/api/apps/${appId}/auth/login`, expectedPayload)
+        .reply(200, mockResponse);
+        
+      // Call the API with fromUrl option
+      const result = await base44.auth.loginViaEmailPassword(
+        loginData.email,
+        loginData.password,
+        { fromUrl: 'https://example.com/dashboard' }
+      );
+      
+      // Verify the response
+      expect(result.access_token).toBe('test-access-token');
+      
+      // Verify all mocks were called
+      expect(scope.isDone()).toBe(true);
+    });
+    
+    test('should login with multiple options', async () => {
+      const loginData = {
+        email: 'test@example.com',
+        password: 'password123'
+      };
+      
+      const expectedPayload = {
+        email: 'test@example.com',
+        password: 'password123',
+        turnstile_token: 'turnstile-token-123',
+        from_url: 'https://example.com/dashboard'
+      };
+      
+      const mockResponse = {
+        access_token: 'test-access-token',
+        user: {
+          id: 'user-123',
+          email: 'test@example.com'
+        }
+      };
+      
+      // Mock the API response
+      scope.post(`/api/apps/${appId}/auth/login`, expectedPayload)
+        .reply(200, mockResponse);
+        
+      // Call the API with multiple options
+      const result = await base44.auth.loginViaEmailPassword(
+        loginData.email,
+        loginData.password,
+        { 
+          turnstileToken: 'turnstile-token-123',
+          fromUrl: 'https://example.com/dashboard'
+        }
+      );
+      
+      // Verify the response
+      expect(result.access_token).toBe('test-access-token');
+      
+      // Verify all mocks were called
       expect(scope.isDone()).toBe(true);
     });
     
