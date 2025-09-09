@@ -1,4 +1,5 @@
 import { AxiosInstance } from "axios";
+import { extractSnapshotIdFromHost } from "../utils/extract-snapshot-id-from-host.js";
 
 /**
  * Creates the functions module for the Base44 SDK
@@ -41,10 +42,18 @@ export function createFunctionsModule(axios: AxiosInstance, appId: string) {
         contentType = "application/json";
       }
 
+      // Extract functions version from the current URL host
+      const functionsVersion = extractSnapshotIdFromHost();
+
       return axios.post(
         `/apps/${appId}/functions/${functionName}`,
         formData || data,
-        { headers: { "Content-Type": contentType } }
+        { 
+          headers: { 
+            "Content-Type": contentType,
+            "X-Functions-Version": functionsVersion
+          } 
+        }
       );
     },
   };
