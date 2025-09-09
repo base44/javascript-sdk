@@ -14,9 +14,12 @@ export type TJsonStr = string;
 
 type RoomsSocketEventsMap = {
   listen: {
-    connect: () => void;
-    update_model: (msg: { room: string; data: TJsonStr }) => void;
-    error: (error: Error) => void;
+    connect: () => Promise<void> | void;
+    update_model: (msg: {
+      room: string;
+      data: TJsonStr;
+    }) => Promise<void> | void;
+    error: (error: Error) => Promise<void> | void;
   };
   emit: {
     join: (room: string) => void;
@@ -26,9 +29,7 @@ type RoomsSocketEventsMap = {
 
 type TEvent = keyof RoomsSocketEventsMap["listen"];
 
-type THandler<E extends TEvent> = (
-  ...args: Parameters<RoomsSocketEventsMap["listen"][E]>
-) => void;
+type THandler<E extends TEvent> = RoomsSocketEventsMap["listen"][E];
 
 function initializeSocket(
   config: RoomsSocketConfig,
@@ -68,6 +69,8 @@ function initializeSocket(
   return socket;
 }
 
+export type RoomsSocket = ReturnType<typeof RoomsSocket>;
+
 export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
   let currentConfig = { ...config };
   const roomsToListeners: Record<
@@ -76,24 +79,28 @@ export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
   > = {};
 
   const handlers: { [k in TEvent]: THandler<k> } = {
-    connect: () => {
+    connect: async () => {
+      const promises: Promise<void>[] = [];
       Object.keys(roomsToListeners).forEach((room) => {
         joinRoom(room);
-        getListeners(room)?.forEach(({ connect: connectHandler }) => {
-          connectHandler?.();
+        const listeners = getListeners(room);
+        listeners?.forEach(({ connect }) => {
+          const promise = async () => connect?.();
+          promises.push(promise());
         });
       });
+      await Promise.all(promises);
     },
-    update_model: (msg) => {
-      if (roomsToListeners[msg.room]) {
-        getListeners(msg.room)?.forEach(({ update_model }) => {
-          update_model?.(msg);
-        });
-      }
+    update_model: async (msg) => {
+      const listeners = getListeners(msg.room);
+      const promises = listeners.map((listener) =>
+        listener.update_model?.(msg)
+      );
+      await Promise.all(promises);
     },
-    error: (error) => {
+    error: async (error) => {
       console.error("error", error);
-      handlers.error?.(error);
+      await handlers.error?.(error);
     },
   };
 
@@ -126,6 +133,11 @@ export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
     socket.emit("leave", room);
   }
 
+  async function updateModel(room: string, data: any) {
+    const dataStr = JSON.stringify(data);
+    return handlers.update_model?.({ room, data: dataStr });
+  }
+
   function getListeners(room: string) {
     return roomsToListeners[room];
   }
@@ -152,7 +164,7 @@ export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
     socket,
     subscribeToRoom,
     updateConfig,
-    handlers,
+    updateModel,
     disconnect,
   };
 }

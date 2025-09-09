@@ -1,7 +1,7 @@
-import { RoomsSocket, RoomsSocketConfig } from "../utils/socket-utils.js";
-import { createAxiosClient } from "../utils/axios-client.js";
-import { AgentConversation, AgentMessage } from "./agents.types.js";
+import { RoomsSocket } from "../utils/socket-utils.js";
+import { AgentConversation, AgentMessage } from "./types.js";
 import { AxiosInstance } from "axios";
+import { ModelFilterParams } from "../types.js";
 
 export type AgentsModuleConfig = {
   axios: AxiosInstance;
@@ -14,7 +14,6 @@ export function createAgentsModule({
   socket,
   appId,
 }: AgentsModuleConfig) {
-  let currentConversation: any = null;
   const baseURL = `/apps/${appId}/agents`;
 
   const getConversations = () => {
@@ -27,48 +26,50 @@ export function createAgentsModule({
     );
   };
 
-  const listConversations = (filterParams: any) => {
+  const listConversations = (filterParams: ModelFilterParams) => {
     return axios.get<any, AgentConversation[]>(`${baseURL}/conversations`, {
       params: filterParams,
     });
   };
 
-  const createConversation = (conversation: any) => {
+  const createConversation = (conversation: {
+    agent_name: string;
+    metadata?: Record<string, any>;
+  }) => {
     return axios.post<any, AgentConversation>(
       `${baseURL}/conversations`,
       conversation
     );
   };
-
-  const addMessage = (conversation: any, message: any) => {
-    // this whole trick with current conversation so that we can call the onUpdateModel with the latest messages
-    let convLatestMessages = null;
-    if (currentConversation && currentConversation.id === conversation.id) {
-      convLatestMessages = currentConversation.messages;
-    } else {
-      currentConversation = conversation;
-      convLatestMessages = conversation.messages;
-    }
-    conversation.messages = [...convLatestMessages, message];
-    socket.handlers.update_model({
-      room: `/agent-conversations/${conversation.id}`,
-      data: JSON.stringify(conversation),
-    });
+ 
+  const addMessage = async (
+    conversation: AgentConversation,
+    message: AgentMessage
+  ) => {
+    const room = `/agent-conversations/${conversation.id}`;
+    await socket.updateModel(
+      room,
+      {
+        ...conversation,
+        messages: [...(conversation.messages || []), message],
+      }
+    );
     return axios.post<any, AgentMessage>(
       `${baseURL}/conversations/${conversation.id}/messages`,
       message
     );
   };
 
-  const subscribeToConversation = (conversationId: string, onUpdate: any) => {
-    return socket.subscribeToRoom(`/agent-conversations/${conversationId}`, {
+  const subscribeToConversation = (
+    conversationId: string,
+    onUpdate?: (conversation: AgentConversation) => void
+  ) => {
+    const room = `/agent-conversations/${conversationId}`;
+    return socket.subscribeToRoom(room, {
       connect: () => {},
       update_model: ({ data: jsonStr }) => {
-        const data = JSON.parse(jsonStr) as {} & { id: string };
-        if (currentConversation && currentConversation.id === data.id) {
-          currentConversation = data;
-        }
-        onUpdate(data);
+        const conv = JSON.parse(jsonStr) as AgentConversation;
+        onUpdate?.(conv);
       },
     });
   };

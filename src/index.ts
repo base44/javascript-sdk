@@ -1,4 +1,4 @@
-import { createClient, createClientFromRequest } from "./client.js";
+import { createClient, createClientFromRequest, Base44SDK } from "./client.js";
 import { Base44Error } from "./utils/axios-client.js";
 import {
   getAccessToken,
@@ -16,3 +16,7 @@ export {
   removeAccessToken,
   getLoginUrl,
 };
+
+export type { Base44SDK };
+
+export * from "./types.js";

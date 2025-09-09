@@ -12,6 +12,8 @@ export type CreateClientOptions = {
   onError?: (error: Error) => void;
 };
 
+export type Base44SDK = ReturnType<typeof createClient>;
+
 /**
  * Create a Base44 client instance
  * @param {Object} config - Client configuration
