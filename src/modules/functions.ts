@@ -51,7 +51,7 @@ export function createFunctionsModule(axios: AxiosInstance, appId: string) {
         { 
           headers: { 
             "Content-Type": contentType,
-            "X-Functions-Version": functionsVersion
+            "Base44-Functions-Version": functionsVersion
           } 
         }
       );
