@@ -22,6 +22,7 @@ export function createClient(config: {
   token?: string;
   serviceToken?: string;
   requiresAuth?: boolean;
+  functionsVersion?: string;
 }) {
   const {
     serverUrl = "https://base44.app",
@@ -29,13 +30,21 @@ export function createClient(config: {
     token,
     serviceToken,
     requiresAuth = false,
+    functionsVersion
   } = config;
+
+  const headers = {
+    "X-App-Id": String(appId),
+  }
+
+  const functionHeaders = functionsVersion ? {
+    ...headers,
+    "Base44-Functions-Version": functionsVersion
+  } : headers;
 
   const axiosClient = createAxiosClient({
     baseURL: `${serverUrl}/api`,
-    headers: {
-      "X-App-Id": String(appId),
-    },
+    headers,
     token,
     requiresAuth,
     appId,
@@ -44,9 +53,7 @@ export function createClient(config: {
 
   const functionsAxiosClient = createAxiosClient({
     baseURL: `${serverUrl}/api`,
-    headers: {
-      "X-App-Id": String(appId),
-    },
+    headers: functionHeaders,
     token,
     requiresAuth,
     appId,
@@ -56,9 +63,7 @@ export function createClient(config: {
 
   const serviceRoleAxiosClient = createAxiosClient({
     baseURL: `${serverUrl}/api`,
-    headers: {
-      "X-App-Id": String(appId),
-    },
+    headers,
     token: serviceToken,
     serverUrl,
     appId,
@@ -66,9 +71,7 @@ export function createClient(config: {
 
   const serviceRoleFunctionsAxiosClient = createAxiosClient({
     baseURL: `${serverUrl}/api`,
-    headers: {
-      "X-App-Id": String(appId),
-    },
+    headers: functionHeaders,
     token: serviceToken,
     serverUrl,
     appId,
@@ -160,6 +163,7 @@ export function createClientFromRequest(request: Request) {
   );
   const appId = request.headers.get("Base44-App-Id");
   const serverUrlHeader = request.headers.get("Base44-Api-Url");
+  const functionsVersion = request.headers.get("Base44-Functions-Version");
 
   if (!appId) {
     throw new Error(
@@ -190,5 +194,6 @@ export function createClientFromRequest(request: Request) {
     appId,
     token: userToken,
     serviceToken: serviceRoleToken,
+    functionsVersion: functionsVersion ?? undefined
   });
 }
