@@ -33,11 +33,7 @@ type THandler<E extends TEvent> = RoomsSocketEventsMap["listen"][E];
 
 function initializeSocket(
   config: RoomsSocketConfig,
-  handlers: Partial<{
-    [k in TEvent]: (
-      ...args: Parameters<RoomsSocketEventsMap["listen"][k]>
-    ) => void;
-  }>
+  handlers: Partial<RoomsSocketEventsMap["listen"]>
 ) {
   const socket = io(config.serverUrl, {
     path: config.mountPath,
@@ -48,22 +44,22 @@ function initializeSocket(
     },
   }) as Socket<RoomsSocketEventsMap["listen"], RoomsSocketEventsMap["emit"]>;
 
-  socket.on("connect", () => {
+  socket.on("connect", async () => {
     console.log("connect", socket.id);
-    handlers.connect?.();
+    return handlers.connect?.();
   });
 
-  socket.on("update_model", (msg) => {
-    handlers.update_model?.(msg);
+  socket.on("update_model", async (msg) => {
+    return handlers.update_model?.(msg);
   });
 
-  socket.on("error", (error) => {
-    handlers.error?.(error);
+  socket.on("error", async (error) => {
+    return handlers.error?.(error);
   });
 
-  socket.on("connect_error", (error) => {
+  socket.on("connect_error", async (error) => {
     console.error("connect_error", error);
-    handlers.error?.(error);
+    return handlers.error?.(error);
   });
 
   return socket;
@@ -75,10 +71,10 @@ export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
   let currentConfig = { ...config };
   const roomsToListeners: Record<
     TSocketRoom,
-    Partial<{ [k in TEvent]: THandler<k> }>[]
+    Partial<RoomsSocketEventsMap["listen"]>[]
   > = {};
 
-  const handlers: { [k in TEvent]: THandler<k> } = {
+  const handlers: RoomsSocketEventsMap["listen"] = {
     connect: async () => {
       const promises: Promise<void>[] = [];
       Object.keys(roomsToListeners).forEach((room) => {
@@ -100,7 +96,10 @@ export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
     },
     error: async (error) => {
       console.error("error", error);
-      await handlers.error?.(error);
+      const promises = Object.values(roomsToListeners)
+        .flat()
+        .map((listener) => listener.error?.(error));
+      await Promise.all(promises);
     },
   };
 
@@ -154,9 +153,12 @@ export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
     roomsToListeners[room].push(handlers);
 
     return () => {
-      roomsToListeners[room] = roomsToListeners[room].filter(
-        (listener) => listener !== handlers
-      );
+      roomsToListeners[room] =
+        roomsToListeners[room]?.filter((listener) => listener !== handlers) ??
+        [];
+      if (roomsToListeners[room].length === 0) {
+        leaveRoom(room);
+      }
     };
   };
 
