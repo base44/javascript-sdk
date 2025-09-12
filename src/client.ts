@@ -112,7 +112,6 @@ export function createClient(config: {
   });
 
   const userModules = {
-    app: createAppModule(axiosClient, appId),
     entities: createEntitiesModule(axiosClient, appId),
     integrations: createIntegrationsModule(axiosClient, appId),
     auth: createAuthModule(axiosClient, functionsAxiosClient, appId, {
