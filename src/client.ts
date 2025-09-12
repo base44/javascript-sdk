@@ -32,6 +32,7 @@ export function createClient(config: {
   requiresAuth?: boolean;
   functionsVersion?: string;
   options?: CreateClientOptions;
+  onRedirectToLogin?: () => void;
 }) {
   const {
     serverUrl = "https://base44.app",
@@ -41,6 +42,7 @@ export function createClient(config: {
     requiresAuth = false,
     options,
     functionsVersion,
+    onRedirectToLogin,
   } = config;
 
   const socketConfig: RoomsSocketConfig = {
@@ -74,6 +76,7 @@ export function createClient(config: {
     appId,
     serverUrl,
     onError: options?.onError,
+    onRedirectToLogin,
   });
 
   const functionsAxiosClient = createAxiosClient({
@@ -85,6 +88,7 @@ export function createClient(config: {
     serverUrl,
     interceptResponses: false,
     onError: options?.onError,
+    onRedirectToLogin,
   });
 
   const serviceRoleAxiosClient = createAxiosClient({
@@ -94,6 +98,7 @@ export function createClient(config: {
     serverUrl,
     appId,
     onError: options?.onError,
+    onRedirectToLogin,
   });
 
   const serviceRoleFunctionsAxiosClient = createAxiosClient({
@@ -103,12 +108,17 @@ export function createClient(config: {
     serverUrl,
     appId,
     interceptResponses: false,
+    onRedirectToLogin,
   });
 
   const userModules = {
+    app: createAppModule(axiosClient, appId),
     entities: createEntitiesModule(axiosClient, appId),
     integrations: createIntegrationsModule(axiosClient, appId),
-    auth: createAuthModule(axiosClient, functionsAxiosClient, appId),
+    auth: createAuthModule(axiosClient, functionsAxiosClient, appId, {
+      onRedirectToLogin,
+      serverUrl,
+    }),
     functions: createFunctionsModule(functionsAxiosClient, appId),
     agents: createAgentsModule({
       axios: axiosClient,
