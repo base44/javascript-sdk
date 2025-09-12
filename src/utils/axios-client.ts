@@ -90,6 +90,7 @@ export function createAxiosClient({
   serverUrl,
   interceptResponses = true,
   onError,
+  onRedirectToLogin,
 }: {
   baseURL: string;
   headers?: Record<string, string>;
@@ -99,6 +100,7 @@ export function createAxiosClient({
   serverUrl: string;
   interceptResponses?: boolean;
   onError?: (error: Error) => void;
+  onRedirectToLogin?: () => void;
 }) {
   const client = axios.create({
     baseURL,
@@ -159,7 +161,9 @@ export function createAxiosClient({
           console.log("Authentication required. Redirecting to login...");
           // Use a slight delay to allow the error to propagate first
           setTimeout(() => {
-            redirectToLogin(serverUrl, appId);
+            onRedirectToLogin
+              ? onRedirectToLogin()
+              : redirectToLogin(serverUrl, appId);
           }, 100);
         }
 

@@ -1,5 +1,5 @@
 import { RoomsSocket } from "../utils/socket-utils.js";
-import { AgentConversation, AgentMessage } from "./types.js";
+import { AgentConversation, AgentMessage } from "./agents.types.js";
 import { AxiosInstance } from "axios";
 import { ModelFilterParams } from "../types.js";
 

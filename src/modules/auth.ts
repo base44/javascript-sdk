@@ -10,7 +10,11 @@ import { AxiosInstance } from "axios";
 export function createAuthModule(
   axios: AxiosInstance,
   functionsAxiosClient: AxiosInstance,
-  appId: string
+  appId: string,
+  options: {
+    serverUrl: string;
+    onRedirectToLogin?: () => void;
+  }
 ) {
   return {
     /**
@@ -42,6 +46,10 @@ export function createAuthModule(
         );
       }
 
+      if (options.onRedirectToLogin) {
+        options.onRedirectToLogin();
+        return;
+      }
       // If nextUrl is not provided, use the current URL
       const redirectUrl = nextUrl || window.location.href;
 
