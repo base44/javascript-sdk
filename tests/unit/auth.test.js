@@ -149,7 +149,7 @@ describe('Auth Module', () => {
       
       // Verify the redirect URL was set correctly
       expect(mockLocation.href).toBe(
-        `/login?from_url=${encodeURIComponent(nextUrl)}`
+        `${serverUrl}/login?from_url=${encodeURIComponent(nextUrl)}&app_id=${appId}`
       );
       
       // Restore window
@@ -169,7 +169,7 @@ describe('Auth Module', () => {
       
       // Verify the redirect URL uses current URL
       expect(mockLocation.href).toBe(
-        `/login?from_url=${encodeURIComponent(currentUrl)}`
+        `${serverUrl}/login?from_url=${encodeURIComponent(currentUrl)}&app_id=${appId}`
       );
       
       // Restore window
