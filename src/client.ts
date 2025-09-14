@@ -5,6 +5,14 @@ import { createAuthModule } from "./modules/auth.js";
 import { createSsoModule } from "./modules/sso.js";
 import { getAccessToken } from "./utils/auth-utils.js";
 import { createFunctionsModule } from "./modules/functions.js";
+import { createAgentsModule } from "./modules/agents.js";
+import { RoomsSocket, RoomsSocketConfig } from "./utils/socket-utils.js";
+
+export type CreateClientOptions = {
+  onError?: (error: Error) => void;
+};
+
+export type Base44Client = ReturnType<typeof createClient>;
 
 /**
  * Create a Base44 client instance
@@ -23,6 +31,8 @@ export function createClient(config: {
   serviceToken?: string;
   requiresAuth?: boolean;
   functionsVersion?: string;
+  options?: CreateClientOptions;
+  onRedirectToLogin?: () => void;
 }) {
   const {
     serverUrl = "https://base44.app",
@@ -30,17 +40,33 @@ export function createClient(config: {
     token,
     serviceToken,
     requiresAuth = false,
-    functionsVersion
+    options,
+    functionsVersion,
+    onRedirectToLogin,
   } = config;
+
+  const socketConfig: RoomsSocketConfig = {
+    serverUrl,
+    mountPath: "/ws-user-apps/socket.io/",
+    transports: ["websocket"],
+    appId,
+    token,
+  };
+
+  const socket = RoomsSocket({
+    config: socketConfig,
+  });
 
   const headers = {
     "X-App-Id": String(appId),
-  }
+  };
 
-  const functionHeaders = functionsVersion ? {
-    ...headers,
-    "Base44-Functions-Version": functionsVersion
-  } : headers;
+  const functionHeaders = functionsVersion
+    ? {
+        ...headers,
+        "Base44-Functions-Version": functionsVersion,
+      }
+    : headers;
 
   const axiosClient = createAxiosClient({
     baseURL: `${serverUrl}/api`,
@@ -49,6 +75,8 @@ export function createClient(config: {
     requiresAuth,
     appId,
     serverUrl,
+    onError: options?.onError,
+    onRedirectToLogin,
   });
 
   const functionsAxiosClient = createAxiosClient({
@@ -59,6 +87,8 @@ export function createClient(config: {
     appId,
     serverUrl,
     interceptResponses: false,
+    onError: options?.onError,
+    onRedirectToLogin,
   });
 
   const serviceRoleAxiosClient = createAxiosClient({
@@ -67,6 +97,8 @@ export function createClient(config: {
     token: serviceToken,
     serverUrl,
     appId,
+    onError: options?.onError,
+    onRedirectToLogin,
   });
 
   const serviceRoleFunctionsAxiosClient = createAxiosClient({
@@ -76,13 +108,25 @@ export function createClient(config: {
     serverUrl,
     appId,
     interceptResponses: false,
+    onRedirectToLogin,
   });
 
   const userModules = {
     entities: createEntitiesModule(axiosClient, appId),
     integrations: createIntegrationsModule(axiosClient, appId),
-    auth: createAuthModule(axiosClient, functionsAxiosClient, appId),
+    auth: createAuthModule(axiosClient, functionsAxiosClient, appId, {
+      onRedirectToLogin,
+      serverUrl,
+    }),
     functions: createFunctionsModule(functionsAxiosClient, appId),
+    agents: createAgentsModule({
+      axios: axiosClient,
+      socket,
+      appId,
+    }),
+    cleanup: () => {
+      socket.disconnect();
+    },
   };
 
   const serviceRoleModules = {
@@ -90,6 +134,14 @@ export function createClient(config: {
     integrations: createIntegrationsModule(serviceRoleAxiosClient, appId),
     sso: createSsoModule(serviceRoleAxiosClient, appId, token),
     functions: createFunctionsModule(serviceRoleFunctionsAxiosClient, appId),
+    agents: createAgentsModule({
+      axios: serviceRoleAxiosClient,
+      socket,
+      appId,
+    }),
+    cleanup: () => {
+      socket.disconnect();
+    },
   };
 
   // Always try to get token from localStorage or URL parameters
@@ -127,6 +179,9 @@ export function createClient(config: {
      */
     setToken(newToken: string) {
       userModules.auth.setToken(newToken);
+      socket.updateConfig({
+        token: newToken,
+      });
     },
 
     /**
@@ -147,10 +202,12 @@ export function createClient(config: {
      */
     get asServiceRole() {
       if (!serviceToken) {
-        throw new Error('Service token is required to use asServiceRole. Please provide a serviceToken when creating the client.');
+        throw new Error(
+          "Service token is required to use asServiceRole. Please provide a serviceToken when creating the client."
+        );
       }
       return serviceRoleModules;
-    }
+    },
   };
 
   return client;
@@ -176,17 +233,29 @@ export function createClientFromRequest(request: Request) {
   let userToken: string | undefined;
 
   if (serviceRoleAuthHeader !== null) {
-    if (serviceRoleAuthHeader === '' || !serviceRoleAuthHeader.startsWith('Bearer ') || serviceRoleAuthHeader.split(' ').length !== 2) {
-      throw new Error('Invalid authorization header format. Expected "Bearer <token>"');
+    if (
+      serviceRoleAuthHeader === "" ||
+      !serviceRoleAuthHeader.startsWith("Bearer ") ||
+      serviceRoleAuthHeader.split(" ").length !== 2
+    ) {
+      throw new Error(
+        'Invalid authorization header format. Expected "Bearer <token>"'
+      );
     }
-    serviceRoleToken = serviceRoleAuthHeader.split(' ')[1];
+    serviceRoleToken = serviceRoleAuthHeader.split(" ")[1];
   }
 
   if (authHeader !== null) {
-    if (authHeader === '' || !authHeader.startsWith('Bearer ') || authHeader.split(' ').length !== 2) {
-      throw new Error('Invalid authorization header format. Expected "Bearer <token>"');
+    if (
+      authHeader === "" ||
+      !authHeader.startsWith("Bearer ") ||
+      authHeader.split(" ").length !== 2
+    ) {
+      throw new Error(
+        'Invalid authorization header format. Expected "Bearer <token>"'
+      );
     }
-    userToken = authHeader.split(' ')[1];
+    userToken = authHeader.split(" ")[1];
   }
 
   return createClient({
@@ -194,6 +263,6 @@ export function createClientFromRequest(request: Request) {
     appId,
     token: userToken,
     serviceToken: serviceRoleToken,
-    functionsVersion: functionsVersion ?? undefined
+    functionsVersion: functionsVersion ?? undefined,
   });
 }
