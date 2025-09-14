@@ -54,7 +54,9 @@ export function createAuthModule(
       const redirectUrl = nextUrl || window.location.href;
 
       // Build the login URL
-      const loginUrl = `/login?from_url=${encodeURIComponent(redirectUrl)}`;
+      const loginUrl = `${
+        options.serverUrl
+      }/login?from_url=${encodeURIComponent(redirectUrl)}`;
 
       // Redirect to the login page
       window.location.href = loginUrl;
