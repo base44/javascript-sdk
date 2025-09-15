@@ -1,4 +1,5 @@
 import { AxiosInstance } from "axios";
+import { RegisterPayload } from "./auth.types";
 
 /**
  * Creates the auth module for the Base44 SDK
@@ -173,6 +174,78 @@ export function createAuthModule(
       } catch (error) {
         return false;
       }
+    },
+
+    inviteUser(userEmail: string, role: string) {
+      return axios.post(`/apps/${appId}/users/invite-user`, {
+        user_email: userEmail,
+        role,
+      });
+    },
+
+    register(payload: {
+      email: string;
+      password: string;
+      turnstile_token?: string | null;
+      referral_code?: string | null;
+    }) {
+      return axios.post(`/apps/${appId}/auth/register`, payload);
+    },
+
+    verifyOtp({ email, otpCode }: { email: string; otpCode: string }) {
+      return axios.post(`/apps/${appId}/auth/verify-otp`, {
+        email,
+        otp_code: otpCode,
+      });
+    },
+
+    resendOtp(email: string) {
+      return axios.post(`/apps/${appId}/auth/resend-otp`, { email });
+    },
+
+    loginViaUsernamePassword({
+      email,
+      password,
+    }: {
+      email: string;
+      password: string;
+    }) {
+      return axios.post(`/apps/${appId}/auth/login`, { email, password });
+    },
+
+    resetPasswordRequest(email: string) {
+      return axios.post(`/apps/${appId}/auth/reset-password-request`, {
+        email,
+      });
+    },
+
+    resetPassword({
+      resetToken,
+      newPassword,
+    }: {
+      resetToken: string;
+      newPassword: string;
+    }) {
+      return axios.post(`/apps/${appId}/auth/reset-password`, {
+        reset_token: resetToken,
+        new_password: newPassword,
+      });
+    },
+
+    changePassword({
+      userId,
+      currentPassword,
+      newPassword,
+    }: {
+      userId: string;
+      currentPassword: string;
+      newPassword: string;
+    }) {
+      return axios.post(`/apps/${appId}/auth/change-password`, {
+        user_id: userId,
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
     },
   };
 }
