@@ -202,16 +202,6 @@ export function createAuthModule(
       return axios.post(`/apps/${appId}/auth/resend-otp`, { email });
     },
 
-    loginViaUsernamePassword({
-      email,
-      password,
-    }: {
-      email: string;
-      password: string;
-    }) {
-      return axios.post(`/apps/${appId}/auth/login`, { email, password });
-    },
-
     resetPasswordRequest(email: string) {
       return axios.post(`/apps/${appId}/auth/reset-password-request`, {
         email,
