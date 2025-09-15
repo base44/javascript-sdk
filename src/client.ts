@@ -31,6 +31,7 @@ export function createClient(config: {
   serviceToken?: string;
   requiresAuth?: boolean;
   functionsVersion?: string;
+  headers?: Record<string, string>;
   options?: CreateClientOptions;
   onRedirectToLogin?: () => void;
 }) {
@@ -43,6 +44,7 @@ export function createClient(config: {
     options,
     functionsVersion,
     onRedirectToLogin,
+    headers: optionalHeaders,
   } = config;
 
   const socketConfig: RoomsSocketConfig = {
@@ -58,6 +60,7 @@ export function createClient(config: {
   });
 
   const headers = {
+    ...optionalHeaders,
     "X-App-Id": String(appId),
   };
 

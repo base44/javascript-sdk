@@ -54,7 +54,9 @@ export function createAuthModule(
       const redirectUrl = nextUrl || window.location.href;
 
       // Build the login URL
-      const loginUrl = `/login?from_url=${encodeURIComponent(redirectUrl)}`;
+      const loginUrl = `${
+        options.serverUrl
+      }/login?from_url=${encodeURIComponent(redirectUrl)}&app_id=${appId}`;
 
       // Redirect to the login page
       window.location.href = loginUrl;
@@ -171,6 +173,68 @@ export function createAuthModule(
       } catch (error) {
         return false;
       }
+    },
+
+    inviteUser(userEmail: string, role: string) {
+      return axios.post(`/apps/${appId}/users/invite-user`, {
+        user_email: userEmail,
+        role,
+      });
+    },
+
+    register(payload: {
+      email: string;
+      password: string;
+      turnstile_token?: string | null;
+      referral_code?: string | null;
+    }) {
+      return axios.post(`/apps/${appId}/auth/register`, payload);
+    },
+
+    verifyOtp({ email, otpCode }: { email: string; otpCode: string }) {
+      return axios.post(`/apps/${appId}/auth/verify-otp`, {
+        email,
+        otp_code: otpCode,
+      });
+    },
+
+    resendOtp(email: string) {
+      return axios.post(`/apps/${appId}/auth/resend-otp`, { email });
+    },
+
+    resetPasswordRequest(email: string) {
+      return axios.post(`/apps/${appId}/auth/reset-password-request`, {
+        email,
+      });
+    },
+
+    resetPassword({
+      resetToken,
+      newPassword,
+    }: {
+      resetToken: string;
+      newPassword: string;
+    }) {
+      return axios.post(`/apps/${appId}/auth/reset-password`, {
+        reset_token: resetToken,
+        new_password: newPassword,
+      });
+    },
+
+    changePassword({
+      userId,
+      currentPassword,
+      newPassword,
+    }: {
+      userId: string;
+      currentPassword: string;
+      newPassword: string;
+    }) {
+      return axios.post(`/apps/${appId}/auth/change-password`, {
+        user_id: userId,
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
     },
   };
 }
