@@ -1,5 +1,4 @@
 import { AxiosInstance } from "axios";
-import { RegisterPayload } from "./auth.types";
 
 /**
  * Creates the auth module for the Base44 SDK
