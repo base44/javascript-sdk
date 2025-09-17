@@ -1,4 +1,6 @@
 import axios from "axios";
+import { isInIFrame } from "./common";
+import { v4 as uuidv4 } from "./common";
 
 export class Base44Error extends Error {
   status: number;
@@ -121,13 +123,57 @@ export function createAxiosClient({
     if (typeof window !== "undefined") {
       config.headers.set("X-Origin-URL", window.location.href);
     }
+
+    if (isInIFrame) {
+      const requestId = uuidv4();
+      try {
+        window.parent.postMessage(
+          {
+            type: "api-request-start",
+            requestId,
+            data: {
+              url: baseURL + config.url,
+              method: config.method,
+              body:
+                config.data instanceof FormData
+                  ? "[FormData object]"
+                  : config.data,
+            },
+          },
+          "*"
+        );
+      } catch {
+        /* skip the logging */
+      }
+    }
     return config;
   });
 
   // Handle responses
   if (interceptResponses) {
     client.interceptors.response.use(
-      (response) => response.data,
+      (response) => {
+        const requestId = (response.config as any)?.requestId;
+        try {
+          if (isInIFrame && requestId) {
+            window.parent.postMessage(
+              {
+                type: "api-request-end",
+                requestId,
+                data: {
+                  statusCode: response.status,
+                  response: response.data,
+                },
+              },
+              "*"
+            );
+          }
+        } catch {
+          /* do nothing */
+        }
+
+        return response.data;
+      },
       (error) => {
         const message =
           error.response?.data?.message ||
