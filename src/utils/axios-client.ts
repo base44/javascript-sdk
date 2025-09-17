@@ -1,6 +1,6 @@
 import axios from "axios";
 import { isInIFrame } from "./common";
-import { v4 as uuidv4 } from "./common";
+import { v4 as uuidv4 } from "uuid";
 
 export class Base44Error extends Error {
   status: number;
