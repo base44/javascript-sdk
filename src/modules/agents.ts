@@ -74,6 +74,10 @@ export function createAgentsModule({
     });
   };
 
+  const generateUserWhatsAppLink = (agentName: string) => {
+    return axios.post(`/whatsapp/generate-user-link`, { agent_name: agentName });
+  };
+
   return {
     getConversations,
     getConversation,
@@ -81,5 +85,6 @@ export function createAgentsModule({
     createConversation,
     addMessage,
     subscribeToConversation,
+    generateUserWhatsAppLink,
   };
 }
