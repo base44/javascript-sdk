@@ -1,5 +1,5 @@
 import axios from "axios";
-import { isInIFrame } from "./common";
+import { isInIFrame } from "./common.js";
 import { v4 as uuidv4 } from "uuid";
 
 export class Base44Error extends Error {
