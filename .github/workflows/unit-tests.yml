@@ -25,3 +25,6 @@ jobs:
 
       - name: Run unit tests
         run: npm run test:unit
+
+      - name: Test ES module compliance
+        run: npm run test:esm

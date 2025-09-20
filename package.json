@@ -11,9 +11,10 @@
   "scripts": {
     "build": "tsc",
     "lint": "eslint src",
-    "test": "vitest run",
+    "test": "npm run build && vitest run",
     "test:unit": "vitest run tests/unit",
     "test:e2e": "vitest run tests/e2e",
+    "test:esm": "npm run build && node test-esm-strict.mjs",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "prepublishOnly": "npm run build"
