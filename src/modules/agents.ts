@@ -2,17 +2,22 @@ import { RoomsSocket } from "../utils/socket-utils.js";
 import { AgentConversation, AgentMessage } from "./agents.types.js";
 import { AxiosInstance } from "axios";
 import { ModelFilterParams } from "../types.js";
+import { getAccessToken } from "../utils/auth-utils.js";
 
 export type AgentsModuleConfig = {
   axios: AxiosInstance;
   socket: ReturnType<typeof RoomsSocket>;
   appId: string;
+  serverUrl?: string;
+  token?: string;
 };
 
 export function createAgentsModule({
   axios,
   socket,
   appId,
+  serverUrl,
+  token,
 }: AgentsModuleConfig) {
   const baseURL = `/apps/${appId}/agents`;
 
@@ -74,8 +79,16 @@ export function createAgentsModule({
     });
   };
 
-  const generateUserWhatsAppLink = (agentName: string) => {
-    return axios.post(`/whatsapp/generate-user-link`, { agent_name: agentName });
+  const getWhatsAppConnectURL = (agentName: string) => {
+    const baseUrl = `${serverUrl}/whatsapp/${appId}/${encodeURIComponent(agentName)}`;
+    const accessToken = token ?? getAccessToken();
+
+    if (accessToken) {
+      return `${baseUrl}?token=${accessToken}`;
+    } else {
+      // No token - URL will redirect to login automatically
+      return baseUrl;
+    }
   };
 
   return {
@@ -85,6 +98,6 @@ export function createAgentsModule({
     createConversation,
     addMessage,
     subscribeToConversation,
-    generateUserWhatsAppLink,
+    getWhatsAppConnectURL,
   };
 }
