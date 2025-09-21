@@ -126,6 +126,8 @@ export function createClient(config: {
       axios: axiosClient,
       socket,
       appId,
+      serverUrl,
+      token,
     }),
     cleanup: () => {
       socket.disconnect();
@@ -141,6 +143,8 @@ export function createClient(config: {
       axios: serviceRoleAxiosClient,
       socket,
       appId,
+      serverUrl,
+      token
     }),
     cleanup: () => {
       socket.disconnect();
