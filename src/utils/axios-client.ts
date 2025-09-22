@@ -123,9 +123,9 @@ export function createAxiosClient({
     if (typeof window !== "undefined") {
       config.headers.set("X-Origin-URL", window.location.href);
     }
-
+    const requestId = uuidv4();
+    (config as any).requestId = requestId;
     if (isInIFrame) {
-      const requestId = uuidv4();
       try {
         window.parent.postMessage(
           {
