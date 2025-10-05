@@ -115,6 +115,8 @@ export function createAuthModule(
       ) {
         try {
           window.localStorage.setItem("base44_access_token", token);
+          // Set "token" that is set by the built-in SDK of platform version 2
+          window.localStorage.setItem("token", token);
         } catch (e) {
           console.error("Failed to save token to localStorage:", e);
         }

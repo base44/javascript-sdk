@@ -93,6 +93,8 @@ export function saveAccessToken(
 
   try {
     window.localStorage.setItem(storageKey, token);
+    // Set "token" that is set by the built-in SDK of platform version 2
+    window.localStorage.setItem("token", token);
     return true;
   } catch (e) {
     console.error("Error saving token to localStorage:", e);
