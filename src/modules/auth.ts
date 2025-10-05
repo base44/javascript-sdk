@@ -51,7 +51,9 @@ export function createAuthModule(
         return;
       }
       // If nextUrl is not provided, use the current URL
-      const redirectUrl = nextUrl || window.location.href;
+      const redirectUrl = nextUrl
+        ? new URL(nextUrl, window.location.origin).toString()
+        : window.location.href;
 
       // Build the login URL
       const loginUrl = `${
