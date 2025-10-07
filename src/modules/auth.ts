@@ -13,7 +13,7 @@ export function createAuthModule(
   appId: string,
   options: {
     serverUrl: string;
-    onRedirectToLogin?: () => void;
+    appBaseUrl?: string;
   }
 ) {
   return {
@@ -46,10 +46,6 @@ export function createAuthModule(
         );
       }
 
-      if (options.onRedirectToLogin) {
-        options.onRedirectToLogin();
-        return;
-      }
       // If nextUrl is not provided, use the current URL
       const redirectUrl = nextUrl
         ? new URL(nextUrl, window.location.origin).toString()
@@ -57,8 +53,8 @@ export function createAuthModule(
 
       // Build the login URL
       const loginUrl = `${
-        options.serverUrl
-      }/login?from_url=${encodeURIComponent(redirectUrl)}&app_id=${appId}`;
+        options.appBaseUrl ?? ""
+      }/login?from_url=${encodeURIComponent(redirectUrl)}`;
 
       // Redirect to the login page
       window.location.href = loginUrl;

@@ -18,6 +18,7 @@ export type Base44Client = ReturnType<typeof createClient>;
  * Create a Base44 client instance
  * @param {Object} config - Client configuration
  * @param {string} [config.serverUrl='https://base44.app'] - API server URL
+ * @param {string} [config.appBaseUrl] - Application base URL
  * @param {string|number} config.appId - Application ID
  * @param {string} [config.token] - Authentication token
  * @param {string} [config.serviceToken] - Service role authentication token
@@ -26,6 +27,7 @@ export type Base44Client = ReturnType<typeof createClient>;
  */
 export function createClient(config: {
   serverUrl?: string;
+  appBaseUrl?: string;
   appId: string;
   token?: string;
   serviceToken?: string;
@@ -33,7 +35,6 @@ export function createClient(config: {
   functionsVersion?: string;
   headers?: Record<string, string>;
   options?: CreateClientOptions;
-  onRedirectToLogin?: () => void;
 }) {
   const {
     serverUrl = "https://base44.app",
@@ -41,9 +42,9 @@ export function createClient(config: {
     token,
     serviceToken,
     requiresAuth = false,
+    appBaseUrl,
     options,
     functionsVersion,
-    onRedirectToLogin,
     headers: optionalHeaders,
   } = config;
 
@@ -75,50 +76,36 @@ export function createClient(config: {
     baseURL: `${serverUrl}/api`,
     headers,
     token,
-    requiresAuth,
-    appId,
-    serverUrl,
     onError: options?.onError,
-    onRedirectToLogin,
   });
 
   const functionsAxiosClient = createAxiosClient({
     baseURL: `${serverUrl}/api`,
     headers: functionHeaders,
     token,
-    requiresAuth,
-    appId,
-    serverUrl,
     interceptResponses: false,
     onError: options?.onError,
-    onRedirectToLogin,
   });
 
   const serviceRoleAxiosClient = createAxiosClient({
     baseURL: `${serverUrl}/api`,
     headers,
     token: serviceToken,
-    serverUrl,
-    appId,
     onError: options?.onError,
-    onRedirectToLogin,
   });
 
   const serviceRoleFunctionsAxiosClient = createAxiosClient({
     baseURL: `${serverUrl}/api`,
     headers: functionHeaders,
     token: serviceToken,
-    serverUrl,
-    appId,
     interceptResponses: false,
-    onRedirectToLogin,
   });
 
   const userModules = {
     entities: createEntitiesModule(axiosClient, appId),
     integrations: createIntegrationsModule(axiosClient, appId),
     auth: createAuthModule(axiosClient, functionsAxiosClient, appId, {
-      onRedirectToLogin,
+      appBaseUrl,
       serverUrl,
     }),
     functions: createFunctionsModule(functionsAxiosClient, appId),
@@ -144,7 +131,7 @@ export function createClient(config: {
       socket,
       appId,
       serverUrl,
-      token
+      token,
     }),
     cleanup: () => {
       socket.disconnect();
