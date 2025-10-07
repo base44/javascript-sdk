@@ -149,7 +149,7 @@ describe('Auth Module', () => {
       
       // Verify the redirect URL was set correctly
       expect(mockLocation.href).toBe(
-        `${serverUrl}/login?from_url=${encodeURIComponent(nextUrl)}&app_id=${appId}`
+        `/login?from_url=${encodeURIComponent(nextUrl)}`
       );
       
       // Restore window
@@ -164,14 +164,61 @@ describe('Auth Module', () => {
       global.window = {
         location: mockLocation
       };
-      
+
       base44.auth.redirectToLogin();
-      
+
       // Verify the redirect URL uses current URL
       expect(mockLocation.href).toBe(
-        `${serverUrl}/login?from_url=${encodeURIComponent(currentUrl)}&app_id=${appId}`
+        `/login?from_url=${encodeURIComponent(currentUrl)}`
       );
-      
+
+      // Restore window
+      global.window = originalWindow;
+    });
+
+    test('should use appBaseUrl for login redirect when provided', () => {
+      const customAppBaseUrl = 'https://custom-app.example.com';
+      const clientWithCustomUrl = createClient({
+        serverUrl,
+        appId,
+        appBaseUrl: customAppBaseUrl,
+      });
+
+      // Mock window.location
+      const originalWindow = global.window;
+      const mockLocation = { href: '' };
+      global.window = {
+        location: mockLocation
+      };
+
+      const nextUrl = 'https://example.com/dashboard';
+      clientWithCustomUrl.auth.redirectToLogin(nextUrl);
+
+      // Verify the redirect URL uses the custom appBaseUrl
+      expect(mockLocation.href).toBe(
+        `${customAppBaseUrl}/login?from_url=${encodeURIComponent(nextUrl)}`
+      );
+
+      // Restore window
+      global.window = originalWindow;
+    });
+
+    test('should use relative URL for login redirect when appBaseUrl is not provided', () => {
+      // Mock window.location
+      const originalWindow = global.window;
+      const mockLocation = { href: '', origin: 'https://current-app.com' };
+      global.window = {
+        location: mockLocation
+      };
+
+      const nextUrl = 'https://example.com/dashboard';
+      base44.auth.redirectToLogin(nextUrl);
+
+      // Verify the redirect URL uses a relative path (no appBaseUrl prefix)
+      expect(mockLocation.href).toBe(
+        `/login?from_url=${encodeURIComponent(nextUrl)}`
+      );
+
       // Restore window
       global.window = originalWindow;
     });

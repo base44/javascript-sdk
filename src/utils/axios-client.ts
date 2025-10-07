@@ -58,21 +58,6 @@ function safeErrorLog(prefix: string, error: unknown) {
 }
 
 /**
- * Redirects to the login page with the current URL as return destination
- * @param {string} serverUrl - Base server URL
- * @param {string|number} appId - Application ID
- */
-function redirectToLogin(serverUrl: string, appId: string) {
-  if (typeof window === "undefined") {
-    return; // Can't redirect in non-browser environment
-  }
-
-  const currentUrl = encodeURIComponent(window.location.href);
-  const loginUrl = `${serverUrl}/login?from_url=${currentUrl}&app_id=${appId}`;
-  window.location.href = loginUrl;
-}
-
-/**
  * Creates an axios client with default configuration and interceptors
  * @param {Object} options - Client configuration options
  * @param {string} options.baseURL - Base URL for all requests
@@ -87,22 +72,14 @@ export function createAxiosClient({
   baseURL,
   headers = {},
   token,
-  requiresAuth = false,
-  appId,
-  serverUrl,
   interceptResponses = true,
   onError,
-  onRedirectToLogin,
 }: {
   baseURL: string;
   headers?: Record<string, string>;
   token?: string;
-  requiresAuth?: boolean;
-  appId: string;
-  serverUrl: string;
   interceptResponses?: boolean;
   onError?: (error: Error) => void;
-  onRedirectToLogin?: () => void;
 }) {
   const client = axios.create({
     baseURL,
@@ -191,26 +168,6 @@ export function createAxiosClient({
         // Log errors in development
         if (process.env.NODE_ENV !== "production") {
           safeErrorLog("[Base44 SDK Error]", base44Error);
-        }
-
-        // Check for 403 Forbidden (authentication required) and redirect to login if requiresAuth is true
-        console.log(
-          requiresAuth,
-          error.response?.status,
-          typeof window !== "undefined"
-        );
-        if (
-          requiresAuth &&
-          error.response?.status === 403 &&
-          typeof window !== "undefined"
-        ) {
-          console.log("Authentication required. Redirecting to login...");
-          // Use a slight delay to allow the error to propagate first
-          setTimeout(() => {
-            onRedirectToLogin
-              ? onRedirectToLogin()
-              : redirectToLogin(serverUrl, appId);
-          }, 100);
         }
 
         onError?.(base44Error);
