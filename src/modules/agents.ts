@@ -80,7 +80,7 @@ export function createAgentsModule({
   };
 
   const getWhatsAppConnectURL = (agentName: string) => {
-    const baseUrl = `${serverUrl}/whatsapp/${appId}/${encodeURIComponent(agentName)}`;
+    const baseUrl = `${serverUrl}/api/apps/${appId}/agents/${encodeURIComponent(agentName)}/whatsapp`;
     const accessToken = token ?? getAccessToken();
 
     if (accessToken) {
