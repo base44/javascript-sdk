@@ -6,6 +6,7 @@ import { createSsoModule } from "./modules/sso.js";
 import { getAccessToken } from "./utils/auth-utils.js";
 import { createFunctionsModule } from "./modules/functions.js";
 import { createAgentsModule } from "./modules/agents.js";
+import { createAppLogsModule } from "./modules/app-logs.js";
 import { RoomsSocket, RoomsSocketConfig } from "./utils/socket-utils.js";
 
 export type CreateClientOptions = {
@@ -116,6 +117,7 @@ export function createClient(config: {
       serverUrl,
       token,
     }),
+    appLogs: createAppLogsModule(axiosClient, appId),
     cleanup: () => {
       socket.disconnect();
     },
@@ -133,6 +135,7 @@ export function createClient(config: {
       serverUrl,
       token,
     }),
+    appLogs: createAppLogsModule(serviceRoleAxiosClient, appId),
     cleanup: () => {
       socket.disconnect();
     },
