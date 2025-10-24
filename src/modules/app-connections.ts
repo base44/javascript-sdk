@@ -1,16 +1,16 @@
 import { AxiosInstance } from "axios";
 import {
-  ExternalAuthIntegrationType,
-  ExternalAuthAccessTokenResponse,
-} from "./external-auth.types.js";
+  AppConnectionIntegrationType,
+  AppConnectionAccessTokenResponse,
+} from "./app-connections.types.js";
 
 /**
- * Creates the External Auth module for the Base44 SDK
+ * Creates the App Connections module for the Base44 SDK
  * @param axios - Axios instance (should be service role client)
  * @param appId - Application ID
- * @returns External Auth module
+ * @returns App Connections module
  */
-export function createExternalAuthModule(axios: AxiosInstance, appId: string) {
+export function createAppConnectionsModule(axios: AxiosInstance, appId: string) {
   return {
     /**
      * Retrieve an access token for a given integration type
@@ -18,16 +18,16 @@ export function createExternalAuthModule(axios: AxiosInstance, appId: string) {
      * @returns Access token response
      */
     async getAccessToken(
-      integrationType: ExternalAuthIntegrationType
-    ): Promise<ExternalAuthAccessTokenResponse> {
+      integrationType: AppConnectionIntegrationType
+    ): Promise<AppConnectionAccessTokenResponse> {
       if (!integrationType || typeof integrationType !== "string") {
         throw new Error(
           "Integration type is required and must be a string"
         );
       }
 
-      const response = await axios.get<ExternalAuthAccessTokenResponse>(
-        `/apps/${appId}/external-auth/tokens/${integrationType}`
+      const response = await axios.get<AppConnectionAccessTokenResponse>(
+        `/apps/${appId}/app-connections/tokens/${integrationType}`
       );
 
       // @ts-expect-error
