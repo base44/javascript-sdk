@@ -27,7 +27,7 @@ export function createAppConnectionsModule(axios: AxiosInstance, appId: string) 
       }
 
       const response = await axios.get<AppConnectionAccessTokenResponse>(
-        `/apps/${appId}/app-connections/tokens/${integrationType}`
+        `/apps/${appId}/external-auth/tokens/${integrationType}`
       );
 
       // @ts-expect-error
