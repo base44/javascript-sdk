@@ -3,6 +3,7 @@ import { createEntitiesModule } from "./modules/entities.js";
 import { createIntegrationsModule } from "./modules/integrations.js";
 import { createAuthModule } from "./modules/auth.js";
 import { createSsoModule } from "./modules/sso.js";
+import { createConnectorsModule } from "./modules/connectors.js";
 import { getAccessToken } from "./utils/auth-utils.js";
 import { createFunctionsModule } from "./modules/functions.js";
 import { createAgentsModule } from "./modules/agents.js";
@@ -127,6 +128,7 @@ export function createClient(config: {
     entities: createEntitiesModule(serviceRoleAxiosClient, appId),
     integrations: createIntegrationsModule(serviceRoleAxiosClient, appId),
     sso: createSsoModule(serviceRoleAxiosClient, appId, token),
+    connectors: createConnectorsModule(serviceRoleAxiosClient, appId),
     functions: createFunctionsModule(serviceRoleFunctionsAxiosClient, appId),
     agents: createAgentsModule({
       axios: serviceRoleAxiosClient,
