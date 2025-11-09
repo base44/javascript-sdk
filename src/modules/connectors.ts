@@ -1,16 +1,16 @@
 import { AxiosInstance } from "axios";
 import {
-  AppConnectionIntegrationType,
-  AppConnectionAccessTokenResponse,
-} from "./app-connections.types.js";
+  ConnectorIntegrationType,
+  ConnectorAccessTokenResponse,
+} from "./connectors.types.js";
 
 /**
- * Creates the App Connections module for the Base44 SDK
+ * Creates the Connectors module for the Base44 SDK
  * @param axios - Axios instance (should be service role client)
  * @param appId - Application ID
- * @returns App Connections module
+ * @returns Connectors module
  */
-export function createAppConnectionsModule(axios: AxiosInstance, appId: string) {
+export function createConnectorsModule(axios: AxiosInstance, appId: string) {
   return {
     /**
      * Retrieve an access token for a given integration type
@@ -18,15 +18,15 @@ export function createAppConnectionsModule(axios: AxiosInstance, appId: string) 
      * @returns Access token response
      */
     async getAccessToken(
-      integrationType: AppConnectionIntegrationType
-    ): Promise<AppConnectionAccessTokenResponse> {
+      integrationType: ConnectorIntegrationType
+    ): Promise<ConnectorAccessTokenResponse> {
       if (!integrationType || typeof integrationType !== "string") {
         throw new Error(
           "Integration type is required and must be a string"
         );
       }
 
-      const response = await axios.get<AppConnectionAccessTokenResponse>(
+      const response = await axios.get<ConnectorAccessTokenResponse>(
         `/apps/${appId}/external-auth/tokens/${integrationType}`
       );
 
@@ -35,3 +35,4 @@ export function createAppConnectionsModule(axios: AxiosInstance, appId: string) 
     },
   };
 }
+
