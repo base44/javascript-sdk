@@ -220,7 +220,7 @@ export function createClientFromRequest(request: Request) {
   const appId = request.headers.get("Base44-App-Id");
   const serverUrlHeader = request.headers.get("Base44-Api-Url");
   const functionsVersion = request.headers.get("Base44-Functions-Version");
-
+  const userCountry = request.headers.get("Base44-User-Country");
   if (!appId) {
     throw new Error(
       "Base44-App-Id header is required, but is was not found on the request"
@@ -256,8 +256,12 @@ export function createClientFromRequest(request: Request) {
     }
     userToken = authHeader.split(" ")[1];
   }
-
+  const forwardHeaders: Record<string, string> = {};
+  if (userCountry) {
+    forwardHeaders["Base44-User-Country"] = userCountry;
+  }
   return createClient({
+    headers: forwardHeaders,
     serverUrl: serverUrlHeader || "https://base44.app",
     appId,
     token: userToken,
