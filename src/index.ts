@@ -20,3 +20,4 @@ export {
 export type { Base44Client };
 
 export * from "./types.js";
+export type { AuthMethods } from "./modules/auth.js";

@@ -1,6 +1,71 @@
 import { AxiosInstance } from "axios";
 
 /**
+ * Public auth methods available from the SDK.
+ * Document only the methods you want to expose and support.
+ */
+export interface AuthMethods {
+  /** Get current user information */
+  me(): Promise<any>;
+
+  /** Update current user data */
+  /** @internal */
+  updateMe(data: Record<string, any>): Promise<any>;
+
+  /** Redirects the user to the app's login page */
+  redirectToLogin(nextUrl: string): void;
+
+  /**
+   * Logout the current user
+   * Removes the token from localStorage and optionally redirects to a URL or reloads the page
+   */
+  logout(redirectUrl?: string): void;
+
+  /**
+   * Set authentication token
+   * @param token - Auth token
+   * @param saveToStorage - Whether to save the token to localStorage (default true)
+   */
+  setToken(token: string, saveToStorage?: boolean): void;
+
+  /**
+   * Login via username and password
+   * @returns Login response with access_token and user
+   */
+  loginViaEmailPassword(
+    email: string,
+    password: string,
+    turnstileToken?: string
+  ): Promise<{ access_token: string; user: any }>;
+
+  /** Verify if the current token is valid */
+  isAuthenticated(): Promise<boolean>;
+
+  inviteUser(userEmail: string, role: string): Promise<any>;
+
+  register(payload: {
+    email: string;
+    password: string;
+    turnstile_token?: string | null;
+    referral_code?: string | null;
+  }): Promise<any>;
+
+  verifyOtp(args: { email: string; otpCode: string }): Promise<any>;
+
+  resendOtp(email: string): Promise<any>;
+
+  resetPasswordRequest(email: string): Promise<any>;
+
+  resetPassword(args: { resetToken: string; newPassword: string }): Promise<any>;
+
+  changePassword(args: {
+    userId: string;
+    currentPassword: string;
+    newPassword: string;
+  }): Promise<any>;
+}
+
+/**
  * Creates the auth module for the Base44 SDK
  * @param {import('axios').AxiosInstance} axios - Axios instance
  * @param {string|number} appId - Application ID
@@ -15,29 +80,15 @@ export function createAuthModule(
     serverUrl: string;
     appBaseUrl?: string;
   }
-) {
+): AuthMethods {
   return {
-    /**
-     * Get current user information
-     * @returns {Promise<Object>} Current user data
-     */
     async me() {
       return axios.get(`/apps/${appId}/entities/User/me`);
     },
-    /**
-     * Update current user data
-     * @param {Object} data - Updated user data
-     * @returns {Promise<Object>} Updated user
-     */
     async updateMe(data: Record<string, any>) {
       return axios.put(`/apps/${appId}/entities/User/me`, data);
     },
 
-    /**
-     * Redirects the user to the app's login page
-     * @param {string} nextUrl - URL to redirect to after successful login
-     * @throws {Error} When not in a browser environment
-     */
     redirectToLogin(nextUrl: string) {
       // This function only works in a browser environment
       if (typeof window === "undefined") {
@@ -60,12 +111,6 @@ export function createAuthModule(
       window.location.href = loginUrl;
     },
 
-    /**
-     * Logout the current user
-     * Removes the token from localStorage and optionally redirects to a URL or reloads the page
-     * @param redirectUrl - Optional URL to redirect to after logout. Reloads the page if not provided
-     * @returns {Promise<void>}
-     */
     logout(redirectUrl?: string) {
       // Remove token from axios headers
       delete axios.defaults.headers.common["Authorization"];
@@ -91,11 +136,6 @@ export function createAuthModule(
       }
     },
 
-    /**
-     * Set authentication token
-     * @param {string} token - Auth token
-     * @param {boolean} [saveToStorage=true] - Whether to save the token to localStorage
-     */
     setToken(token: string, saveToStorage = true) {
       if (!token) return;
 
@@ -121,13 +161,6 @@ export function createAuthModule(
       }
     },
 
-    /**
-     * Login via username and password
-     * @param email - User email
-     * @param password - User password
-     * @param turnstileToken - Optional Turnstile captcha token
-     * @returns Login response with access_token and user
-     */
     async loginViaEmailPassword(
       email: string,
       password: string,
@@ -162,10 +195,6 @@ export function createAuthModule(
       }
     },
 
-    /**
-     * Verify if the current token is valid
-     * @returns {Promise<boolean>} True if token is valid
-     */
     async isAuthenticated() {
       try {
         await this.me();
