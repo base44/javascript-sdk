@@ -1,11 +1,7 @@
 ---
 title: "Interface: AppMessageContent"
-description: "Documentation for Interface: AppMessageContent"
+description: "modules/app.types.ts:7"
 ---
-
-[@base44/sdk](../README.md) / AppMessageContent
-
-# Interface: AppMessageContent
 
 ## Hierarchy
 
@@ -16,15 +12,6 @@ description: "Documentation for Interface: AppMessageContent"
 ## Indexable
 
 ▪ [key: `string`]: `unknown`
-
-## Table of contents
-
-### Properties
-
-- [content](AppMessageContent.md#content)
-- [file\_urls](AppMessageContent.md#file_urls)
-- [custom\_context](AppMessageContent.md#custom_context)
-- [additional\_message\_params](AppMessageContent.md#additional_message_params)
 
 ## Properties
 

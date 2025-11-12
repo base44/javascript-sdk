@@ -1,11 +1,7 @@
 ---
 title: "Function: getLoginUrl"
-description: "Documentation for Function: getLoginUrl"
+description: "utils/auth-utils.ts:138"
 ---
-
-[@base44/sdk](../README.md) / getLoginUrl
-
-# Function: getLoginUrl
 
 ▸ **getLoginUrl**(`nextUrl`, `options`): `string`
 

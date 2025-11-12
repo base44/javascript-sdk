@@ -1,11 +1,7 @@
 ---
 title: "Type alias: AgentConversation"
-description: "Documentation for Type alias: AgentConversation"
+description: "modules/agents.types.ts:1"
 ---
-
-[@base44/sdk](../README.md) / AgentConversation
-
-# Type alias: AgentConversation
 
 Ƭ **AgentConversation**: `Object`
 

@@ -1,16 +1,4 @@
-[@base44/sdk](../README.md) / UserEntityLike
-
 # Interface: UserEntityLike
-
-## Table of contents
-
-### Properties
-
-- [type](UserEntityLike.md#type)
-- [name](UserEntityLike.md#name)
-- [title](UserEntityLike.md#title)
-- [properties](UserEntityLike.md#properties)
-- [required](UserEntityLike.md#required)
 
 ## Properties
 

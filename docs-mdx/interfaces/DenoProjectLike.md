@@ -1,20 +1,7 @@
 ---
 title: "Interface: DenoProjectLike"
-description: "Documentation for Interface: DenoProjectLike"
+description: "modules/app.types.ts:28"
 ---
-
-[@base44/sdk](../README.md) / DenoProjectLike
-
-# Interface: DenoProjectLike
-
-## Table of contents
-
-### Properties
-
-- [project\_id](DenoProjectLike.md#project_id)
-- [project\_name](DenoProjectLike.md#project_name)
-- [app\_id](DenoProjectLike.md#app_id)
-- [deployment\_name\_to\_info](DenoProjectLike.md#deployment_name_to_info)
 
 ## Properties
 

@@ -1,11 +1,7 @@
 ---
 title: "Function: getAccessToken"
-description: "Documentation for Function: getAccessToken"
+description: "utils/auth-utils.ts:15"
 ---
-
-[@base44/sdk](../README.md) / getAccessToken
-
-# Function: getAccessToken
 
 ▸ **getAccessToken**(`options?`): ``null`` \| `string`
 

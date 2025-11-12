@@ -1,11 +1,7 @@
 ---
 title: "Function: removeAccessToken"
-description: "Documentation for Function: removeAccessToken"
+description: "utils/auth-utils.ts:112"
 ---
-
-[@base44/sdk](../README.md) / removeAccessToken
-
-# Function: removeAccessToken
 
 ▸ **removeAccessToken**(`options`): `boolean`
 

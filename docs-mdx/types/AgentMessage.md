@@ -1,11 +1,7 @@
 ---
 title: "Type alias: AgentMessage"
-description: "Documentation for Type alias: AgentMessage"
+description: "modules/agents.types.ts:10"
 ---
-
-[@base44/sdk](../README.md) / AgentMessage
-
-# Type alias: AgentMessage
 
 Ƭ **AgentMessage**: `Object`
 

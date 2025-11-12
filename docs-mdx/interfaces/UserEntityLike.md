@@ -1,21 +1,7 @@
 ---
 title: "Interface: UserEntityLike"
-description: "Documentation for Interface: UserEntityLike"
+description: "modules/app.types.ts:108"
 ---
-
-[@base44/sdk](../README.md) / UserEntityLike
-
-# Interface: UserEntityLike
-
-## Table of contents
-
-### Properties
-
-- [type](UserEntityLike.md#type)
-- [name](UserEntityLike.md#name)
-- [title](UserEntityLike.md#title)
-- [properties](UserEntityLike.md#properties)
-- [required](UserEntityLike.md#required)
 
 ## Properties
 

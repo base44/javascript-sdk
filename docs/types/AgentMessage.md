@@ -1,5 +1,3 @@
-[@base44/sdk](../README.md) / AgentMessage
-
 # Type alias: AgentMessage
 
 Ƭ **AgentMessage**: `Object`

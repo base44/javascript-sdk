@@ -1,20 +1,7 @@
 ---
 title: "Interface: AppConversationLike"
-description: "Documentation for Interface: AppConversationLike"
+description: "modules/app.types.ts:20"
 ---
-
-[@base44/sdk](../README.md) / AppConversationLike
-
-# Interface: AppConversationLike
-
-## Table of contents
-
-### Properties
-
-- [id](AppConversationLike.md#id)
-- [messages](AppConversationLike.md#messages)
-- [model](AppConversationLike.md#model)
-- [functions\_fail\_silently](AppConversationLike.md#functions_fail_silently)
 
 ## Properties
 

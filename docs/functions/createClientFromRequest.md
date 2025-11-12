@@ -1,5 +1,3 @@
-[@base44/sdk](../README.md) / createClientFromRequest
-
 # Function: createClientFromRequest
 
 ▸ **createClientFromRequest**(`request`): `Object`

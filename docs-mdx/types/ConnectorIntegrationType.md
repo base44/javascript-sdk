@@ -1,11 +1,7 @@
 ---
 title: "Type alias: ConnectorIntegrationType"
-description: "Documentation for Type alias: ConnectorIntegrationType"
+description: "modules/connectors.types.ts:1"
 ---
-
-[@base44/sdk](../README.md) / ConnectorIntegrationType
-
-# Type alias: ConnectorIntegrationType
 
 Ƭ **ConnectorIntegrationType**: `string`
 

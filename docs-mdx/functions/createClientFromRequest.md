@@ -1,11 +1,7 @@
 ---
 title: "Function: createClientFromRequest"
-description: "Documentation for Function: createClientFromRequest"
+description: "client.ts:215"
 ---
-
-[@base44/sdk](../README.md) / createClientFromRequest
-
-# Function: createClientFromRequest
 
 ▸ **createClientFromRequest**(`request`): `Object`
 

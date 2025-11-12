@@ -1,5 +1,3 @@
-[@base44/sdk](../README.md) / saveAccessToken
-
 # Function: saveAccessToken
 
 ▸ **saveAccessToken**(`token`, `options`): `boolean`

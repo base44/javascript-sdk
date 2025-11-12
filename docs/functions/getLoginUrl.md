@@ -1,5 +1,3 @@
-[@base44/sdk](../README.md) / getLoginUrl
-
 # Function: getLoginUrl
 
 ▸ **getLoginUrl**(`nextUrl`, `options`): `string`

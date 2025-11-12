@@ -1,11 +1,7 @@
 ---
 title: "Function: saveAccessToken"
-description: "Documentation for Function: saveAccessToken"
+description: "utils/auth-utils.ts:82"
 ---
-
-[@base44/sdk](../README.md) / saveAccessToken
-
-# Function: saveAccessToken
 
 ▸ **saveAccessToken**(`token`, `options`): `boolean`
 

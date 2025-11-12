@@ -1,5 +1,3 @@
-[@base44/sdk](../README.md) / LoginInfoResponse
-
 # Type alias: LoginInfoResponse
 
 Ƭ **LoginInfoResponse**: `Pick`\<[`AppLike`](../interfaces/AppLike.md), ``"id"`` \| ``"name"`` \| ``"slug"`` \| ``"logo_url"`` \| ``"user_description"`` \| ``"updated_date"`` \| ``"created_date"`` \| ``"auth_config"`` \| ``"platform_version"``\>

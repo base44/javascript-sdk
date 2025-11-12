@@ -1,17 +1,7 @@
 ---
 title: "Interface: UserLike"
-description: "Documentation for Interface: UserLike"
+description: "modules/app.types.ts:86"
 ---
-
-[@base44/sdk](../README.md) / UserLike
-
-# Interface: UserLike
-
-## Table of contents
-
-### Properties
-
-- [id](UserLike.md#id)
 
 ## Properties
 

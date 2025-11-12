@@ -1,11 +1,7 @@
 ---
 title: "Type alias: Base44Client"
-description: "Documentation for Type alias: Base44Client"
+description: "client.ts:17"
 ---
-
-[@base44/sdk](../README.md) / Base44Client
-
-# Type alias: Base44Client
 
 Ƭ **Base44Client**: `ReturnType`\<typeof [`createClient`](../functions/createClient.md)\>
 

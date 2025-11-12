@@ -1,11 +1,7 @@
 ---
 title: "Function: createClient"
-description: "Documentation for Function: createClient"
+description: "client.ts:30"
 ---
-
-[@base44/sdk](../README.md) / createClient
-
-# Function: createClient
 
 ▸ **createClient**(`config`): `Object`
 

@@ -1,5 +1,3 @@
-[@base44/sdk](../README.md) / ConnectorIntegrationType
-
 # Type alias: ConnectorIntegrationType
 
 Ƭ **ConnectorIntegrationType**: `string`

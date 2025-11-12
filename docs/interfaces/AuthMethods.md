@@ -1,27 +1,7 @@
-[@base44/sdk](../README.md) / AuthMethods
-
 # Interface: AuthMethods
 
 Public auth methods available from the SDK.
 Document only the methods you want to expose and support.
-
-## Table of contents
-
-### Methods
-
-- [me](AuthMethods.md#me)
-- [redirectToLogin](AuthMethods.md#redirecttologin)
-- [logout](AuthMethods.md#logout)
-- [setToken](AuthMethods.md#settoken)
-- [loginViaEmailPassword](AuthMethods.md#loginviaemailpassword)
-- [isAuthenticated](AuthMethods.md#isauthenticated)
-- [inviteUser](AuthMethods.md#inviteuser)
-- [register](AuthMethods.md#register)
-- [verifyOtp](AuthMethods.md#verifyotp)
-- [resendOtp](AuthMethods.md#resendotp)
-- [resetPasswordRequest](AuthMethods.md#resetpasswordrequest)
-- [resetPassword](AuthMethods.md#resetpassword)
-- [changePassword](AuthMethods.md#changepassword)
 
 ## Methods
 
@@ -35,9 +15,19 @@ Get current user information
 
 `Promise`\<`any`\>
 
+**`Example`**
+
+```ts
+import { createClient, getAccessToken } from '@base44/sdk';
+
+const client = createClient({ appId: 'your-app-id', token: getAccessToken() });
+const user = await client.auth.me();
+console.log(user);
+```
+
 #### Defined in
 
-[modules/auth.ts:9](https://github.com/base44-dev/javascript-sdk/blob/main/src/modules/auth.ts#L9)
+[modules/auth.ts:24](https://github.com/base44-dev/javascript-sdk/blob/main/src/modules/auth.ts#L24)
 
 ___
 
@@ -57,18 +47,22 @@ Redirects the user to the app's login page
 
 `void`
 
+**`Example`**
+
+```ts
+// Redirect and return to current route after login
+client.auth.redirectToLogin(window.location.pathname);
+```
+
 #### Defined in
 
-[modules/auth.ts:16](https://github.com/base44-dev/javascript-sdk/blob/main/src/modules/auth.ts#L16)
+[modules/auth.ts:38](https://github.com/base44-dev/javascript-sdk/blob/main/src/modules/auth.ts#L38)
 
 ___
 
 ### logout
 
 ▸ **logout**(`redirectUrl?`): `void`
-
-Logout the current user
-Removes the token from localStorage and optionally redirects to a URL or reloads the page
 
 #### Parameters
 
@@ -80,9 +74,19 @@ Removes the token from localStorage and optionally redirects to a URL or reloads
 
 `void`
 
+**`Example`**
+
+```ts
+// Reload the page after logout
+client.auth.logout();
+
+// Or redirect to a login page
+client.auth.logout('/login');
+```
+
 #### Defined in
 
-[modules/auth.ts:22](https://github.com/base44-dev/javascript-sdk/blob/main/src/modules/auth.ts#L22)
+[modules/auth.ts:54](https://github.com/base44-dev/javascript-sdk/blob/main/src/modules/auth.ts#L54)
 
 ___
 
@@ -90,30 +94,33 @@ ___
 
 ▸ **setToken**(`token`, `saveToStorage?`): `void`
 
-Set authentication token
-
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `token` | `string` | Auth token |
-| `saveToStorage?` | `boolean` | Whether to save the token to localStorage (default true) |
+| Name | Type |
+| :------ | :------ |
+| `token` | `string` |
+| `saveToStorage?` | `boolean` |
 
 #### Returns
 
 `void`
 
+**`Example`**
+
+```ts
+// After obtaining a token from your auth flow
+client.auth.setToken(accessToken);
+```
+
 #### Defined in
 
-[modules/auth.ts:29](https://github.com/base44-dev/javascript-sdk/blob/main/src/modules/auth.ts#L29)
+[modules/auth.ts:68](https://github.com/base44-dev/javascript-sdk/blob/main/src/modules/auth.ts#L68)
 
 ___
 
 ### loginViaEmailPassword
 
-▸ **loginViaEmailPassword**(`email`, `password`, `turnstileToken?`): `Promise`\<\{ `access_token`: `string` ; `user`: `any`  }\>
-
-Login via username and password
+▸ **loginViaEmailPassword**(`email`, `password`, `turnstileToken?`): `Promise`\<[`LoginViaEmailPasswordResponse`](LoginViaEmailPasswordResponse.md)\>
 
 #### Parameters
 
@@ -125,13 +132,21 @@ Login via username and password
 
 #### Returns
 
-`Promise`\<\{ `access_token`: `string` ; `user`: `any`  }\>
+`Promise`\<[`LoginViaEmailPasswordResponse`](LoginViaEmailPasswordResponse.md)\>
 
-Login response with access_token and user
+**`Example`**
+
+```ts
+const { access_token, user } = await client.auth.loginViaEmailPassword(
+  'user@example.com',
+  's3cret'
+);
+client.auth.setToken(access_token);
+```
 
 #### Defined in
 
-[modules/auth.ts:35](https://github.com/base44-dev/javascript-sdk/blob/main/src/modules/auth.ts#L35)
+[modules/auth.ts:84](https://github.com/base44-dev/javascript-sdk/blob/main/src/modules/auth.ts#L84)
 
 ___
 
@@ -145,9 +160,16 @@ Verify if the current token is valid
 
 `Promise`\<`boolean`\>
 
+**`Example`**
+
+```ts
+const ok = await client.auth.isAuthenticated();
+if (!ok) client.auth.redirectToLogin('/dashboard');
+```
+
 #### Defined in
 
-[modules/auth.ts:42](https://github.com/base44-dev/javascript-sdk/blob/main/src/modules/auth.ts#L42)
+[modules/auth.ts:98](https://github.com/base44-dev/javascript-sdk/blob/main/src/modules/auth.ts#L98)
 
 ___
 
@@ -166,9 +188,15 @@ ___
 
 `Promise`\<`any`\>
 
+**`Example`**
+
+```ts
+await client.auth.inviteUser('new-user@example.com', 'member');
+```
+
 #### Defined in
 
-[modules/auth.ts:44](https://github.com/base44-dev/javascript-sdk/blob/main/src/modules/auth.ts#L44)
+[modules/auth.ts:106](https://github.com/base44-dev/javascript-sdk/blob/main/src/modules/auth.ts#L106)
 
 ___
 
@@ -190,9 +218,18 @@ ___
 
 `Promise`\<`any`\>
 
+**`Example`**
+
+```ts
+await client.auth.register({
+  email: 'user@example.com',
+  password: 's3cret',
+});
+```
+
 #### Defined in
 
-[modules/auth.ts:46](https://github.com/base44-dev/javascript-sdk/blob/main/src/modules/auth.ts#L46)
+[modules/auth.ts:117](https://github.com/base44-dev/javascript-sdk/blob/main/src/modules/auth.ts#L117)
 
 ___
 
@@ -212,9 +249,15 @@ ___
 
 `Promise`\<`any`\>
 
+**`Example`**
+
+```ts
+await client.auth.verifyOtp({ email: 'user@example.com', otpCode: '123456' });
+```
+
 #### Defined in
 
-[modules/auth.ts:53](https://github.com/base44-dev/javascript-sdk/blob/main/src/modules/auth.ts#L53)
+[modules/auth.ts:130](https://github.com/base44-dev/javascript-sdk/blob/main/src/modules/auth.ts#L130)
 
 ___
 
@@ -232,9 +275,15 @@ ___
 
 `Promise`\<`any`\>
 
+**`Example`**
+
+```ts
+await client.auth.resendOtp('user@example.com');
+```
+
 #### Defined in
 
-[modules/auth.ts:55](https://github.com/base44-dev/javascript-sdk/blob/main/src/modules/auth.ts#L55)
+[modules/auth.ts:138](https://github.com/base44-dev/javascript-sdk/blob/main/src/modules/auth.ts#L138)
 
 ___
 
@@ -252,9 +301,15 @@ ___
 
 `Promise`\<`any`\>
 
+**`Example`**
+
+```ts
+await client.auth.resetPasswordRequest('user@example.com');
+```
+
 #### Defined in
 
-[modules/auth.ts:57](https://github.com/base44-dev/javascript-sdk/blob/main/src/modules/auth.ts#L57)
+[modules/auth.ts:146](https://github.com/base44-dev/javascript-sdk/blob/main/src/modules/auth.ts#L146)
 
 ___
 
@@ -274,9 +329,15 @@ ___
 
 `Promise`\<`any`\>
 
+**`Example`**
+
+```ts
+await client.auth.resetPassword({ resetToken: 'token', newPassword: 'newPass123' });
+```
+
 #### Defined in
 
-[modules/auth.ts:59](https://github.com/base44-dev/javascript-sdk/blob/main/src/modules/auth.ts#L59)
+[modules/auth.ts:154](https://github.com/base44-dev/javascript-sdk/blob/main/src/modules/auth.ts#L154)
 
 ___
 
@@ -297,6 +358,16 @@ ___
 
 `Promise`\<`any`\>
 
+**`Example`**
+
+```ts
+await client.auth.changePassword({
+  userId: 'abc123',
+  currentPassword: 'oldPass',
+  newPassword: 'newPass123',
+});
+```
+
 #### Defined in
 
-[modules/auth.ts:61](https://github.com/base44-dev/javascript-sdk/blob/main/src/modules/auth.ts#L61)
+[modules/auth.ts:166](https://github.com/base44-dev/javascript-sdk/blob/main/src/modules/auth.ts#L166)

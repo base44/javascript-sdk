@@ -1,28 +1,13 @@
 ---
 title: "Interface: AppConversationMessage"
-description: "Documentation for Interface: AppConversationMessage"
+description: "modules/app.types.ts:13"
 ---
-
-[@base44/sdk](../README.md) / AppConversationMessage
-
-# Interface: AppConversationMessage
 
 ## Hierarchy
 
 - [`AppMessageContent`](AppMessageContent.md)
 
   ↳ **`AppConversationMessage`**
-
-## Table of contents
-
-### Properties
-
-- [content](AppConversationMessage.md#content)
-- [file\_urls](AppConversationMessage.md#file_urls)
-- [custom\_context](AppConversationMessage.md#custom_context)
-- [additional\_message\_params](AppConversationMessage.md#additional_message_params)
-- [id](AppConversationMessage.md#id)
-- [role](AppConversationMessage.md#role)
 
 ## Properties
 

@@ -1,23 +1,55 @@
 import { AxiosInstance } from "axios";
 
+export interface LoginViaEmailPasswordResponse {
+  access_token: string;
+  user: any;
+}
+
 /**
  * Public auth methods available from the SDK.
  * Document only the methods you want to expose and support.
  */
 export interface AuthMethods {
-  /** Get current user information */
+  /**
+   * Get current user information
+   * @example
+   * ```ts
+   * import { createClient, getAccessToken } from '@base44/sdk';
+   *
+   * const client = createClient({ appId: 'your-app-id', token: getAccessToken() });
+   * const user = await client.auth.me();
+   * console.log(user);
+   * ```
+   */
   me(): Promise<any>;
 
   /** Update current user data */
   /** @internal */
   updateMe(data: Record<string, any>): Promise<any>;
 
-  /** Redirects the user to the app's login page */
+  /**
+   * Redirects the user to the app's login page
+   * @example
+   * ```ts
+   * // Redirect and return to current route after login
+   * client.auth.redirectToLogin(window.location.pathname);
+   * ```
+   */
   redirectToLogin(nextUrl: string): void;
 
   /**
    * Logout the current user
    * Removes the token from localStorage and optionally redirects to a URL or reloads the page
+   */
+  /**
+   * @example
+   * ```ts
+   * // Reload the page after logout
+   * client.auth.logout();
+   *
+   * // Or redirect to a login page
+   * client.auth.logout('/login');
+   * ```
    */
   logout(redirectUrl?: string): void;
 
@@ -26,23 +58,62 @@ export interface AuthMethods {
    * @param token - Auth token
    * @param saveToStorage - Whether to save the token to localStorage (default true)
    */
+  /**
+   * @example
+   * ```ts
+   * // After obtaining a token from your auth flow
+   * client.auth.setToken(accessToken);
+   * ```
+   */
   setToken(token: string, saveToStorage?: boolean): void;
 
   /**
    * Login via username and password
    * @returns Login response with access_token and user
    */
+  /**
+   * @example
+   * ```ts
+   * const { access_token, user } = await client.auth.loginViaEmailPassword(
+   *   'user@example.com',
+   *   's3cret'
+   * );
+   * client.auth.setToken(access_token);
+   * ```
+   */
   loginViaEmailPassword(
     email: string,
     password: string,
     turnstileToken?: string
-  ): Promise<{ access_token: string; user: any }>;
+  ): Promise<LoginViaEmailPasswordResponse>;
 
-  /** Verify if the current token is valid */
+  /**
+   * Verify if the current token is valid
+   * @example
+   * ```ts
+   * const ok = await client.auth.isAuthenticated();
+   * if (!ok) client.auth.redirectToLogin('/dashboard');
+   * ```
+   */
   isAuthenticated(): Promise<boolean>;
 
+  /**
+   * @example
+   * ```ts
+   * await client.auth.inviteUser('new-user@example.com', 'member');
+   * ```
+   */
   inviteUser(userEmail: string, role: string): Promise<any>;
 
+  /**
+   * @example
+   * ```ts
+   * await client.auth.register({
+   *   email: 'user@example.com',
+   *   password: 's3cret',
+   * });
+   * ```
+   */
   register(payload: {
     email: string;
     password: string;
@@ -50,14 +121,48 @@ export interface AuthMethods {
     referral_code?: string | null;
   }): Promise<any>;
 
+  /**
+   * @example
+   * ```ts
+   * await client.auth.verifyOtp({ email: 'user@example.com', otpCode: '123456' });
+   * ```
+   */
   verifyOtp(args: { email: string; otpCode: string }): Promise<any>;
 
+  /**
+   * @example
+   * ```ts
+   * await client.auth.resendOtp('user@example.com');
+   * ```
+   */
   resendOtp(email: string): Promise<any>;
 
+  /**
+   * @example
+   * ```ts
+   * await client.auth.resetPasswordRequest('user@example.com');
+   * ```
+   */
   resetPasswordRequest(email: string): Promise<any>;
 
+  /**
+   * @example
+   * ```ts
+   * await client.auth.resetPassword({ resetToken: 'token', newPassword: 'newPass123' });
+   * ```
+   */
   resetPassword(args: { resetToken: string; newPassword: string }): Promise<any>;
 
+  /**
+   * @example
+   * ```ts
+   * await client.auth.changePassword({
+   *   userId: 'abc123',
+   *   currentPassword: 'oldPass',
+   *   newPassword: 'newPass123',
+   * });
+   * ```
+   */
   changePassword(args: {
     userId: string;
     currentPassword: string;

@@ -1,19 +1,13 @@
 ---
 title: @base44/sdk
-description: Documentation for @base44/sdk
+description: - createClient - createClientFromRequest - getAccessToken -
 ---
 
-@base44/sdk
-
-# @base44/sdk
-
-## Table of contents
-
-### Classes
+## Classes
 
 - [Base44Error](classes/Base44Error.md)
 
-### Interfaces
+## Interfaces
 
 - [AppMessageContent](interfaces/AppMessageContent.md)
 - [AppConversationMessage](interfaces/AppConversationMessage.md)
@@ -23,9 +17,10 @@ description: Documentation for @base44/sdk
 - [UserLike](interfaces/UserLike.md)
 - [UserEntityLike](interfaces/UserEntityLike.md)
 - [AuthConfigLike](interfaces/AuthConfigLike.md)
+- [LoginViaEmailPasswordResponse](interfaces/LoginViaEmailPasswordResponse.md)
 - [AuthMethods](interfaces/AuthMethods.md)
 
-### Type Aliases
+## Type Aliases
 
 - [Base44Client](types/Base44Client.md)
 - [AgentConversation](types/AgentConversation.md)
@@ -35,7 +30,7 @@ description: Documentation for @base44/sdk
 - [ConnectorAccessTokenResponse](types/ConnectorAccessTokenResponse.md)
 - [ModelFilterParams](types/ModelFilterParams.md)
 
-### Functions
+## Functions
 
 - [createClient](functions/createClient.md)
 - [createClientFromRequest](functions/createClientFromRequest.md)

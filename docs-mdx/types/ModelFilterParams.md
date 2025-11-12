@@ -1,11 +1,7 @@
 ---
 title: "Type alias: ModelFilterParams"
-description: "Documentation for Type alias: ModelFilterParams"
+description: "types.ts:3"
 ---
-
-[@base44/sdk](../README.md) / ModelFilterParams
-
-# Type alias: ModelFilterParams
 
 Ƭ **ModelFilterParams**: `Object`
 

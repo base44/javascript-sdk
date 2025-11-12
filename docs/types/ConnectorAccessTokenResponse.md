@@ -1,5 +1,3 @@
-[@base44/sdk](../README.md) / ConnectorAccessTokenResponse
-
 # Type alias: ConnectorAccessTokenResponse
 
 Ƭ **ConnectorAccessTokenResponse**: `Object`

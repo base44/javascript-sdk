@@ -27,6 +27,8 @@
   ],
   "entryDocument": "README.md",
   "allReflectionsHaveOwnDocument": true,
-  "maxTypeConversionDepth": 2
+  "maxTypeConversionDepth": 2,
+  "hideBreadcrumbs": true,
+  "hideInPageTOC": true
 }
 

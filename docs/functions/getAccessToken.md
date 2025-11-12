@@ -1,5 +1,3 @@
-[@base44/sdk](../README.md) / getAccessToken
-
 # Function: getAccessToken
 
 ▸ **getAccessToken**(`options?`): ``null`` \| `string`

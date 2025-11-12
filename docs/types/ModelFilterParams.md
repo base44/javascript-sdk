@@ -1,5 +1,3 @@
-[@base44/sdk](../README.md) / ModelFilterParams
-
 # Type alias: ModelFilterParams
 
 Ƭ **ModelFilterParams**: `Object`

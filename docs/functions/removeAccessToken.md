@@ -1,5 +1,3 @@
-[@base44/sdk](../README.md) / removeAccessToken
-
 # Function: removeAccessToken
 
 ▸ **removeAccessToken**(`options`): `boolean`

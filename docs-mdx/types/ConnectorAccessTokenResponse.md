@@ -1,11 +1,7 @@
 ---
 title: "Type alias: ConnectorAccessTokenResponse"
-description: "Documentation for Type alias: ConnectorAccessTokenResponse"
+description: "modules/connectors.types.ts:3"
 ---
-
-[@base44/sdk](../README.md) / ConnectorAccessTokenResponse
-
-# Type alias: ConnectorAccessTokenResponse
 
 Ƭ **ConnectorAccessTokenResponse**: `Object`
 

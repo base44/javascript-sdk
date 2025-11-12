@@ -1,17 +1,4 @@
-[@base44/sdk](../README.md) / AuthConfigLike
-
 # Interface: AuthConfigLike
-
-## Table of contents
-
-### Properties
-
-- [enable\_username\_password](AuthConfigLike.md#enable_username_password)
-- [enable\_google\_login](AuthConfigLike.md#enable_google_login)
-- [enable\_microsoft\_login](AuthConfigLike.md#enable_microsoft_login)
-- [enable\_facebook\_login](AuthConfigLike.md#enable_facebook_login)
-- [sso\_provider\_name](AuthConfigLike.md#sso_provider_name)
-- [enable\_sso\_login](AuthConfigLike.md#enable_sso_login)
 
 ## Properties
 

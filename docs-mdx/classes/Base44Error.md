@@ -1,34 +1,13 @@
 ---
 title: "Class: Base44Error"
-description: "Documentation for Class: Base44Error"
+description: "utils/axios-client.ts:27"
 ---
-
-[@base44/sdk](../README.md) / Base44Error
-
-# Class: Base44Error
 
 ## Hierarchy
 
 - `Error`
 
   ↳ **`Base44Error`**
-
-## Table of contents
-
-### Constructors
-
-- [constructor](Base44Error.md#constructor)
-
-### Properties
-
-- [status](Base44Error.md#status)
-- [code](Base44Error.md#code)
-- [data](Base44Error.md#data)
-- [originalError](Base44Error.md#originalerror)
-
-### Methods
-
-- [toJSON](Base44Error.md#tojson)
 
 ## Constructors
 
