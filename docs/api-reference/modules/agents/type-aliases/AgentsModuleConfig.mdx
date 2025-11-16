@@ -1,0 +1,75 @@
+[**@base44/sdk v0.8.3**](../../../README.mdx)
+
+***
+
+[@base44/sdk](./README.mdx) / [modules/agents](./modules/agents/README.mdx) / AgentsModuleConfig
+
+# AgentsModuleConfig
+
+```ts
+type AgentsModuleConfig = object;
+```
+
+Defined in: [modules/agents.ts:10](https://github.com/base44/sdk/blob/main/src/modules/agents.ts#L10)
+
+Configuration for the agents module
+
+## Properties
+
+### axios
+
+```ts
+axios: AxiosInstance;
+```
+
+Defined in: [modules/agents.ts:12](https://github.com/base44/sdk/blob/main/src/modules/agents.ts#L12)
+
+Axios instance for API requests
+
+***
+
+### socket
+
+```ts
+socket: ReturnType<typeof RoomsSocket>;
+```
+
+Defined in: [modules/agents.ts:14](https://github.com/base44/sdk/blob/main/src/modules/agents.ts#L14)
+
+WebSocket connection for real-time updates
+
+***
+
+### appId
+
+```ts
+appId: string;
+```
+
+Defined in: [modules/agents.ts:16](https://github.com/base44/sdk/blob/main/src/modules/agents.ts#L16)
+
+Application ID
+
+***
+
+### serverUrl?
+
+```ts
+optional serverUrl: string;
+```
+
+Defined in: [modules/agents.ts:18](https://github.com/base44/sdk/blob/main/src/modules/agents.ts#L18)
+
+Base44 server URL
+
+***
+
+### token?
+
+```ts
+optional token: string;
+```
+
+Defined in: [modules/agents.ts:20](https://github.com/base44/sdk/blob/main/src/modules/agents.ts#L20)
+
+Authentication token

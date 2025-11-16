@@ -1,0 +1,103 @@
+[**@base44/sdk v0.8.3**](../../../../README.mdx)
+
+***
+
+[@base44/sdk](./README.mdx) / [modules/agents](./modules/agents/README.mdx) / [\<internal\>](./modules/agents/-internal-/README.mdx) / RoomsSocket
+
+# RoomsSocket()
+
+```ts
+function RoomsSocket(__namedParameters): object;
+```
+
+Defined in: [utils/socket-utils.ts:70](https://github.com/base44/sdk/blob/main/src/utils/socket-utils.ts#L70)
+
+## Parameters
+
+| Parameter | Type |
+| ------ | ------ |
+| `__namedParameters` | \{ `config`: [`RoomsSocketConfig`](./modules/agents/-internal-/type-aliases/RoomsSocketConfig.mdx); \} |
+| `__namedParameters.config` | [`RoomsSocketConfig`](./modules/agents/-internal-/type-aliases/RoomsSocketConfig.mdx) |
+
+## Returns
+
+`object`
+
+### socket
+
+```ts
+socket: Socket<{
+  connect: () => void | Promise<void>;
+  update_model: (msg) => void | Promise<void>;
+  error: (error) => void | Promise<void>;
+}, {
+  join: (room) => void;
+  leave: (room) => void;
+}>;
+```
+
+### subscribeToRoom()
+
+```ts
+subscribeToRoom: (room, handlers) => () => void;
+```
+
+#### Parameters
+
+| Parameter | Type |
+| ------ | ------ |
+| `room` | `string` |
+| `handlers` | `Partial`\<`{ [k in TEvent]: THandler<k> }`\> |
+
+#### Returns
+
+```ts
+(): void;
+```
+
+##### Returns
+
+`void`
+
+### updateConfig()
+
+```ts
+updateConfig: (config) => void;
+```
+
+#### Parameters
+
+| Parameter | Type |
+| ------ | ------ |
+| `config` | `Partial`\<[`RoomsSocketConfig`](./modules/agents/-internal-/type-aliases/RoomsSocketConfig.mdx)\> |
+
+#### Returns
+
+`void`
+
+### updateModel()
+
+```ts
+updateModel: (room, data) => Promise<void>;
+```
+
+#### Parameters
+
+| Parameter | Type |
+| ------ | ------ |
+| `room` | `string` |
+| `data` | `any` |
+
+#### Returns
+
+`Promise`\<`void`\>
+
+### disconnect()
+
+```ts
+disconnect: () => void;
+```
+
+#### Returns
+
+`void`

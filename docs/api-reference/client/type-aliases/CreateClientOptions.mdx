@@ -1,0 +1,37 @@
+[**@base44/sdk v0.8.3**](../../README.mdx)
+
+***
+
+[@base44/sdk](./README.mdx) / [client](./client/README.mdx) / CreateClientOptions
+
+# CreateClientOptions
+
+```ts
+type CreateClientOptions = object;
+```
+
+Defined in: [client.ts:15](https://github.com/base44/sdk/blob/main/src/client.ts#L15)
+
+Options for configuring the Base44 client
+
+## Properties
+
+### onError()?
+
+```ts
+optional onError: (error) => void;
+```
+
+Defined in: [client.ts:20](https://github.com/base44/sdk/blob/main/src/client.ts#L20)
+
+Error handler callback that will be invoked when API requests fail
+
+#### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `error` | `Error` | The error object from the failed request |
+
+#### Returns
+
+`void`

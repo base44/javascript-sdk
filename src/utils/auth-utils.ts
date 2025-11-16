@@ -1,25 +1,12 @@
-/**
- * Utility functions for authentication and token handling
- */
+import {
+  GetAccessTokenOptions,
+  SaveAccessTokenOptions,
+  RemoveAccessTokenOptions,
+  GetLoginUrlOptions,
+} from "./auth-utils.types.js";
 
-/**
- * Retrieves an access token from either localStorage or URL parameters
- *
- * @param {Object} options - Configuration options
- * @param {string} [options.storageKey='base44_access_token'] - The key to use in localStorage
- * @param {string} [options.paramName='access_token'] - The URL parameter name
- * @param {boolean} [options.saveToStorage=true] - Whether to save the token to localStorage if found in URL
- * @param {boolean} [options.removeFromUrl=true] - Whether to remove the token from URL after retrieval
- * @returns {string|null} The access token or null if not found
- */
-export function getAccessToken(
-  options: {
-    storageKey?: string;
-    paramName?: string;
-    saveToStorage?: boolean;
-    removeFromUrl?: boolean;
-  } = {}
-) {
+// Retrieve an access token from URL parameters or localStorage
+export function getAccessToken(options: GetAccessTokenOptions = {}) {
   const {
     storageKey = "base44_access_token",
     paramName = "access_token",
@@ -71,19 +58,10 @@ export function getAccessToken(
   return null;
 }
 
-/**
- * Saves an access token to localStorage
- *
- * @param {string} token - The access token to save
- * @param {Object} options - Configuration options
- * @param {string} [options.storageKey='base44_access_token'] - The key to use in localStorage
- * @returns {boolean} Success status
- */
+// Save an access token to localStorage
 export function saveAccessToken(
   token: string,
-  options: {
-    storageKey?: string;
-  }
+  options: SaveAccessTokenOptions
 ) {
   const { storageKey = "base44_access_token" } = options;
 
@@ -102,14 +80,8 @@ export function saveAccessToken(
   }
 }
 
-/**
- * Removes the access token from localStorage
- *
- * @param {Object} options - Configuration options
- * @param {string} [options.storageKey='base44_access_token'] - The key to use in localStorage
- * @returns {boolean} Success status
- */
-export function removeAccessToken(options: { storageKey?: string }) {
+// Remove the access token from localStorage
+export function removeAccessToken(options: RemoveAccessTokenOptions) {
   const { storageKey = "base44_access_token" } = options;
 
   if (typeof window === "undefined" || !window.localStorage) {
@@ -125,24 +97,8 @@ export function removeAccessToken(options: { storageKey?: string }) {
   }
 }
 
-/**
- * Constructs the absolute URL for the login page
- *
- * @param {string} nextUrl - URL to redirect back to after login
- * @param {Object} options - Configuration options
- * @param {string} options.serverUrl - Server URL (e.g., 'https://base44.app')
- * @param {string|number} options.appId - Application ID
- * @param {string} [options.loginPath='/login'] - Path to the login endpoint
- * @returns {string} The complete login URL
- */
-export function getLoginUrl(
-  nextUrl: string,
-  options: {
-    serverUrl: string;
-    appId: string;
-    loginPath?: string;
-  }
-) {
+// Construct the absolute URL for the login page with redirect
+export function getLoginUrl(nextUrl: string, options: GetLoginUrlOptions) {
   const { serverUrl, appId, loginPath = "/login" } = options;
 
   if (!serverUrl || !appId) {

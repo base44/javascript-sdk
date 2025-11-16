@@ -1,0 +1,109 @@
+[**@base44/sdk v0.8.3**](../../../../README.mdx)
+
+***
+
+[@base44/sdk](./README.mdx) / [modules/agents](./modules/agents/README.mdx) / [\<internal\>](./modules/agents/-internal-/README.mdx) / RoomsSocketEventsMap
+
+# RoomsSocketEventsMap
+
+```ts
+type RoomsSocketEventsMap = object;
+```
+
+Defined in: [utils/socket-utils.ts:15](https://github.com/base44/sdk/blob/main/src/utils/socket-utils.ts#L15)
+
+## Properties
+
+### listen
+
+```ts
+listen: object;
+```
+
+Defined in: [utils/socket-utils.ts:16](https://github.com/base44/sdk/blob/main/src/utils/socket-utils.ts#L16)
+
+#### connect()
+
+```ts
+connect: () => Promise<void> | void;
+```
+
+##### Returns
+
+`Promise`\<`void`\> \| `void`
+
+#### update\_model()
+
+```ts
+update_model: (msg) => Promise<void> | void;
+```
+
+##### Parameters
+
+| Parameter | Type |
+| ------ | ------ |
+| `msg` | \{ `room`: `string`; `data`: [`TJsonStr`](./modules/agents/-internal-/type-aliases/TJsonStr.mdx); \} |
+| `msg.room` | `string` |
+| `msg.data` | [`TJsonStr`](./modules/agents/-internal-/type-aliases/TJsonStr.mdx) |
+
+##### Returns
+
+`Promise`\<`void`\> \| `void`
+
+#### error()
+
+```ts
+error: (error) => Promise<void> | void;
+```
+
+##### Parameters
+
+| Parameter | Type |
+| ------ | ------ |
+| `error` | `Error` |
+
+##### Returns
+
+`Promise`\<`void`\> \| `void`
+
+***
+
+### emit
+
+```ts
+emit: object;
+```
+
+Defined in: [utils/socket-utils.ts:24](https://github.com/base44/sdk/blob/main/src/utils/socket-utils.ts#L24)
+
+#### join()
+
+```ts
+join: (room) => void;
+```
+
+##### Parameters
+
+| Parameter | Type |
+| ------ | ------ |
+| `room` | `string` |
+
+##### Returns
+
+`void`
+
+#### leave()
+
+```ts
+leave: (room) => void;
+```
+
+##### Parameters
+
+| Parameter | Type |
+| ------ | ------ |
+| `room` | `string` |
+
+##### Returns
+
+`void`

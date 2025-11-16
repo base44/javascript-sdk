@@ -1,0 +1,245 @@
+[**@base44/sdk v0.8.3**](../../../README.mdx)
+
+***
+
+[@base44/sdk](./README.mdx) / [modules/agents](./modules/agents/README.mdx) / createAgentsModule
+
+# createAgentsModule()
+
+```ts
+function createAgentsModule(config): object;
+```
+
+Defined in: [modules/agents.ts:32](https://github.com/base44/sdk/blob/main/src/modules/agents.ts#L32)
+
+Creates the agents module for the Base44 SDK
+
+Provides methods to interact with AI agents, manage conversations,
+and receive real-time updates via WebSocket.
+
+## Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `config` | [`AgentsModuleConfig`](./modules/agents/type-aliases/AgentsModuleConfig.mdx) | Module configuration |
+
+## Returns
+
+Agents module with conversation and messaging methods
+
+### getConversations()
+
+```ts
+getConversations: () => Promise<AgentConversation[]>;
+```
+
+Get all agent conversations
+
+#### Returns
+
+`Promise`\<[`AgentConversation`](./index/type-aliases/AgentConversation.mdx)[]\>
+
+Promise resolving to array of conversations
+
+#### Example
+
+```typescript
+const conversations = await client.agents.getConversations();
+console.log(`Total conversations: ${conversations.length}`);
+```
+
+### getConversation()
+
+```ts
+getConversation: (conversationId) => Promise<
+  | AgentConversation
+| undefined>;
+```
+
+Get a specific agent conversation by ID
+
+#### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `conversationId` | `string` | The ID of the conversation to retrieve |
+
+#### Returns
+
+`Promise`\<
+  \| [`AgentConversation`](./index/type-aliases/AgentConversation.mdx)
+  \| `undefined`\>
+
+Promise resolving to the conversation or undefined
+
+#### Example
+
+```typescript
+const conversation = await client.agents.getConversation('conv-123');
+console.log(conversation.messages);
+```
+
+### listConversations()
+
+```ts
+listConversations: (filterParams) => Promise<AgentConversation[]>;
+```
+
+List agent conversations with filtering and pagination
+
+#### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `filterParams` | [`ModelFilterParams`](./index/type-aliases/ModelFilterParams.mdx) | Query parameters for filtering |
+
+#### Returns
+
+`Promise`\<[`AgentConversation`](./index/type-aliases/AgentConversation.mdx)[]\>
+
+Promise resolving to filtered conversations
+
+#### Example
+
+```typescript
+const recent = await client.agents.listConversations({
+  sort: '-created_at',
+  limit: 10
+});
+```
+
+### createConversation()
+
+```ts
+createConversation: (conversation) => Promise<AgentConversation>;
+```
+
+Create a new agent conversation
+
+#### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `conversation` | \{ `agent_name`: `string`; `metadata?`: `Record`\<`string`, `any`\>; \} | Conversation data |
+| `conversation.agent_name` | `string` | Name of the agent to create conversation with |
+| `conversation.metadata?` | `Record`\<`string`, `any`\> | Optional metadata for the conversation |
+
+#### Returns
+
+`Promise`\<[`AgentConversation`](./index/type-aliases/AgentConversation.mdx)\>
+
+Promise resolving to the created conversation
+
+#### Example
+
+```typescript
+const conversation = await client.agents.createConversation({
+  agent_name: 'support-agent',
+  metadata: { user_id: 'user-123' }
+});
+```
+
+### addMessage()
+
+```ts
+addMessage: (conversation, message) => Promise<AgentMessage>;
+```
+
+Add a message to an agent conversation
+
+Sends a message and updates the conversation in real-time via WebSocket.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `conversation` | [`AgentConversation`](./index/type-aliases/AgentConversation.mdx) | The conversation to add the message to |
+| `message` | [`AgentMessage`](./index/type-aliases/AgentMessage.mdx) | The message to add |
+
+#### Returns
+
+`Promise`\<[`AgentMessage`](./index/type-aliases/AgentMessage.mdx)\>
+
+Promise resolving to the created message
+
+#### Example
+
+```typescript
+const message = await client.agents.addMessage(conversation, {
+  role: 'user',
+  content: 'Hello, I need help with my order'
+});
+```
+
+### subscribeToConversation()
+
+```ts
+subscribeToConversation: (conversationId, onUpdate?) => () => void;
+```
+
+Subscribe to real-time updates for a conversation
+
+Establishes a WebSocket connection to receive live updates when
+the agent responds or the conversation is updated.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `conversationId` | `string` | The ID of the conversation to subscribe to |
+| `onUpdate?` | (`conversation`) => `void` | Callback function invoked when the conversation updates |
+
+#### Returns
+
+Unsubscribe function to stop receiving updates
+
+```ts
+(): void;
+```
+
+##### Returns
+
+`void`
+
+#### Example
+
+```typescript
+const unsubscribe = client.agents.subscribeToConversation(
+  'conv-123',
+  (updatedConversation) => {
+    console.log('New message:', updatedConversation.messages);
+  }
+);
+
+// Later, stop listening
+unsubscribe();
+```
+
+### getWhatsAppConnectURL()
+
+```ts
+getWhatsAppConnectURL: (agentName) => string;
+```
+
+Get WhatsApp connection URL for an agent
+
+Generates a URL that allows users to connect with an agent via WhatsApp.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `agentName` | `string` | Name of the agent |
+
+#### Returns
+
+`string`
+
+WhatsApp connection URL with authentication token
+
+#### Example
+
+```typescript
+const whatsappURL = client.agents.getWhatsAppConnectURL('support-agent');
+window.open(whatsappURL, '_blank');
+```

@@ -1,0 +1,132 @@
+[**@base44/sdk v0.8.3**](../../README.mdx)
+
+***
+
+[@base44/sdk](./README.mdx) / [index](./index/README.mdx) / Base44Error
+
+# Base44Error
+
+Defined in: [utils/axios-client.ts:5](https://github.com/base44/sdk/blob/main/src/utils/axios-client.ts#L5)
+
+## Extends
+
+- `Error`
+
+## Constructors
+
+### Constructor
+
+```ts
+new Base44Error(
+   message, 
+   status, 
+   code, 
+   data, 
+   originalError): Base44Error;
+```
+
+Defined in: [utils/axios-client.ts:11](https://github.com/base44/sdk/blob/main/src/utils/axios-client.ts#L11)
+
+#### Parameters
+
+| Parameter | Type |
+| ------ | ------ |
+| `message` | `string` |
+| `status` | `number` |
+| `code` | `string` |
+| `data` | `any` |
+| `originalError` | `unknown` |
+
+#### Returns
+
+`Base44Error`
+
+#### Overrides
+
+```ts
+Error.constructor
+```
+
+## Methods
+
+### toJSON()
+
+```ts
+toJSON(): object;
+```
+
+Defined in: [utils/axios-client.ts:27](https://github.com/base44/sdk/blob/main/src/utils/axios-client.ts#L27)
+
+#### Returns
+
+`object`
+
+##### name
+
+```ts
+name: string;
+```
+
+##### message
+
+```ts
+message: string;
+```
+
+##### status
+
+```ts
+status: number;
+```
+
+##### code
+
+```ts
+code: string;
+```
+
+##### data
+
+```ts
+data: any;
+```
+
+## Properties
+
+### status
+
+```ts
+status: number;
+```
+
+Defined in: [utils/axios-client.ts:6](https://github.com/base44/sdk/blob/main/src/utils/axios-client.ts#L6)
+
+***
+
+### code
+
+```ts
+code: string;
+```
+
+Defined in: [utils/axios-client.ts:7](https://github.com/base44/sdk/blob/main/src/utils/axios-client.ts#L7)
+
+***
+
+### data
+
+```ts
+data: any;
+```
+
+Defined in: [utils/axios-client.ts:8](https://github.com/base44/sdk/blob/main/src/utils/axios-client.ts#L8)
+
+***
+
+### originalError
+
+```ts
+originalError: unknown;
+```
+
+Defined in: [utils/axios-client.ts:9](https://github.com/base44/sdk/blob/main/src/utils/axios-client.ts#L9)

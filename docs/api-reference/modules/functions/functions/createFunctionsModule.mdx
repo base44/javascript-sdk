@@ -1,0 +1,80 @@
+[**@base44/sdk v0.8.3**](../../../README.mdx)
+
+***
+
+[@base44/sdk](./README.mdx) / [modules/functions](./modules/functions/README.mdx) / createFunctionsModule
+
+# createFunctionsModule()
+
+```ts
+function createFunctionsModule(axios, appId): object;
+```
+
+Defined in: [modules/functions.ts:14](https://github.com/base44/sdk/blob/main/src/modules/functions.ts#L14)
+
+Creates the functions module for the Base44 SDK
+
+Provides access to invoke custom cloud functions defined in your Base44 application.
+Functions can be used to execute custom server-side logic, perform complex operations,
+or integrate with external services.
+
+## Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `axios` | `AxiosInstance` | Axios instance for API requests |
+| `appId` | `string` | Application ID |
+
+## Returns
+
+Functions module with invoke method
+
+### invoke()
+
+```ts
+invoke(functionName, data): Promise<AxiosResponse<any, any>>;
+```
+
+Invoke a custom function by name
+
+Executes a cloud function defined in your Base44 application with the provided
+parameters. Automatically handles file uploads when File objects are included.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `functionName` | `string` | Name of the function to invoke |
+| `data` | `Record`\<`string`, `any`\> | Object containing named parameters for the function |
+
+#### Returns
+
+`Promise`\<`AxiosResponse`\<`any`, `any`\>\>
+
+Promise resolving to the function's response
+
+#### Throws
+
+If function doesn't exist or execution fails
+
+#### Example
+
+```typescript
+// Simple function call
+const result = await client.functions.invoke('calculateTotal', {
+  items: ['item1', 'item2'],
+  discount: 0.1
+});
+
+// Function with file upload
+const fileInput = document.querySelector('input[type="file"]');
+const result = await client.functions.invoke('processImage', {
+  image: fileInput.files[0],
+  filter: 'grayscale'
+});
+
+// Service role function invocation
+const adminResult = await client.asServiceRole.functions.invoke('adminTask', {
+  action: 'cleanup'
+});
+```

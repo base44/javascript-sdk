@@ -1,43 +1,34 @@
 import { AxiosInstance } from "axios";
+import { AuthModule, AuthModuleOptions } from "./auth.types";
 
 /**
- * Creates the auth module for the Base44 SDK
- * @param {import('axios').AxiosInstance} axios - Axios instance
- * @param {string|number} appId - Application ID
- * @param {string} serverUrl - Server URL
- * @returns {Object} Auth module with authentication methods
+ * Creates the auth module for the Base44 SDK.
+ *
+ * @param axios - Axios instance for API requests
+ * @param functionsAxiosClient - Axios instance for functions API requests
+ * @param appId - Application ID
+ * @param options - Configuration options including server URLs
+ * @returns Auth module with authentication and user management methods
+ * @internal
  */
 export function createAuthModule(
   axios: AxiosInstance,
   functionsAxiosClient: AxiosInstance,
   appId: string,
-  options: {
-    serverUrl: string;
-    appBaseUrl?: string;
-  }
-) {
+  options: AuthModuleOptions
+): AuthModule {
   return {
-    /**
-     * Get current user information
-     * @returns {Promise<Object>} Current user data
-     */
+    // Get current user information
     async me() {
       return axios.get(`/apps/${appId}/entities/User/me`);
     },
-    /**
-     * Update current user data
-     * @param {Object} data - Updated user data
-     * @returns {Promise<Object>} Updated user
-     */
+
+    // Update current user data
     async updateMe(data: Record<string, any>) {
       return axios.put(`/apps/${appId}/entities/User/me`, data);
     },
 
-    /**
-     * Redirects the user to the app's login page
-     * @param {string} nextUrl - URL to redirect to after successful login
-     * @throws {Error} When not in a browser environment
-     */
+    // Redirects the user to the app's login page
     redirectToLogin(nextUrl: string) {
       // This function only works in a browser environment
       if (typeof window === "undefined") {
@@ -60,12 +51,8 @@ export function createAuthModule(
       window.location.href = loginUrl;
     },
 
-    /**
-     * Logout the current user
-     * Removes the token from localStorage and optionally redirects to a URL or reloads the page
-     * @param redirectUrl - Optional URL to redirect to after logout. Reloads the page if not provided
-     * @returns {Promise<void>}
-     */
+    // Logout the current user
+    // Removes the token from localStorage and optionally redirects to a URL or reloads the page
     logout(redirectUrl?: string) {
       // Remove token from axios headers
       delete axios.defaults.headers.common["Authorization"];
@@ -91,11 +78,7 @@ export function createAuthModule(
       }
     },
 
-    /**
-     * Set authentication token
-     * @param {string} token - Auth token
-     * @param {boolean} [saveToStorage=true] - Whether to save the token to localStorage
-     */
+    // Set authentication token
     setToken(token: string, saveToStorage = true) {
       if (!token) return;
 
@@ -121,13 +104,7 @@ export function createAuthModule(
       }
     },
 
-    /**
-     * Login via username and password
-     * @param email - User email
-     * @param password - User password
-     * @param turnstileToken - Optional Turnstile captcha token
-     * @returns Login response with access_token and user
-     */
+    // Login via username and password
     async loginViaEmailPassword(
       email: string,
       password: string,
@@ -162,10 +139,7 @@ export function createAuthModule(
       }
     },
 
-    /**
-     * Verify if the current token is valid
-     * @returns {Promise<boolean>} True if token is valid
-     */
+    // Verify if the current token is valid
     async isAuthenticated() {
       try {
         await this.me();
@@ -175,6 +149,7 @@ export function createAuthModule(
       }
     },
 
+    // Invite a user to the application
     inviteUser(userEmail: string, role: string) {
       return axios.post(`/apps/${appId}/users/invite-user`, {
         user_email: userEmail,
@@ -182,6 +157,7 @@ export function createAuthModule(
       });
     },
 
+    // Register a new user account
     register(payload: {
       email: string;
       password: string;
@@ -191,6 +167,7 @@ export function createAuthModule(
       return axios.post(`/apps/${appId}/auth/register`, payload);
     },
 
+    // Verify an OTP (One-Time Password) code
     verifyOtp({ email, otpCode }: { email: string; otpCode: string }) {
       return axios.post(`/apps/${appId}/auth/verify-otp`, {
         email,
@@ -198,16 +175,19 @@ export function createAuthModule(
       });
     },
 
+    // Resend an OTP code to the user's email
     resendOtp(email: string) {
       return axios.post(`/apps/${appId}/auth/resend-otp`, { email });
     },
 
+    // Request a password reset
     resetPasswordRequest(email: string) {
       return axios.post(`/apps/${appId}/auth/reset-password-request`, {
         email,
       });
     },
 
+    // Reset password using a reset token
     resetPassword({
       resetToken,
       newPassword,
@@ -221,6 +201,7 @@ export function createAuthModule(
       });
     },
 
+    // Change the user's password
     changePassword({
       userId,
       currentPassword,

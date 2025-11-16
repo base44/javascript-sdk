@@ -1,0 +1,542 @@
+[**@base44/sdk v0.8.3**](../../../README.mdx)
+
+***
+
+[@base44/sdk](./README.mdx) / [modules/auth](./modules/auth/README.mdx) / createAuthModule
+
+# createAuthModule()
+
+```ts
+function createAuthModule(
+   axios, 
+   functionsAxiosClient, 
+   appId, 
+   options): object;
+```
+
+Defined in: [modules/auth.ts:18](https://github.com/base44/sdk/blob/main/src/modules/auth.ts#L18)
+
+Creates the authentication module for the Base44 SDK
+
+Provides comprehensive authentication functionality including user login,
+registration, password reset, and user profile management.
+
+## Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `axios` | `AxiosInstance` | Axios instance for API requests |
+| `functionsAxiosClient` | `AxiosInstance` | Axios instance for function invocations |
+| `appId` | `string` | Application ID |
+| `options` | \{ `serverUrl`: `string`; `appBaseUrl?`: `string`; \} | Configuration options |
+| `options.serverUrl` | `string` | Base44 server URL |
+| `options.appBaseUrl?` | `string` | Application base URL for redirects |
+
+## Returns
+
+Auth module with authentication methods
+
+### me()
+
+```ts
+me(): Promise<AxiosResponse<any, any>>;
+```
+
+Get current user information
+
+Retrieves the authenticated user's profile data including
+id, email, name, role, and other custom fields.
+
+#### Returns
+
+`Promise`\<`AxiosResponse`\<`any`, `any`\>\>
+
+Promise resolving to the current user data
+
+#### Throws
+
+If user is not authenticated
+
+#### Example
+
+```typescript
+const user = await client.auth.me();
+console.log(`Logged in as: ${user.name}`);
+console.log(`Role: ${user.role}`);
+```
+
+### updateMe()
+
+```ts
+updateMe(data): Promise<AxiosResponse<any, any>>;
+```
+
+Update current user's profile data
+
+Updates the authenticated user's information. You can update any
+custom fields on the user entity.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `data` | `Record`\<`string`, `any`\> | Object containing fields to update |
+
+#### Returns
+
+`Promise`\<`AxiosResponse`\<`any`, `any`\>\>
+
+Promise resolving to the updated user data
+
+#### Throws
+
+If user is not authenticated
+
+#### Example
+
+```typescript
+const updatedUser = await client.auth.updateMe({
+  name: 'John Doe',
+  preferences: {
+    theme: 'dark',
+    notifications: true
+  }
+});
+```
+
+### redirectToLogin()
+
+```ts
+redirectToLogin(nextUrl): void;
+```
+
+Redirects the user to the app's login page
+
+Navigates to the Base44 login page with a return URL. After successful
+authentication, the user will be redirected back to the specified URL
+with an access token in the query parameters.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `nextUrl` | `string` | URL to redirect to after successful login |
+
+#### Returns
+
+`void`
+
+#### Throws
+
+When not in a browser environment
+
+#### Example
+
+```typescript
+// Redirect to login and return to current page
+client.auth.redirectToLogin(window.location.href);
+
+// Redirect to login and go to dashboard after
+client.auth.redirectToLogin('/dashboard');
+```
+
+### logout()
+
+```ts
+logout(redirectUrl?): void;
+```
+
+Logout the current user
+
+Removes the authentication token from memory and localStorage, then either
+redirects to a specified URL or reloads the page to clear the session.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `redirectUrl?` | `string` | Optional URL to redirect to after logout. Reloads the page if not provided |
+
+#### Returns
+
+`void`
+
+#### Example
+
+```typescript
+// Simple logout (reloads page)
+client.auth.logout();
+
+// Logout and redirect to login page
+client.auth.logout('/login');
+
+// Logout and redirect to home
+client.auth.logout('/');
+```
+
+### setToken()
+
+```ts
+setToken(token, saveToStorage): void;
+```
+
+Set authentication token for the client
+
+Updates the Authorization header for all API requests and optionally
+saves the token to localStorage for persistence across page reloads.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `token` | `string` | Authentication token |
+| `saveToStorage` | `boolean` | Whether to save the token to localStorage (default: true) |
+
+#### Returns
+
+`void`
+
+#### Example
+
+```typescript
+// Set token and save to localStorage
+client.auth.setToken('your-access-token');
+
+// Set token without saving (for server-side or temporary tokens)
+client.auth.setToken('your-access-token', false);
+```
+
+### loginViaEmailPassword()
+
+```ts
+loginViaEmailPassword(
+   email, 
+   password, 
+   turnstileToken?): Promise<{
+  access_token: string;
+  user: any;
+}>;
+```
+
+Login via email and password
+
+Authenticates a user with their email and password credentials.
+On success, automatically sets the token in the client and localStorage.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `email` | `string` | User's email address |
+| `password` | `string` | User's password |
+| `turnstileToken?` | `string` | Optional Cloudflare Turnstile captcha token for bot protection |
+
+#### Returns
+
+`Promise`\<\{
+  `access_token`: `string`;
+  `user`: `any`;
+\}\>
+
+Promise resolving to login response with access_token and user data
+
+#### Throws
+
+If credentials are invalid or authentication fails
+
+#### Example
+
+```typescript
+try {
+  const { access_token, user } = await client.auth.loginViaEmailPassword(
+    'user@example.com',
+    'password123'
+  );
+  console.log(`Logged in as ${user.name}`);
+  // Token is automatically set in the client
+} catch (error) {
+  console.error('Login failed:', error.message);
+}
+```
+
+### isAuthenticated()
+
+```ts
+isAuthenticated(): Promise<boolean>;
+```
+
+Verify if the current user is authenticated
+
+Checks whether the current token is valid by attempting to fetch
+the user's profile. Returns true if authenticated, false otherwise.
+
+#### Returns
+
+`Promise`\<`boolean`\>
+
+Promise resolving to true if authenticated, false if not
+
+#### Example
+
+```typescript
+if (await client.auth.isAuthenticated()) {
+  console.log('User is logged in');
+  const user = await client.auth.me();
+} else {
+  console.log('User needs to log in');
+  client.auth.redirectToLogin('/dashboard');
+}
+```
+
+### inviteUser()
+
+```ts
+inviteUser(userEmail, role): Promise<AxiosResponse<any, any>>;
+```
+
+Invite a user to the application
+
+Sends an invitation email to the specified user with the assigned role.
+The user will receive a link to complete their registration.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `userEmail` | `string` | Email address of the user to invite |
+| `role` | `string` | Role to assign to the user (e.g., 'admin', 'editor', 'viewer') |
+
+#### Returns
+
+`Promise`\<`AxiosResponse`\<`any`, `any`\>\>
+
+Promise resolving to the invitation result
+
+#### Example
+
+```typescript
+await client.auth.inviteUser('newuser@example.com', 'editor');
+console.log('Invitation sent!');
+```
+
+### register()
+
+```ts
+register(payload): Promise<AxiosResponse<any, any>>;
+```
+
+Register a new user account
+
+Creates a new user account with email and password. May require
+email verification via OTP depending on app configuration.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `payload` | \{ `email`: `string`; `password`: `string`; `turnstile_token?`: `string` \| `null`; `referral_code?`: `string` \| `null`; \} | Registration data |
+| `payload.email` | `string` | User's email address |
+| `payload.password` | `string` | User's password |
+| `payload.turnstile_token?` | `string` \| `null` | Optional Cloudflare Turnstile captcha token |
+| `payload.referral_code?` | `string` \| `null` | Optional referral code |
+
+#### Returns
+
+`Promise`\<`AxiosResponse`\<`any`, `any`\>\>
+
+Promise resolving to the registration result
+
+#### Example
+
+```typescript
+try {
+  await client.auth.register({
+    email: 'newuser@example.com',
+    password: 'securePassword123'
+  });
+  // Check email for verification code
+} catch (error) {
+  console.error('Registration failed:', error.message);
+}
+```
+
+### verifyOtp()
+
+```ts
+verifyOtp(params): Promise<AxiosResponse<any, any>>;
+```
+
+Verify email with OTP code
+
+Verifies a user's email address using the one-time password (OTP)
+sent to their email during registration.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `params` | \{ `email`: `string`; `otpCode`: `string`; \} | Verification parameters |
+| `params.email` | `string` | User's email address |
+| `params.otpCode` | `string` | One-time password code from email |
+
+#### Returns
+
+`Promise`\<`AxiosResponse`\<`any`, `any`\>\>
+
+Promise resolving to verification result with access token
+
+#### Example
+
+```typescript
+const { access_token } = await client.auth.verifyOtp({
+  email: 'user@example.com',
+  otpCode: '123456'
+});
+client.auth.setToken(access_token);
+```
+
+### resendOtp()
+
+```ts
+resendOtp(email): Promise<AxiosResponse<any, any>>;
+```
+
+Resend OTP verification code
+
+Sends a new OTP code to the user's email if the previous one expired
+or was not received.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `email` | `string` | User's email address |
+
+#### Returns
+
+`Promise`\<`AxiosResponse`\<`any`, `any`\>\>
+
+Promise resolving when OTP is sent
+
+#### Example
+
+```typescript
+await client.auth.resendOtp('user@example.com');
+console.log('New verification code sent!');
+```
+
+### resetPasswordRequest()
+
+```ts
+resetPasswordRequest(email): Promise<AxiosResponse<any, any>>;
+```
+
+Request password reset
+
+Initiates the password reset process by sending a reset link
+to the user's email address.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `email` | `string` | User's email address |
+
+#### Returns
+
+`Promise`\<`AxiosResponse`\<`any`, `any`\>\>
+
+Promise resolving when reset email is sent
+
+#### Example
+
+```typescript
+await client.auth.resetPasswordRequest('user@example.com');
+console.log('Password reset email sent!');
+```
+
+### resetPassword()
+
+```ts
+resetPassword(params): Promise<AxiosResponse<any, any>>;
+```
+
+Reset password with token
+
+Completes the password reset process using the reset token from
+the email and setting a new password.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `params` | \{ `resetToken`: `string`; `newPassword`: `string`; \} | Reset parameters |
+| `params.resetToken` | `string` | Reset token from email link |
+| `params.newPassword` | `string` | New password to set |
+
+#### Returns
+
+`Promise`\<`AxiosResponse`\<`any`, `any`\>\>
+
+Promise resolving when password is reset
+
+#### Example
+
+```typescript
+// Extract token from email link
+const urlParams = new URLSearchParams(window.location.search);
+const resetToken = urlParams.get('reset_token');
+
+await client.auth.resetPassword({
+  resetToken,
+  newPassword: 'newSecurePassword123'
+});
+console.log('Password reset successful!');
+```
+
+### changePassword()
+
+```ts
+changePassword(params): Promise<AxiosResponse<any, any>>;
+```
+
+Change password for authenticated user
+
+Allows a logged-in user to change their password by providing
+their current password and a new password.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `params` | \{ `userId`: `string`; `currentPassword`: `string`; `newPassword`: `string`; \} | Change password parameters |
+| `params.userId` | `string` | User's ID |
+| `params.currentPassword` | `string` | Current password for verification |
+| `params.newPassword` | `string` | New password to set |
+
+#### Returns
+
+`Promise`\<`AxiosResponse`\<`any`, `any`\>\>
+
+Promise resolving when password is changed
+
+#### Throws
+
+If current password is incorrect
+
+#### Example
+
+```typescript
+const user = await client.auth.me();
+
+try {
+  await client.auth.changePassword({
+    userId: user.id,
+    currentPassword: 'oldPassword123',
+    newPassword: 'newSecurePassword456'
+  });
+  console.log('Password changed successfully!');
+} catch (error) {
+  console.error('Failed to change password:', error.message);
+}
+```
