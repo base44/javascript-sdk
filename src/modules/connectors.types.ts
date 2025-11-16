@@ -17,7 +17,7 @@ export interface ConnectorAccessTokenResponse {
  * that users have connected to your Base44 app. Use these tokens to make API
  * calls to external services on behalf of your users.
  *
- * **Important:** This module is only available via service role authentication.
+ * **Important:** This module is only available with service role authentication.
  *
  * **Difference from SSO module:**
  * - **Connectors**: Retrieve OAuth tokens for external services (Google, Slack, etc.)

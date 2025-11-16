@@ -16,7 +16,7 @@ export interface SsoAccessTokenResponse {
  *
  * @example
  * ```typescript
- * // Access SSO module via service role
+ * // Access SSO module with service role
  * const response = await client.asServiceRole.sso.getAccessToken("user_123");
  * console.log(response.data.access_token);
  * ```

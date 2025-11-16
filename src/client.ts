@@ -9,60 +9,31 @@ import { createFunctionsModule } from "./modules/functions.js";
 import { createAgentsModule } from "./modules/agents.js";
 import { createAppLogsModule } from "./modules/app-logs.js";
 import { RoomsSocket, RoomsSocketConfig } from "./utils/socket-utils.js";
+import type {
+  Base44Client,
+  CreateClientConfig,
+  CreateClientOptions,
+} from "./client.types.js";
 
-/**
- * Options for creating a Base44 client.
- */
-export type CreateClientOptions = {
-  /**
-   * Optional error handler that will be called whenever an API error occurs.
-   *
-   * @example
-   * ```typescript
-   * const client = createClient({
-   *   appId: 'my-app',
-   *   options: {
-   *     onError: (error) => {
-   *       console.error('API Error:', error);
-   *       // Send to error tracking service
-   *       Sentry.captureException(error);
-   *     }
-   *   }
-   * });
-   * ```
-   */
-  onError?: (error: Error) => void;
-};
-
-/**
- * The Base44 client instance type.
- *
- * Provides access to all SDK modules and methods for interacting with your Base44 app.
- */
-export type Base44Client = ReturnType<typeof createClient>;
+// Re-export client types
+export type { Base44Client, CreateClientConfig, CreateClientOptions };
 
 /**
  * Creates a Base44 SDK client instance.
  *
- * This is the main entry point for the Base44 SDK. It creates a client that provides
- * access to all SDK modules including entities, auth, functions, integrations, agents,
- * and more.
+ * This is the main entry point for the Base44 SDK. It creates a client that provides access to the SDK's modules, such as {@link EntitiesModule | entities}, {@link AuthModule | auth}, and {@link FunctionsModule | functions}.
  *
- * **User Modules (default access):**
- * - `entities` - CRUD operations for your data
- * - `integrations` - Pre-built integration endpoints
- * - `auth` - User authentication and management
- * - `functions` - Custom backend functions
- * - `agents` - AI agent conversations
- * - `appLogs` - Application usage tracking
+ * The client supports two authentication modes:
+ * - **User authentication** (default): Access modules with user-level permissions using `client.moduleName`.
+ * - **Service role authentication**: Access modules with elevated permissions using `client.asServiceRole.moduleName`.
  *
- * **Service Role Modules (via `asServiceRole`):**
- * - All user modules PLUS:
- * - `sso` - SSO token generation
- * - `connectors` - OAuth token retrieval
+ * Most modules are available in both modes, but with different permission levels. Some modules are only available with service role authentication.
  *
- * @param config - Client configuration options
- * @returns Base44 client instance with access to all modules
+ * For example, when using the {@link EntitiesModule | entities} module with user authentication you'll only get data accessible to the current user. With service role authentication, you'll get all data accessible to all users across the entire application.
+ *
+ * To use the service role authentication mode, you need to provide a service role token when creating the client. This token should be kept secret and never exposed in your application's frontend.
+ *
+ * <Info> The {@link AuthModule | auth} module is only available with user authentication for security reasons.</Info>
  *
  * @example
  * ```typescript
@@ -74,18 +45,8 @@ export type Base44Client = ReturnType<typeof createClient>;
  * });
  *
  * // Use client modules
- * const todos = await client.entities.Todo.list();
+ * const products = await client.entities.Products.list();
  * const user = await client.auth.me();
- * ```
- *
- * @example
- * ```typescript
- * // Client with authentication
- * const client = createClient({
- *   appId: 'my-app-id',
- *   token: 'user-auth-token',
- *   requiresAuth: true  // Automatically redirects to login if not authenticated
- * });
  * ```
  *
  * @example
@@ -115,27 +76,8 @@ export type Base44Client = ReturnType<typeof createClient>;
  *   }
  * });
  * ```
- *
- * @example
- * ```typescript
- * // Client with custom server URL (self-hosted)
- * const client = createClient({
- *   serverUrl: 'https://my-base44-instance.com',
- *   appId: 'my-app-id'
- * });
- * ```
  */
-export function createClient(config: {
-  serverUrl?: string;
-  appBaseUrl?: string;
-  appId: string;
-  token?: string;
-  serviceToken?: string;
-  requiresAuth?: boolean;
-  functionsVersion?: string;
-  headers?: Record<string, string>;
-  options?: CreateClientOptions;
-}) {
+export function createClient(config: CreateClientConfig): Base44Client {
   const {
     serverUrl = "https://base44.app",
     appId,
@@ -273,8 +215,6 @@ export function createClient(config: {
     /**
      * Sets a new authentication token for all subsequent requests.
      *
-     * Updates the token for both HTTP requests and WebSocket connections.
-     *
      * @param newToken - The new authentication token
      *
      * @example
@@ -297,15 +237,7 @@ export function createClient(config: {
     /**
      * Gets the current client configuration.
      *
-     * @returns Current configuration including serverUrl, appId, and requiresAuth
-     *
-     * @example
-     * ```typescript
-     * const config = client.getConfig();
-     * console.log(config.appId);       // 'my-app-id'
-     * console.log(config.serverUrl);   // 'https://base44.app'
-     * console.log(config.requiresAuth); // true/false
-     * ```
+     * @internal
      */
     getConfig() {
       return {
@@ -318,16 +250,9 @@ export function createClient(config: {
     /**
      * Provides access to service role modules.
      *
-     * Service role modules have elevated permissions and include additional
-     * modules like `sso` and `connectors` that are not available with regular
-     * user authentication.
+     * Service role authentication provides elevated permissions for server-side operations. Unlike user authentication, which is scoped to a specific user's permissions, service role authentication has access to data and operations across all users.
      *
-     * **Available modules:**
-     * - All regular user modules (entities, auth, functions, etc.)
-     * - `sso` - SSO token generation
-     * - `connectors` - OAuth token retrieval
-     *
-     * @throws {Error} When accessed without providing a serviceToken during client creation
+     * @throws {Error} When accessed without providing a serviceToken during client creation.
      *
      * @example
      * ```typescript
@@ -336,11 +261,7 @@ export function createClient(config: {
      *   serviceToken: 'service-role-token'
      * });
      *
-     * // Access service-role-only features
-     * const ssoToken = await client.asServiceRole.sso.getAccessToken('user-123');
-     * const googleToken = await client.asServiceRole.connectors.getAccessToken('google');
-     *
-     * // Also access regular modules with elevated permissions
+     * // Also access a module with elevated permissions
      * const allUsers = await client.asServiceRole.entities.User.list();
      * ```
      */
@@ -358,66 +279,40 @@ export function createClient(config: {
 }
 
 /**
- * Creates a Base44 client from an HTTP request (server-side helper).
+ * Creates a Base44 client from an HTTP request.
  *
- * This is a convenience function for server-side environments (like Next.js API routes,
- * Edge functions, or Express servers) that automatically extracts authentication tokens
- * and configuration from request headers.
+ * Creates a client by automatically extracting authentication tokens and configuration from request with authentication information in their headers. Use this function in backend environments, such as when building backend functions. Base44 inserts the necessary headers when forwarding requests from your app frontend to your backend functions.
  *
- * **Required Headers:**
- * - `Base44-App-Id` - Your Base44 application ID
- *
- * **Optional Headers:**
- * - `Authorization` - User authentication token (format: "Bearer <token>")
- * - `Base44-Service-Authorization` - Service role token (format: "Bearer <token>")
- * - `Base44-Api-Url` - Custom API URL (defaults to https://base44.app)
- * - `Base44-Functions-Version` - Functions version
- *
- * @param request - HTTP Request object (standard Fetch API Request)
- * @returns Base44 client instance configured from request headers
- *
- * @throws {Error} When Base44-App-Id header is missing
- * @throws {Error} When authorization headers have invalid format
+ * @throws {Error} When Base44-App-Id header is missing.
+ * @throws {Error} When authorization headers have invalid format.
  *
  * @example
  * ```typescript
- * // Next.js API Route
+ * // Frontend call to a backend function
+ * const response = await client.functions.invoke('myBackendFunction', {});
+ *
+ * // Backend function that receives the call
  * import { createClientFromRequest } from '@base44/client-sdk';
  *
- * export async function GET(request: Request) {
- *   const client = createClientFromRequest(request);
- *   const data = await client.entities.Product.list();
- *   return Response.json(data);
- * }
- * ```
+ * Deno.serve(async (req) => {
+ *   try {
+ *     const base44 = createClientFromRequest(req);
+ *     const user = await base44.auth.me();
  *
- * @example
- * ```typescript
- * // Edge Function (Vercel, Cloudflare Workers, Deno Deploy)
- * export default async function handler(request: Request) {
- *   const client = createClientFromRequest(request);
- *   const user = await client.auth.me();
- *   return new Response(JSON.stringify(user));
- * }
- * ```
+ *     if (!user) {
+ *       return Response.json({ error: 'Unauthorized' }, { status: 401 });
+ *     }
  *
- * @example
- * ```typescript
- * // Express.js (with adapter for Request object)
- * import express from 'express';
+ *     // Use the client to access the API
  *
- * app.get('/api/data', async (req, res) => {
- *   // Convert Express req to Fetch API Request
- *   const request = new Request(`http://localhost${req.url}`, {
- *     headers: req.headers
- *   });
- *   const client = createClientFromRequest(request);
- *   const data = await client.entities.Todo.list();
- *   res.json(data);
+ *   } catch (error) {
+ *     return Response.json({ error: error.message }, { status: 500 });
+ *   }
  * });
  * ```
+ *
  */
-export function createClientFromRequest(request: Request) {
+export function createClientFromRequest(request: Request): Base44Client {
   const authHeader = request.headers.get("Authorization");
   const serviceRoleAuthHeader = request.headers.get(
     "Base44-Service-Authorization"

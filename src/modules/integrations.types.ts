@@ -52,14 +52,14 @@ export type IntegrationPackage = {
  *
  * @example
  * ```typescript
- * // Send email via Core package
+ * // Send email using Core package
  * const emailResult = await client.integrations.Core.SendEmail({
  *   to: 'user@example.com',
  *   subject: 'Hello from Base44',
  *   body: 'This is a test email'
  * });
  *
- * // Upload file via Core package
+ * // Upload file using Core package
  * const fileInput = document.querySelector('input[type="file"]');
  * const uploadResult = await client.integrations.Core.UploadFile({
  *   file: fileInput.files[0],

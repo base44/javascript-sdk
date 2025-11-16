@@ -323,7 +323,7 @@ export interface AuthModule {
    * Reset password using a reset token.
    *
    * Completes the password reset flow by setting a new password
-   * using the token received via email.
+   * using the token received by email.
    *
    * @param params - Object containing the reset token and new password
    * @returns Promise resolving to the response

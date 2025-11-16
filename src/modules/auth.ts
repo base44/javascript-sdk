@@ -104,7 +104,7 @@ export function createAuthModule(
       }
     },
 
-    // Login via username and password
+    // Login using username and password
     async loginViaEmailPassword(
       email: string,
       password: string,

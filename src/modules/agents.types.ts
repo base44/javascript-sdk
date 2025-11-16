@@ -80,6 +80,7 @@ export type AgentMessage = {
 
 /**
  * Configuration for creating the agents module.
+ * @internal
  */
 export type AgentsModuleConfig = {
   /** Axios instance for HTTP requests */
@@ -102,7 +103,7 @@ export type AgentsModuleConfig = {
  * for chat interfaces, support systems, or any interactive AI application.
  *
  * **Real-time Updates:**
- * The agents module supports real-time updates via WebSocket subscriptions,
+ * The agents module supports real-time updates through WebSocket subscriptions,
  * allowing you to receive instant notifications when new messages arrive.
  *
  * **Available with both auth modes:**
@@ -267,7 +268,7 @@ export interface AgentsModule {
   /**
    * Get WhatsApp connection URL for an agent.
    *
-   * Generates a URL that users can use to connect with the agent via WhatsApp.
+   * Generates a URL that users can use to connect with the agent through WhatsApp.
    * The URL includes authentication if a token is available.
    *
    * @param agentName - The name of the agent
@@ -276,7 +277,7 @@ export interface AgentsModule {
    * @example
    * ```typescript
    * const whatsappUrl = client.agents.getWhatsAppConnectURL('support-agent');
-   * console.log(`Connect via WhatsApp: ${whatsappUrl}`);
+   * console.log(`Connect through WhatsApp: ${whatsappUrl}`);
    * // User can open this URL to start a WhatsApp conversation
    * ```
    */
