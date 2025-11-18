@@ -125,8 +125,10 @@ function main() {
     process.exit(1);
   }
 
+  let tempRepoDir;
+  try{
   // Create temporary directory
-  const tempRepoDir = fs.mkdtempSync(
+  tempRepoDir = fs.mkdtempSync(
     path.join(os.tmpdir(), "mintlify-docs-")
   );
   // Clone the repository
@@ -168,16 +170,14 @@ function main() {
   execSync(`git commit -m "Auto-updates to SDK Reference Docs"`, { cwd: tempRepoDir });
   execSync(`git push --set-upstream origin ${branch}`, { cwd: tempRepoDir });
 
-  // Remove the temporary directory
-  try {
-    fs.rmSync(tempRepoDir, { recursive: true, force: true });
-  } catch (e) {
-    console.error(`Error: Failed to remove temporary directory: ${tempRepoDir}`);
-    process.exit(1);
-  }
-  
-
   console.log("Successfully committed and pushed the changes");
+ } catch (e) {
+    console.error(`Error: Failed to commit and push changes: ${e}`);
+    process.exit(1);
+ } finally {
+    // Remove the temporary directory
+    fs.rmSync(tempRepoDir, { recursive: true, force: true });
+ }
 }
 
 main();
