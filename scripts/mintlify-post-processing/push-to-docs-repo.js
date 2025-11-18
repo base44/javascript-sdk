@@ -148,10 +148,10 @@ function main() {
   }
 
   // Remove the existing sdk-docs directory
-  execSync(`rm -rf ${tempRepoDir}/sdk-docs`);
+  fs.rmSync(path.join(tempRepoDir, "sdk-docs"), { recursive: true, force: true });
 
   // Copy the docs directory to the temporary repository
-  execSync(`cp -r ${DOCS_SOURCE_PATH} ${tempRepoDir}/sdk-docs`);
+  fs.cpSync(DOCS_SOURCE_PATH, path.join(tempRepoDir, "sdk-docs"), { recursive: true });
 
   // Scan the sdk-docs directory
   const sdkDocsDir = path.join(tempRepoDir, "sdk-docs");
@@ -167,6 +167,15 @@ function main() {
   execSync(`git add sdk-docs`, { cwd: tempRepoDir });
   execSync(`git commit -m "Auto-updates to SDK Reference Docs"`, { cwd: tempRepoDir });
   execSync(`git push --set-upstream origin ${branch}`, { cwd: tempRepoDir });
+
+  // Remove the temporary directory
+  try {
+    fs.rmSync(tempRepoDir, { recursive: true, force: true });
+  } catch (e) {
+    console.error(`Error: Failed to remove temporary directory: ${tempRepoDir}`);
+    process.exit(1);
+  }
+  
 
   console.log("Successfully committed and pushed the changes");
 }
