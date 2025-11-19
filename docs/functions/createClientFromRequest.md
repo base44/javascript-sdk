@@ -16,9 +16,13 @@ Creates a client by automatically extracting authentication tokens and configura
 
 `Request`
 
+The incoming HTTP request object containing Base44 authentication headers.
+
 ## Returns
 
 [`Base44Client`](../interfaces/Base44Client.md)
+
+A configured Base44 client instance with authentication from the request.
 
 ## Throws
 

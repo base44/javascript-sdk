@@ -35,6 +35,9 @@ export type { Base44Client, CreateClientConfig, CreateClientOptions };
  *
  * <Info> The {@link AuthModule | auth} module is only available with user authentication for security reasons.</Info>
  *
+ * @param config - Configuration object for the client.
+ * @returns A configured Base44 client instance with access to all SDK modules.
+ *
  * @example
  * ```typescript
  * // Basic client setup
@@ -282,6 +285,9 @@ export function createClient(config: CreateClientConfig): Base44Client {
  * Creates a Base44 client from an HTTP request.
  *
  * Creates a client by automatically extracting authentication tokens and configuration from request with authentication information in their headers. Use this function in backend environments, such as when building backend functions. Base44 inserts the necessary headers when forwarding requests from your app frontend to your backend functions.
+ *
+ * @param request - The incoming HTTP request object containing Base44 authentication headers.
+ * @returns A configured Base44 client instance with authentication from the request.
  *
  * @throws {Error} When Base44-App-Id header is missing.
  * @throws {Error} When authorization headers have invalid format.

@@ -10,23 +10,33 @@ This module provides methods to create and manage conversations with AI agents,
 send messages, and subscribe to real-time updates. Conversations can be used
 for chat interfaces, support systems, or any interactive AI application.
 
-**Real-time Updates:**
-The agents module supports real-time updates through WebSocket subscriptions,
-allowing you to receive instant notifications when new messages arrive.
+**Authentication modes:**
+- **User authentication** (`client.agents`): Access only conversations created by the authenticated user.
+- **Service role authentication** (`client.asServiceRole.agents`): Access all conversations across all users.
 
-**Available with both auth modes:**
-- User auth: `client.agents.method(...)`
-- Service role: `client.asServiceRole.agents.method(...)`
-
-## Example
+## Examples
 
 ```typescript
 // Create a new conversation
 const conversation = await client.agents.createConversation({
   agent_name: 'support-agent',
-  metadata: { user_id: 'user-123' }
+  metadata: {
+    ticket_id: 'SUPP-1234',
+    category: 'billing',
+    priority: 'high'
+  }
 });
+```
 
+```typescript
+// Send a message
+await client.agents.addMessage(conversation, {
+  role: 'user',
+  content: 'Hello, I need help!'
+});
+```
+
+```typescript
 // Subscribe to real-time updates
 const unsubscribe = client.agents.subscribeToConversation(
   conversation.id,
@@ -35,13 +45,7 @@ const unsubscribe = client.agents.subscribeToConversation(
   }
 );
 
-// Send a message
-await client.agents.addMessage(conversation, {
-  role: 'user',
-  content: 'Hello, I need help!'
-});
-
-// Clean up subscription
+// Clean up subscription later
 unsubscribe();
 ```
 
@@ -51,15 +55,13 @@ unsubscribe();
 
 > **getConversations**(): `Promise`\<[`AgentConversation`](../type-aliases/AgentConversation.md)[]\>
 
-Get all conversations for the current user.
-
-Retrieves all agent conversations without filtering.
+Gets all conversations.
 
 #### Returns
 
 `Promise`\<[`AgentConversation`](../type-aliases/AgentConversation.md)[]\>
 
-Promise resolving to an array of conversations
+Promise resolving to an array of conversations.
 
 #### Example
 
@@ -74,7 +76,7 @@ console.log(`Total conversations: ${conversations.length}`);
 
 > **getConversation**(`conversationId`): `Promise`\<[`AgentConversation`](../type-aliases/AgentConversation.md) \| `undefined`\>
 
-Get a specific conversation by ID.
+Gets a specific conversation by ID.
 
 #### Parameters
 
@@ -82,13 +84,13 @@ Get a specific conversation by ID.
 
 `string`
 
-The unique identifier of the conversation
+The unique identifier of the conversation.
 
 #### Returns
 
 `Promise`\<[`AgentConversation`](../type-aliases/AgentConversation.md) \| `undefined`\>
 
-Promise resolving to the conversation, or undefined if not found
+Promise resolving to the conversation, or undefined if not found.
 
 #### Example
 
@@ -105,7 +107,7 @@ if (conversation) {
 
 > **listConversations**(`filterParams`): `Promise`\<[`AgentConversation`](../type-aliases/AgentConversation.md)[]\>
 
-List conversations with filtering and pagination.
+Lists conversations with filtering and pagination.
 
 #### Parameters
 
@@ -113,13 +115,13 @@ List conversations with filtering and pagination.
 
 [`ModelFilterParams`](../type-aliases/ModelFilterParams.md)
 
-Filter parameters for querying conversations
+Filter parameters for querying conversations.
 
 #### Returns
 
 `Promise`\<[`AgentConversation`](../type-aliases/AgentConversation.md)[]\>
 
-Promise resolving to an array of filtered conversations
+Promise resolving to an array of filtered conversations.
 
 #### Example
 
@@ -136,13 +138,13 @@ const recentConversations = await client.agents.listConversations({
 
 > **createConversation**(`conversation`): `Promise`\<[`AgentConversation`](../type-aliases/AgentConversation.md)\>
 
-Create a new conversation with an agent.
+Creates a new conversation with an agent.
 
 #### Parameters
 
 ##### conversation
 
-Conversation details including agent name and optional metadata
+Conversation details including agent name and optional metadata.
 
 ###### agent_name
 
@@ -156,7 +158,7 @@ Conversation details including agent name and optional metadata
 
 `Promise`\<[`AgentConversation`](../type-aliases/AgentConversation.md)\>
 
-Promise resolving to the created conversation
+Promise resolving to the created conversation.
 
 #### Example
 
@@ -164,7 +166,8 @@ Promise resolving to the created conversation
 const conversation = await client.agents.createConversation({
   agent_name: 'support-agent',
   metadata: {
-    user_id: 'user-123',
+    order_id: 'ORD-789',
+    product_id: 'PROD-456',
     category: 'technical-support'
   }
 });
@@ -177,7 +180,7 @@ console.log(`Created conversation: ${conversation.id}`);
 
 > **addMessage**(`conversation`, `message`): `Promise`\<[`AgentMessage`](../type-aliases/AgentMessage.md)\>
 
-Add a message to a conversation.
+Adds a message to a conversation.
 
 Sends a message to the agent and updates the conversation. This method
 also updates the real-time socket to notify any subscribers.
@@ -188,19 +191,19 @@ also updates the real-time socket to notify any subscribers.
 
 [`AgentConversation`](../type-aliases/AgentConversation.md)
 
-The conversation to add the message to
+The conversation to add the message to.
 
 ##### message
 
 `Partial`\<[`AgentMessage`](../type-aliases/AgentMessage.md)\>
 
-The message to add
+The message to add.
 
 #### Returns
 
 `Promise`\<[`AgentMessage`](../type-aliases/AgentMessage.md)\>
 
-Promise resolving to the created message
+Promise resolving to the created message.
 
 #### Example
 
@@ -218,7 +221,7 @@ console.log(`Message sent with ID: ${message.id}`);
 
 > **subscribeToConversation**(`conversationId`, `onUpdate?`): () => `void`
 
-Subscribe to real-time updates for a conversation.
+Subscribes to real-time updates for a conversation.
 
 Establishes a WebSocket connection to receive instant updates when new
 messages are added to the conversation. Returns an unsubscribe function
@@ -230,17 +233,17 @@ to clean up the connection.
 
 `string`
 
-The conversation ID to subscribe to
+The conversation ID to subscribe to.
 
 ##### onUpdate?
 
 (`conversation`) => `void`
 
-Callback function called when the conversation is updated
+Callback function called when the conversation is updated.
 
 #### Returns
 
-Unsubscribe function to stop receiving updates
+Unsubscribe function to stop receiving updates.
 
 > (): `void`
 
@@ -269,7 +272,7 @@ unsubscribe();
 
 > **getWhatsAppConnectURL**(`agentName`): `string`
 
-Get WhatsApp connection URL for an agent.
+Gets WhatsApp connection URL for an agent.
 
 Generates a URL that users can use to connect with the agent through WhatsApp.
 The URL includes authentication if a token is available.
@@ -280,13 +283,13 @@ The URL includes authentication if a token is available.
 
 `string`
 
-The name of the agent
+The name of the agent.
 
 #### Returns
 
 `string`
 
-WhatsApp connection URL
+WhatsApp connection URL.
 
 #### Example
 

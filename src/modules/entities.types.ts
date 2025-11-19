@@ -240,10 +240,8 @@ export interface EntityHandler {
   /**
    * Import entities from a file.
    *
-   * **Browser only:** Requires File object from file input.
-   *
    * Imports entities from a file (typically CSV or similar format).
-   * The file format should match your entity structure.
+   * The file format should match your entity structure. Requires a browser environment and cannot be used in the backend.
    *
    * @param file - File object to import
    * @returns Promise resolving to the import result

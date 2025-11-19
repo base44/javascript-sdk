@@ -23,7 +23,7 @@ export function createAgentsModule({
 }: AgentsModuleConfig): AgentsModule {
   const baseURL = `/apps/${appId}/agents`;
 
-  // Get all conversations for the current user
+  // Get all conversations (current user with user auth, all users with service role)
   const getConversations = () => {
     return axios.get<any, AgentConversation[]>(`${baseURL}/conversations`);
   };

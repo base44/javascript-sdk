@@ -6,23 +6,21 @@
 
 > **ModelFilterParams** = `object`
 
-Parameters for filtering, sorting, and paginating model data.
+Parameters for filtering, sorting, and paginating agent model data.
 
-This type is primarily used in the agents module for querying agent
-conversations. It provides a structured way to specify query criteria,
-sorting, pagination, and field selection.
+Used in the agents module for querying agent conversations. Provides a structured way to specify query criteria, sorting, pagination, and field selection.
 
 ## Examples
 
 ```typescript
-// Basic filtering by agent name
+// Filter conversations by agent name
 const conversations = await client.agents.listConversations({
   q: { agent_name: 'support-bot' }
 });
 ```
 
 ```typescript
-// Filtering with sorting
+// Filter conversations with sorting
 const conversations = await client.agents.listConversations({
   q: { status: 'active' },
   sort: '-created_at'  // Sort by created_at descending
@@ -30,7 +28,7 @@ const conversations = await client.agents.listConversations({
 ```
 
 ```typescript
-// Pagination with limit and skip
+// Filter conversations with pagination
 const conversations = await client.agents.listConversations({
   q: { agent_name: 'support-bot' },
   limit: 20,  // Get 20 results
@@ -39,7 +37,7 @@ const conversations = await client.agents.listConversations({
 ```
 
 ```typescript
-// Field selection (only return specific fields)
+// Filter conversations with field selection
 const conversations = await client.agents.listConversations({
   q: { status: 'active' },
   fields: ['id', 'agent_name', 'created_at']
@@ -47,7 +45,7 @@ const conversations = await client.agents.listConversations({
 ```
 
 ```typescript
-// Complex query with multiple filters
+// Filter conversations with multiple filters
 const conversations = await client.agents.listConversations({
   q: {
     agent_name: 'support-bot',
@@ -66,7 +64,7 @@ const conversations = await client.agents.listConversations({
 
 > `optional` **q**: `Record`\<`string`, `any`\>
 
-Query object with field-value pairs for filtering
+Query object with field-value pairs for filtering.
 
 ***
 
@@ -74,7 +72,7 @@ Query object with field-value pairs for filtering
 
 > `optional` **sort**: `string` \| `null`
 
-Sort parameter (e.g., "-created_date" for descending order)
+Sort parameter. For example, "-created_date" for descending order.
 
 ***
 
@@ -82,7 +80,7 @@ Sort parameter (e.g., "-created_date" for descending order)
 
 > `optional` **sort\_by**: `string` \| `null`
 
-Alternative sort parameter (use either `sort` or `sort_by`)
+Alternative sort parameter. Use either `sort` or `sort_by`.
 
 ***
 
@@ -90,7 +88,7 @@ Alternative sort parameter (use either `sort` or `sort_by`)
 
 > `optional` **limit**: `number` \| `null`
 
-Maximum number of results to return
+Maximum number of results to return.
 
 ***
 
@@ -98,7 +96,7 @@ Maximum number of results to return
 
 > `optional` **skip**: `number` \| `null`
 
-Number of results to skip (for pagination)
+Number of results to skip. Used for pagination.
 
 ***
 
@@ -106,4 +104,4 @@ Number of results to skip (for pagination)
 
 > `optional` **fields**: ...[] \| `null`
 
-Array of field names to include in the response
+Array of field names to include in the response.

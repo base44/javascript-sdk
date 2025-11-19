@@ -31,7 +31,12 @@ export type CreateClientConfig = {
    * @internal
    */
   appBaseUrl?: string;
-  /** Your Base44 application ID. */
+  /**
+   * Your Base44 application ID.
+   *
+   * You can find your `appId` in the browser URL when you're in the app editor.
+   * It's the string between `/apps/` and `/editor/`.
+   */
   appId: string;
   /**
    * User authentication token. Use this for client-side applications where you want to

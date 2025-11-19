@@ -16,6 +16,9 @@ Configuration for creating a Base44 client.
 
 Your Base44 application ID.
 
+You can find your `appId` in the browser URL when you're in the app editor.
+It's the string between `/apps/` and `/editor/`.
+
 ***
 
 ### token?

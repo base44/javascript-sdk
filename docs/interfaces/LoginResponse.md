@@ -12,12 +12,12 @@ Response from login endpoints containing user information and access token.
 
 > **access\_token**: `string`
 
-JWT access token for authentication
+JWT access token for authentication.
 
 ***
 
 ### user
 
-> **user**: `any`
+> **user**: [`User`](User.md)
 
-User information
+User information.

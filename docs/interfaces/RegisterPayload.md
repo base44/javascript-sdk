@@ -12,7 +12,7 @@ Payload for user registration.
 
 > **email**: `string`
 
-User's email address
+User's email address.
 
 ***
 
@@ -20,7 +20,7 @@ User's email address
 
 > **password**: `string`
 
-User's password
+User's password.
 
 ***
 
@@ -28,7 +28,7 @@ User's password
 
 > `optional` **turnstile\_token**: `string` \| `null`
 
-Optional Turnstile captcha token
+Optional [Cloudflare Turnstile CAPTCHA token](https://developers.cloudflare.com/turnstile/) for bot protection.
 
 ***
 
@@ -36,4 +36,4 @@ Optional Turnstile captcha token
 
 > `optional` **referral\_code**: `string` \| `null`
 
-Optional referral code
+Optional [referral code](https://docs.base44.com/Getting-Started/Referral-program) from an existing user.

@@ -28,9 +28,13 @@ To use the service role authentication mode, you need to provide a service role 
 
 [`CreateClientConfig`](../type-aliases/CreateClientConfig.md)
 
+Configuration object for the client.
+
 ## Returns
 
 [`Base44Client`](../interfaces/Base44Client.md)
+
+A configured Base44 client instance with access to all SDK modules.
 
 ## Examples
 

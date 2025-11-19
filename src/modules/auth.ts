@@ -1,5 +1,12 @@
 import { AxiosInstance } from "axios";
-import { AuthModule, AuthModuleOptions } from "./auth.types";
+import {
+  AuthModule,
+  AuthModuleOptions,
+  User,
+  VerifyOtpParams,
+  ChangePasswordParams,
+  ResetPasswordParams,
+} from "./auth.types";
 
 /**
  * Creates the auth module for the Base44 SDK.
@@ -24,7 +31,9 @@ export function createAuthModule(
     },
 
     // Update current user data
-    async updateMe(data: Record<string, any>) {
+    async updateMe(
+      data: Partial<Omit<User, "id" | "created_at" | "updated_at">>
+    ) {
       return axios.put(`/apps/${appId}/entities/User/me`, data);
     },
 
@@ -167,8 +176,8 @@ export function createAuthModule(
       return axios.post(`/apps/${appId}/auth/register`, payload);
     },
 
-    // Verify an OTP (One-Time Password) code
-    verifyOtp({ email, otpCode }: { email: string; otpCode: string }) {
+    // Verify an OTP (One-time password) code
+    verifyOtp({ email, otpCode }: VerifyOtpParams) {
       return axios.post(`/apps/${appId}/auth/verify-otp`, {
         email,
         otp_code: otpCode,
@@ -188,13 +197,7 @@ export function createAuthModule(
     },
 
     // Reset password using a reset token
-    resetPassword({
-      resetToken,
-      newPassword,
-    }: {
-      resetToken: string;
-      newPassword: string;
-    }) {
+    resetPassword({ resetToken, newPassword }: ResetPasswordParams) {
       return axios.post(`/apps/${appId}/auth/reset-password`, {
         reset_token: resetToken,
         new_password: newPassword,
@@ -206,11 +209,7 @@ export function createAuthModule(
       userId,
       currentPassword,
       newPassword,
-    }: {
-      userId: string;
-      currentPassword: string;
-      newPassword: string;
-    }) {
+    }: ChangePasswordParams) {
       return axios.post(`/apps/${appId}/auth/change-password`, {
         user_id: userId,
         current_password: currentPassword,

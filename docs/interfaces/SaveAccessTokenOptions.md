@@ -22,7 +22,7 @@ saveAccessToken('my-token-123', { storageKey: 'my_app_token' });
 
 > `optional` **storageKey**: `string`
 
-The key to use when storing the token in localStorage
+The key to use when storing the token in local storage
 
 #### Default
 

@@ -14,7 +14,7 @@ An agent conversation containing messages exchanged with an AI agent.
 
 > **id**: `string`
 
-Unique identifier for the conversation
+Unique identifier for the conversation.
 
 ***
 
@@ -22,7 +22,7 @@ Unique identifier for the conversation
 
 > **app\_id**: `string`
 
-Application ID
+Application ID.
 
 ***
 
@@ -30,7 +30,7 @@ Application ID
 
 > **agent\_name**: `string`
 
-Name of the agent in this conversation
+Name of the agent in this conversation.
 
 ***
 
@@ -38,7 +38,7 @@ Name of the agent in this conversation
 
 > **created\_by\_id**: `string`
 
-ID of the user who created the conversation
+ID of the user who created the conversation.
 
 ***
 
@@ -46,7 +46,7 @@ ID of the user who created the conversation
 
 > **messages**: [`AgentMessage`](AgentMessage.md)[]
 
-Array of messages in the conversation
+Array of messages in the conversation.
 
 ***
 
@@ -54,4 +54,4 @@ Array of messages in the conversation
 
 > `optional` **metadata**: `Record`\<`string`, `any`\>
 
-Optional metadata associated with the conversation
+Optional metadata associated with the conversation.

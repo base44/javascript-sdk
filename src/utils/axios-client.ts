@@ -1,13 +1,12 @@
 import axios from "axios";
 import { isInIFrame } from "./common.js";
 import { v4 as uuidv4 } from "uuid";
+import type { Base44ErrorJSON } from "./axios-client.types.js";
 
 /**
  * Custom error class for Base44 SDK errors.
  *
- * This error is thrown when API requests fail. It extends the standard Error
- * class and includes additional information about the HTTP status, error code,
- * and response data from the server.
+ * This error is thrown when API requests fail. It extends the standard `Error` class and includes additional information about the HTTP status, error code, and response data from the server.
  *
  * @example
  * ```typescript
@@ -23,40 +22,15 @@ import { v4 as uuidv4 } from "uuid";
  * }
  * ```
  *
- * @example
- * ```typescript
- * // Handling authentication errors
- * try {
- *   await client.auth.loginViaEmailPassword('user@example.com', 'wrong-password');
- * } catch (error) {
- *   if (error instanceof Base44Error && error.status === 401) {
- *     console.error('Authentication failed:', error.message);
- *   }
- * }
- * ```
- *
- * @example
- * ```typescript
- * // Serializing errors for logging
- * try {
- *   await client.entities.User.create({ invalid: 'data' });
- * } catch (error) {
- *   if (error instanceof Base44Error) {
- *     const serialized = error.toJSON();
- *     // Send to logging service
- *     logger.error(serialized);
- *   }
- * }
- * ```
  */
 export class Base44Error extends Error {
   /**
-   * HTTP status code of the error (e.g., 400, 401, 404, 500).
+   * HTTP status code of the error.
    */
   status: number;
 
   /**
-   * Error code from the API (e.g., "NOT_FOUND", "VALIDATION_ERROR").
+   * Error code from the API.
    */
   code: string;
 
@@ -66,7 +40,7 @@ export class Base44Error extends Error {
   data: any;
 
   /**
-   * The original error object from axios.
+   * The original error object from Axios.
    */
   originalError: unknown;
 
@@ -78,6 +52,7 @@ export class Base44Error extends Error {
    * @param code - Error code from the API
    * @param data - Full response data from the server
    * @param originalError - Original axios error object
+   * @internal
    */
   constructor(
     message: string,
@@ -100,7 +75,7 @@ export class Base44Error extends Error {
    * Useful for logging or sending error information to external services
    * without circular reference issues.
    *
-   * @returns JSON-safe representation of the error
+   * @returns JSON-safe representation of the error.
    *
    * @example
    * ```typescript
@@ -121,7 +96,7 @@ export class Base44Error extends Error {
    * }
    * ```
    */
-  toJSON() {
+  toJSON(): Base44ErrorJSON {
     return {
       name: this.name,
       message: this.message,
@@ -281,3 +256,6 @@ export function createAxiosClient({
 
   return client;
 }
+
+// Re-export types
+export type { Base44ErrorJSON } from "./axios-client.types.js";

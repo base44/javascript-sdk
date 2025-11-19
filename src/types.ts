@@ -1,22 +1,20 @@
 export * from "./modules/types.js";
 
 /**
- * Parameters for filtering, sorting, and paginating model data.
+ * Parameters for filtering, sorting, and paginating agent model data.
  *
- * This type is primarily used in the agents module for querying agent
- * conversations. It provides a structured way to specify query criteria,
- * sorting, pagination, and field selection.
+ * Used in the agents module for querying agent conversations. Provides a structured way to specify query criteria, sorting, pagination, and field selection.
  *
- * @property q - Query object with field-value pairs for filtering
- * @property sort - Sort parameter (e.g., "-created_date" for descending order)
- * @property sort_by - Alternative sort parameter (use either `sort` or `sort_by`)
- * @property limit - Maximum number of results to return
- * @property skip - Number of results to skip (for pagination)
- * @property fields - Array of field names to include in the response
+ * @property q - Query object with field-value pairs for filtering.
+ * @property sort - Sort parameter. For example, "-created_date" for descending order.
+ * @property sort_by - Alternative sort parameter. Use either `sort` or `sort_by`.
+ * @property limit - Maximum number of results to return.
+ * @property skip - Number of results to skip. Used for pagination.
+ * @property fields - Array of field names to include in the response.
  *
  * @example
  * ```typescript
- * // Basic filtering by agent name
+ * // Filter conversations by agent name
  * const conversations = await client.agents.listConversations({
  *   q: { agent_name: 'support-bot' }
  * });
@@ -24,7 +22,7 @@ export * from "./modules/types.js";
  *
  * @example
  * ```typescript
- * // Filtering with sorting
+ * // Filter conversations with sorting
  * const conversations = await client.agents.listConversations({
  *   q: { status: 'active' },
  *   sort: '-created_at'  // Sort by created_at descending
@@ -33,7 +31,7 @@ export * from "./modules/types.js";
  *
  * @example
  * ```typescript
- * // Pagination with limit and skip
+ * // Filter conversations with pagination
  * const conversations = await client.agents.listConversations({
  *   q: { agent_name: 'support-bot' },
  *   limit: 20,  // Get 20 results
@@ -43,7 +41,7 @@ export * from "./modules/types.js";
  *
  * @example
  * ```typescript
- * // Field selection (only return specific fields)
+ * // Filter conversations with field selection
  * const conversations = await client.agents.listConversations({
  *   q: { status: 'active' },
  *   fields: ['id', 'agent_name', 'created_at']
@@ -52,7 +50,7 @@ export * from "./modules/types.js";
  *
  * @example
  * ```typescript
- * // Complex query with multiple filters
+ * // Filter conversations with multiple filters
  * const conversations = await client.agents.listConversations({
  *   q: {
  *     agent_name: 'support-bot',
@@ -73,5 +71,3 @@ export type ModelFilterParams = {
   skip?: number | null;
   fields?: string[] | null;
 };
-
-

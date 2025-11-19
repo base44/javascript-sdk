@@ -4,7 +4,7 @@
 
 # Interface: AuthModule
 
-Authentication module for managing user authentication and authorization.
+Authentication module for managing user authentication and authorization. The module automatically stores tokens in local storage when available and manages authorization headers for API requests.
 
 This module provides comprehensive authentication functionality including:
 - Email/password login and registration
@@ -14,15 +14,7 @@ This module provides comprehensive authentication functionality including:
 - OTP verification
 - User invitations
 
-**Browser-Only Features:**
-Some methods like `redirectToLogin()` and `logout()` only work in browser
-environments as they interact with localStorage and window.location.
-
-**Token Storage:**
-The module automatically stores tokens in localStorage (when available) and
-manages Authorization headers for API requests.
-
-## Example
+## Examples
 
 ```typescript
 // Login with email and password
@@ -30,32 +22,41 @@ const { access_token, user } = await client.auth.loginViaEmailPassword(
   'user@example.com',
   'password123'
 );
+```
 
+```typescript
 // Check if user is authenticated
 const isAuth = await client.auth.isAuthenticated();
+```
 
+```typescript
 // Get current user profile
 const currentUser = await client.auth.me();
+```
 
-// Logout
+```typescript
+// Logout and reload page
 client.auth.logout();
+```
+
+```typescript
+// Logout and redirect to login page
+client.auth.logout('/login');
 ```
 
 ## Methods
 
 ### me()
 
-> **me**(): `Promise`\<`any`\>
+> **me**(): `Promise`\<[`User`](User.md)\>
 
-Get the current authenticated user's information.
-
-Retrieves the profile data for the currently authenticated user.
+Gets the current authenticated user's information.
 
 #### Returns
 
-`Promise`\<`any`\>
+`Promise`\<[`User`](User.md)\>
 
-Promise resolving to the user's profile data
+Promise resolving to the user's profile data.
 
 #### Example
 
@@ -69,32 +70,44 @@ console.log(`User ID: ${user.id}`);
 
 ### updateMe()
 
-> **updateMe**(`data`): `Promise`\<`any`\>
+> **updateMe**(`data`): `Promise`\<[`User`](User.md)\>
 
-Update the current authenticated user's information.
+Updates the current authenticated user's information.
 
-Updates profile fields for the currently authenticated user.
+Performs a partial update - only include the fields you want to change.
+Commonly updated fields include name, avatar_url, and custom profile fields.
 
 #### Parameters
 
 ##### data
 
-`Record`\<`string`, `any`\>
+`Partial`\<`Omit`\<[`User`](User.md), ... \| ... \| ...\>\>
 
-Object containing the fields to update
+Object containing the fields to update. Only the provided fields will be changed.
 
 #### Returns
 
-`Promise`\<`any`\>
+`Promise`\<[`User`](User.md)\>
 
-Promise resolving to the updated user data
+Promise resolving to the updated user data.
 
-#### Example
+#### Examples
 
 ```typescript
+// Update specific fields
 const updatedUser = await client.auth.updateMe({
   name: 'John Doe',
-  bio: 'Software developer'
+  avatar_url: 'https://example.com/avatar.jpg'
+});
+console.log(`Updated user: ${updatedUser.name}`);
+```
+
+```typescript
+// Update custom fields defined in your User entity
+await client.auth.updateMe({
+  bio: 'Software developer',
+  phone: '+1234567890',
+  preferences: { theme: 'dark' }
 });
 ```
 
@@ -104,12 +117,9 @@ const updatedUser = await client.auth.updateMe({
 
 > **redirectToLogin**(`nextUrl`): `void`
 
-Redirect the user to the app's login page.
+Redirects the user to the app's login page.
 
-**Browser only:** This method only works in browser environments.
-
-Redirects the user to your app's login page with a callback URL
-to return to after successful authentication.
+Redirects with a callback URL to return to after successful authentication. Requires a browser environment and cannot be used in the backend.
 
 #### Parameters
 
@@ -117,7 +127,7 @@ to return to after successful authentication.
 
 `string`
 
-URL to redirect to after successful login
+URL to redirect to after successful login.
 
 #### Returns
 
@@ -125,15 +135,17 @@ URL to redirect to after successful login
 
 #### Throws
 
-When not in a browser environment
+When not in a browser environment.
 
-#### Example
+#### Examples
 
 ```typescript
 // Redirect to login and come back to current page
 client.auth.redirectToLogin(window.location.href);
+```
 
-// Redirect to login and go to dashboard after
+```typescript
+// Redirect to login and then go to the dashboard page
 client.auth.redirectToLogin('/dashboard');
 ```
 
@@ -143,12 +155,9 @@ client.auth.redirectToLogin('/dashboard');
 
 > **logout**(`redirectUrl?`): `void`
 
-Logout the current user.
+Logs out the current user.
 
-**Browser only:** Full functionality requires browser environment.
-
-Removes the authentication token from localStorage and axios headers,
-then optionally redirects to a URL or reloads the page.
+Removes the authentication token from local storage and Axios headers, then optionally redirects to a URL or reloads the page. Requires a browser environment and cannot be used in the backend.
 
 #### Parameters
 
@@ -156,21 +165,25 @@ then optionally redirects to a URL or reloads the page.
 
 `string`
 
-Optional URL to redirect to after logout. Reloads the page if not provided
+Optional URL to redirect to after logout. Reloads the page if not provided.
 
 #### Returns
 
 `void`
 
-#### Example
+#### Examples
 
 ```typescript
 // Logout and reload page
 client.auth.logout();
+```
 
+```typescript
 // Logout and redirect to login page
 client.auth.logout('/login');
+```
 
+```typescript
 // Logout and redirect to home
 client.auth.logout('/');
 ```
@@ -181,10 +194,9 @@ client.auth.logout('/');
 
 > **setToken**(`token`, `saveToStorage?`): `void`
 
-Set the authentication token.
+Sets the authentication token.
 
-Updates the Authorization header for API requests and optionally
-saves the token to localStorage for persistence.
+Updates the authorization header for API requests and optionally saves the token to local storage for persistence. Saving to local storage requires a browser environment and is automatically skipped in backend environments.
 
 #### Parameters
 
@@ -192,25 +204,27 @@ saves the token to localStorage for persistence.
 
 `string`
 
-JWT authentication token
+JWT authentication token.
 
 ##### saveToStorage?
 
 `boolean`
 
-Whether to save the token to localStorage (default: true)
+Whether to save the token to local storage. Defaults to true.
 
 #### Returns
 
 `void`
 
-#### Example
+#### Examples
 
 ```typescript
-// Set token and save to localStorage
+// Set token and save to local storage
 client.auth.setToken('eyJhbGciOiJIUzI1NiIs...');
+```
 
-// Set token without saving to localStorage
+```typescript
+// Set token without saving to local storage
 client.auth.setToken('eyJhbGciOiJIUzI1NiIs...', false);
 ```
 
@@ -220,10 +234,9 @@ client.auth.setToken('eyJhbGciOiJIUzI1NiIs...', false);
 
 > **loginViaEmailPassword**(`email`, `password`, `turnstileToken?`): `Promise`\<[`LoginResponse`](LoginResponse.md)\>
 
-Login using email and password.
+Logs in a registered user using email and password.
 
-Authenticates a user with email and password credentials. On success,
-automatically sets the token for subsequent requests.
+Authenticates a user with email and password credentials. The user must already have a registered account. For new users, use [`register()`](#register) first to create an account. On successful login, automatically sets the token for subsequent requests.
 
 #### Parameters
 
@@ -231,27 +244,31 @@ automatically sets the token for subsequent requests.
 
 `string`
 
-User's email address
+User's email address.
 
 ##### password
 
 `string`
 
-User's password
+User's password.
 
 ##### turnstileToken?
 
 `string`
 
-Optional Turnstile captcha token
+Optional [Cloudflare Turnstile CAPTCHA token](https://developers.cloudflare.com/turnstile/) for bot protection.
 
 #### Returns
 
 `Promise`\<[`LoginResponse`](LoginResponse.md)\>
 
-Promise resolving to login response with access token and user data
+Promise resolving to login response with access token and user data.
 
-#### Example
+#### Throws
+
+Error if the email and password combination is invalid or the user is not registered.
+
+#### Examples
 
 ```typescript
 try {
@@ -263,7 +280,9 @@ try {
 } catch (error) {
   console.error('Login failed:', error);
 }
+```
 
+```typescript
 // With captcha token
 const response = await client.auth.loginViaEmailPassword(
   'user@example.com',
@@ -278,25 +297,22 @@ const response = await client.auth.loginViaEmailPassword(
 
 > **isAuthenticated**(): `Promise`\<`boolean`\>
 
-Check if the current user is authenticated.
-
-Verifies whether the current token is valid by attempting to
-fetch the user's profile.
+Checks if the current user is authenticated.
 
 #### Returns
 
 `Promise`\<`boolean`\>
 
-Promise resolving to true if authenticated, false otherwise
+Promise resolving to true if authenticated, false otherwise.
 
 #### Example
 
 ```typescript
-const isAuth = await client.auth.isAuthenticated();
-if (isAuth) {
+const isAuthenticated = await client.auth.isAuthenticated();
+if (isAuthenticated) {
   console.log('User is logged in');
 } else {
-  // Redirect to login
+  // Redirect to login page
   client.auth.redirectToLogin(window.location.href);
 }
 ```
@@ -307,9 +323,11 @@ if (isAuth) {
 
 > **inviteUser**(`userEmail`, `role`): `Promise`\<`any`\>
 
-Invite a user to the application.
+Invites a user to the application.
 
-Sends an invitation email to a user with a specific role.
+Sends an invitation email to a potential user with a specific role.
+Roles are configured in your Base44 application settings and determine
+the user's permissions and access levels.
 
 #### Parameters
 
@@ -317,25 +335,29 @@ Sends an invitation email to a user with a specific role.
 
 `string`
 
-Email address of the user to invite
+Email address of the user to invite.
 
 ##### role
 
 `string`
 
-Role to assign to the invited user
+Role to assign to the invited user. Must match a role defined in your Base44 application. For example, `'admin'`, `'editor'`, `'viewer'`, or `'member'`.
 
 #### Returns
 
 `Promise`\<`any`\>
 
-Promise resolving to the invitation response
+Promise that resolves when the invitation is sent successfully. Throws an error if the invitation fails.
 
 #### Example
 
 ```typescript
-await client.auth.inviteUser('newuser@example.com', 'editor');
-console.log('Invitation sent!');
+try {
+  await client.auth.inviteUser('newuser@example.com', 'editor');
+  console.log('Invitation sent successfully!');
+} catch (error) {
+  console.error('Failed to send invitation:', error);
+}
 ```
 
 ***
@@ -344,7 +366,7 @@ console.log('Invitation sent!');
 
 > **register**(`payload`): `Promise`\<`any`\>
 
-Register a new user account.
+Registers a new user account.
 
 Creates a new user account with email and password.
 
@@ -354,13 +376,13 @@ Creates a new user account with email and password.
 
 [`RegisterPayload`](RegisterPayload.md)
 
-Registration details including email, password, and optional fields
+Registration details including email, password, and optional fields.
 
 #### Returns
 
 `Promise`\<`any`\>
 
-Promise resolving to the registration response
+Promise resolving to the registration response.
 
 #### Example
 
@@ -379,7 +401,7 @@ console.log('Registration successful! Please check your email.');
 
 > **verifyOtp**(`params`): `Promise`\<`any`\>
 
-Verify an OTP (One-Time Password) code.
+Verifies an OTP (One-time password) code.
 
 Validates an OTP code sent to the user's email during registration
 or authentication.
@@ -388,30 +410,32 @@ or authentication.
 
 ##### params
 
-Object containing email and OTP code
+[`VerifyOtpParams`](VerifyOtpParams.md)
 
-###### email
-
-`string`
-
-###### otpCode
-
-`string`
+Object containing email and OTP code.
 
 #### Returns
 
 `Promise`\<`any`\>
 
-Promise resolving to the verification response
+Promise resolving to the verification response if valid.
+
+#### Throws
+
+Error if the OTP code is invalid, expired, or verification fails.
 
 #### Example
 
 ```typescript
-await client.auth.verifyOtp({
-  email: 'user@example.com',
-  otpCode: '123456'
-});
-console.log('Email verified!');
+try {
+  await client.auth.verifyOtp({
+    email: 'user@example.com',
+    otpCode: '123456'
+  });
+  console.log('Email verified successfully!');
+} catch (error) {
+  console.error('Invalid or expired OTP code');
+}
 ```
 
 ***
@@ -420,7 +444,7 @@ console.log('Email verified!');
 
 > **resendOtp**(`email`): `Promise`\<`any`\>
 
-Resend an OTP code to the user's email.
+Resends an OTP code to the user's email address.
 
 Requests a new OTP code to be sent to the specified email address.
 
@@ -430,19 +454,27 @@ Requests a new OTP code to be sent to the specified email address.
 
 `string`
 
-Email address to send the OTP to
+Email address to send the OTP to.
 
 #### Returns
 
 `Promise`\<`any`\>
 
-Promise resolving to the response
+Promise resolving when the OTP is sent successfully.
+
+#### Throws
+
+Error if the email is invalid or the request fails.
 
 #### Example
 
 ```typescript
-await client.auth.resendOtp('user@example.com');
-console.log('OTP resent! Please check your email.');
+try {
+  await client.auth.resendOtp('user@example.com');
+  console.log('OTP resent! Please check your email.');
+} catch (error) {
+  console.error('Failed to resend OTP:', error);
+}
 ```
 
 ***
@@ -451,7 +483,7 @@ console.log('OTP resent! Please check your email.');
 
 > **resetPasswordRequest**(`email`): `Promise`\<`any`\>
 
-Request a password reset.
+Requests a password reset.
 
 Sends a password reset email to the specified email address.
 
@@ -461,19 +493,27 @@ Sends a password reset email to the specified email address.
 
 `string`
 
-Email address for the account to reset
+Email address for the account to reset.
 
 #### Returns
 
 `Promise`\<`any`\>
 
-Promise resolving to the response
+Promise resolving when the password reset email is sent successfully.
+
+#### Throws
+
+Error if the email is invalid or the request fails.
 
 #### Example
 
 ```typescript
-await client.auth.resetPasswordRequest('user@example.com');
-console.log('Password reset email sent!');
+try {
+  await client.auth.resetPasswordRequest('user@example.com');
+  console.log('Password reset email sent!');
+} catch (error) {
+  console.error('Failed to send password reset email:', error);
+}
 ```
 
 ***
@@ -482,7 +522,7 @@ console.log('Password reset email sent!');
 
 > **resetPassword**(`params`): `Promise`\<`any`\>
 
-Reset password using a reset token.
+Resets password using a reset token.
 
 Completes the password reset flow by setting a new password
 using the token received by email.
@@ -491,30 +531,32 @@ using the token received by email.
 
 ##### params
 
-Object containing the reset token and new password
+[`ResetPasswordParams`](ResetPasswordParams.md)
 
-###### resetToken
-
-`string`
-
-###### newPassword
-
-`string`
+Object containing the reset token and new password.
 
 #### Returns
 
 `Promise`\<`any`\>
 
-Promise resolving to the response
+Promise resolving when the password is reset successfully.
+
+#### Throws
+
+Error if the reset token is invalid, expired, or the request fails.
 
 #### Example
 
 ```typescript
-await client.auth.resetPassword({
-  resetToken: 'token-from-email',
-  newPassword: 'newSecurePassword456'
-});
-console.log('Password reset successful!');
+try {
+  await client.auth.resetPassword({
+    resetToken: 'token-from-email',
+    newPassword: 'newSecurePassword456'
+  });
+  console.log('Password reset successful!');
+} catch (error) {
+  console.error('Failed to reset password:', error);
+}
 ```
 
 ***
@@ -523,7 +565,7 @@ console.log('Password reset successful!');
 
 > **changePassword**(`params`): `Promise`\<`any`\>
 
-Change the user's password.
+Changes the user's password.
 
 Updates the password for an authenticated user by verifying
 the current password and setting a new one.
@@ -532,33 +574,31 @@ the current password and setting a new one.
 
 ##### params
 
-Object containing user ID, current password, and new password
+[`ChangePasswordParams`](ChangePasswordParams.md)
 
-###### userId
-
-`string`
-
-###### currentPassword
-
-`string`
-
-###### newPassword
-
-`string`
+Object containing user ID, current password, and new password.
 
 #### Returns
 
 `Promise`\<`any`\>
 
-Promise resolving to the response
+Promise resolving when the password is changed successfully.
+
+#### Throws
+
+Error if the current password is incorrect or the request fails.
 
 #### Example
 
 ```typescript
-await client.auth.changePassword({
-  userId: 'user-123',
-  currentPassword: 'oldPassword123',
-  newPassword: 'newSecurePassword456'
-});
-console.log('Password changed successfully!');
+try {
+  await client.auth.changePassword({
+    userId: 'user-123',
+    currentPassword: 'oldPassword123',
+    newPassword: 'newSecurePassword456'
+  });
+  console.log('Password changed successfully!');
+} catch (error) {
+  console.error('Failed to change password:', error);
+}
 ```

@@ -22,7 +22,7 @@ removeAccessToken({ storageKey: 'my_app_token' });
 
 > `optional` **storageKey**: `string`
 
-The key to use when removing the token from localStorage
+The key to use when removing the token from local storage
 
 #### Default
 

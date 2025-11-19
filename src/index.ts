@@ -5,7 +5,7 @@ import {
   type CreateClientConfig,
   type CreateClientOptions,
 } from "./client.js";
-import { Base44Error } from "./utils/axios-client.js";
+import { Base44Error, type Base44ErrorJSON } from "./utils/axios-client.js";
 import {
   getAccessToken,
   saveAccessToken,
@@ -23,7 +23,12 @@ export {
   getLoginUrl,
 };
 
-export type { Base44Client, CreateClientConfig, CreateClientOptions };
+export type {
+  Base44Client,
+  CreateClientConfig,
+  CreateClientOptions,
+  Base44ErrorJSON,
+};
 
 export * from "./types.js";
 
@@ -37,6 +42,10 @@ export type {
   AuthModule,
   LoginResponse,
   RegisterPayload,
+  VerifyOtpParams,
+  ChangePasswordParams,
+  ResetPasswordParams,
+  User,
 } from "./modules/auth.types.js";
 
 export type {
@@ -47,7 +56,16 @@ export type {
 
 export type { FunctionsModule } from "./modules/functions.types.js";
 
-export type { AgentsModule } from "./modules/agents.types.js";
+export type {
+  AgentsModule,
+  AgentConversation,
+  AgentMessage,
+  AgentMessageReasoning,
+  AgentMessageToolCall,
+  AgentMessageUsage,
+  AgentMessageCustomContext,
+  AgentMessageMetadata,
+} from "./modules/agents.types.js";
 
 export type { AppLogsModule } from "./modules/app-logs.types.js";
 

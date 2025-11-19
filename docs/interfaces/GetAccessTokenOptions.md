@@ -6,15 +6,19 @@
 
 Configuration options for retrieving an access token
 
-## Example
+## Examples
 
 ```typescript
-// Use default options
+// Get access token from URL or local storage using default options
 const token = getAccessToken();
+```
 
-// Custom storage key
+```typescript
+// Get access token from custom local storage key
 const token = getAccessToken({ storageKey: 'my_app_token' });
+```
 
+```typescript
 // Get token from URL but don't save or remove from URL
 const token = getAccessToken({
   saveToStorage: false,
@@ -28,7 +32,7 @@ const token = getAccessToken({
 
 > `optional` **storageKey**: `string`
 
-The key to use when storing/retrieving the token in localStorage
+The key to use when storing or retrieving the token in local storage
 
 #### Default
 
@@ -56,7 +60,7 @@ The URL parameter name to check for the access token
 
 > `optional` **saveToStorage**: `boolean`
 
-Whether to save the token to localStorage if found in the URL
+Whether to save the token to local storage if found in the URL
 
 #### Default
 

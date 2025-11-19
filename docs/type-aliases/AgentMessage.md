@@ -14,7 +14,7 @@ A message in an agent conversation.
 
 > **id**: `string`
 
-Unique identifier for the message
+Unique identifier for the message.
 
 ***
 
@@ -22,33 +22,15 @@ Unique identifier for the message
 
 > **role**: `"user"` \| `"assistant"` \| `"system"`
 
-Role of the message sender
+Role of the message sender.
 
 ***
 
 ### reasoning?
 
-> `optional` **reasoning**: `object`
+> `optional` **reasoning**: [`AgentMessageReasoning`](AgentMessageReasoning.md)
 
-Optional reasoning information for the message
-
-#### start\_date
-
-> **start\_date**: `string`
-
-When reasoning started
-
-#### end\_date?
-
-> `optional` **end\_date**: `string`
-
-When reasoning ended
-
-#### content
-
-> **content**: `string`
-
-Reasoning content
+Optional reasoning information for the message.
 
 ***
 
@@ -56,7 +38,7 @@ Reasoning content
 
 > `optional` **content**: `string` \| `Record`\<..., ...\> \| `null`
 
-Message content (can be text or structured data)
+Message content.
 
 ***
 
@@ -64,7 +46,7 @@ Message content (can be text or structured data)
 
 > `optional` **file\_urls**: ...[] \| `null`
 
-URLs to files attached to the message
+URLs to files attached to the message.
 
 ***
 
@@ -72,15 +54,15 @@ URLs to files attached to the message
 
 > `optional` **tool\_calls**: ...[] \| `null`
 
-Tool calls made by the agent
+Tool calls made by the agent.
 
 ***
 
 ### usage?
 
-> `optional` **usage**: \{ `prompt_tokens?`: ...; `completion_tokens?`: ...; \} \| `null`
+> `optional` **usage**: [`AgentMessageUsage`](AgentMessageUsage.md) \| `null`
 
-Token usage statistics
+Token usage statistics.
 
 ***
 
@@ -88,7 +70,7 @@ Token usage statistics
 
 > `optional` **hidden**: `boolean`
 
-Whether the message is hidden from the user
+Whether the message is hidden from the user.
 
 ***
 
@@ -96,7 +78,7 @@ Whether the message is hidden from the user
 
 > `optional` **custom\_context**: ...[] \| `null`
 
-Custom context provided with the message
+Custom context provided with the message.
 
 ***
 
@@ -104,7 +86,7 @@ Custom context provided with the message
 
 > `optional` **model**: `string` \| `null`
 
-Model used to generate the message
+Model used to generate the message.
 
 ***
 
@@ -112,27 +94,15 @@ Model used to generate the message
 
 > `optional` **checkpoint\_id**: `string` \| `null`
 
-Checkpoint ID for the message
+Checkpoint ID for the message.
 
 ***
 
 ### metadata?
 
-> `optional` **metadata**: `object`
+> `optional` **metadata**: [`AgentMessageMetadata`](AgentMessageMetadata.md)
 
-Metadata about when and by whom the message was created
-
-#### created\_date
-
-> **created\_date**: `string`
-
-#### created\_by\_email
-
-> **created\_by\_email**: `string`
-
-#### created\_by\_full\_name
-
-> **created\_by\_full\_name**: ... \| ...
+Metadata about when and by whom the message was created.
 
 ***
 
@@ -140,4 +110,4 @@ Metadata about when and by whom the message was created
 
 > `optional` **additional\_message\_params**: `Record`\<`string`, `any`\>
 
-Additional custom parameters for the message
+Additional custom parameters for the message.
