@@ -9,7 +9,7 @@
 Constructs the absolute URL for the login page with a redirect parameter.
 
 Low-level utility for building login URLs. For standard login redirects, use
-`client.auth.redirectToLogin()` instead, which handles this automatically. This function
+`base44.auth.redirectToLogin()` instead, which handles this automatically. This function
 is useful when you need to construct login URLs without a client instance or for custom
 authentication flows.
 

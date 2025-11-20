@@ -146,14 +146,15 @@ export type AgentsModuleConfig = {
  * send messages, and subscribe to real-time updates. Conversations can be used
  * for chat interfaces, support systems, or any interactive AI application.
  *
- * **Authentication modes:**
- * - **User authentication** (`client.agents`): Access only conversations created by the authenticated user.
+ * Methods in this module respect the authentication mode used when calling them:
+ *
+ * - **User authentication** (`base44.agents`): Access only conversations created by the authenticated user.
  * - **Service role authentication** (`client.asServiceRole.agents`): Access all conversations across all users.
  *
  * @example
  * ```typescript
  * // Create a new conversation
- * const conversation = await client.agents.createConversation({
+ * const conversation = await base44.agents.createConversation({
  *   agent_name: 'support-agent',
  *   metadata: {
  *     ticket_id: 'SUPP-1234',
@@ -166,7 +167,7 @@ export type AgentsModuleConfig = {
  * @example
  * ```typescript
  * // Send a message
- * await client.agents.addMessage(conversation, {
+ * await base44.agents.addMessage(conversation, {
  *   role: 'user',
  *   content: 'Hello, I need help!'
  * });
@@ -175,7 +176,7 @@ export type AgentsModuleConfig = {
  * @example
  * ```typescript
  * // Subscribe to real-time updates
- * const unsubscribe = client.agents.subscribeToConversation(
+ * const unsubscribe = base44.agents.subscribeToConversation(
  *   conversation.id,
  *   (updatedConversation) => {
  *     console.log('New messages:', updatedConversation.messages);
@@ -195,7 +196,7 @@ export interface AgentsModule {
    *
    * @example
    * ```typescript
-   * const conversations = await client.agents.getConversations();
+   * const conversations = await base44.agents.getConversations();
    * console.log(`Total conversations: ${conversations.length}`);
    * ```
    */
@@ -209,7 +210,7 @@ export interface AgentsModule {
    *
    * @example
    * ```typescript
-   * const conversation = await client.agents.getConversation('conv-123');
+   * const conversation = await base44.agents.getConversation('conv-123');
    * if (conversation) {
    *   console.log(`Conversation has ${conversation.messages.length} messages`);
    * }
@@ -227,7 +228,7 @@ export interface AgentsModule {
    *
    * @example
    * ```typescript
-   * const recentConversations = await client.agents.listConversations({
+   * const recentConversations = await base44.agents.listConversations({
    *   limit: 10,
    *   sort: '-created_date'
    * });
@@ -245,7 +246,7 @@ export interface AgentsModule {
    *
    * @example
    * ```typescript
-   * const conversation = await client.agents.createConversation({
+   * const conversation = await base44.agents.createConversation({
    *   agent_name: 'support-agent',
    *   metadata: {
    *     order_id: 'ORD-789',
@@ -273,7 +274,7 @@ export interface AgentsModule {
    *
    * @example
    * ```typescript
-   * const message = await client.agents.addMessage(conversation, {
+   * const message = await base44.agents.addMessage(conversation, {
    *   role: 'user',
    *   content: 'Hello, I need help with my order #12345'
    * });
@@ -298,7 +299,7 @@ export interface AgentsModule {
    *
    * @example
    * ```typescript
-   * const unsubscribe = client.agents.subscribeToConversation(
+   * const unsubscribe = base44.agents.subscribeToConversation(
    *   'conv-123',
    *   (updatedConversation) => {
    *     const latestMessage = updatedConversation.messages[updatedConversation.messages.length - 1];
@@ -326,7 +327,7 @@ export interface AgentsModule {
    *
    * @example
    * ```typescript
-   * const whatsappUrl = client.agents.getWhatsAppConnectURL('support-agent');
+   * const whatsappUrl = base44.agents.getWhatsAppConnectURL('support-agent');
    * console.log(`Connect through WhatsApp: ${whatsappUrl}`);
    * // User can open this URL to start a WhatsApp conversation
    * ```

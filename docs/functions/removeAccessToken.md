@@ -8,7 +8,7 @@
 
 Removes the access token from local storage.
 
-Low-level utility for manually removing tokens from the browser's local storage. In most cases, the Base44 client handles token management automatically. For standard logout flows, use [`client.auth.logout()`](../interfaces/AuthModule.md#logout) instead, which handles token removal and redirects automatically. This function is useful for custom authentication flows or when you need to manually remove tokens. Requires a browser environment and cannot be used in the backend.
+Low-level utility for manually removing tokens from the browser's local storage. In most cases, the Base44 client handles token management automatically. For standard logout flows, use [`base44.auth.logout()`](../interfaces/AuthModule.md#logout) instead, which handles token removal and redirects automatically. This function is useful for custom authentication flows or when you need to manually remove tokens. Requires a browser environment and cannot be used in the backend.
 
 ## Parameters
 
@@ -35,5 +35,5 @@ const success = removeAccessToken({
 
 ```typescript
 // Standard logout flow with token removal and redirect
-client.auth.logout('/login');
+base44.auth.logout('/login');
 ```

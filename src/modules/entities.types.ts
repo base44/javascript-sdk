@@ -1,35 +1,43 @@
 /**
  * Entity handler providing CRUD operations for a specific entity type.
  *
- * Each entity in your Base44 app (like User, Todo, Product, etc.) gets
- * a handler with these methods for managing data.
+ * Each entity in your Base44 app gets a handler with these methods for managing data.
  */
 export interface EntityHandler {
   /**
-   * List entities with optional pagination and sorting.
+   * Lists records with optional pagination and sorting.
    *
-   * Retrieves all entities of this type with support for sorting,
+   * Retrieves all records of this type with support for sorting,
    * pagination, and field selection.
    *
-   * @param sort - Sort parameter (e.g., "-created_date" for descending)
-   * @param limit - Maximum number of results to return
-   * @param skip - Number of results to skip (for pagination)
-   * @param fields - Array of field names to include in the response
-   * @returns Promise resolving to an array of entities
+   * @param sort - Sort parameter, such as `'-created_date'` for descending.
+   * @param limit - Maximum number of results to return.
+   * @param skip - Number of results to skip for pagination.
+   * @param fields - Array of field names to include in the response.
+   * @returns Promise resolving to an array of records.
    *
    * @example
    * ```typescript
-   * // Get all todos
-   * const todos = await client.entities.Todo.list();
+   * // Get all records
+   * const records = await base44.entities.MyEntity.list();
+   * ```
    *
-   * // Get first 10 todos sorted by date
-   * const recentTodos = await client.entities.Todo.list('-created_date', 10);
+   * @example
+   * ```typescript
+   * // Get first 10 records sorted by date
+   * const recentRecords = await base44.entities.MyEntity.list('-created_date', 10);
+   * ```
    *
-   * // Get paginated results (skip first 20, get next 10)
-   * const page3 = await client.entities.Todo.list(null, 10, 20);
+   * @example
+   * ```typescript
+   * // Get paginated results: skip first 20, get next 10
+   * const page3 = await base44.entities.MyEntity.list('-created_date', 10, 20);
+   * ```
    *
+   * @example
+   * ```typescript
    * // Get only specific fields
-   * const titles = await client.entities.Todo.list(null, null, null, ['title', 'completed']);
+   * const fields = await base44.entities.MyEntity.list('-created_date', 10, 0, ['name', 'status']);
    * ```
    */
   list(
@@ -40,46 +48,57 @@ export interface EntityHandler {
   ): Promise<any>;
 
   /**
-   * Filter entities based on a query.
+   * Filters records based on a query.
    *
-   * Retrieves entities that match specific criteria with support for
+   * Retrieves records that match specific criteria with support for
    * sorting, pagination, and field selection.
    *
-   * @param query - Filter query object with field-value pairs
-   * @param sort - Sort parameter (e.g., "-created_date" for descending)
-   * @param limit - Maximum number of results to return
-   * @param skip - Number of results to skip (for pagination)
-   * @param fields - Array of field names to include in the response
-   * @returns Promise resolving to an array of filtered entities
+   * @param query - Filter query object with field-value pairs. Each key should be a field name
+   * from your entity schema, and each value is the criteria to match. Records matching all
+   * specified criteria are returned. Field names are case-sensitive.
+   * @param sort - Sort parameter, such as `'-created_date'` for descending.
+   * @param limit - Maximum number of results to return.
+   * @param skip - Number of results to skip for pagination.
+   * @param fields - Array of field names to include in the response.
+   * @returns Promise resolving to an array of filtered records.
    *
    * @example
    * ```typescript
    * // Filter by single field
-   * const completedTodos = await client.entities.Todo.filter({
-   *   completed: true
+   * const activeRecords = await base44.entities.MyEntity.filter({
+   *   status: 'active'
    * });
+   * ```
    *
+   * @example
+   * ```typescript
    * // Filter by multiple fields
-   * const highPriorityTodos = await client.entities.Todo.filter({
+   * const filteredRecords = await base44.entities.MyEntity.filter({
    *   priority: 'high',
-   *   completed: false
+   *   status: 'active'
    * });
+   * ```
    *
+   * @example
+   * ```typescript
    * // Filter with sorting and pagination
-   * const results = await client.entities.Todo.filter(
+   * const results = await base44.entities.MyEntity.filter(
    *   { status: 'active' },
    *   '-created_date',
    *   20,
    *   0
    * );
+   * ```
    *
+   * @example
+   * ```typescript
    * // Filter with specific fields
-   * const titles = await client.entities.Todo.filter(
+   * const fields = await base44.entities.MyEntity.filter(
    *   { priority: 'high' },
-   *   null,
-   *   null,
-   *   null,
-   *   ['title', 'priority']
+   *   '-created_date',
+   *   10,
+   *   0,
+   *   ['name', 'priority']
    * );
    * ```
    */
@@ -92,119 +111,119 @@ export interface EntityHandler {
   ): Promise<any>;
 
   /**
-   * Get a single entity by ID.
+   * Gets a single record by ID.
    *
-   * Retrieves a specific entity using its unique identifier.
+   * Retrieves a specific record using its unique identifier.
    *
-   * @param id - The unique identifier of the entity
-   * @returns Promise resolving to the entity
+   * @param id - The unique identifier of the record.
+   * @returns Promise resolving to the record.
    *
    * @example
    * ```typescript
-   * const todo = await client.entities.Todo.get('todo-123');
-   * console.log(todo.title);
-   *
-   * const user = await client.entities.User.get('user-456');
-   * console.log(user.email);
+   * const record = await base44.entities.MyEntity.get('entity-123');
+   * console.log(record.name);
    * ```
    */
   get(id: string): Promise<any>;
 
   /**
-   * Create a new entity.
+   * Creates a new record.
    *
-   * Creates a new entity with the provided data.
+   * Creates a new record with the provided data.
    *
-   * @param data - Object containing the entity data
-   * @returns Promise resolving to the created entity
+   * @param data - Object containing the record data.
+   * @returns Promise resolving to the created record.
    *
    * @example
    * ```typescript
-   * const newTodo = await client.entities.Todo.create({
-   *   title: 'Buy groceries',
-   *   completed: false,
+   * const newRecord = await base44.entities.MyEntity.create({
+   *   name: 'My Item',
+   *   status: 'active',
    *   priority: 'high'
    * });
-   * console.log('Created todo with ID:', newTodo.id);
-   *
-   * const newUser = await client.entities.User.create({
-   *   name: 'John Doe',
-   *   email: 'john@example.com',
-   *   role: 'user'
-   * });
+   * console.log('Created record with ID:', newRecord.id);
    * ```
    */
   create(data: Record<string, any>): Promise<any>;
 
   /**
-   * Update an existing entity.
+   * Updates an existing record.
    *
-   * Updates an entity by ID with the provided data. Only the fields
+   * Updates a record by ID with the provided data. Only the fields
    * included in the data object will be updated.
    *
-   * @param id - The unique identifier of the entity to update
-   * @param data - Object containing the fields to update
-   * @returns Promise resolving to the updated entity
+   * @param id - The unique identifier of the record to update.
+   * @param data - Object containing the fields to update.
+   * @returns Promise resolving to the updated record.
    *
    * @example
    * ```typescript
    * // Update single field
-   * const updated = await client.entities.Todo.update('todo-123', {
-   *   completed: true
+   * const updated = await base44.entities.MyEntity.update('entity-123', {
+   *   status: 'completed'
    * });
+   * ```
    *
+   * @example
+   * ```typescript
    * // Update multiple fields
-   * const updated = await client.entities.Todo.update('todo-123', {
-   *   title: 'Updated title',
+   * const updated = await base44.entities.MyEntity.update('entity-123', {
+   *   name: 'Updated name',
    *   priority: 'low',
-   *   completed: true
+   *   status: 'active'
    * });
    * ```
    */
   update(id: string, data: Record<string, any>): Promise<any>;
 
   /**
-   * Delete a single entity by ID.
+   * Deletes a single record by ID.
    *
-   * Permanently removes an entity from the database.
+   * Permanently removes a record from the database.
    *
-   * @param id - The unique identifier of the entity to delete
-   * @returns Promise that resolves when the entity is deleted
+   * @param id - The unique identifier of the record to delete.
+   * @returns Promise that resolves when the record is deleted.
    *
    * @example
    * ```typescript
-   * await client.entities.Todo.delete('todo-123');
-   * console.log('Todo deleted');
-   *
-   * await client.entities.User.delete('user-456');
+   * await base44.entities.MyEntity.delete('entity-123');
+   * console.log('Record deleted');
    * ```
    */
   delete(id: string): Promise<void>;
 
   /**
-   * Delete multiple entities matching a query.
+   * Deletes multiple records matching a query.
    *
-   * Permanently removes all entities that match the provided query.
+   * Permanently removes all records that match the provided query.
    * Use with caution as this operation cannot be undone.
    *
-   * @param query - Filter query object to match entities for deletion
-   * @returns Promise that resolves when the entities are deleted
+   * @param query - Filter query object with field-value pairs. Each key should be a field name
+   * from your entity schema, and each value is the criteria to match. Records matching all
+   * specified criteria will be deleted. Field names are case-sensitive.
+   * @returns Promise that resolves when the records are deleted.
    *
    * @example
    * ```typescript
-   * // Delete all completed todos
-   * await client.entities.Todo.deleteMany({
-   *   completed: true
+   * // Delete all completed records
+   * await base44.entities.MyEntity.deleteMany({
+   *   status: 'completed'
    * });
+   * ```
    *
+   * @example
+   * ```typescript
    * // Delete all low priority items
-   * await client.entities.Todo.deleteMany({
+   * await base44.entities.MyEntity.deleteMany({
    *   priority: 'low'
    * });
+   * ```
    *
+   * @example
+   * ```typescript
    * // Delete by multiple criteria
-   * await client.entities.Todo.deleteMany({
-   *   completed: true,
+   * await base44.entities.MyEntity.deleteMany({
+   *   status: 'completed',
    *   priority: 'low'
    * });
    * ```
@@ -212,48 +231,45 @@ export interface EntityHandler {
   deleteMany(query: Record<string, any>): Promise<void>;
 
   /**
-   * Create multiple entities in a single request.
+   * Creates multiple records in a single request.
    *
-   * Efficiently creates multiple entities at once. This is faster
+   * Efficiently creates multiple records at once. This is faster
    * than creating them individually.
    *
-   * @param data - Array of entity data objects
-   * @returns Promise resolving to an array of created entities
+   * @param data - Array of record data objects.
+   * @returns Promise resolving to an array of created records.
    *
    * @example
    * ```typescript
-   * const newTodos = await client.entities.Todo.bulkCreate([
-   *   { title: 'Task 1', completed: false },
-   *   { title: 'Task 2', completed: false },
-   *   { title: 'Task 3', completed: true }
+   * const newRecords = await base44.entities.MyEntity.bulkCreate([
+   *   { name: 'Item 1', status: 'active' },
+   *   { name: 'Item 2', status: 'active' },
+   *   { name: 'Item 3', status: 'completed' }
    * ]);
-   * console.log(`Created ${newTodos.length} todos`);
-   *
-   * const newUsers = await client.entities.User.bulkCreate([
-   *   { name: 'Alice', email: 'alice@example.com' },
-   *   { name: 'Bob', email: 'bob@example.com' }
-   * ]);
+   * console.log(`Created ${newRecords.length} records`);
    * ```
    */
   bulkCreate(data: Record<string, any>[]): Promise<any>;
 
   /**
-   * Import entities from a file.
+   * Imports records from a file.
    *
-   * Imports entities from a file (typically CSV or similar format).
+   * Imports records from a file, typically CSV or similar format.
    * The file format should match your entity structure. Requires a browser environment and cannot be used in the backend.
    *
-   * @param file - File object to import
-   * @returns Promise resolving to the import result
+   * @param file - File object to import.
+   * @returns Promise resolving to the import result.
    *
    * @example
    * ```typescript
-   * // In a browser with file input
-   * const fileInput = document.querySelector('input[type="file"]');
-   * const file = fileInput.files[0];
-   *
-   * const result = await client.entities.Todo.importEntities(file);
-   * console.log(`Imported ${result.count} todos`);
+   * // Import records from file in React
+   * const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+   *   const file = event.target.files?.[0];
+   *   if (file) {
+   *     const result = await base44.entities.MyEntity.importEntities(file);
+   *     console.log(`Imported ${result.count} records`);
+   *   }
+   * };
    * ```
    */
   importEntities(file: File): Promise<any>;
@@ -263,66 +279,86 @@ export interface EntityHandler {
  * Entities module for managing application data.
  *
  * This module provides dynamic access to all entities in your Base44 app.
- * Each entity (like User, Todo, Product, etc.) gets a handler with full
- * CRUD operations and additional utility methods.
+ * Each entity gets a handler with full CRUD operations and additional utility methods.
  *
- * **Dynamic Access:**
- * Entities are accessed dynamically using: `client.entities.EntityName.method()`
+ * Entities are accessed dynamically using the pattern:
+ * `base44.entities.EntityName.method()`
  *
- * **Available with both auth modes:**
- * - User auth: `client.entities.EntityName.method(...)`
- * - Service role: `client.asServiceRole.entities.EntityName.method(...)`
+ * Methods in this module respect the authentication mode used when calling them:
+ *
+ * - **User authentication** (`base44.entities`): Operations are scoped to the currently
+ *   authenticated user's permissions. Access is limited to entities the user has permission to view or modify.
+ *
+ * - **Service role authentication** (`client.asServiceRole.entities`): Operations have
+ *   elevated permissions and can access entities across all users. This is useful for admin
+ *   operations or workflows that need to operate on data regardless of user permissions.
  *
  * @example
  * ```typescript
- * // List all todos
- * const todos = await client.entities.Todo.list();
+ * // List all records
+ * const records = await base44.entities.MyEntity.list();
+ * ```
  *
- * // Filter users by role
- * const admins = await client.entities.User.filter({ role: 'admin' });
+ * @example
+ * ```typescript
+ * // Filter records by field
+ * const activeRecords = await base44.entities.MyEntity.filter({ status: 'active' });
+ * ```
  *
- * // Get specific product
- * const product = await client.entities.Product.get('prod-123');
+ * @example
+ * ```typescript
+ * // Get specific record by ID
+ * const record = await base44.entities.MyEntity.get('entity-123');
+ * ```
  *
- * // Create new todo
- * const newTodo = await client.entities.Todo.create({
- *   title: 'Buy groceries',
- *   completed: false
+ * @example
+ * ```typescript
+ * // Create new record
+ * const newRecord = await base44.entities.MyEntity.create({
+ *   name: 'My Item',
+ *   status: 'active'
  * });
+ * ```
  *
- * // Update entity
- * await client.entities.Todo.update('todo-123', { completed: true });
+ * @example
+ * ```typescript
+ * // Update record
+ * await base44.entities.MyEntity.update('entity-123', { status: 'completed' });
+ * ```
  *
- * // Delete entity
- * await client.entities.Todo.delete('todo-123');
+ * @example
+ * ```typescript
+ * // Delete record
+ * await base44.entities.MyEntity.delete('entity-123');
+ * ```
  *
+ * @example
+ * ```typescript
  * // Bulk operations
- * await client.entities.Todo.bulkCreate([
- *   { title: 'Task 1' },
- *   { title: 'Task 2' }
+ * await base44.entities.MyEntity.bulkCreate([
+ *   { name: 'Item 1' },
+ *   { name: 'Item 2' }
  * ]);
+ * ```
  *
+ * @example
+ * ```typescript
  * // Delete many
- * await client.entities.Todo.deleteMany({ completed: true });
+ * await base44.entities.MyEntity.deleteMany({ status: 'completed' });
  * ```
  */
-export type EntitiesModule = {
+export interface EntitiesModule {
   /**
    * Access any entity by name.
    *
-   * Use this to access custom entities defined in your Base44 app.
+   * Use this to access entities defined in your Base44 app.
    *
    * @example
    * ```typescript
-   * // Built-in entities
-   * client.entities.User
-   * client.entities.Todo
-   *
-   * // Custom entities
-   * client.entities.Product
-   * client.entities.Order
-   * client.entities.Invoice
+   * // Access entities dynamically
+   * base44.entities.MyEntity
+   * base44.entities.AnotherEntity
    * ```
    */
   [entityName: string]: EntityHandler;
-};
+}

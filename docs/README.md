@@ -12,6 +12,8 @@
 
 - [Base44Client](interfaces/Base44Client.md)
 - [AgentsModule](interfaces/AgentsModule.md)
+- [FetchLogsParams](interfaces/FetchLogsParams.md)
+- [GetStatsParams](interfaces/GetStatsParams.md)
 - [AppLogsModule](interfaces/AppLogsModule.md)
 - [User](interfaces/User.md)
 - [LoginResponse](interfaces/LoginResponse.md)
@@ -23,7 +25,9 @@
 - [ConnectorAccessTokenResponse](interfaces/ConnectorAccessTokenResponse.md)
 - [ConnectorsModule](interfaces/ConnectorsModule.md)
 - [EntityHandler](interfaces/EntityHandler.md)
+- [EntitiesModule](interfaces/EntitiesModule.md)
 - [FunctionsModule](interfaces/FunctionsModule.md)
+- [IntegrationsModule](interfaces/IntegrationsModule.md)
 - [SsoAccessTokenResponse](interfaces/SsoAccessTokenResponse.md)
 - [SsoModule](interfaces/SsoModule.md)
 - [GetAccessTokenOptions](interfaces/GetAccessTokenOptions.md)
@@ -44,10 +48,8 @@
 - [AgentConversation](type-aliases/AgentConversation.md)
 - [AgentMessage](type-aliases/AgentMessage.md)
 - [ConnectorIntegrationType](type-aliases/ConnectorIntegrationType.md)
-- [EntitiesModule](type-aliases/EntitiesModule.md)
 - [IntegrationEndpointFunction](type-aliases/IntegrationEndpointFunction.md)
 - [IntegrationPackage](type-aliases/IntegrationPackage.md)
-- [IntegrationsModule](type-aliases/IntegrationsModule.md)
 - [ModelFilterParams](type-aliases/ModelFilterParams.md)
 
 ## Functions

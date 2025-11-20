@@ -18,7 +18,7 @@ This module provides comprehensive authentication functionality including:
 
 ```typescript
 // Login with email and password
-const { access_token, user } = await client.auth.loginViaEmailPassword(
+const { access_token, user } = await base44.auth.loginViaEmailPassword(
   'user@example.com',
   'password123'
 );
@@ -26,22 +26,22 @@ const { access_token, user } = await client.auth.loginViaEmailPassword(
 
 ```typescript
 // Check if user is authenticated
-const isAuth = await client.auth.isAuthenticated();
+const isAuth = await base44.auth.isAuthenticated();
 ```
 
 ```typescript
 // Get current user profile
-const currentUser = await client.auth.me();
+const currentUser = await base44.auth.me();
 ```
 
 ```typescript
 // Logout and reload page
-client.auth.logout();
+base44.auth.logout();
 ```
 
 ```typescript
 // Logout and redirect to login page
-client.auth.logout('/login');
+base44.auth.logout('/login');
 ```
 
 ## Methods
@@ -61,7 +61,7 @@ Promise resolving to the user's profile data.
 #### Example
 
 ```typescript
-const user = await client.auth.me();
+const user = await base44.auth.me();
 console.log(`Logged in as: ${user.email}`);
 console.log(`User ID: ${user.id}`);
 ```
@@ -95,7 +95,7 @@ Promise resolving to the updated user data.
 
 ```typescript
 // Update specific fields
-const updatedUser = await client.auth.updateMe({
+const updatedUser = await base44.auth.updateMe({
   name: 'John Doe',
   avatar_url: 'https://example.com/avatar.jpg'
 });
@@ -104,7 +104,7 @@ console.log(`Updated user: ${updatedUser.name}`);
 
 ```typescript
 // Update custom fields defined in your User entity
-await client.auth.updateMe({
+await base44.auth.updateMe({
   bio: 'Software developer',
   phone: '+1234567890',
   preferences: { theme: 'dark' }
@@ -141,12 +141,12 @@ When not in a browser environment.
 
 ```typescript
 // Redirect to login and come back to current page
-client.auth.redirectToLogin(window.location.href);
+base44.auth.redirectToLogin(window.location.href);
 ```
 
 ```typescript
 // Redirect to login and then go to the dashboard page
-client.auth.redirectToLogin('/dashboard');
+base44.auth.redirectToLogin('/dashboard');
 ```
 
 ***
@@ -175,17 +175,17 @@ Optional URL to redirect to after logout. Reloads the page if not provided.
 
 ```typescript
 // Logout and reload page
-client.auth.logout();
+base44.auth.logout();
 ```
 
 ```typescript
 // Logout and redirect to login page
-client.auth.logout('/login');
+base44.auth.logout('/login');
 ```
 
 ```typescript
 // Logout and redirect to home
-client.auth.logout('/');
+base44.auth.logout('/');
 ```
 
 ***
@@ -220,12 +220,12 @@ Whether to save the token to local storage. Defaults to true.
 
 ```typescript
 // Set token and save to local storage
-client.auth.setToken('eyJhbGciOiJIUzI1NiIs...');
+base44.auth.setToken('eyJhbGciOiJIUzI1NiIs...');
 ```
 
 ```typescript
 // Set token without saving to local storage
-client.auth.setToken('eyJhbGciOiJIUzI1NiIs...', false);
+base44.auth.setToken('eyJhbGciOiJIUzI1NiIs...', false);
 ```
 
 ***
@@ -272,7 +272,7 @@ Error if the email and password combination is invalid or the user is not regist
 
 ```typescript
 try {
-  const { access_token, user } = await client.auth.loginViaEmailPassword(
+  const { access_token, user } = await base44.auth.loginViaEmailPassword(
     'user@example.com',
     'securePassword123'
   );
@@ -284,7 +284,7 @@ try {
 
 ```typescript
 // With captcha token
-const response = await client.auth.loginViaEmailPassword(
+const response = await base44.auth.loginViaEmailPassword(
   'user@example.com',
   'securePassword123',
   'captcha-token-here'
@@ -308,12 +308,12 @@ Promise resolving to true if authenticated, false otherwise.
 #### Example
 
 ```typescript
-const isAuthenticated = await client.auth.isAuthenticated();
+const isAuthenticated = await base44.auth.isAuthenticated();
 if (isAuthenticated) {
   console.log('User is logged in');
 } else {
   // Redirect to login page
-  client.auth.redirectToLogin(window.location.href);
+  base44.auth.redirectToLogin(window.location.href);
 }
 ```
 
@@ -353,7 +353,7 @@ Promise that resolves when the invitation is sent successfully. Throws an error 
 
 ```typescript
 try {
-  await client.auth.inviteUser('newuser@example.com', 'editor');
+  await base44.auth.inviteUser('newuser@example.com', 'editor');
   console.log('Invitation sent successfully!');
 } catch (error) {
   console.error('Failed to send invitation:', error);
@@ -387,7 +387,7 @@ Promise resolving to the registration response.
 #### Example
 
 ```typescript
-await client.auth.register({
+await base44.auth.register({
   email: 'newuser@example.com',
   password: 'securePassword123',
   referral_code: 'FRIEND2024'
@@ -428,7 +428,7 @@ Error if the OTP code is invalid, expired, or verification fails.
 
 ```typescript
 try {
-  await client.auth.verifyOtp({
+  await base44.auth.verifyOtp({
     email: 'user@example.com',
     otpCode: '123456'
   });
@@ -470,7 +470,7 @@ Error if the email is invalid or the request fails.
 
 ```typescript
 try {
-  await client.auth.resendOtp('user@example.com');
+  await base44.auth.resendOtp('user@example.com');
   console.log('OTP resent! Please check your email.');
 } catch (error) {
   console.error('Failed to resend OTP:', error);
@@ -509,7 +509,7 @@ Error if the email is invalid or the request fails.
 
 ```typescript
 try {
-  await client.auth.resetPasswordRequest('user@example.com');
+  await base44.auth.resetPasswordRequest('user@example.com');
   console.log('Password reset email sent!');
 } catch (error) {
   console.error('Failed to send password reset email:', error);
@@ -549,7 +549,7 @@ Error if the reset token is invalid, expired, or the request fails.
 
 ```typescript
 try {
-  await client.auth.resetPassword({
+  await base44.auth.resetPassword({
     resetToken: 'token-from-email',
     newPassword: 'newSecurePassword456'
   });
@@ -592,7 +592,7 @@ Error if the current password is incorrect or the request fails.
 
 ```typescript
 try {
-  await client.auth.changePassword({
+  await base44.auth.changePassword({
     userId: 'user-123',
     currentPassword: 'oldPassword123',
     newPassword: 'newSecurePassword456'

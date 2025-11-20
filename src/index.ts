@@ -67,7 +67,11 @@ export type {
   AgentMessageMetadata,
 } from "./modules/agents.types.js";
 
-export type { AppLogsModule } from "./modules/app-logs.types.js";
+export type {
+  AppLogsModule,
+  FetchLogsParams,
+  GetStatsParams,
+} from "./modules/app-logs.types.js";
 
 export type { SsoModule, SsoAccessTokenResponse } from "./modules/sso.types.js";
 

@@ -1,8 +1,11 @@
 /**
  * Function signature for calling an integration endpoint.
  *
- * @param data - An object containing named parameters for the integration endpoint
- * @returns Promise resolving to the integration endpoint's response
+ * If any parameter is a `File` object, the request will automatically be
+ * sent as `multipart/form-data`. Otherwise, it will be sent as JSON.
+ *
+ * @param data - An object containing named parameters for the integration endpoint.
+ * @returns Promise resolving to the integration endpoint's response.
  */
 export type IntegrationEndpointFunction = (
   data: Record<string, any>
@@ -29,49 +32,64 @@ export type IntegrationPackage = {
 };
 
 /**
- * Integrations module for calling pre-built integration endpoints.
+ * Integrations module for calling integration endpoints.
  *
- * This module provides access to integration endpoints that Base44 provides
- * for interacting with external services. Integrations are organized into
- * packages, with the most common being the "Core" package.
+ * This module provides access to integration endpoints for interacting with external
+ * services. Integrations are organized into packages. Base44 provides built-in integrations
+ * in the "Core" package, and you can install additional integration packages for other services.
  *
- * Unlike the connectors module (which gives you raw OAuth tokens), integrations
- * provide pre-built functions that Base44 executes on your behalf.
+ * Unlike the connectors module that gives you raw OAuth tokens, integrations provide
+ * pre-built functions that Base44 executes on your behalf.
  *
- * **Dynamic Access:**
  * Integration endpoints are accessed dynamically using the pattern:
- * `client.integrations.PackageName.EndpointName(params)`
+ * `base44.integrations.PackageName.EndpointName(params)`
  *
- * **File Upload Support:**
- * If any parameter is a `File` object, the request will automatically be
- * sent as `multipart/form-data`. Otherwise, it will be sent as JSON.
+ * Methods in this module respect the authentication mode used when calling them:
  *
- * **Available with both auth modes:**
- * - User auth: `client.integrations.PackageName.EndpointName(...)`
- * - Service role: `client.asServiceRole.integrations.PackageName.EndpointName(...)`
+ * - **User authentication** (`base44.integrations`): Integration endpoints are invoked with the
+ *   currently authenticated user's permissions. The endpoints execute with the user's authentication
+ *   context and can only access data the user has permission to access.
+ *
+ * - **Service role authentication** (`client.asServiceRole.integrations`): Integration endpoints
+ *   are invoked with elevated permissions. The endpoints execute with service role authentication
+ *   and can access data across all users. This is useful for admin operations or workflows that
+ *   need to operate regardless of user permissions.
  *
  * @example
  * ```typescript
  * // Send email using Core package
- * const emailResult = await client.integrations.Core.SendEmail({
+ * const emailResult = await base44.integrations.Core.SendEmail({
  *   to: 'user@example.com',
  *   subject: 'Hello from Base44',
  *   body: 'This is a test email'
  * });
+ * ```
  *
- * // Upload file using Core package
- * const fileInput = document.querySelector('input[type="file"]');
- * const uploadResult = await client.integrations.Core.UploadFile({
- *   file: fileInput.files[0],
- *   metadata: { type: 'profile-picture' }
- * });
+ * @example
+ * ```typescript
+ * // Upload file using Core package in React
+ * const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+ *   const file = event.target.files?.[0];
+ *   if (file) {
+ *     const uploadResult = await base44.integrations.Core.UploadFile({
+ *       file: file,
+ *       metadata: { type: 'profile-picture' }
+ *     });
+ *   }
+ * };
+ * ```
  *
+ * @example
+ * ```typescript
  * // Use custom integration package
- * const result = await client.integrations.CustomPackage.CustomEndpoint({
+ * const result = await base44.integrations.CustomPackage.CustomEndpoint({
  *   param1: 'value1',
  *   param2: 'value2'
  * });
+ * ```
  *
+ * @example
+ * ```typescript
  * // Use with service role
  * const adminEmail = await client.asServiceRole.integrations.Core.SendEmail({
  *   to: 'admin@example.com',
@@ -80,7 +98,7 @@ export type IntegrationPackage = {
  * });
  * ```
  */
-export type IntegrationsModule = {
+export interface IntegrationsModule {
   /**
    * Core package containing built-in Base44 integration endpoints.
    *
@@ -90,7 +108,7 @@ export type IntegrationsModule = {
    *
    * @example
    * ```typescript
-   * await client.integrations.Core.SendEmail({
+   * await base44.integrations.Core.SendEmail({
    *   to: 'user@example.com',
    *   subject: 'Welcome',
    *   body: 'Welcome to our app!'
@@ -108,11 +126,11 @@ export type IntegrationsModule = {
    * @example
    * ```typescript
    * // Access custom package dynamically
-   * await client.integrations.Slack.PostMessage({
+   * await base44.integrations.Slack.PostMessage({
    *   channel: '#general',
    *   text: 'Hello from Base44'
    * });
    * ```
    */
   [packageName: string]: IntegrationPackage;
-};
+}

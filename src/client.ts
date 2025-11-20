@@ -24,8 +24,8 @@ export type { Base44Client, CreateClientConfig, CreateClientOptions };
  * This is the main entry point for the Base44 SDK. It creates a client that provides access to the SDK's modules, such as {@link EntitiesModule | entities}, {@link AuthModule | auth}, and {@link FunctionsModule | functions}.
  *
  * The client supports two authentication modes:
- * - **User authentication** (default): Access modules with user-level permissions using `client.moduleName`.
- * - **Service role authentication**: Access modules with elevated permissions using `client.asServiceRole.moduleName`.
+ * - **User authentication** (default): Access modules with user-level permissions using `base44.moduleName`.
+ * - **Service role authentication**: Access modules with elevated permissions using `base44.asServiceRole.moduleName`.
  *
  * Most modules are available in both modes, but with different permission levels. Some modules are only available with service role authentication.
  *
@@ -43,33 +43,33 @@ export type { Base44Client, CreateClientConfig, CreateClientOptions };
  * // Basic client setup
  * import { createClient } from '@base44/client-sdk';
  *
- * const client = createClient({
+ * const base44 = createClient({
  *   appId: 'my-app-id'
  * });
  *
  * // Use client modules
- * const products = await client.entities.Products.list();
- * const user = await client.auth.me();
+ * const products = await base44.entities.Products.list();
+ * const user = await base44.auth.me();
  * ```
  *
  * @example
  * ```typescript
  * // Client with service role access
- * const client = createClient({
+ * const base44 = createClient({
  *   appId: 'my-app-id',
  *   token: 'user-token',
  *   serviceToken: 'service-role-token'
  * });
  *
  * // Access service-role-only modules
- * const ssoToken = await client.asServiceRole.sso.getAccessToken('user-123');
- * const oauthToken = await client.asServiceRole.connectors.getAccessToken('google');
+ * const ssoToken = await base44.asServiceRole.sso.getAccessToken('user-123');
+ * const oauthToken = await base44.asServiceRole.connectors.getAccessToken('google');
  * ```
  *
  * @example
  * ```typescript
  * // Client with error handling
- * const client = createClient({
+ * const base44 = createClient({
  *   appId: 'my-app-id',
  *   options: {
  *     onError: (error) => {
@@ -223,11 +223,11 @@ export function createClient(config: CreateClientConfig): Base44Client {
      * @example
      * ```typescript
      * // Update token after login
-     * const { access_token } = await client.auth.loginViaEmailPassword(
+     * const { access_token } = await base44.auth.loginViaEmailPassword(
      *   'user@example.com',
      *   'password'
      * );
-     * client.setToken(access_token);
+     * base44.setToken(access_token);
      * ```
      */
     setToken(newToken: string) {
@@ -259,13 +259,13 @@ export function createClient(config: CreateClientConfig): Base44Client {
      *
      * @example
      * ```typescript
-     * const client = createClient({
+     * const base44 = createClient({
      *   appId: 'my-app-id',
      *   serviceToken: 'service-role-token'
      * });
      *
      * // Also access a module with elevated permissions
-     * const allUsers = await client.asServiceRole.entities.User.list();
+     * const allUsers = await base44.asServiceRole.entities.User.list();
      * ```
      */
     get asServiceRole() {
@@ -295,7 +295,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
  * @example
  * ```typescript
  * // Frontend call to a backend function
- * const response = await client.functions.invoke('myBackendFunction', {});
+ * const response = await base44.functions.invoke('myBackendFunction', {});
  *
  * // Backend function that receives the call
  * import { createClientFromRequest } from '@base44/client-sdk';

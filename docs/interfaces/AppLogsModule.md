@@ -10,24 +10,35 @@ This module provides methods to log user activity, fetch logs, and retrieve
 statistics about your application's usage. Useful for analytics, monitoring,
 and understanding user behavior.
 
-**Available with both auth modes:**
-- User auth: `client.appLogs.method(...)`
-- Service role: `client.asServiceRole.appLogs.method(...)`
+Methods in this module respect the authentication mode used when calling them:
 
-## Example
+- **User authentication** (`base44.appLogs`): Operations are scoped to the currently
+  authenticated user. For example, `fetchLogs()` returns only logs for the current user,
+  and `getStats()` returns statistics about that user's activity.
+
+- **Service role authentication** (`client.asServiceRole.appLogs`): Operations have
+  elevated permissions and can access data across all users. For example, `fetchLogs()`
+  returns logs from all users in your application, and `getStats()` returns application-wide
+  statistics. This is useful for admin dashboards, analytics, and monitoring overall usage patterns.
+
+## Examples
 
 ```typescript
 // Log user visiting a page
-await client.appLogs.logUserInApp('dashboard');
+await base44.appLogs.logUserInApp('dashboard');
+```
 
+```typescript
 // Fetch recent logs
-const logs = await client.appLogs.fetchLogs({
+const logs = await base44.appLogs.fetchLogs({
   limit: 100,
   sort: '-timestamp'
 });
+```
 
+```typescript
 // Get application statistics
-const stats = await client.appLogs.getStats({
+const stats = await base44.appLogs.getStats({
   startDate: '2024-01-01',
   endDate: '2024-01-31'
 });
@@ -50,25 +61,27 @@ Useful for tracking user navigation patterns and popular features.
 
 `string`
 
-Name of the page or section being visited
+Name of the page or section being visited.
 
 #### Returns
 
 `Promise`\<`void`\>
 
-Promise that resolves when the log is recorded
+Promise that resolves when the log is recorded.
 
-#### Example
+#### Examples
 
 ```typescript
 // Log page visit
-await client.appLogs.logUserInApp('home');
-await client.appLogs.logUserInApp('profile');
-await client.appLogs.logUserInApp('settings');
+await base44.appLogs.logUserInApp('home');
+await base44.appLogs.logUserInApp('profile');
+await base44.appLogs.logUserInApp('settings');
+```
 
+```typescript
 // Log specific feature usage
-await client.appLogs.logUserInApp('checkout-page');
-await client.appLogs.logUserInApp('product-details');
+await base44.appLogs.logUserInApp('checkout-page');
+await base44.appLogs.logUserInApp('product-details');
 ```
 
 ***
@@ -86,36 +99,42 @@ and sorting. Use this to analyze user behavior and application usage patterns.
 
 ##### params?
 
-`Record`\<`string`, `any`\>
+[`FetchLogsParams`](FetchLogsParams.md)
 
-Query parameters for filtering logs (limit, sort, date ranges, etc.)
+Query parameters for filtering logs.
 
 #### Returns
 
 `Promise`\<`any`\>
 
-Promise resolving to the logs data
+Promise resolving to the logs data.
 
-#### Example
+#### Examples
 
 ```typescript
 // Fetch all logs
-const allLogs = await client.appLogs.fetchLogs();
+const allLogs = await base44.appLogs.fetchLogs();
+```
 
+```typescript
 // Fetch logs with pagination
-const recentLogs = await client.appLogs.fetchLogs({
+const recentLogs = await base44.appLogs.fetchLogs({
   limit: 50,
   skip: 0,
   sort: '-timestamp'
 });
+```
 
+```typescript
 // Fetch logs for a specific page
-const dashboardLogs = await client.appLogs.fetchLogs({
+const dashboardLogs = await base44.appLogs.fetchLogs({
   pageName: 'dashboard'
 });
+```
 
+```typescript
 // Fetch logs within a date range
-const periodLogs = await client.appLogs.fetchLogs({
+const periodLogs = await base44.appLogs.fetchLogs({
   startDate: '2024-01-01',
   endDate: '2024-01-31'
 });
@@ -127,7 +146,7 @@ const periodLogs = await client.appLogs.fetchLogs({
 
 > **getStats**(`params?`): `Promise`\<`any`\>
 
-Get application usage statistics.
+Gets application usage statistics.
 
 Retrieves aggregated statistics about application usage, such as page views,
 active users, and popular features. Useful for dashboards and analytics.
@@ -136,35 +155,41 @@ active users, and popular features. Useful for dashboards and analytics.
 
 ##### params?
 
-`Record`\<`string`, `any`\>
+[`GetStatsParams`](GetStatsParams.md)
 
-Query parameters for filtering statistics (date ranges, grouping, etc.)
+Query parameters for filtering and grouping statistics.
 
 #### Returns
 
 `Promise`\<`any`\>
 
-Promise resolving to the statistics data
+Promise resolving to the statistics data.
 
-#### Example
+#### Examples
 
 ```typescript
 // Get overall stats
-const stats = await client.appLogs.getStats();
+const stats = await base44.appLogs.getStats();
+```
 
+```typescript
 // Get stats for a specific time period
-const monthlyStats = await client.appLogs.getStats({
+const monthlyStats = await base44.appLogs.getStats({
   startDate: '2024-01-01',
   endDate: '2024-01-31'
 });
+```
 
+```typescript
 // Get stats grouped by page
-const pageStats = await client.appLogs.getStats({
+const pageStats = await base44.appLogs.getStats({
   groupBy: 'page'
 });
+```
 
+```typescript
 // Get daily active users
-const dailyStats = await client.appLogs.getStats({
+const dailyStats = await base44.appLogs.getStats({
   period: 'daily',
   metric: 'active_users'
 });

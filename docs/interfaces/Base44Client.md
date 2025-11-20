@@ -15,17 +15,17 @@ It includes all SDK modules and utility methods for managing authentication and 
 
 ### entities
 
-> **entities**: [`EntitiesModule`](../type-aliases/EntitiesModule.md)
+> **entities**: [`EntitiesModule`](EntitiesModule.md)
 
-[Entities module](../type-aliases/EntitiesModule.md) for CRUD operations on your data models.
+[Entities module](EntitiesModule.md) for CRUD operations on your data models.
 
 ***
 
 ### integrations
 
-> **integrations**: [`IntegrationsModule`](../type-aliases/IntegrationsModule.md)
+> **integrations**: [`IntegrationsModule`](IntegrationsModule.md)
 
-[Integrations module](../type-aliases/IntegrationsModule.md) for calling pre-built integration endpoints.
+[Integrations module](IntegrationsModule.md) for calling pre-built integration endpoints.
 
 ***
 
@@ -85,15 +85,15 @@ role authentication has access to data and operations across all users.
 
 #### entities
 
-> **entities**: [`EntitiesModule`](../type-aliases/EntitiesModule.md)
+> **entities**: [`EntitiesModule`](EntitiesModule.md)
 
-[Entities module](../type-aliases/EntitiesModule.md) with elevated permissions.
+[Entities module](EntitiesModule.md) with elevated permissions.
 
 #### integrations
 
-> **integrations**: [`IntegrationsModule`](../type-aliases/IntegrationsModule.md)
+> **integrations**: [`IntegrationsModule`](IntegrationsModule.md)
 
-[Integrations module](../type-aliases/IntegrationsModule.md) with elevated permissions.
+[Integrations module](IntegrationsModule.md) with elevated permissions.
 
 #### sso
 

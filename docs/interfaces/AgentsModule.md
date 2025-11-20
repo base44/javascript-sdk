@@ -10,15 +10,16 @@ This module provides methods to create and manage conversations with AI agents,
 send messages, and subscribe to real-time updates. Conversations can be used
 for chat interfaces, support systems, or any interactive AI application.
 
-**Authentication modes:**
-- **User authentication** (`client.agents`): Access only conversations created by the authenticated user.
+Methods in this module respect the authentication mode used when calling them:
+
+- **User authentication** (`base44.agents`): Access only conversations created by the authenticated user.
 - **Service role authentication** (`client.asServiceRole.agents`): Access all conversations across all users.
 
 ## Examples
 
 ```typescript
 // Create a new conversation
-const conversation = await client.agents.createConversation({
+const conversation = await base44.agents.createConversation({
   agent_name: 'support-agent',
   metadata: {
     ticket_id: 'SUPP-1234',
@@ -30,7 +31,7 @@ const conversation = await client.agents.createConversation({
 
 ```typescript
 // Send a message
-await client.agents.addMessage(conversation, {
+await base44.agents.addMessage(conversation, {
   role: 'user',
   content: 'Hello, I need help!'
 });
@@ -38,7 +39,7 @@ await client.agents.addMessage(conversation, {
 
 ```typescript
 // Subscribe to real-time updates
-const unsubscribe = client.agents.subscribeToConversation(
+const unsubscribe = base44.agents.subscribeToConversation(
   conversation.id,
   (updatedConversation) => {
     console.log('New messages:', updatedConversation.messages);
@@ -66,7 +67,7 @@ Promise resolving to an array of conversations.
 #### Example
 
 ```typescript
-const conversations = await client.agents.getConversations();
+const conversations = await base44.agents.getConversations();
 console.log(`Total conversations: ${conversations.length}`);
 ```
 
@@ -95,7 +96,7 @@ Promise resolving to the conversation, or undefined if not found.
 #### Example
 
 ```typescript
-const conversation = await client.agents.getConversation('conv-123');
+const conversation = await base44.agents.getConversation('conv-123');
 if (conversation) {
   console.log(`Conversation has ${conversation.messages.length} messages`);
 }
@@ -126,7 +127,7 @@ Promise resolving to an array of filtered conversations.
 #### Example
 
 ```typescript
-const recentConversations = await client.agents.listConversations({
+const recentConversations = await base44.agents.listConversations({
   limit: 10,
   sort: '-created_date'
 });
@@ -163,7 +164,7 @@ Promise resolving to the created conversation.
 #### Example
 
 ```typescript
-const conversation = await client.agents.createConversation({
+const conversation = await base44.agents.createConversation({
   agent_name: 'support-agent',
   metadata: {
     order_id: 'ORD-789',
@@ -208,7 +209,7 @@ Promise resolving to the created message.
 #### Example
 
 ```typescript
-const message = await client.agents.addMessage(conversation, {
+const message = await base44.agents.addMessage(conversation, {
   role: 'user',
   content: 'Hello, I need help with my order #12345'
 });
@@ -254,7 +255,7 @@ Unsubscribe function to stop receiving updates.
 #### Example
 
 ```typescript
-const unsubscribe = client.agents.subscribeToConversation(
+const unsubscribe = base44.agents.subscribeToConversation(
   'conv-123',
   (updatedConversation) => {
     const latestMessage = updatedConversation.messages[updatedConversation.messages.length - 1];
@@ -294,7 +295,7 @@ WhatsApp connection URL.
 #### Example
 
 ```typescript
-const whatsappUrl = client.agents.getWhatsAppConnectURL('support-agent');
+const whatsappUrl = base44.agents.getWhatsAppConnectURL('support-agent');
 console.log(`Connect through WhatsApp: ${whatsappUrl}`);
 // User can open this URL to start a WhatsApp conversation
 ```

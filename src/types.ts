@@ -15,7 +15,7 @@ export * from "./modules/types.js";
  * @example
  * ```typescript
  * // Filter conversations by agent name
- * const conversations = await client.agents.listConversations({
+ * const conversations = await base44.agents.listConversations({
  *   q: { agent_name: 'support-bot' }
  * });
  * ```
@@ -23,7 +23,7 @@ export * from "./modules/types.js";
  * @example
  * ```typescript
  * // Filter conversations with sorting
- * const conversations = await client.agents.listConversations({
+ * const conversations = await base44.agents.listConversations({
  *   q: { status: 'active' },
  *   sort: '-created_at'  // Sort by created_at descending
  * });
@@ -32,7 +32,7 @@ export * from "./modules/types.js";
  * @example
  * ```typescript
  * // Filter conversations with pagination
- * const conversations = await client.agents.listConversations({
+ * const conversations = await base44.agents.listConversations({
  *   q: { agent_name: 'support-bot' },
  *   limit: 20,  // Get 20 results
  *   skip: 40    // Skip first 40 (page 3)
@@ -42,7 +42,7 @@ export * from "./modules/types.js";
  * @example
  * ```typescript
  * // Filter conversations with field selection
- * const conversations = await client.agents.listConversations({
+ * const conversations = await base44.agents.listConversations({
  *   q: { status: 'active' },
  *   fields: ['id', 'agent_name', 'created_at']
  * });
@@ -51,7 +51,7 @@ export * from "./modules/types.js";
  * @example
  * ```typescript
  * // Filter conversations with multiple filters
- * const conversations = await client.agents.listConversations({
+ * const conversations = await base44.agents.listConversations({
  *   q: {
  *     agent_name: 'support-bot',
  *     'metadata.priority': 'high',

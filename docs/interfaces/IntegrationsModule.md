@@ -1,0 +1,110 @@
+[**@base44/sdk**](../README.md)
+
+***
+
+# Interface: IntegrationsModule
+
+Integrations module for calling integration endpoints.
+
+This module provides access to integration endpoints for interacting with external
+services. Integrations are organized into packages. Base44 provides built-in integrations
+in the "Core" package, and you can install additional integration packages for other services.
+
+Unlike the connectors module that gives you raw OAuth tokens, integrations provide
+pre-built functions that Base44 executes on your behalf.
+
+Integration endpoints are accessed dynamically using the pattern:
+`base44.integrations.PackageName.EndpointName(params)`
+
+Methods in this module respect the authentication mode used when calling them:
+
+- **User authentication** (`base44.integrations`): Integration endpoints are invoked with the
+  currently authenticated user's permissions. The endpoints execute with the user's authentication
+  context and can only access data the user has permission to access.
+
+- **Service role authentication** (`client.asServiceRole.integrations`): Integration endpoints
+  are invoked with elevated permissions. The endpoints execute with service role authentication
+  and can access data across all users. This is useful for admin operations or workflows that
+  need to operate regardless of user permissions.
+
+## Examples
+
+```typescript
+// Send email using Core package
+const emailResult = await base44.integrations.Core.SendEmail({
+  to: 'user@example.com',
+  subject: 'Hello from Base44',
+  body: 'This is a test email'
+});
+```
+
+```typescript
+// Upload file using Core package in React
+const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const file = event.target.files?.[0];
+  if (file) {
+    const uploadResult = await base44.integrations.Core.UploadFile({
+      file: file,
+      metadata: { type: 'profile-picture' }
+    });
+  }
+};
+```
+
+```typescript
+// Use custom integration package
+const result = await base44.integrations.CustomPackage.CustomEndpoint({
+  param1: 'value1',
+  param2: 'value2'
+});
+```
+
+```typescript
+// Use with service role
+const adminEmail = await client.asServiceRole.integrations.Core.SendEmail({
+  to: 'admin@example.com',
+  subject: 'Admin notification',
+  body: 'System alert'
+});
+```
+
+## Indexable
+
+\[`packageName`: `string`\]: [`IntegrationPackage`](../type-aliases/IntegrationPackage.md)
+
+Access to any custom or installable integration package.
+
+Use this to call endpoints from custom integration packages
+you've installed in your Base44 app.
+
+### Example
+
+```typescript
+// Access custom package dynamically
+await base44.integrations.Slack.PostMessage({
+  channel: '#general',
+  text: 'Hello from Base44'
+});
+```
+
+## Properties
+
+### Core
+
+> **Core**: [`IntegrationPackage`](../type-aliases/IntegrationPackage.md)
+
+Core package containing built-in Base44 integration endpoints.
+
+Common endpoints include:
+- `SendEmail` - Send emails
+- `UploadFile` - Upload files
+
+#### Example
+
+```typescript
+await base44.integrations.Core.SendEmail({
+  to: 'user@example.com',
+  subject: 'Welcome',
+  body: 'Welcome to our app!'
+});
+```

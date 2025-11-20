@@ -34,7 +34,7 @@ Configuration options for saving the token.
 
 ```typescript
 // Save access token after login
-const response = await client.auth.loginViaEmailPassword(email, password);
+const response = await base44.auth.loginViaEmailPassword(email, password);
 const success = saveAccessToken(response.access_token, {});
 
 if (success) {

@@ -36,7 +36,7 @@ When authorization headers have invalid format.
 
 ```typescript
 // Frontend call to a backend function
-const response = await client.functions.invoke('myBackendFunction', {});
+const response = await base44.functions.invoke('myBackendFunction', {});
 
 // Backend function that receives the call
 import { createClientFromRequest } from '@base44/client-sdk';
