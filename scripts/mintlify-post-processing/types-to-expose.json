@@ -1,0 +1,12 @@
+[
+  "AgentsModule",
+  "AppLogsModule",
+  "AuthModule",
+  "ConnectorsModule",
+  "EntitiesModule",
+  "FunctionsModule",
+  "IntegrationsModule",
+  "SsoModule"
+]
+
+

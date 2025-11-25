@@ -1,8 +1,12 @@
 {
   "$schema": "https://typedoc.org/schema.json",
   "entryPoints": ["./src/index.ts"],
-  "out": "docs",
-  "plugin": ["typedoc-plugin-markdown"],
+  "out": "docs/content",
+  "plugin": [
+    "typedoc-plugin-markdown",
+    "./scripts/mintlify-post-processing/typedoc-plugin/typedoc-mintlify-plugin.js"
+  ],
+  "fileExtension": ".mdx",
   "excludePrivate": true,
   "excludeProtected": true,
   "excludeInternal": true,
@@ -25,7 +29,9 @@
     "Accessor",
     "Variable"
   ],
+  "entryFileName": "README.mdx",
   "maxTypeConversionDepth": 2,
   "hideBreadcrumbs": true,
-  "disableSources": true
+  "disableSources": true,
+  "hidePageTitle": true
 }
