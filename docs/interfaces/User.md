@@ -10,7 +10,7 @@ An authenticated user.
 
 \[`key`: `string`\]: `any`
 
-Additional custom fields defined in your user schema. Any custom properties you've added to your user schema in your Base44 application will be available here with their configured types and values.
+Additional custom fields defined in the user schema. Any custom properties added to the user schema in the app will be available here with their configured types and values.
 
 ## Properties
 
@@ -66,7 +66,7 @@ URL to user's profile picture.
 
 > `optional` **role**: `string`
 
-User's role in the application. Roles are configured in your Base44 application settings and determine the user's permissions and access levels.
+User's role in the app. Roles are configured in the app settings and determine the user's permissions and access levels.
 
 ***
 

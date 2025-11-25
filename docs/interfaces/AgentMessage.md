@@ -2,9 +2,7 @@
 
 ***
 
-# Type Alias: AgentMessage
-
-> **AgentMessage** = `object`
+# Interface: AgentMessage
 
 A message in an agent conversation.
 
@@ -36,7 +34,7 @@ Optional reasoning information for the message.
 
 ### content?
 
-> `optional` **content**: `string` \| `Record`\<..., ...\> \| `null`
+> `optional` **content**: `string` \| `Record`\<`string`, `any`\> \| `null`
 
 Message content.
 
@@ -44,7 +42,7 @@ Message content.
 
 ### file\_urls?
 
-> `optional` **file\_urls**: ...[] \| `null`
+> `optional` **file\_urls**: `string`[] \| `null`
 
 URLs to files attached to the message.
 
@@ -52,7 +50,7 @@ URLs to files attached to the message.
 
 ### tool\_calls?
 
-> `optional` **tool\_calls**: ...[] \| `null`
+> `optional` **tool\_calls**: [`AgentMessageToolCall`](AgentMessageToolCall.md)[] \| `null`
 
 Tool calls made by the agent.
 
@@ -76,7 +74,7 @@ Whether the message is hidden from the user.
 
 ### custom\_context?
 
-> `optional` **custom\_context**: ...[] \| `null`
+> `optional` **custom\_context**: [`AgentMessageCustomContext`](AgentMessageCustomContext.md)[] \| `null`
 
 Custom context provided with the message.
 

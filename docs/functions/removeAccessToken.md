@@ -22,7 +22,7 @@ Configuration options for token removal.
 
 `boolean`
 
-`true` if the token was removed successfully, `false` otherwise.
+Returns `true` if the token was removed successfully, `false` otherwise.
 
 ## Examples
 

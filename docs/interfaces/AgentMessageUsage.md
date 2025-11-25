@@ -2,9 +2,7 @@
 
 ***
 
-# Type Alias: AgentMessageUsage
-
-> **AgentMessageUsage** = `object`
+# Interface: AgentMessageUsage
 
 Token usage statistics for an agent message.
 

@@ -6,9 +6,9 @@
 
 Functions module for invoking custom backend functions.
 
-This module allows you to invoke the custom backend functions in your Base44 app.
+This module allows you to invoke the custom backend functions defined in the app.
 
-Methods in this module respect the authentication mode used when calling them:
+This module is available to use with a client in both user and service role authentication modes:
 
 - **User authentication** (`base44.functions`): Functions are invoked with the currently
   authenticated user's permissions. The function code receives a request with the user's authentication context and can only access data the user has permission to access.
@@ -42,7 +42,7 @@ const adminResult = await client.asServiceRole.functions.invoke('adminTask', {
 
 Invokes a custom backend function by name.
 
-Calls a custom backend function that you've deployed to your Base44 app.
+Calls a custom backend function deployed to the app.
 The function receives the provided data as named parameters and returns
 the result. If any parameter is a `File` object, the request will automatically be
 sent as `multipart/form-data`. Otherwise, it will be sent as JSON.

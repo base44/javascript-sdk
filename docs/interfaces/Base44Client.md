@@ -6,9 +6,9 @@
 
 The Base44 client instance.
 
-Provides access to all SDK modules and methods for interacting with your Base44 app.
+Provides access to all SDK modules and methods for interacting with the app.
 
-This is the main client object returned by [createClient](../functions/createClient.md) and [createClientFromRequest](../functions/createClientFromRequest.md).
+This is the main client object returned by [`createClient`](../functions/createClient.md) and [`createClientFromRequest`](../functions/createClientFromRequest.md).
 It includes all SDK modules and utility methods for managing authentication and configuration.
 
 ## Properties
@@ -57,7 +57,7 @@ It includes all SDK modules and utility methods for managing authentication and 
 
 > **appLogs**: [`AppLogsModule`](AppLogsModule.md)
 
-[App logs module](AppLogsModule.md) for tracking application usage.
+[App logs module](AppLogsModule.md) for tracking app usage.
 
 ***
 
@@ -77,11 +77,9 @@ Cleanup function to disconnect WebSocket connections. Call when you're done with
 
 > `readonly` **asServiceRole**: `object`
 
-Provides access to service role modules with elevated permissions.
+Provides access to supported modules with elevated permissions.
 
-Service role authentication provides elevated permissions for server-side operations.
-Unlike user authentication, which is scoped to a specific user's permissions, service
-role authentication has access to data and operations across all users.
+Service role authentication provides elevated permissions for backend operations. Unlike user authentication, which is scoped to a specific user's permissions, service role authentication has access to data and operations across all users.
 
 #### entities
 
@@ -99,13 +97,13 @@ role authentication has access to data and operations across all users.
 
 > **sso**: [`SsoModule`](SsoModule.md)
 
-[SSO module](SsoModule.md) for generating SSO tokens (service role only).
+[SSO module](SsoModule.md) for generating SSO tokens.
 
 #### connectors
 
 > **connectors**: [`ConnectorsModule`](ConnectorsModule.md)
 
-[Connectors module](ConnectorsModule.md) for OAuth token retrieval (service role only).
+[Connectors module](ConnectorsModule.md) for OAuth token retrieval.
 
 #### functions
 
@@ -155,7 +153,7 @@ Updates the token for both HTTP requests and WebSocket connections.
 
 `string`
 
-The new authentication token
+The new authentication token.
 
 #### Returns
 

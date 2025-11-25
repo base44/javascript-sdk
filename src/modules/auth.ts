@@ -158,7 +158,7 @@ export function createAuthModule(
       }
     },
 
-    // Invite a user to the application
+    // Invite a user to the app
     inviteUser(userEmail: string, role: string) {
       return axios.post(`/apps/${appId}/users/invite-user`, {
         user_email: userEmail,

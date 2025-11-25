@@ -1,5 +1,5 @@
 /**
- * Configuration options for retrieving an access token
+ * Configuration options for retrieving an access token.
  *
  * @example
  * ```typescript
@@ -24,32 +24,32 @@
  */
 export interface GetAccessTokenOptions {
   /**
-   * The key to use when storing or retrieving the token in local storage
+   * The key to use when storing or retrieving the token in local storage.
    * @default 'base44_access_token'
    */
   storageKey?: string;
 
   /**
-   * The URL parameter name to check for the access token
+   * The URL parameter name to check for the access token.
    * @default 'access_token'
    */
   paramName?: string;
 
   /**
-   * Whether to save the token to local storage if found in the URL
+   * Whether to save the token to local storage if found in the URL.
    * @default true
    */
   saveToStorage?: boolean;
 
   /**
-   * Whether to remove the token from the URL after retrieval for security
+   * Whether to remove the token from the URL after retrieval for security.
    * @default true
    */
   removeFromUrl?: boolean;
 }
 
 /**
- * Configuration options for saving an access token
+ * Configuration options for saving an access token.
  *
  * @example
  * ```typescript
@@ -62,14 +62,14 @@ export interface GetAccessTokenOptions {
  */
 export interface SaveAccessTokenOptions {
   /**
-   * The key to use when storing the token in local storage
+   * The key to use when storing the token in local storage.
    * @default 'base44_access_token'
    */
   storageKey?: string;
 }
 
 /**
- * Configuration options for removing an access token
+ * Configuration options for removing an access token.
  *
  * @example
  * ```typescript
@@ -82,14 +82,14 @@ export interface SaveAccessTokenOptions {
  */
 export interface RemoveAccessTokenOptions {
   /**
-   * The key to use when removing the token from local storage
+   * The key to use when removing the token from local storage.
    * @default 'base44_access_token'
    */
   storageKey?: string;
 }
 
 /**
- * Configuration options for constructing a login URL
+ * Configuration options for constructing a login URL.
  *
  * @example
  * ```typescript
@@ -109,39 +109,39 @@ export interface RemoveAccessTokenOptions {
  */
 export interface GetLoginUrlOptions {
   /**
-   * The base server URL (e.g., 'https://base44.app')
+   * The base server URL (e.g., 'https://base44.app').
    */
   serverUrl: string;
 
   /**
-   * The application ID
+   * The app ID.
    */
   appId: string;
 
   /**
-   * The path to the login endpoint
+   * The path to the login endpoint.
    * @default '/login'
    */
   loginPath?: string;
 }
 
-/** Type definition for getAccessToken function */
+/** Type definition for getAccessToken function. */
 export type GetAccessTokenFunction = (
   options?: GetAccessTokenOptions
 ) => string | null;
 
-/** Type definition for saveAccessToken function */
+/** Type definition for saveAccessToken function. */
 export type SaveAccessTokenFunction = (
   token: string,
   options: SaveAccessTokenOptions
 ) => boolean;
 
-/** Type definition for removeAccessToken function */
+/** Type definition for removeAccessToken function. */
 export type RemoveAccessTokenFunction = (
   options: RemoveAccessTokenOptions
 ) => boolean;
 
-/** Type definition for getLoginUrl function */
+/** Type definition for getLoginUrl function. */
 export type GetLoginUrlFunction = (
   nextUrl: string,
   options: GetLoginUrlOptions

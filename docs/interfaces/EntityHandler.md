@@ -6,7 +6,7 @@
 
 Entity handler providing CRUD operations for a specific entity type.
 
-Each entity in your Base44 app gets a handler with these methods for managing data.
+Each entity in the app gets a handler with these methods for managing data.
 
 ## Methods
 
@@ -64,7 +64,8 @@ const recentRecords = await base44.entities.MyEntity.list('-created_date', 10);
 ```
 
 ```typescript
-// Get paginated results: skip first 20, get next 10
+// Get paginated results
+// Skip first 20, get next 10
 const page3 = await base44.entities.MyEntity.list('-created_date', 10, 20);
 ```
 
@@ -90,10 +91,9 @@ sorting, pagination, and field selection.
 
 `Record`\<`string`, `any`\>
 
-Filter query object with field-value pairs. Each key should be a field name
-from your entity schema, and each value is the criteria to match. Records matching ALL
-specified criteria are returned (AND logic). Field names are case-sensitive and must match
-your entity schema definition.
+Query object with field-value pairs. Each key should be a field name
+from your entity schema, and each value is the criteria to match. Records matching all
+specified criteria are returned. Field names are case-sensitive.
 
 ##### sort?
 
@@ -190,6 +190,7 @@ Promise resolving to the record.
 #### Example
 
 ```typescript
+// Get record by ID
 const record = await base44.entities.MyEntity.get('entity-123');
 console.log(record.name);
 ```
@@ -221,6 +222,7 @@ Promise resolving to the created record.
 #### Example
 
 ```typescript
+// Create a new record
 const newRecord = await base44.entities.MyEntity.create({
   name: 'My Item',
   status: 'active',
@@ -282,7 +284,7 @@ const updated = await base44.entities.MyEntity.update('entity-123', {
 
 ### delete()
 
-> **delete**(`id`): `Promise`\<`void`\>
+> **delete**(`id`): `Promise`\<`any`\>
 
 Deletes a single record by ID.
 
@@ -298,27 +300,27 @@ The unique identifier of the record to delete.
 
 #### Returns
 
-`Promise`\<`void`\>
+`Promise`\<`any`\>
 
-Promise that resolves when the record is deleted.
+Promise resolving to the deletion result.
 
 #### Example
 
 ```typescript
-await base44.entities.MyEntity.delete('entity-123');
-console.log('Record deleted');
+// Delete a record
+const result = await base44.entities.MyEntity.delete('entity-123');
+console.log('Deleted:', result);
 ```
 
 ***
 
 ### deleteMany()
 
-> **deleteMany**(`query`): `Promise`\<`void`\>
+> **deleteMany**(`query`): `Promise`\<`any`\>
 
 Deletes multiple records matching a query.
 
 Permanently removes all records that match the provided query.
-Use with caution as this operation cannot be undone.
 
 #### Parameters
 
@@ -326,36 +328,25 @@ Use with caution as this operation cannot be undone.
 
 `Record`\<`string`, `any`\>
 
-Filter query object to match records for deletion.
+Query object with field-value pairs. Each key should be a field name
+from your entity schema, and each value is the criteria to match. Records matching all
+specified criteria will be deleted. Field names are case-sensitive.
 
 #### Returns
 
-`Promise`\<`void`\>
+`Promise`\<`any`\>
 
-Promise that resolves when the records are deleted.
+Promise resolving to the deletion result.
 
-#### Examples
-
-```typescript
-// Delete all completed records
-await base44.entities.MyEntity.deleteMany({
-  status: 'completed'
-});
-```
-
-```typescript
-// Delete all low priority items
-await base44.entities.MyEntity.deleteMany({
-  priority: 'low'
-});
-```
+#### Example
 
 ```typescript
 // Delete by multiple criteria
-await base44.entities.MyEntity.deleteMany({
+const result = await base44.entities.MyEntity.deleteMany({
   status: 'completed',
   priority: 'low'
 });
+console.log('Deleted:', result);
 ```
 
 ***
@@ -386,12 +377,12 @@ Promise resolving to an array of created records.
 #### Example
 
 ```typescript
-const newRecords = await base44.entities.MyEntity.bulkCreate([
+// Create multiple records at once
+const result = await base44.entities.MyEntity.bulkCreate([
   { name: 'Item 1', status: 'active' },
   { name: 'Item 2', status: 'active' },
   { name: 'Item 3', status: 'completed' }
 ]);
-console.log(`Created ${newRecords.length} records`);
 ```
 
 ***
@@ -422,10 +413,12 @@ Promise resolving to the import result.
 #### Example
 
 ```typescript
-// In a browser with file input
-const fileInput = document.querySelector('input[type="file"]');
-const file = fileInput.files[0];
-
-const result = await base44.entities.MyEntity.importEntities(file);
-console.log(`Imported ${result.count} records`);
+// Import records from file in React
+const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const file = event.target.files?.[0];
+  if (file) {
+    const result = await base44.entities.MyEntity.importEntities(file);
+    console.log(`Imported ${result.count} records`);
+  }
+};
 ```

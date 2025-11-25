@@ -10,43 +10,40 @@ import type { AppLogsModule } from "./modules/app-logs.types.js";
 /**
  * Options for creating a Base44 client.
  */
-export type CreateClientOptions = {
+export interface CreateClientOptions {
   /**
    * Optional error handler that will be called whenever an API error occurs.
    */
   onError?: (error: Error) => void;
-};
+}
 
 /**
  * Configuration for creating a Base44 client.
  */
-export type CreateClientConfig = {
+export interface CreateClientConfig {
   /**
    * The Base44 server URL. Defaults to "https://base44.app".
    * @internal
    */
   serverUrl?: string;
   /**
-   * The base URL of your application (used for login redirects).
+   * The base URL of the app, which is used for login redirects.
    * @internal
    */
   appBaseUrl?: string;
   /**
-   * Your Base44 application ID.
+   * The Base44 app ID.
    *
-   * You can find your `appId` in the browser URL when you're in the app editor.
+   * You can find the `appId` in the browser URL when you're in the app editor.
    * It's the string between `/apps/` and `/editor/`.
    */
   appId: string;
   /**
-   * User authentication token. Use this for client-side applications where you want to
-   * authenticate as a specific user.
+   * User authentication token. Use this in the frontend when you want to authenticate as a specific user.
    */
   token?: string;
   /**
-   * Service role authentication token. Use this for server-side applications where you need
-   * elevated permissions to access data across all users or perform admin operations. This token
-   * should be kept secret and never exposed to the client.
+   * Service role authentication token. Use this in the backend when you need elevated permissions to access data across all users or perform admin operations. This token should be kept secret and never exposed in the app's frontend.
    */
   serviceToken?: string;
   /**
@@ -66,17 +63,16 @@ export type CreateClientConfig = {
   headers?: Record<string, string>;
   /**
    * Additional client options.
-   * @internal
    */
   options?: CreateClientOptions;
-};
+}
 
 /**
  * The Base44 client instance.
  *
- * Provides access to all SDK modules and methods for interacting with your Base44 app.
+ * Provides access to all SDK modules and methods for interacting with the app.
  *
- * This is the main client object returned by {@link createClient} and {@link createClientFromRequest}.
+ * This is the main client object returned by {@linkcode createClient} and {@linkcode createClientFromRequest}.
  * It includes all SDK modules and utility methods for managing authentication and configuration.
  */
 export interface Base44Client {
@@ -90,7 +86,7 @@ export interface Base44Client {
   functions: FunctionsModule;
   /** {@link AgentsModule | Agents module} for managing AI agent conversations. */
   agents: AgentsModule;
-  /** {@link AppLogsModule | App logs module} for tracking application usage. */
+  /** {@link AppLogsModule | App logs module} for tracking app usage. */
   appLogs: AppLogsModule;
   /** Cleanup function to disconnect WebSocket connections. Call when you're done with the client. */
   cleanup: () => void;
@@ -100,7 +96,7 @@ export interface Base44Client {
    *
    * Updates the token for both HTTP requests and WebSocket connections.
    *
-   * @param newToken - The new authentication token
+   * @param newToken - The new authentication token.
    */
   setToken(newToken: string): void;
 
@@ -111,11 +107,9 @@ export interface Base44Client {
   getConfig(): { serverUrl: string; appId: string; requiresAuth: boolean };
 
   /**
-   * Provides access to service role modules with elevated permissions.
+   * Provides access to supported modules with elevated permissions.
    *
-   * Service role authentication provides elevated permissions for server-side operations.
-   * Unlike user authentication, which is scoped to a specific user's permissions, service
-   * role authentication has access to data and operations across all users.
+   * Service role authentication provides elevated permissions for backend operations. Unlike user authentication, which is scoped to a specific user's permissions, service role authentication has access to data and operations across all users.
    *
    * @throws {Error} When accessed without providing a serviceToken during client creation
    */
@@ -124,9 +118,9 @@ export interface Base44Client {
     entities: EntitiesModule;
     /** {@link IntegrationsModule | Integrations module} with elevated permissions. */
     integrations: IntegrationsModule;
-    /** {@link SsoModule | SSO module} for generating SSO tokens (service role only). */
+    /** {@link SsoModule | SSO module} for generating SSO tokens. */
     sso: SsoModule;
-    /** {@link ConnectorsModule | Connectors module} for OAuth token retrieval (service role only). */
+    /** {@link ConnectorsModule | Connectors module} for OAuth token retrieval. */
     connectors: ConnectorsModule;
     /** {@link FunctionsModule | Functions module} with elevated permissions. */
     functions: FunctionsModule;

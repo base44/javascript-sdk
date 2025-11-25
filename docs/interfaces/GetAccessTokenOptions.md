@@ -4,7 +4,7 @@
 
 # Interface: GetAccessTokenOptions
 
-Configuration options for retrieving an access token
+Configuration options for retrieving an access token.
 
 ## Examples
 
@@ -32,7 +32,7 @@ const token = getAccessToken({
 
 > `optional` **storageKey**: `string`
 
-The key to use when storing or retrieving the token in local storage
+The key to use when storing or retrieving the token in local storage.
 
 #### Default
 
@@ -46,7 +46,7 @@ The key to use when storing or retrieving the token in local storage
 
 > `optional` **paramName**: `string`
 
-The URL parameter name to check for the access token
+The URL parameter name to check for the access token.
 
 #### Default
 
@@ -60,7 +60,7 @@ The URL parameter name to check for the access token
 
 > `optional` **saveToStorage**: `boolean`
 
-Whether to save the token to local storage if found in the URL
+Whether to save the token to local storage if found in the URL.
 
 #### Default
 
@@ -74,7 +74,7 @@ true
 
 > `optional` **removeFromUrl**: `boolean`
 
-Whether to remove the token from the URL after retrieval for security
+Whether to remove the token from the URL after retrieval for security.
 
 #### Default
 

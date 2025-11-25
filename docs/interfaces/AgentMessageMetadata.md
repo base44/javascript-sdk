@@ -2,9 +2,7 @@
 
 ***
 
-# Type Alias: AgentMessageMetadata
-
-> **AgentMessageMetadata** = `object`
+# Interface: AgentMessageMetadata
 
 Metadata about when and by whom a message was created.
 

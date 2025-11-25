@@ -21,19 +21,17 @@ export type { Base44Client, CreateClientConfig, CreateClientOptions };
 /**
  * Creates a Base44 SDK client instance.
  *
- * This is the main entry point for the Base44 SDK. It creates a client that provides access to the SDK's modules, such as {@link EntitiesModule | entities}, {@link AuthModule | auth}, and {@link FunctionsModule | functions}.
+ * This is the main entry point for the Base44 SDK. It creates a client that provides access to the SDK's modules, such as {@linkcode EntitiesModule | entities}, {@linkcode AuthModule | auth}, and {@linkcode FunctionsModule | functions}.
  *
  * The client supports two authentication modes:
  * - **User authentication** (default): Access modules with user-level permissions using `base44.moduleName`.
  * - **Service role authentication**: Access modules with elevated permissions using `base44.asServiceRole.moduleName`.
  *
- * Most modules are available in both modes, but with different permission levels. Some modules are only available with service role authentication.
+ * For example, when using the {@linkcode EntitiesModule | entities} module with user authentication you'll only have access to the current user's data. With service role authentication, you'll have access to all data across the entire app.
  *
- * For example, when using the {@link EntitiesModule | entities} module with user authentication you'll only get data accessible to the current user. With service role authentication, you'll get all data accessible to all users across the entire application.
+ * Most modules are available in both modes, but with different permission levels. However, some modules are only available in one authentication mode.
  *
- * To use the service role authentication mode, you need to provide a service role token when creating the client. This token should be kept secret and never exposed in your application's frontend.
- *
- * <Info> The {@link AuthModule | auth} module is only available with user authentication for security reasons.</Info>
+ * To use the service role authentication mode, you need to provide a service role token when creating the client. This token should be kept secret and never exposed in the app's frontend.
  *
  * @param config - Configuration object for the client.
  * @returns A configured Base44 client instance with access to all SDK modules.
@@ -284,13 +282,10 @@ export function createClient(config: CreateClientConfig): Base44Client {
 /**
  * Creates a Base44 client from an HTTP request.
  *
- * Creates a client by automatically extracting authentication tokens and configuration from request with authentication information in their headers. Use this function in backend environments, such as when building backend functions. Base44 inserts the necessary headers when forwarding requests from your app frontend to your backend functions.
+ * Creates a client by automatically extracting authentication tokens and configuration from an incoming HTTP request with authentication information in its headers. Use this function in backend environments, such as when building backend functions. Base44 inserts the necessary headers when forwarding requests from the app's frontend to the backend functions.
  *
  * @param request - The incoming HTTP request object containing Base44 authentication headers.
- * @returns A configured Base44 client instance with authentication from the request.
- *
- * @throws {Error} When Base44-App-Id header is missing.
- * @throws {Error} When authorization headers have invalid format.
+ * @returns A configured Base44 client instance with authentication from the incoming request.
  *
  * @example
  * ```typescript
@@ -309,7 +304,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
  *       return Response.json({ error: 'Unauthorized' }, { status: 401 });
  *     }
  *
- *     // Use the client to access the API
+ *     // Use the client to make API calls
  *
  *   } catch (error) {
  *     return Response.json({ error: error.message }, { status: 500 });

@@ -2,9 +2,7 @@
 
 ***
 
-# Type Alias: AgentMessageCustomContext
-
-> **AgentMessageCustomContext** = `object`
+# Interface: AgentMessageCustomContext
 
 Custom context provided with an agent message.
 

@@ -2,9 +2,7 @@
 
 ***
 
-# Type Alias: ModelFilterParams
-
-> **ModelFilterParams** = `object`
+# Interface: ModelFilterParams
 
 Parameters for filtering, sorting, and paginating agent model data.
 
@@ -102,6 +100,6 @@ Number of results to skip. Used for pagination.
 
 ### fields?
 
-> `optional` **fields**: ...[] \| `null`
+> `optional` **fields**: `string`[] \| `null`
 
 Array of field names to include in the response.

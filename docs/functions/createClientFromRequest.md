@@ -8,7 +8,7 @@
 
 Creates a Base44 client from an HTTP request.
 
-Creates a client by automatically extracting authentication tokens and configuration from request with authentication information in their headers. Use this function in backend environments, such as when building backend functions. Base44 inserts the necessary headers when forwarding requests from your app frontend to your backend functions.
+Creates a client by automatically extracting authentication tokens and configuration from an incoming HTTP request with authentication information in its headers. Use this function in backend environments, such as when building backend functions. Base44 inserts the necessary headers when forwarding requests from the app's frontend to the backend functions.
 
 ## Parameters
 
@@ -22,15 +22,7 @@ The incoming HTTP request object containing Base44 authentication headers.
 
 [`Base44Client`](../interfaces/Base44Client.md)
 
-A configured Base44 client instance with authentication from the request.
-
-## Throws
-
-When Base44-App-Id header is missing.
-
-## Throws
-
-When authorization headers have invalid format.
+A configured Base44 client instance with authentication from the incoming request.
 
 ## Example
 
@@ -50,7 +42,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Use the client to access the API
+    // Use the client to make API calls
 
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

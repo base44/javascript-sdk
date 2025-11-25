@@ -11,10 +11,10 @@ export interface SsoAccessTokenResponse {
  * SSO (Single Sign-On) module for managing SSO authentication.
  *
  * This module provides methods for retrieving SSO access tokens for users.
- * These tokens allow you to authenticate your Base44 users with external
+ * These tokens allow you to authenticate Base44 users with external
  * systems or services.
  *
- * This module is only available with service role authentication.
+ * This module is only available to use with a client in service role authentication mode, which means it can only be used in backend environments.
  *
  * @example
  * ```typescript
@@ -31,16 +31,14 @@ export interface SsoModule {
    * a user with external services or systems.
    *
    * @param userid - The user ID to get the access token for.
-   * @returns Promise resolving to an Axios response containing the access token.
+   * @returns Promise resolving to the SSO access token response.
    *
    * @example
    * ```typescript
    * // Get SSO access token for a user
    * const response = await base44.asServiceRole.sso.getAccessToken('user_123');
-   * console.log(response.data.access_token);
+   * console.log(response.access_token);
    * ```
    */
-  getAccessToken(
-    userid: string
-  ): Promise<AxiosResponse<SsoAccessTokenResponse>>;
+  getAccessToken(userid: string): Promise<SsoAccessTokenResponse>;
 }

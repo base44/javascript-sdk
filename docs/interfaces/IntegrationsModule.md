@@ -16,7 +16,7 @@ pre-built functions that Base44 executes on your behalf.
 Integration endpoints are accessed dynamically using the pattern:
 `base44.integrations.PackageName.EndpointName(params)`
 
-Methods in this module respect the authentication mode used when calling them:
+This module is available to use with a client in both user and service role authentication modes:
 
 - **User authentication** (`base44.integrations`): Integration endpoints are invoked with the
   currently authenticated user's permissions. The endpoints execute with the user's authentication
@@ -52,14 +52,6 @@ const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
 ```
 
 ```typescript
-// Use custom integration package
-const result = await base44.integrations.CustomPackage.CustomEndpoint({
-  param1: 'value1',
-  param2: 'value2'
-});
-```
-
-```typescript
 // Use with service role
 const adminEmail = await client.asServiceRole.integrations.Core.SendEmail({
   to: 'admin@example.com',
@@ -72,20 +64,10 @@ const adminEmail = await client.asServiceRole.integrations.Core.SendEmail({
 
 \[`packageName`: `string`\]: [`IntegrationPackage`](../type-aliases/IntegrationPackage.md)
 
-Access to any custom or installable integration package.
+Access to additional integration packages.
 
-Use this to call endpoints from custom integration packages
-you've installed in your Base44 app.
-
-### Example
-
-```typescript
-// Access custom package dynamically
-await base44.integrations.Slack.PostMessage({
-  channel: '#general',
-  text: 'Hello from Base44'
-});
-```
+Additional integration packages may be added in the future and will be
+accessible using the same pattern as Core.
 
 ## Properties
 
@@ -93,15 +75,21 @@ await base44.integrations.Slack.PostMessage({
 
 > **Core**: [`IntegrationPackage`](../type-aliases/IntegrationPackage.md)
 
-Core package containing built-in Base44 integration endpoints.
+Core package containing built-in Base44 integration functions.
 
-Common endpoints include:
-- `SendEmail` - Send emails
-- `UploadFile` - Upload files
+The core integrations package includes the following functions:
+- `InvokeLLM`: Generate text or structured JSON data using AI models.
+- `GenerateImage`: Create AI-generated images from text prompts.
+- `UploadFile`: Upload files to public storage and get a URL.
+- `SendEmail`: Send emails to users.
+- `ExtractDataFromUploadedFile`: Extract structured data (CSV, PDF, etc.) from uploaded files.
+- `UploadPrivateFile`: Upload files to private storage (requires signed URLs to access).
+- `CreateFileSignedUrl`: Generate temporary access links for private files.
 
 #### Example
 
 ```typescript
+// Send an email
 await base44.integrations.Core.SendEmail({
   to: 'user@example.com',
   subject: 'Welcome',

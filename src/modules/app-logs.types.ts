@@ -37,13 +37,13 @@ export interface GetStatsParams {
 }
 
 /**
- * App Logs module for tracking and analyzing application usage.
+ * App Logs module for tracking and analyzing app usage.
  *
  * This module provides methods to log user activity, fetch logs, and retrieve
- * statistics about your application's usage. Useful for analytics, monitoring,
+ * statistics about the app's usage. Useful for analytics, monitoring,
  * and understanding user behavior.
  *
- * Methods in this module respect the authentication mode used when calling them:
+ * This module is available to use with a client in both user and service role authentication modes:
  *
  * - **User authentication** (`base44.appLogs`): Operations are scoped to the currently
  *   authenticated user. For example, `fetchLogs()` returns only logs for the current user,
@@ -51,7 +51,7 @@ export interface GetStatsParams {
  *
  * - **Service role authentication** (`client.asServiceRole.appLogs`): Operations have
  *   elevated permissions and can access data across all users. For example, `fetchLogs()`
- *   returns logs from all users in your application, and `getStats()` returns application-wide
+ *   returns logs from all users in the app, and `getStats()` returns app-wide
  *   statistics. This is useful for admin dashboards, analytics, and monitoring overall usage patterns.
  *
  * @example
@@ -71,7 +71,7 @@ export interface GetStatsParams {
  *
  * @example
  * ```typescript
- * // Get application statistics
+ * // Get app statistics
  * const stats = await base44.appLogs.getStats({
  *   startDate: '2024-01-01',
  *   endDate: '2024-01-31'
@@ -80,9 +80,9 @@ export interface GetStatsParams {
  */
 export interface AppLogsModule {
   /**
-   * Log user activity in the application.
+   * Log user activity in the app.
    *
-   * Records when a user visits a specific page or section of your application.
+   * Records when a user visits a specific page or section of the app.
    * Useful for tracking user navigation patterns and popular features.
    *
    * @param pageName - Name of the page or section being visited.
@@ -106,10 +106,10 @@ export interface AppLogsModule {
   logUserInApp(pageName: string): Promise<void>;
 
   /**
-   * Fetch application logs with optional filtering.
+   * Fetch app logs with optional filtering.
    *
    * Retrieves logs of user activity with support for filtering, pagination,
-   * and sorting. Use this to analyze user behavior and application usage patterns.
+   * and sorting. Use this to analyze user behavior and app usage patterns.
    *
    * @param params - Query parameters for filtering logs.
    * @returns Promise resolving to the logs data.
@@ -150,9 +150,9 @@ export interface AppLogsModule {
   fetchLogs(params?: FetchLogsParams): Promise<any>;
 
   /**
-   * Gets application usage statistics.
+   * Gets app usage statistics.
    *
-   * Retrieves aggregated statistics about application usage, such as page views,
+   * Retrieves aggregated statistics about app usage, such as page views,
    * active users, and popular features. Useful for dashboards and analytics.
    *
    * @param params - Query parameters for filtering and grouping statistics.

@@ -8,25 +8,23 @@
 
 Creates a Base44 SDK client instance.
 
-This is the main entry point for the Base44 SDK. It creates a client that provides access to the SDK's modules, such as [entities](../interfaces/EntitiesModule.md), [auth](../interfaces/AuthModule.md), and [functions](../interfaces/FunctionsModule.md).
+This is the main entry point for the Base44 SDK. It creates a client that provides access to the SDK's modules, such as [`entities`](../interfaces/EntitiesModule.md), [`auth`](../interfaces/AuthModule.md), and [`functions`](../interfaces/FunctionsModule.md).
 
 The client supports two authentication modes:
 - **User authentication** (default): Access modules with user-level permissions using `base44.moduleName`.
 - **Service role authentication**: Access modules with elevated permissions using `base44.asServiceRole.moduleName`.
 
-Most modules are available in both modes, but with different permission levels. Some modules are only available with service role authentication.
+For example, when using the [`entities`](../interfaces/EntitiesModule.md) module with user authentication you'll only have access to the current user's data. With service role authentication, you'll have access to all data across the entire app.
 
-For example, when using the [entities](../interfaces/EntitiesModule.md) module with user authentication you'll only get data accessible to the current user. With service role authentication, you'll get all data accessible to all users across the entire application.
+Most modules are available in both modes, but with different permission levels. However, some modules are only available in one authentication mode.
 
-To use the service role authentication mode, you need to provide a service role token when creating the client. This token should be kept secret and never exposed in your application's frontend.
-
-<Info> The [auth](../interfaces/AuthModule.md) module is only available with user authentication for security reasons.</Info>
+To use the service role authentication mode, you need to provide a service role token when creating the client. This token should be kept secret and never exposed in the app's frontend.
 
 ## Parameters
 
 ### config
 
-[`CreateClientConfig`](../type-aliases/CreateClientConfig.md)
+[`CreateClientConfig`](../interfaces/CreateClientConfig.md)
 
 Configuration object for the client.
 

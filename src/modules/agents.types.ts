@@ -7,21 +7,21 @@ import { ModelFilterParams } from "../types";
  *
  * Contains details about the agent's reasoning process when generating a response.
  */
-export type AgentMessageReasoning = {
+export interface AgentMessageReasoning {
   /** When reasoning started. */
   start_date: string;
   /** When reasoning ended. */
   end_date?: string;
   /** Reasoning content. */
   content: string;
-};
+}
 
 /**
  * A tool call made by the agent.
  *
  * Represents a function or tool that the agent invoked during message generation.
  */
-export type AgentMessageToolCall = {
+export interface AgentMessageToolCall {
   /** Tool call ID. */
   id: string;
   /** Name of the tool called. */
@@ -32,50 +32,50 @@ export type AgentMessageToolCall = {
   status: "running" | "success" | "error" | "stopped";
   /** Results from the tool call. */
   results?: string | null;
-};
+}
 
 /**
  * Token usage statistics for an agent message.
  *
  * Tracks the number of tokens consumed when generating the message.
  */
-export type AgentMessageUsage = {
+export interface AgentMessageUsage {
   /** Number of tokens in the prompt. */
   prompt_tokens?: number;
   /** Number of tokens in the completion. */
   completion_tokens?: number;
-};
+}
 
 /**
  * Custom context provided with an agent message.
  *
  * Additional contextual information that can be passed to the agent.
  */
-export type AgentMessageCustomContext = {
+export interface AgentMessageCustomContext {
   /** Context message. */
   message: string;
   /** Associated data for the context. */
   data: Record<string, any>;
   /** Type of context. */
   type: string;
-};
+}
 
 /**
  * Metadata about when and by whom a message was created.
  */
-export type AgentMessageMetadata = {
+export interface AgentMessageMetadata {
   /** When the message was created. */
   created_date: string;
   /** Email of the user who created the message. */
   created_by_email: string;
   /** Full name of the user who created the message. */
   created_by_full_name: string | null;
-};
+}
 
 /**
  * An agent conversation containing messages exchanged with an AI agent.
  */
-export type AgentConversation = {
+export interface AgentConversation {
   /** Unique identifier for the conversation. */
   id: string;
   /** Application ID. */
@@ -88,12 +88,12 @@ export type AgentConversation = {
   messages: AgentMessage[];
   /** Optional metadata associated with the conversation. */
   metadata?: Record<string, any>;
-};
+}
 
 /**
  * A message in an agent conversation.
  */
-export type AgentMessage = {
+export interface AgentMessage {
   /** Unique identifier for the message. */
   id: string;
   /** Role of the message sender. */
@@ -120,13 +120,13 @@ export type AgentMessage = {
   metadata?: AgentMessageMetadata;
   /** Additional custom parameters for the message. */
   additional_message_params?: Record<string, any>;
-};
+}
 
 /**
  * Configuration for creating the agents module.
  * @internal
  */
-export type AgentsModuleConfig = {
+export interface AgentsModuleConfig {
   /** Axios instance for HTTP requests */
   axios: AxiosInstance;
   /** WebSocket instance for real-time updates */
@@ -137,16 +137,31 @@ export type AgentsModuleConfig = {
   serverUrl?: string;
   /** Authentication token */
   token?: string;
-};
+}
 
 /**
  * Agents module for managing AI agent conversations.
  *
  * This module provides methods to create and manage conversations with AI agents,
  * send messages, and subscribe to real-time updates. Conversations can be used
- * for chat interfaces, support systems, or any interactive AI application.
+ * for chat interfaces, support systems, or any interactive AI app.
  *
- * Methods in this module respect the authentication mode used when calling them:
+ * The agents module enables you to:
+ *
+ * - **Create conversations** with agents defined in the app.
+ * - **Send messages** from users to agents and receive AI-generated responses.
+ * - **Retrieve conversations** individually or as filtered lists with sorting and pagination.
+ * - **Subscribe to real-time updates** using WebSocket connections to receive instant notifications when new messages arrive.
+ * - **Attach metadata** to conversations for tracking context, categories, priorities, or linking to external systems.
+ * - **Generate WhatsApp connection URLs** for users to interact with agents through WhatsApp.
+ *
+ * The agents module operates with a two-level hierarchy:
+ *
+ * 1. **Conversations** ({@link AgentConversation}): Top-level containers that represent a dialogue with a specific agent. Each conversation has a unique ID, is associated with an agent by name, and belongs to the user who created it. Conversations can include optional metadata for tracking app-specific context like ticket IDs, categories, or custom fields.
+ *
+ * 2. **Messages** ({@link AgentMessage}): Individual exchanges within a conversation. Each message has a role, content, and optional metadata like token usage, tool calls, file attachments, and reasoning information. Messages are stored as an array within their parent conversation.
+ *
+ * This module is available to use with a client in both user and service role authentication modes:
  *
  * - **User authentication** (`base44.agents`): Access only conversations created by the authenticated user.
  * - **Service role authentication** (`client.asServiceRole.agents`): Access all conversations across all users.
@@ -192,6 +207,8 @@ export interface AgentsModule {
   /**
    * Gets all conversations.
    *
+   * Retrieves all conversations. Use {@linkcode listConversations | listConversations()} to filter which conversations are returned, apply sorting, or paginate results. Use {@linkcode getConversation | getConversation()} to retrieve a specific conversation by ID.
+   *
    * @returns Promise resolving to an array of conversations.
    *
    * @example
@@ -199,11 +216,17 @@ export interface AgentsModule {
    * const conversations = await base44.agents.getConversations();
    * console.log(`Total conversations: ${conversations.length}`);
    * ```
+   *
+   * @see {@linkcode listConversations | listConversations()} for filtering, sorting, and pagination
+   * @see {@linkcode getConversation | getConversation()} for retrieving a specific conversation by ID
    */
   getConversations(): Promise<AgentConversation[]>;
 
   /**
    * Gets a specific conversation by ID.
+   *
+   * Retrieves a single conversation using its unique identifier. To retrieve
+   * all conversations, use {@linkcode getConversations | getConversations()} To filter, sort, or paginate conversations, use {@linkcode listConversations | listConversations()}.
    *
    * @param conversationId - The unique identifier of the conversation.
    * @returns Promise resolving to the conversation, or undefined if not found.
@@ -215,13 +238,18 @@ export interface AgentsModule {
    *   console.log(`Conversation has ${conversation.messages.length} messages`);
    * }
    * ```
+   *
+   * @see {@linkcode getConversations | getConversations()} for retrieving all conversations
+   * @see {@linkcode listConversations | listConversations()} for filtering and sorting conversations
    */
   getConversation(
     conversationId: string
   ): Promise<AgentConversation | undefined>;
 
   /**
-   * Lists conversations with filtering and pagination.
+   * Lists conversations with filtering, sorting, and pagination.
+   *
+   * Provides querying capabilities including filtering by fields, sorting, pagination, and field selection. For cases where you need all conversations without filtering, use {@linkcode getConversations | getConversations()}. To retrieve a specific conversation by ID, use {@linkcode getConversation | getConversation()}.
    *
    * @param filterParams - Filter parameters for querying conversations.
    * @returns Promise resolving to an array of filtered conversations.
@@ -233,6 +261,22 @@ export interface AgentsModule {
    *   sort: '-created_date'
    * });
    * ```
+   *
+   * @example
+   * ```typescript
+   * // Filter by agent and metadata
+   * const supportConversations = await base44.agents.listConversations({
+   *   q: {
+   *     agent_name: 'support-agent',
+   *     'metadata.priority': 'high'
+   *   },
+   *   sort: '-created_date',
+   *   limit: 20
+   * });
+   * ```
+   *
+   * @see {@linkcode getConversations | getConversations()} for retrieving all conversations without filtering
+   * @see {@linkcode getConversation | getConversation()} for retrieving a specific conversation by ID
    */
   listConversations(
     filterParams: ModelFilterParams
@@ -274,6 +318,7 @@ export interface AgentsModule {
    *
    * @example
    * ```typescript
+   * // Send a message to the agent
    * const message = await base44.agents.addMessage(conversation, {
    *   role: 'user',
    *   content: 'Hello, I need help with my order #12345'
@@ -299,6 +344,7 @@ export interface AgentsModule {
    *
    * @example
    * ```typescript
+   * // Subscribe to real-time updates
    * const unsubscribe = base44.agents.subscribeToConversation(
    *   'conv-123',
    *   (updatedConversation) => {

@@ -14,7 +14,7 @@ export interface ConnectorAccessTokenResponse {
  * Connectors module for managing OAuth tokens for external services.
  *
  * This module allows you to retrieve OAuth access tokens for external services
- * that your Base44 app has connected to. Use these tokens to make API
+ * that the app has connected to. Use these tokens to make API
  * calls to external services.
  *
  * Unlike the integrations module that provides pre-built functions, connectors give you
@@ -22,7 +22,7 @@ export interface ConnectorAccessTokenResponse {
  * the API calls you make. This is useful when you need custom API interactions that aren't
  * covered by Base44's pre-built integrations.
  *
- * This module is only available with service role authentication.
+ * This module is only available to use with a client in service role authentication mode, which means it can only be used in backend environments.
  *
  * @example
  * ```typescript
@@ -38,7 +38,7 @@ export interface ConnectorsModule {
   /**
    * Retrieves an OAuth access token for a specific external integration type.
    *
-   * Returns the stored OAuth token for an external service that your Base44 app
+   * Returns the stored OAuth token for an external service that the app
    * has connected to. You can then use this token to make authenticated API calls
    * to that external service.
    *

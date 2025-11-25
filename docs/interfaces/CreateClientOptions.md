@@ -2,9 +2,7 @@
 
 ***
 
-# Type Alias: CreateClientOptions
-
-> **CreateClientOptions** = `object`
+# Interface: CreateClientOptions
 
 Options for creating a Base44 client.
 

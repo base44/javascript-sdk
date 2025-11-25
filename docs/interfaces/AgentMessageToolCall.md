@@ -2,9 +2,7 @@
 
 ***
 
-# Type Alias: AgentMessageToolCall
-
-> **AgentMessageToolCall** = `object`
+# Interface: AgentMessageToolCall
 
 A tool call made by the agent.
 
@@ -38,7 +36,7 @@ Arguments passed to the tool as JSON string.
 
 ### status
 
-> **status**: `"running"` \| `"success"` \| `"error"` \| `"stopped"`
+> **status**: `"error"` \| `"running"` \| `"success"` \| `"stopped"`
 
 Status of the tool call.
 

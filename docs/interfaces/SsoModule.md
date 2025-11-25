@@ -7,10 +7,10 @@
 SSO (Single Sign-On) module for managing SSO authentication.
 
 This module provides methods for retrieving SSO access tokens for users.
-These tokens allow you to authenticate your Base44 users with external
+These tokens allow you to authenticate Base44 users with external
 systems or services.
 
-This module is only available with service role authentication.
+This module is only available to use with a client in service role authentication mode, which means it can only be used in backend environments.
 
 ## Example
 
@@ -24,7 +24,7 @@ console.log(response.data.access_token);
 
 ### getAccessToken()
 
-> **getAccessToken**(`userid`): `Promise`\<`AxiosResponse`\<[`SsoAccessTokenResponse`](SsoAccessTokenResponse.md), `any`\>\>
+> **getAccessToken**(`userid`): `Promise`\<[`SsoAccessTokenResponse`](SsoAccessTokenResponse.md)\>
 
 Gets SSO access token for a specific user.
 
@@ -41,14 +41,14 @@ The user ID to get the access token for.
 
 #### Returns
 
-`Promise`\<`AxiosResponse`\<[`SsoAccessTokenResponse`](SsoAccessTokenResponse.md), `any`\>\>
+`Promise`\<[`SsoAccessTokenResponse`](SsoAccessTokenResponse.md)\>
 
-Promise resolving to an Axios response containing the access token.
+Promise resolving to the SSO access token response.
 
 #### Example
 
 ```typescript
 // Get SSO access token for a user
 const response = await base44.asServiceRole.sso.getAccessToken('user_123');
-console.log(response.data.access_token);
+console.log(response.access_token);
 ```

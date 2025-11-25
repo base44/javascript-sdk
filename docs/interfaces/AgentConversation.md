@@ -2,9 +2,7 @@
 
 ***
 
-# Type Alias: AgentConversation
-
-> **AgentConversation** = `object`
+# Interface: AgentConversation
 
 An agent conversation containing messages exchanged with an AI agent.
 

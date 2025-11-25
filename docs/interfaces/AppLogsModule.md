@@ -4,13 +4,13 @@
 
 # Interface: AppLogsModule
 
-App Logs module for tracking and analyzing application usage.
+App Logs module for tracking and analyzing app usage.
 
 This module provides methods to log user activity, fetch logs, and retrieve
-statistics about your application's usage. Useful for analytics, monitoring,
+statistics about the app's usage. Useful for analytics, monitoring,
 and understanding user behavior.
 
-Methods in this module respect the authentication mode used when calling them:
+This module is available to use with a client in both user and service role authentication modes:
 
 - **User authentication** (`base44.appLogs`): Operations are scoped to the currently
   authenticated user. For example, `fetchLogs()` returns only logs for the current user,
@@ -18,7 +18,7 @@ Methods in this module respect the authentication mode used when calling them:
 
 - **Service role authentication** (`client.asServiceRole.appLogs`): Operations have
   elevated permissions and can access data across all users. For example, `fetchLogs()`
-  returns logs from all users in your application, and `getStats()` returns application-wide
+  returns logs from all users in the app, and `getStats()` returns app-wide
   statistics. This is useful for admin dashboards, analytics, and monitoring overall usage patterns.
 
 ## Examples
@@ -37,7 +37,7 @@ const logs = await base44.appLogs.fetchLogs({
 ```
 
 ```typescript
-// Get application statistics
+// Get app statistics
 const stats = await base44.appLogs.getStats({
   startDate: '2024-01-01',
   endDate: '2024-01-31'
@@ -50,9 +50,9 @@ const stats = await base44.appLogs.getStats({
 
 > **logUserInApp**(`pageName`): `Promise`\<`void`\>
 
-Log user activity in the application.
+Log user activity in the app.
 
-Records when a user visits a specific page or section of your application.
+Records when a user visits a specific page or section of the app.
 Useful for tracking user navigation patterns and popular features.
 
 #### Parameters
@@ -90,10 +90,10 @@ await base44.appLogs.logUserInApp('product-details');
 
 > **fetchLogs**(`params?`): `Promise`\<`any`\>
 
-Fetch application logs with optional filtering.
+Fetch app logs with optional filtering.
 
 Retrieves logs of user activity with support for filtering, pagination,
-and sorting. Use this to analyze user behavior and application usage patterns.
+and sorting. Use this to analyze user behavior and app usage patterns.
 
 #### Parameters
 
@@ -146,9 +146,9 @@ const periodLogs = await base44.appLogs.fetchLogs({
 
 > **getStats**(`params?`): `Promise`\<`any`\>
 
-Gets application usage statistics.
+Gets app usage statistics.
 
-Retrieves aggregated statistics about application usage, such as page views,
+Retrieves aggregated statistics about app usage, such as page views,
 active users, and popular features. Useful for dashboards and analytics.
 
 #### Parameters

@@ -4,7 +4,7 @@
 
 # Interface: GetLoginUrlOptions
 
-Configuration options for constructing a login URL
+Configuration options for constructing a login URL.
 
 ## Example
 
@@ -29,7 +29,7 @@ const loginUrl = getLoginUrl('/dashboard', {
 
 > **serverUrl**: `string`
 
-The base server URL (e.g., 'https://base44.app')
+The base server URL (e.g., 'https://base44.app').
 
 ***
 
@@ -37,7 +37,7 @@ The base server URL (e.g., 'https://base44.app')
 
 > **appId**: `string`
 
-The application ID
+The app ID.
 
 ***
 
@@ -45,7 +45,7 @@ The application ID
 
 > `optional` **loginPath**: `string`
 
-The path to the login endpoint
+The path to the login endpoint.
 
 #### Default
 

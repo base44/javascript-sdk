@@ -1,7 +1,7 @@
 /**
  * Entity handler providing CRUD operations for a specific entity type.
  *
- * Each entity in your Base44 app gets a handler with these methods for managing data.
+ * Each entity in the app gets a handler with these methods for managing data.
  */
 export interface EntityHandler {
   /**
@@ -30,7 +30,8 @@ export interface EntityHandler {
    *
    * @example
    * ```typescript
-   * // Get paginated results: skip first 20, get next 10
+   * // Get paginated results
+   * // Skip first 20, get next 10
    * const page3 = await base44.entities.MyEntity.list('-created_date', 10, 20);
    * ```
    *
@@ -53,7 +54,7 @@ export interface EntityHandler {
    * Retrieves records that match specific criteria with support for
    * sorting, pagination, and field selection.
    *
-   * @param query - Filter query object with field-value pairs. Each key should be a field name
+   * @param query - Query object with field-value pairs. Each key should be a field name
    * from your entity schema, and each value is the criteria to match. Records matching all
    * specified criteria are returned. Field names are case-sensitive.
    * @param sort - Sort parameter, such as `'-created_date'` for descending.
@@ -120,6 +121,7 @@ export interface EntityHandler {
    *
    * @example
    * ```typescript
+   * // Get record by ID
    * const record = await base44.entities.MyEntity.get('entity-123');
    * console.log(record.name);
    * ```
@@ -136,6 +138,7 @@ export interface EntityHandler {
    *
    * @example
    * ```typescript
+   * // Create a new record
    * const newRecord = await base44.entities.MyEntity.create({
    *   name: 'My Item',
    *   status: 'active',
@@ -182,53 +185,38 @@ export interface EntityHandler {
    * Permanently removes a record from the database.
    *
    * @param id - The unique identifier of the record to delete.
-   * @returns Promise that resolves when the record is deleted.
+   * @returns Promise resolving to the deletion result.
    *
    * @example
    * ```typescript
-   * await base44.entities.MyEntity.delete('entity-123');
-   * console.log('Record deleted');
+   * // Delete a record
+   * const result = await base44.entities.MyEntity.delete('entity-123');
+   * console.log('Deleted:', result);
    * ```
    */
-  delete(id: string): Promise<void>;
+  delete(id: string): Promise<any>;
 
   /**
    * Deletes multiple records matching a query.
    *
    * Permanently removes all records that match the provided query.
-   * Use with caution as this operation cannot be undone.
    *
-   * @param query - Filter query object with field-value pairs. Each key should be a field name
+   * @param query - Query object with field-value pairs. Each key should be a field name
    * from your entity schema, and each value is the criteria to match. Records matching all
    * specified criteria will be deleted. Field names are case-sensitive.
-   * @returns Promise that resolves when the records are deleted.
-   *
-   * @example
-   * ```typescript
-   * // Delete all completed records
-   * await base44.entities.MyEntity.deleteMany({
-   *   status: 'completed'
-   * });
-   * ```
-   *
-   * @example
-   * ```typescript
-   * // Delete all low priority items
-   * await base44.entities.MyEntity.deleteMany({
-   *   priority: 'low'
-   * });
-   * ```
+   * @returns Promise resolving to the deletion result.
    *
    * @example
    * ```typescript
    * // Delete by multiple criteria
-   * await base44.entities.MyEntity.deleteMany({
+   * const result = await base44.entities.MyEntity.deleteMany({
    *   status: 'completed',
    *   priority: 'low'
    * });
+   * console.log('Deleted:', result);
    * ```
    */
-  deleteMany(query: Record<string, any>): Promise<void>;
+  deleteMany(query: Record<string, any>): Promise<any>;
 
   /**
    * Creates multiple records in a single request.
@@ -241,12 +229,12 @@ export interface EntityHandler {
    *
    * @example
    * ```typescript
-   * const newRecords = await base44.entities.MyEntity.bulkCreate([
+   * // Create multiple records at once
+   * const result = await base44.entities.MyEntity.bulkCreate([
    *   { name: 'Item 1', status: 'active' },
    *   { name: 'Item 2', status: 'active' },
    *   { name: 'Item 3', status: 'completed' }
    * ]);
-   * console.log(`Created ${newRecords.length} records`);
    * ```
    */
   bulkCreate(data: Record<string, any>[]): Promise<any>;
@@ -276,15 +264,15 @@ export interface EntityHandler {
 }
 
 /**
- * Entities module for managing application data.
+ * Entities module for managing app data.
  *
- * This module provides dynamic access to all entities in your Base44 app.
+ * This module provides dynamic access to all entities in the app.
  * Each entity gets a handler with full CRUD operations and additional utility methods.
  *
  * Entities are accessed dynamically using the pattern:
  * `base44.entities.EntityName.method()`
  *
- * Methods in this module respect the authentication mode used when calling them:
+ * This module is available to use with a client in both user and service role authentication modes:
  *
  * - **User authentication** (`base44.entities`): Operations are scoped to the currently
  *   authenticated user's permissions. Access is limited to entities the user has permission to view or modify.
@@ -351,7 +339,7 @@ export interface EntitiesModule {
   /**
    * Access any entity by name.
    *
-   * Use this to access entities defined in your Base44 app.
+   * Use this to access entities defined in the app.
    *
    * @example
    * ```typescript

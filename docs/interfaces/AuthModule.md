@@ -14,6 +14,8 @@ This module provides comprehensive authentication functionality including:
 - OTP verification
 - User invitations
 
+The auth module is only available in user authentication mode (`base44.auth`).
+
 ## Examples
 
 ```typescript
@@ -61,6 +63,7 @@ Promise resolving to the user's profile data.
 #### Example
 
 ```typescript
+// Get current user information
 const user = await base44.auth.me();
 console.log(`Logged in as: ${user.email}`);
 console.log(`User ID: ${user.id}`);
@@ -74,8 +77,8 @@ console.log(`User ID: ${user.id}`);
 
 Updates the current authenticated user's information.
 
-Performs a partial update - only include the fields you want to change.
-Commonly updated fields include name, avatar_url, and custom profile fields.
+Only the fields included in the data object will be updated.
+Commonly updated fields include `name`, `avatar_url`, and custom profile fields.
 
 #### Parameters
 
@@ -83,7 +86,7 @@ Commonly updated fields include name, avatar_url, and custom profile fields.
 
 `Partial`\<`Omit`\<[`User`](User.md), ... \| ... \| ...\>\>
 
-Object containing the fields to update. Only the provided fields will be changed.
+Object containing the fields to update.
 
 #### Returns
 
@@ -308,6 +311,7 @@ Promise resolving to true if authenticated, false otherwise.
 #### Example
 
 ```typescript
+// Check authentication status
 const isAuthenticated = await base44.auth.isAuthenticated();
 if (isAuthenticated) {
   console.log('User is logged in');
@@ -323,10 +327,10 @@ if (isAuthenticated) {
 
 > **inviteUser**(`userEmail`, `role`): `Promise`\<`any`\>
 
-Invites a user to the application.
+Invites a user to the app.
 
 Sends an invitation email to a potential user with a specific role.
-Roles are configured in your Base44 application settings and determine
+Roles are configured in the app settings and determine
 the user's permissions and access levels.
 
 #### Parameters
@@ -341,7 +345,7 @@ Email address of the user to invite.
 
 `string`
 
-Role to assign to the invited user. Must match a role defined in your Base44 application. For example, `'admin'`, `'editor'`, `'viewer'`, or `'member'`.
+Role to assign to the invited user. Must match a role defined in the app. For example, `'admin'`, `'editor'`, `'viewer'`, or `'member'`.
 
 #### Returns
 
@@ -368,7 +372,8 @@ try {
 
 Registers a new user account.
 
-Creates a new user account with email and password.
+Creates a new user account with email and password. After successful registration,
+use [`loginViaEmailPassword()`](#loginviaemailpassword) to log in the user.
 
 #### Parameters
 
@@ -387,12 +392,18 @@ Promise resolving to the registration response.
 #### Example
 
 ```typescript
+// Register a new user
 await base44.auth.register({
   email: 'newuser@example.com',
   password: 'securePassword123',
   referral_code: 'FRIEND2024'
 });
-console.log('Registration successful! Please check your email.');
+
+// Login after registration
+const { access_token, user } = await base44.auth.loginViaEmailPassword(
+  'newuser@example.com',
+  'securePassword123'
+);
 ```
 
 ***

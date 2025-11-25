@@ -10,7 +10,16 @@
 
 ## Interfaces
 
+- [CreateClientOptions](interfaces/CreateClientOptions.md)
+- [CreateClientConfig](interfaces/CreateClientConfig.md)
 - [Base44Client](interfaces/Base44Client.md)
+- [AgentMessageReasoning](interfaces/AgentMessageReasoning.md)
+- [AgentMessageToolCall](interfaces/AgentMessageToolCall.md)
+- [AgentMessageUsage](interfaces/AgentMessageUsage.md)
+- [AgentMessageCustomContext](interfaces/AgentMessageCustomContext.md)
+- [AgentMessageMetadata](interfaces/AgentMessageMetadata.md)
+- [AgentConversation](interfaces/AgentConversation.md)
+- [AgentMessage](interfaces/AgentMessage.md)
 - [AgentsModule](interfaces/AgentsModule.md)
 - [FetchLogsParams](interfaces/FetchLogsParams.md)
 - [GetStatsParams](interfaces/GetStatsParams.md)
@@ -30,6 +39,7 @@
 - [IntegrationsModule](interfaces/IntegrationsModule.md)
 - [SsoAccessTokenResponse](interfaces/SsoAccessTokenResponse.md)
 - [SsoModule](interfaces/SsoModule.md)
+- [ModelFilterParams](interfaces/ModelFilterParams.md)
 - [GetAccessTokenOptions](interfaces/GetAccessTokenOptions.md)
 - [SaveAccessTokenOptions](interfaces/SaveAccessTokenOptions.md)
 - [RemoveAccessTokenOptions](interfaces/RemoveAccessTokenOptions.md)
@@ -38,19 +48,9 @@
 
 ## Type Aliases
 
-- [CreateClientOptions](type-aliases/CreateClientOptions.md)
-- [CreateClientConfig](type-aliases/CreateClientConfig.md)
-- [AgentMessageReasoning](type-aliases/AgentMessageReasoning.md)
-- [AgentMessageToolCall](type-aliases/AgentMessageToolCall.md)
-- [AgentMessageUsage](type-aliases/AgentMessageUsage.md)
-- [AgentMessageCustomContext](type-aliases/AgentMessageCustomContext.md)
-- [AgentMessageMetadata](type-aliases/AgentMessageMetadata.md)
-- [AgentConversation](type-aliases/AgentConversation.md)
-- [AgentMessage](type-aliases/AgentMessage.md)
 - [ConnectorIntegrationType](type-aliases/ConnectorIntegrationType.md)
 - [IntegrationEndpointFunction](type-aliases/IntegrationEndpointFunction.md)
 - [IntegrationPackage](type-aliases/IntegrationPackage.md)
-- [ModelFilterParams](type-aliases/ModelFilterParams.md)
 
 ## Functions
 

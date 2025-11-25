@@ -4,15 +4,15 @@
 
 # Interface: EntitiesModule
 
-Entities module for managing application data.
+Entities module for managing app data.
 
-This module provides dynamic access to all entities in your Base44 app.
+This module provides dynamic access to all entities in the app.
 Each entity gets a handler with full CRUD operations and additional utility methods.
 
 Entities are accessed dynamically using the pattern:
 `base44.entities.EntityName.method()`
 
-Methods in this module respect the authentication mode used when calling them:
+This module is available to use with a client in both user and service role authentication modes:
 
 - **User authentication** (`base44.entities`): Operations are scoped to the currently
   authenticated user's permissions. Access is limited to entities the user has permission to view or modify.
@@ -75,7 +75,7 @@ await base44.entities.MyEntity.deleteMany({ status: 'completed' });
 
 Access any entity by name.
 
-Use this to access entities defined in your Base44 app.
+Use this to access entities defined in the app.
 
 ### Example
 

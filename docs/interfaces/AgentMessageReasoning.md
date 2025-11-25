@@ -2,9 +2,7 @@
 
 ***
 
-# Type Alias: AgentMessageReasoning
-
-> **AgentMessageReasoning** = `object`
+# Interface: AgentMessageReasoning
 
 Reasoning information for an agent message.
 

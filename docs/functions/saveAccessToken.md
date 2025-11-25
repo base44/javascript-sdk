@@ -28,7 +28,7 @@ Configuration options for saving the token.
 
 `boolean`
 
-`true` if the token was saved successfully, `false` otherwise.
+Returns`true` if the token was saved successfully, `false` otherwise.
 
 ## Examples
 

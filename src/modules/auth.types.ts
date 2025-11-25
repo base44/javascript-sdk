@@ -17,7 +17,7 @@ export interface User {
   /** URL to user's profile picture. */
   avatar_url?: string;
   /**
-   * User's role in the application. Roles are configured in your Base44 application settings and determine the user's permissions and access levels.
+   * User's role in the app. Roles are configured in the app settings and determine the user's permissions and access levels.
    */
   role?: string;
   /** Timestamp when the user was created. */
@@ -25,7 +25,7 @@ export interface User {
   /** Timestamp when the user was last updated. */
   updated_at?: string;
   /**
-   * Additional custom fields defined in your user schema. Any custom properties you've added to your user schema in your Base44 application will be available here with their configured types and values.
+   * Additional custom fields defined in the user schema. Any custom properties added to the user schema in the app will be available here with their configured types and values.
    */
   [key: string]: any;
 }
@@ -107,6 +107,8 @@ export interface AuthModuleOptions {
  * - OTP verification
  * - User invitations
  *
+ * The auth module is only available in user authentication mode (`base44.auth`).
+ *
  * @example
  * ```typescript
  * // Login with email and password
@@ -148,6 +150,7 @@ export interface AuthModule {
    *
    * @example
    * ```typescript
+   * // Get current user information
    * const user = await base44.auth.me();
    * console.log(`Logged in as: ${user.email}`);
    * console.log(`User ID: ${user.id}`);
@@ -158,10 +161,10 @@ export interface AuthModule {
   /**
    * Updates the current authenticated user's information.
    *
-   * Performs a partial update - only include the fields you want to change.
-   * Commonly updated fields include name, avatar_url, and custom profile fields.
+   * Only the fields included in the data object will be updated.
+   * Commonly updated fields include `name`, `avatar_url`, and custom profile fields.
    *
-   * @param data - Object containing the fields to update. Only the provided fields will be changed.
+   * @param data - Object containing the fields to update.
    * @returns Promise resolving to the updated user data.
    *
    * @example
@@ -306,6 +309,7 @@ export interface AuthModule {
    *
    * @example
    * ```typescript
+   * // Check authentication status
    * const isAuthenticated = await base44.auth.isAuthenticated();
    * if (isAuthenticated) {
    *   console.log('User is logged in');
@@ -318,14 +322,14 @@ export interface AuthModule {
   isAuthenticated(): Promise<boolean>;
 
   /**
-   * Invites a user to the application.
+   * Invites a user to the app.
    *
    * Sends an invitation email to a potential user with a specific role.
-   * Roles are configured in your Base44 application settings and determine
+   * Roles are configured in the app settings and determine
    * the user's permissions and access levels.
    *
    * @param userEmail - Email address of the user to invite.
-   * @param role - Role to assign to the invited user. Must match a role defined in your Base44 application. For example, `'admin'`, `'editor'`, `'viewer'`, or `'member'`.
+   * @param role - Role to assign to the invited user. Must match a role defined in the app. For example, `'admin'`, `'editor'`, `'viewer'`, or `'member'`.
    * @returns Promise that resolves when the invitation is sent successfully. Throws an error if the invitation fails.
    *
    * @example
@@ -343,19 +347,26 @@ export interface AuthModule {
   /**
    * Registers a new user account.
    *
-   * Creates a new user account with email and password.
+   * Creates a new user account with email and password. After successful registration,
+   * use {@linkcode loginViaEmailPassword | loginViaEmailPassword()} to log in the user.
    *
    * @param payload - Registration details including email, password, and optional fields.
    * @returns Promise resolving to the registration response.
    *
    * @example
    * ```typescript
+   * // Register a new user
    * await base44.auth.register({
    *   email: 'newuser@example.com',
    *   password: 'securePassword123',
    *   referral_code: 'FRIEND2024'
    * });
-   * console.log('Registration successful! Please check your email.');
+   *
+   * // Login after registration
+   * const { access_token, user } = await base44.auth.loginViaEmailPassword(
+   *   'newuser@example.com',
+   *   'securePassword123'
+   * );
    * ```
    */
   register(payload: RegisterPayload): Promise<any>;
