@@ -43,16 +43,10 @@ export interface GetStatsParams {
  * statistics about the app's usage. Useful for analytics, monitoring,
  * and understanding user behavior.
  *
- * This module is available to use with a client in both user and service role authentication modes:
+ * This module is available to use with a client in all authentication modes:
  *
- * - **User authentication** (`base44.appLogs`): Operations are scoped to the currently
- *   authenticated user. For example, `fetchLogs()` returns only logs for the current user,
- *   and `getStats()` returns statistics about that user's activity.
- *
- * - **Service role authentication** (`client.asServiceRole.appLogs`): Operations have
- *   elevated permissions and can access data across all users. For example, `fetchLogs()`
- *   returns logs from all users in the app, and `getStats()` returns app-wide
- *   statistics. This is useful for admin dashboards, analytics, and monitoring overall usage patterns.
+ * - **Anonymous or User authentication** (`base44.appLogs`): Access is scoped to the current user's permissions. Anonymous users can create logs but cannot retrieve them, while authenticated users can create logs and retrieve only their own logs and statistics.
+ * - **Service role authentication** (`base44.asServiceRole.appLogs`): Operations have elevated admin-level permissions. Can access all logs and statistics that the app's admin role has access to. This is useful for admin dashboards, analytics, and monitoring overall usage patterns.
  *
  * @example
  * ```typescript

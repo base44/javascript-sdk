@@ -3,13 +3,10 @@
  *
  * This module allows you to invoke the custom backend functions defined in the app.
  *
- * This module is available to use with a client in both user and service role authentication modes:
+ * This module is available to use with a client in all authentication modes:
  *
- * - **User authentication** (`base44.functions`): Functions are invoked with the currently
- *   authenticated user's permissions. The function code receives a request with the user's authentication context and can only access data the user has permission to access.
- *
- * - **Service role authentication** (`client.asServiceRole.functions`): Functions are invoked
- *   with elevated permissions. The function code receives a request with the service role authentication context and can access data across all users.
+ * - **Anonymous or User authentication** (`base44.functions`): Functions are invoked with the current user's permissions. Anonymous users invoke functions without authentication, while authenticated users invoke functions with their authentication context.
+ * - **Service role authentication** (`base44.asServiceRole.functions`): Functions are invoked with elevated admin-level permissions. The function code receives a request with admin authentication context.
  *
  * @example
  * ```typescript
@@ -24,7 +21,7 @@
  * @example
  * ```typescript
  * // Invoke with service role
- * const adminResult = await client.asServiceRole.functions.invoke('adminTask', {
+ * const adminResult = await base44.asServiceRole.functions.invoke('adminTask', {
  *   action: 'cleanup'
  * });
  * ```

@@ -272,67 +272,16 @@ export interface EntityHandler {
  * Entities are accessed dynamically using the pattern:
  * `base44.entities.EntityName.method()`
  *
- * This module is available to use with a client in both user and service role authentication modes:
+ * This module is available to use with a client in all three authentication modes:
  *
- * - **User authentication** (`base44.entities`): Operations are scoped to the currently
- *   authenticated user's permissions. Access is limited to entities the user has permission to view or modify.
- *
- * - **Service role authentication** (`client.asServiceRole.entities`): Operations have
- *   elevated permissions and can access entities across all users. This is useful for admin
- *   operations or workflows that need to operate on data regardless of user permissions.
+ * - **Anonymous or User authentication** (`base44.entities`): Access is scoped to the current user's permissions. Anonymous users can only access public entities, while authenticated users can access entities they have permission to view or modify.
+ * - **Service role authentication** (`base44.asServiceRole.entities`): Operations have elevated admin-level permissions. Can access all entities that the app's admin role has access to.
  *
  * @example
  * ```typescript
- * // List all records
- * const records = await base44.entities.MyEntity.list();
- * ```
- *
- * @example
- * ```typescript
- * // Filter records by field
- * const activeRecords = await base44.entities.MyEntity.filter({ status: 'active' });
- * ```
- *
- * @example
- * ```typescript
- * // Get specific record by ID
- * const record = await base44.entities.MyEntity.get('entity-123');
- * ```
- *
- * @example
- * ```typescript
- * // Create new record
- * const newRecord = await base44.entities.MyEntity.create({
- *   name: 'My Item',
- *   status: 'active'
- * });
- * ```
- *
- * @example
- * ```typescript
- * // Update record
- * await base44.entities.MyEntity.update('entity-123', { status: 'completed' });
- * ```
- *
- * @example
- * ```typescript
- * // Delete record
- * await base44.entities.MyEntity.delete('entity-123');
- * ```
- *
- * @example
- * ```typescript
- * // Bulk operations
- * await base44.entities.MyEntity.bulkCreate([
- *   { name: 'Item 1' },
- *   { name: 'Item 2' }
- * ]);
- * ```
- *
- * @example
- * ```typescript
- * // Delete many
- * await base44.entities.MyEntity.deleteMany({ status: 'completed' });
+ * // Get all records from the MyEntity entity
+ * // Get all records the current user has permissions to view
+ * const myRecords = await base44.entities.MyEntity.list();
  * ```
  */
 export interface EntitiesModule {

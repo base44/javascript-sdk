@@ -11,6 +11,8 @@ import {
  * Low-level utility for manually retrieving tokens. In most cases, the Base44 client handles
  * token management automatically. This function is useful for custom authentication flows or when you need direct access to stored tokens. Requires a browser environment and cannot be used in the backend.
  *
+ * @internal
+ *
  * @param options - Configuration options for token retrieval.
  * @returns The access token string if found, null otherwise.
  *
@@ -96,6 +98,8 @@ export function getAccessToken(options: GetAccessTokenOptions = {}) {
  *
  * Low-level utility for manually saving tokens. In most cases, the Base44 client handles token management automatically. This function is useful for custom authentication flows or managing custom tokens. Requires a browser environment and cannot be used in the backend.
  *
+ * @internal
+ *
  * @param token - The access token string to save.
  * @param options - Configuration options for saving the token.
  * @returns Returns`true` if the token was saved successfully, `false` otherwise.
@@ -145,6 +149,8 @@ export function saveAccessToken(
  *
  * Low-level utility for manually removing tokens from the browser's local storage. In most cases, the Base44 client handles token management automatically. For standard logout flows, use {@linkcode AuthModule.logout | base44.auth.logout()} instead, which handles token removal and redirects automatically. This function is useful for custom authentication flows or when you need to manually remove tokens. Requires a browser environment and cannot be used in the backend.
  *
+ * @internal
+ *
  * @param options - Configuration options for token removal.
  * @returns Returns `true` if the token was removed successfully, `false` otherwise.
  *
@@ -182,6 +188,8 @@ export function removeAccessToken(options: RemoveAccessTokenOptions) {
  * Constructs the absolute URL for the login page with a redirect parameter.
  *
  * Low-level utility for building login URLs. For standard login redirects, use {@linkcode AuthModule.redirectToLogin | base44.auth.redirectToLogin()} instead, which handles this automatically. This function is useful when you need to construct login URLs without a client instance or for custom authentication flows.
+ *
+ * @internal
  *
  * @param nextUrl - The URL to redirect to after successful login.
  * @param options - Configuration options.

@@ -44,16 +44,10 @@ export type IntegrationPackage = {
  * Integration endpoints are accessed dynamically using the pattern:
  * `base44.integrations.PackageName.EndpointName(params)`
  *
- * This module is available to use with a client in both user and service role authentication modes:
+ * This module is available to use with a client in all authentication modes:
  *
- * - **User authentication** (`base44.integrations`): Integration endpoints are invoked with the
- *   currently authenticated user's permissions. The endpoints execute with the user's authentication
- *   context and can only access data the user has permission to access.
- *
- * - **Service role authentication** (`client.asServiceRole.integrations`): Integration endpoints
- *   are invoked with elevated permissions. The endpoints execute with service role authentication
- *   and can access data across all users. This is useful for admin operations or workflows that
- *   need to operate regardless of user permissions.
+ * - **Anonymous or User authentication** (`base44.integrations`): Integration endpoints are invoked with the current user's permissions. Anonymous users invoke endpoints without authentication, while authenticated users invoke endpoints with their authentication context.
+ * - **Service role authentication** (`base44.asServiceRole.integrations`): Integration endpoints are invoked with elevated admin-level permissions. The endpoints execute with admin authentication context.
  *
  * @example
  * ```typescript
@@ -82,7 +76,7 @@ export type IntegrationPackage = {
  * @example
  * ```typescript
  * // Use with service role
- * const adminEmail = await client.asServiceRole.integrations.Core.SendEmail({
+ * const adminEmail = await base44.asServiceRole.integrations.Core.SendEmail({
  *   to: 'admin@example.com',
  *   subject: 'Admin notification',
  *   body: 'System alert'

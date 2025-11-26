@@ -19,64 +19,25 @@ import type {
 export type { Base44Client, CreateClientConfig, CreateClientOptions };
 
 /**
- * Creates a Base44 SDK client instance.
+ * Creates a Base44 client.
  *
  * This is the main entry point for the Base44 SDK. It creates a client that provides access to the SDK's modules, such as {@linkcode EntitiesModule | entities}, {@linkcode AuthModule | auth}, and {@linkcode FunctionsModule | functions}.
  *
- * The client supports two authentication modes:
- * - **User authentication** (default): Access modules with user-level permissions using `base44.moduleName`.
- * - **Service role authentication**: Access modules with elevated permissions using `base44.asServiceRole.moduleName`.
+ * Typically, you don't need to call this function directly. Base44 creates the client for you, which you can import and use to make API calls. The client takes care of managing authentication for you.
  *
- * For example, when using the {@linkcode EntitiesModule | entities} module with user authentication you'll only have access to the current user's data. With service role authentication, you'll have access to all data across the entire app.
+ * The client supports three authentication modes:
+ * - **Anonymous**: Access modules anonymously without authentication using `base44.moduleName`. Operations are scoped to public data and permissions.
+ * - **User authentication**: Access modules with user-level permissions using `base44.moduleName`. Operations are scoped to the authenticated user's data and permissions.
+ * - **Service role authentication**: Access modules with elevated permissions using `base44.asServiceRole.moduleName`. Operations can access data across all users.
  *
- * Most modules are available in both modes, but with different permission levels. However, some modules are only available in one authentication mode.
+ * <Info> Typically, you create a client with service role authentication using the {@linkcode createClientFromRequest | createClientFromRequest()} function in your backend functions.</Info>
  *
- * To use the service role authentication mode, you need to provide a service role token when creating the client. This token should be kept secret and never exposed in the app's frontend.
+ * For example, when using the {@linkcode EntitiesModule | entities} module anonymously you can only read public data. With user authentication, you'll have access to the current user's data. With service role authentication, you'll have access to all data that admins can access.
+ *
+ * Most modules are available in all three modes, but with different permission levels. However, some modules are only available in specific authentication modes.
  *
  * @param config - Configuration object for the client.
  * @returns A configured Base44 client instance with access to all SDK modules.
- *
- * @example
- * ```typescript
- * // Basic client setup
- * import { createClient } from '@base44/client-sdk';
- *
- * const base44 = createClient({
- *   appId: 'my-app-id'
- * });
- *
- * // Use client modules
- * const products = await base44.entities.Products.list();
- * const user = await base44.auth.me();
- * ```
- *
- * @example
- * ```typescript
- * // Client with service role access
- * const base44 = createClient({
- *   appId: 'my-app-id',
- *   token: 'user-token',
- *   serviceToken: 'service-role-token'
- * });
- *
- * // Access service-role-only modules
- * const ssoToken = await base44.asServiceRole.sso.getAccessToken('user-123');
- * const oauthToken = await base44.asServiceRole.connectors.getAccessToken('google');
- * ```
- *
- * @example
- * ```typescript
- * // Client with error handling
- * const base44 = createClient({
- *   appId: 'my-app-id',
- *   options: {
- *     onError: (error) => {
- *       console.error('API Error:', error);
- *       Sentry.captureException(error);
- *     }
- *   }
- * });
- * ```
  */
 export function createClient(config: CreateClientConfig): Base44Client {
   const {
@@ -282,18 +243,17 @@ export function createClient(config: CreateClientConfig): Base44Client {
 /**
  * Creates a Base44 client from an HTTP request.
  *
- * Creates a client by automatically extracting authentication tokens and configuration from an incoming HTTP request with authentication information in its headers. Use this function in backend environments, such as when building backend functions. Base44 inserts the necessary headers when forwarding requests from the app's frontend to the backend functions.
+ * Creates a client by automatically extracting authentication tokens from a request to a backend function. Base44 inserts the necessary headers when forwarding requests to backend functions.
+ *
+ * To learn more about the Base44 client, see {@linkcode createClient | createClient()}.
  *
  * @param request - The incoming HTTP request object containing Base44 authentication headers.
  * @returns A configured Base44 client instance with authentication from the incoming request.
  *
  * @example
  * ```typescript
- * // Frontend call to a backend function
- * const response = await base44.functions.invoke('myBackendFunction', {});
- *
- * // Backend function that receives the call
- * import { createClientFromRequest } from '@base44/client-sdk';
+ * // User authentication in backend function
+ * import { createClientFromRequest } from 'npm:@base44/sdk';
  *
  * Deno.serve(async (req) => {
  *   try {
@@ -304,8 +264,28 @@ export function createClient(config: CreateClientConfig): Base44Client {
  *       return Response.json({ error: 'Unauthorized' }, { status: 401 });
  *     }
  *
- *     // Use the client to make API calls
+ *     // Access user's data
+ *     const userOrders = await base44.entities.Orders.filter({ userId: user.id });
+ *     return Response.json({ orders: userOrders });
+ *   } catch (error) {
+ *     return Response.json({ error: error.message }, { status: 500 });
+ *   }
+ * });
+ * ```
  *
+ * @example
+ * ```typescript
+ * // Service role authentication in backend function
+ * import { createClientFromRequest } from 'npm:@base44/sdk';
+ *
+ * Deno.serve(async (req) => {
+ *   try {
+ *     const base44 = createClientFromRequest(req);
+ *
+ *     // Access admin data with service role permissions
+ *     const recentOrders = await base44.asServiceRole.entities.Orders.list('-created_at', 50);
+ *
+ *     return Response.json({ orders: recentOrders });
  *   } catch (error) {
  *     return Response.json({ error: error.message }, { status: 500 });
  *   }

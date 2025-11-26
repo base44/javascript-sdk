@@ -1,6 +1,8 @@
 /**
  * Configuration options for retrieving an access token.
  *
+ * @internal
+ *
  * @example
  * ```typescript
  * // Get access token from URL or local storage using default options
@@ -51,6 +53,8 @@ export interface GetAccessTokenOptions {
 /**
  * Configuration options for saving an access token.
  *
+ * @internal
+ *
  * @example
  * ```typescript
  * // Use default storage key
@@ -71,6 +75,8 @@ export interface SaveAccessTokenOptions {
 /**
  * Configuration options for removing an access token.
  *
+ * @internal
+ *
  * @example
  * ```typescript
  * // Remove token from default storage key
@@ -90,6 +96,8 @@ export interface RemoveAccessTokenOptions {
 
 /**
  * Configuration options for constructing a login URL.
+ *
+ * @internal
  *
  * @example
  * ```typescript
@@ -125,23 +133,35 @@ export interface GetLoginUrlOptions {
   loginPath?: string;
 }
 
-/** Type definition for getAccessToken function. */
+/**
+ * Type definition for getAccessToken function.
+ * @internal
+ */
 export type GetAccessTokenFunction = (
   options?: GetAccessTokenOptions
 ) => string | null;
 
-/** Type definition for saveAccessToken function. */
+/**
+ * Type definition for saveAccessToken function.
+ * @internal
+ */
 export type SaveAccessTokenFunction = (
   token: string,
   options: SaveAccessTokenOptions
 ) => boolean;
 
-/** Type definition for removeAccessToken function. */
+/**
+ * Type definition for removeAccessToken function.
+ * @internal
+ */
 export type RemoveAccessTokenFunction = (
   options: RemoveAccessTokenOptions
 ) => boolean;
 
-/** Type definition for getLoginUrl function. */
+/**
+ * Type definition for getLoginUrl function.
+ * @internal
+ */
 export type GetLoginUrlFunction = (
   nextUrl: string,
   options: GetLoginUrlOptions

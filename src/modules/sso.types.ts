@@ -2,6 +2,7 @@ import { AxiosResponse } from "axios";
 
 /**
  * Response from SSO access token endpoint.
+ * @internal
  */
 export interface SsoAccessTokenResponse {
   access_token: string;
@@ -15,6 +16,8 @@ export interface SsoAccessTokenResponse {
  * systems or services.
  *
  * This module is only available to use with a client in service role authentication mode, which means it can only be used in backend environments.
+ *
+ * @internal
  *
  * @example
  * ```typescript

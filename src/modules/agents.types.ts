@@ -157,14 +157,14 @@ export interface AgentsModuleConfig {
  *
  * The agents module operates with a two-level hierarchy:
  *
- * 1. **Conversations** ({@link AgentConversation}): Top-level containers that represent a dialogue with a specific agent. Each conversation has a unique ID, is associated with an agent by name, and belongs to the user who created it. Conversations can include optional metadata for tracking app-specific context like ticket IDs, categories, or custom fields.
+ * 1. **Conversations**: Top-level containers that represent a dialogue with a specific agent. Each conversation has a unique ID, is associated with an agent by name, and belongs to the user who created it. Conversations can include optional metadata for tracking app-specific context like ticket IDs, categories, or custom fields.
  *
- * 2. **Messages** ({@link AgentMessage}): Individual exchanges within a conversation. Each message has a role, content, and optional metadata like token usage, tool calls, file attachments, and reasoning information. Messages are stored as an array within their parent conversation.
+ * 2. **Messages**: Individual exchanges within a conversation. Each message has a role, content, and optional metadata like token usage, tool calls, file attachments, and reasoning information. Messages are stored as an array within their parent conversation.
  *
- * This module is available to use with a client in both user and service role authentication modes:
+ * This module is available to use with a client in all authentication modes:
  *
- * - **User authentication** (`base44.agents`): Access only conversations created by the authenticated user.
- * - **Service role authentication** (`client.asServiceRole.agents`): Access all conversations across all users.
+ * - **Anonymous or User authentication** (`base44.agents`): Access is scoped to the current user's permissions. Anonymous users can create conversations but cannot retrieve them later, while authenticated users can access conversations they created.
+ * - **Service role authentication** (`base44.asServiceRole.agents`): Operations have elevated admin-level permissions. Can access all conversations that the app's admin role has access to.
  *
  * @example
  * ```typescript
@@ -213,6 +213,7 @@ export interface AgentsModule {
    *
    * @example
    * ```typescript
+   * // Get all conversations
    * const conversations = await base44.agents.getConversations();
    * console.log(`Total conversations: ${conversations.length}`);
    * ```
@@ -233,6 +234,7 @@ export interface AgentsModule {
    *
    * @example
    * ```typescript
+   * // Get a specific conversation by ID
    * const conversation = await base44.agents.getConversation('conv-123');
    * if (conversation) {
    *   console.log(`Conversation has ${conversation.messages.length} messages`);
@@ -256,6 +258,7 @@ export interface AgentsModule {
    *
    * @example
    * ```typescript
+   * // List recent conversations with pagination
    * const recentConversations = await base44.agents.listConversations({
    *   limit: 10,
    *   sort: '-created_date'
@@ -290,6 +293,7 @@ export interface AgentsModule {
    *
    * @example
    * ```typescript
+   * // Create a new conversation with metadata
    * const conversation = await base44.agents.createConversation({
    *   agent_name: 'support-agent',
    *   metadata: {
@@ -373,6 +377,7 @@ export interface AgentsModule {
    *
    * @example
    * ```typescript
+   * // Get WhatsApp connection URL
    * const whatsappUrl = base44.agents.getWhatsAppConnectURL('support-agent');
    * console.log(`Connect through WhatsApp: ${whatsappUrl}`);
    * // User can open this URL to start a WhatsApp conversation

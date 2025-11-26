@@ -275,6 +275,7 @@ export interface AuthModule {
    *
    * @example
    * ```typescript
+   * // Login with email and password
    * try {
    *   const { access_token, user } = await base44.auth.loginViaEmailPassword(
    *     'user@example.com',
