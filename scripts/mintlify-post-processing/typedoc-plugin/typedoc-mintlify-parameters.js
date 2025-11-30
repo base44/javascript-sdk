@@ -8,6 +8,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 const PRIMITIVE_TYPES = ['any', 'string', 'number', 'boolean', 'void', 'null', 'undefined', 'object', 'Array', 'Promise'];
+const WRAPPER_TYPE_NAMES = new Set(['Partial', 'Required', 'Readonly', 'Omit', 'Pick']);
 
 // Helper function to resolve type paths (similar to returns file)
 function resolveTypePath(typeName, app, currentPagePath = null) {
@@ -182,13 +183,32 @@ function parseParametersWithExpansion(paramContent, paramLevel, nestedLevel, con
     if (linkWithBackticksMatch) {
       return { type: linkWithBackticksMatch[1], link: linkWithBackticksMatch[2] };
     }
+
+    // Handle [TypeName](link) format
+    const linkMatch = trimmed.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+    if (linkMatch) {
+      return { type: linkMatch[1], link: linkMatch[2] };
+    }
     
     // Handle simple `TypeName` format
-    if (!trimmed.startsWith('`')) return null;
     const simpleMatch = trimmed.match(/^`([^`]+)`$/);
     if (simpleMatch) {
       return { type: simpleMatch[1], link: null };
     }
+
+    // Fallback: sanitize markdown-heavy type definitions such as `Partial`<[`Type`](link)>
+    if (trimmed.startsWith('`')) {
+      const sanitized = trimmed
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1')
+        .replace(/`/g, '')
+        .replace(/\\/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (sanitized) {
+        return { type: sanitized, link: null };
+      }
+    }
+
     return null;
   };
 
@@ -354,13 +374,32 @@ function parseParameters(paramContent, paramLevel, nestedLevel, context = null, 
     if (linkWithBackticksMatch) {
       return { type: linkWithBackticksMatch[1], link: linkWithBackticksMatch[2] };
     }
+
+    // Handle [TypeName](link) format
+    const linkMatch = trimmed.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+    if (linkMatch) {
+      return { type: linkMatch[1], link: linkMatch[2] };
+    }
     
     // Handle simple `TypeName` format
-    if (!trimmed.startsWith('`')) return null;
     const simpleMatch = trimmed.match(/^`([^`]+)`$/);
     if (simpleMatch) {
       return { type: simpleMatch[1], link: null };
     }
+
+    // Fallback: sanitize markdown-heavy type definitions such as `Partial`<[`Type`](link)>
+    if (trimmed.startsWith('`')) {
+      const sanitized = trimmed
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1')
+        .replace(/`/g, '')
+        .replace(/\\/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (sanitized) {
+        return { type: sanitized, link: null };
+      }
+    }
+
     return null;
   };
 
@@ -594,9 +633,73 @@ function simplifyTypeName(typeName) {
     return null;
   }
 
+  let cleaned = typeName.trim();
+
+  // Unwrap helper types like Partial<T>, Required<T>, etc.
+  cleaned = unwrapHelperType(cleaned);
+
   // Remove generics/array indicators and take the first union/intersection entry
-  const cleaned = typeName.replace(/[\[\]]/g, '').split('|')[0].split('&')[0].trim();
+  cleaned = cleaned.replace(/[\[\]]/g, '').split('|')[0].split('&')[0].trim();
   return cleaned.replace(/<.*?>/g, '').trim();
+}
+
+function unwrapHelperType(typeName) {
+  let current = typeName.trim();
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+    const match = current.match(/^([A-Za-z0-9_]+)\s*<(.+)>$/);
+    if (!match) {
+      break;
+    }
+
+    const wrapperName = match[1];
+    if (!WRAPPER_TYPE_NAMES.has(wrapperName)) {
+      break;
+    }
+
+    const genericBlock = match[2];
+    const inner = getFirstGenericArgument(genericBlock);
+    if (!inner) {
+      break;
+    }
+
+    current = inner.trim();
+    changed = true;
+  }
+
+  return current;
+}
+
+function getFirstGenericArgument(genericBlock) {
+  if (!genericBlock) {
+    return '';
+  }
+
+  let depth = 0;
+  let buffer = '';
+  for (let i = 0; i < genericBlock.length; i++) {
+    const char = genericBlock[i];
+    if (char === '<') {
+      depth++;
+      buffer += char;
+      continue;
+    }
+    if (char === '>') {
+      if (depth > 0) {
+        depth--;
+      }
+      buffer += char;
+      continue;
+    }
+    if (char === ',' && depth === 0) {
+      return buffer.trim();
+    }
+    buffer += char;
+  }
+
+  return buffer.trim();
 }
 
 function normalizePropertiesForParams(properties) {
