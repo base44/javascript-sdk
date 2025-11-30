@@ -446,6 +446,7 @@ function rewriteReturnSections(content, options) {
 
 function parseReturnFields(sectionContent, fieldHeading, nestedHeading, returnTypeFromSignature = null, linkedTypeInfo = null, context = null, linkedTypeNames = null, writeLinkedTypesFile = null) {
   let infoForDescription = linkedTypeInfo;
+  
   if (!sectionContent) {
     // If we have a linked type but no section content, try to extract from the linked type
     if (linkedTypeInfo && context) {
@@ -736,6 +737,41 @@ function parseReturnFields(sectionContent, fieldHeading, nestedHeading, returnTy
 
     let description = descriptionLines.join('\n').trim();
 
+    // Check if this field's type is a linked type that should be expanded
+    // Only expand if we don't already have nested fields from headings
+    if (nested.length === 0 && context && type && type !== 'any') {
+      const simpleTypeName = getSimpleTypeName(type);
+      if (simpleTypeName && !PRIMITIVE_TYPES.includes(simpleTypeName)) {
+        // Try to resolve the type to a linked type
+        const typePath = resolveTypePath(simpleTypeName, context.app, context.currentPagePath);
+        const linkedTypeInfo = typePath 
+          ? { typeName: simpleTypeName, typePath }
+          : { typeName: simpleTypeName, typePath: simpleTypeName };
+        
+        // Extract properties from the linked type
+        const properties = extractPropertiesFromLinkedType(linkedTypeInfo, context);
+        if (properties.length > 0) {
+          // Add properties as nested fields
+          for (const prop of properties) {
+            nested.push({
+              name: prop.name,
+              type: prop.type,
+              description: prop.description || '',
+              optional: prop.optional,
+            });
+          }
+          
+          // Track the linked type
+          if (linkedTypeNames) {
+            linkedTypeNames.add(simpleTypeName);
+            if (writeLinkedTypesFile) {
+              writeLinkedTypesFile();
+            }
+          }
+        }
+      }
+    }
+
     fields.push({
       name,
       type,
@@ -777,18 +813,7 @@ function buildResponseFieldsSection(fields, linkedTypeNames = null, writeLinkedT
     if (field.nested && field.nested.length > 0) {
       // Wrap nested fields in an Accordion component
       output += `\n<Accordion title="Properties">\n\n`;
-      
-      for (const nested of field.nested) {
-        const requiredAttr = nested.optional ? '' : ' required';
-        output += `<ResponseField name="${escapeAttribute(nested.name)}" type="${escapeAttribute(nested.type)}"${requiredAttr}>\n`;
-        
-        if (nested.description) {
-          output += `\n${nested.description}\n`;
-        }
-        
-        output += '\n</ResponseField>\n\n';
-      }
-      
+      output += renderNestedResponseFields(field.nested, linkedTypeNames, writeLinkedTypesFile);
       output += '</Accordion>\n';
     }
 
@@ -832,6 +857,44 @@ function formatReturnFieldsOutput(fields, returnType = null, linkedTypeNames = n
   }
 
   return fieldsBlock;
+}
+
+function renderNestedResponseFields(fields, linkedTypeNames = null, writeLinkedTypesFile = null) {
+  if (!fields || fields.length === 0) {
+    return '';
+  }
+
+  let output = '';
+  for (const field of fields) {
+    const requiredAttr = field.optional ? '' : ' required';
+    const defaultAttr = field.default ? ` default="${escapeAttribute(field.default)}"` : '';
+
+    if (linkedTypeNames && field.type && !PRIMITIVE_TYPES.includes(field.type)) {
+      const simpleTypeName = field.type.replace(/[<>\[\]]/g, '').trim();
+      if (simpleTypeName && !PRIMITIVE_TYPES.includes(simpleTypeName)) {
+        linkedTypeNames.add(simpleTypeName);
+        if (writeLinkedTypesFile) {
+          writeLinkedTypesFile();
+        }
+      }
+    }
+
+    output += `<ResponseField name="${escapeAttribute(field.name)}" type="${escapeAttribute(field.type)}"${defaultAttr}${requiredAttr}>\n`;
+
+    if (field.description) {
+      output += `\n${field.description}\n`;
+    }
+
+    if (field.nested && field.nested.length > 0) {
+      output += `\n<Accordion title="Properties">\n\n`;
+      output += renderNestedResponseFields(field.nested, linkedTypeNames, writeLinkedTypesFile);
+      output += '</Accordion>\n';
+    }
+
+    output += '\n</ResponseField>\n\n';
+  }
+
+  return output;
 }
 
 function getSimpleTypeName(typeName) {

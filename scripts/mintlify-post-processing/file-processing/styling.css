@@ -105,3 +105,10 @@ div.prose.mt-1.font-normal.text-sm.leading-6.text-gray-600.dark\:text-gray-400 s
 .mint-card .prose span {
   color: var(--mint-text-secondary) !important;
 }
+
+/* Remove bottom border from anchor elements containing code elements */
+a:has(code) {
+  border-bottom: none !important;
+  text-decoration: none !important;
+  color: #FF8844 !important; /* light orange */
+}
