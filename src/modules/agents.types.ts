@@ -123,6 +123,16 @@ export interface AgentMessage {
 }
 
 /**
+ * Parameters for creating a new conversation.
+ */
+export interface CreateConversationParams {
+  /** The name of the agent to create a conversation with. */
+  agent_name: string;
+  /** Optional metadata to attach to the conversation. */
+  metadata?: Record<string, any>;
+}
+
+/**
  * Configuration for creating the agents module.
  * @internal
  */
@@ -305,10 +315,9 @@ export interface AgentsModule {
    * console.log(`Created conversation: ${conversation.id}`);
    * ```
    */
-  createConversation(conversation: {
-    agent_name: string;
-    metadata?: Record<string, any>;
-  }): Promise<AgentConversation>;
+  createConversation(
+    conversation: CreateConversationParams
+  ): Promise<AgentConversation>;
 
   /**
    * Adds a message to a conversation.

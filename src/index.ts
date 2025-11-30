@@ -65,6 +65,7 @@ export type {
   AgentMessageUsage,
   AgentMessageCustomContext,
   AgentMessageMetadata,
+  CreateConversationParams,
 } from "./modules/agents.types.js";
 
 export type {

@@ -5,6 +5,7 @@ import {
   AgentMessage,
   AgentsModule,
   AgentsModuleConfig,
+  CreateConversationParams,
 } from "./agents.types.js";
 
 /**
@@ -43,10 +44,7 @@ export function createAgentsModule({
   };
 
   // Create a new conversation with an agent
-  const createConversation = (conversation: {
-    agent_name: string;
-    metadata?: Record<string, any>;
-  }) => {
+  const createConversation = (conversation: CreateConversationParams) => {
     return axios.post<any, AgentConversation>(
       `${baseURL}/conversations`,
       conversation

@@ -1,5 +1,5 @@
 /**
- * The type of external integration/connector, such as `'google'`, `'slack'`, or `'github'`.
+ * The type of external integration/connector, such as `'googlecalendar'`, `'slack'`, or `'github'`.
  */
 export type ConnectorIntegrationType = string;
 
@@ -23,43 +23,50 @@ export interface ConnectorAccessTokenResponse {
  * covered by Base44's pre-built integrations.
  *
  * This module is only available to use with a client in service role authentication mode, which means it can only be used in backend environments.
- *
- * @example
- * ```typescript
- * // Retrieve Google OAuth token and use it to call Google APIs
- * const response = await base44.asServiceRole.connectors.getAccessToken('google');
- * const googleToken = response.access_token;
- * const calendarResponse = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
- *   headers: { 'Authorization': `Bearer ${googleToken}` }
- * });
- * ```
  */
 export interface ConnectorsModule {
   /**
    * Retrieves an OAuth access token for a specific external integration type.
    *
-   * Returns the stored OAuth token for an external service that the app
+   * Returns the OAuth token string for an external service that the app
    * has connected to. You can then use this token to make authenticated API calls
    * to that external service.
    *
-   * @param integrationType - The type of integration, such as `'google'`, `'slack'`, or `'github'`.
-   * @returns Promise resolving to the access token response.
+   * @param integrationType - The type of integration, such as `'googlecalendar'`, `'slack'`, or `'github'`.
+   * @returns Promise resolving to the access token string.
    *
    * @example
    * ```typescript
-   * // Get Google OAuth token
-   * const response = await base44.asServiceRole.connectors.getAccessToken('google');
-   * console.log(response.access_token);
+   * // Google Calendar connection
+   * // Get Google Calendar OAuth token and fetch upcoming events
+   * const googleToken = await base44.asServiceRole.connectors.getAccessToken('googlecalendar');
+   *
+   * // Fetch upcoming 10 events
+   * const timeMin = new Date().toISOString();
+   * const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?maxResults=10&orderBy=startTime&singleEvents=true&timeMin=${timeMin}`;
+   *
+   * const calendarResponse = await fetch(url, {
+   *   headers: { 'Authorization': `Bearer ${googleToken}` }
+   * });
+   *
+   * const events = await calendarResponse.json();
    * ```
    *
    * @example
    * ```typescript
-   * // Get Slack OAuth token
-   * const slackResponse = await base44.asServiceRole.connectors.getAccessToken('slack');
-   * console.log(slackResponse.access_token);
+   * // Slack connection
+   * // Get Slack OAuth token and list channels
+   * const slackToken = await base44.asServiceRole.connectors.getAccessToken('slack');
+   *
+   * // List all public and private channels
+   * const url = 'https://slack.com/api/conversations.list?types=public_channel,private_channel&limit=100';
+   *
+   * const slackResponse = await fetch(url, {
+   *   headers: { 'Authorization': `Bearer ${slackToken}` }
+   * });
+   *
+   * const data = await slackResponse.json();
    * ```
    */
-  getAccessToken(
-    integrationType: ConnectorIntegrationType
-  ): Promise<ConnectorAccessTokenResponse>;
+  getAccessToken(integrationType: ConnectorIntegrationType): Promise<string>;
 }
