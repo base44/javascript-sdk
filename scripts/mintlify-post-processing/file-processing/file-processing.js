@@ -2,7 +2,7 @@
 
 /**
  * Post-processing script for TypeDoc-generated MDX files
- * 
+ *
  * TypeDoc now emits .mdx files directly, so this script:
  * 1. Processes links to make them Mintlify-compatible
  * 2. Removes files for linked types that should be suppressed
@@ -11,21 +11,43 @@
  * 5. Copies styling.css to docs directory
  */
 
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DOCS_DIR = path.join(__dirname, '..', '..', '..', 'docs');
-const CONTENT_DIR = path.join(DOCS_DIR, 'content');
-const LINKED_TYPES_FILE = path.join(CONTENT_DIR, '.linked-types.json');
-const TEMPLATE_PATH = path.join(__dirname, 'docs-json-template.json');
-const STYLING_CSS_PATH = path.join(__dirname, 'styling.css');
-const CATEGORY_MAP_PATH = path.join(__dirname, '../category-map.json');
-const TYPES_TO_EXPOSE_PATH = path.join(__dirname, '..', 'types-to-expose.json');
-const APPENDED_ARTICLES_PATH = path.join(__dirname, '../appended-articles.json');
+const DOCS_DIR = path.join(__dirname, "..", "..", "..", "docs");
+const CONTENT_DIR = path.join(DOCS_DIR, "content");
+const LINKED_TYPES_FILE = path.join(CONTENT_DIR, ".linked-types.json");
+const TEMPLATE_PATH = path.join(__dirname, "docs-json-template.json");
+const STYLING_CSS_PATH = path.join(__dirname, "styling.css");
+const CATEGORY_MAP_PATH = path.join(__dirname, "../category-map.json");
+const TYPES_TO_EXPOSE_PATH = path.join(__dirname, "..", "types-to-expose.json");
+const APPENDED_ARTICLES_PATH = path.join(
+  __dirname,
+  "../appended-articles.json"
+);
+
+const MODULE_RENAMES = {
+  AgentsModule: "agents",
+  AppLogsModule: "app-logs",
+  AuthModule: "auth",
+  ConnectorsModule: "connectors",
+  EntitiesModule: "entities",
+  FunctionsModule: "functions",
+  IntegrationsModule: "integrations",
+  SsoModule: "sso",
+};
+
+const REVERSE_MODULE_RENAMES = Object.entries(MODULE_RENAMES).reduce(
+  (acc, [k, v]) => {
+    acc[v] = k;
+    return acc;
+  },
+  {}
+);
 
 /**
  * Get list of linked type names that should be suppressed
@@ -33,7 +55,7 @@ const APPENDED_ARTICLES_PATH = path.join(__dirname, '../appended-articles.json')
 function getLinkedTypeNames() {
   try {
     if (fs.existsSync(LINKED_TYPES_FILE)) {
-      const content = fs.readFileSync(LINKED_TYPES_FILE, 'utf-8');
+      const content = fs.readFileSync(LINKED_TYPES_FILE, "utf-8");
       return new Set(JSON.parse(content));
     }
   } catch (e) {
@@ -47,14 +69,16 @@ function getLinkedTypeNames() {
  */
 function getTypesToExpose() {
   try {
-    const content = fs.readFileSync(TYPES_TO_EXPOSE_PATH, 'utf-8');
+    const content = fs.readFileSync(TYPES_TO_EXPOSE_PATH, "utf-8");
     const parsed = JSON.parse(content);
     if (!Array.isArray(parsed)) {
-      throw new Error('types-to-expose.json must be an array of strings');
+      throw new Error("types-to-expose.json must be an array of strings");
     }
     return new Set(parsed);
   } catch (e) {
-    console.error(`Error: Unable to read types-to-expose file: ${TYPES_TO_EXPOSE_PATH}`);
+    console.error(
+      `Error: Unable to read types-to-expose file: ${TYPES_TO_EXPOSE_PATH}`
+    );
     console.error(e.message);
     process.exit(1);
   }
@@ -64,23 +88,88 @@ function getTypesToExpose() {
  * Process links in a file to make them Mintlify-compatible
  */
 function processLinksInFile(filePath) {
-  let content = fs.readFileSync(filePath, 'utf-8');
+  let content = fs.readFileSync(filePath, "utf-8");
   let modified = false;
-  
+
   // Remove .md and .mdx extensions from markdown links
   // This handles both relative and absolute paths
   const linkRegex = /\[([^\]]+)\]\(([^)]+)(\.mdx?)\)/g;
-  const newContent = content.replace(linkRegex, (match, linkText, linkPath, ext) => {
-    modified = true;
-    return `[${linkText}](${linkPath})`;
-  });
-  
+  let newContent = content.replace(
+    linkRegex,
+    (match, linkText, linkPath, ext) => {
+      modified = true;
+
+      // Check if the link points to a renamed module
+      const pathParts = linkPath.split("/");
+      const filename = pathParts[pathParts.length - 1];
+
+      if (MODULE_RENAMES[filename]) {
+        pathParts[pathParts.length - 1] = MODULE_RENAMES[filename];
+        linkPath = pathParts.join("/");
+      }
+
+      return `[${linkText}](${linkPath})`;
+    }
+  );
+
+  // Also check for links that might have already been processed (no extension)
+  // or if the above regex missed them (though it matches .mdx?)
+  // The regex requires .md or .mdx extension. If links are already extensionless, this won't run.
+  // But TypeDoc usually outputs links with extensions.
+
   if (modified) {
-    fs.writeFileSync(filePath, newContent, 'utf-8');
+    fs.writeFileSync(filePath, newContent, "utf-8");
     return true;
   }
-  
+
   return false;
+}
+
+/**
+ * Renames module files and updates their titles
+ */
+function performModuleRenames(dir) {
+  if (!fs.existsSync(dir)) return;
+
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const entryPath = path.join(dir, entry.name);
+
+    if (entry.isDirectory()) {
+      performModuleRenames(entryPath);
+    } else if (
+      entry.isFile() &&
+      (entry.name.endsWith(".mdx") || entry.name.endsWith(".md"))
+    ) {
+      const nameWithoutExt = path.basename(
+        entry.name,
+        path.extname(entry.name)
+      );
+
+      if (MODULE_RENAMES[nameWithoutExt]) {
+        const newName = MODULE_RENAMES[nameWithoutExt];
+        const newPath = path.join(dir, `${newName}.mdx`); // Always use .mdx for new files
+
+        let content = fs.readFileSync(entryPath, "utf-8");
+
+        // Update title in frontmatter
+        const titleRegex = /^title:\s*["']?([^"'\n]+)["']?/m;
+        if (titleRegex.test(content)) {
+          content = content.replace(titleRegex, `title: "${newName}"`);
+        }
+
+        // Write to new path
+        fs.writeFileSync(newPath, content, "utf-8");
+
+        // Delete old file if name is different
+        if (entryPath !== newPath) {
+          fs.unlinkSync(entryPath);
+          console.log(`Renamed module: ${entry.name} -> ${newName}.mdx`);
+        }
+      }
+    }
+  }
 }
 
 /**
@@ -94,26 +183,25 @@ function scanDocsContent() {
     typeAliases: [],
   };
 
-  const sections = ['functions', 'interfaces', 'classes', 'type-aliases'];
-  
+  const sections = ["functions", "interfaces", "classes", "type-aliases"];
+
   for (const section of sections) {
     const sectionDir = path.join(CONTENT_DIR, section);
     if (!fs.existsSync(sectionDir)) continue;
-    
+
     const files = fs.readdirSync(sectionDir);
     const mdxFiles = files
-      .filter((file) => file.endsWith('.mdx'))
-      .map((file) => path.basename(file, '.mdx'))
+      .filter((file) => file.endsWith(".mdx"))
+      .map((file) => path.basename(file, ".mdx"))
       .sort()
       .map((fileName) => `content/${section}/${fileName}`);
-    
-    const key = section === 'type-aliases' ? 'typeAliases' : section;
+
+    const key = section === "type-aliases" ? "typeAliases" : section;
     result[key] = mdxFiles;
   }
 
   return result;
 }
-
 
 /**
  * Get group name for a section, using category map or default
@@ -122,7 +210,7 @@ function getGroupName(section, categoryMap) {
   if (categoryMap[section]) {
     return categoryMap[section];
   }
-  
+
   return section;
 }
 
@@ -130,56 +218,62 @@ function getGroupName(section, categoryMap) {
  * Generate docs.json from template and scanned content
  */
 function generateDocsJson(docsContent) {
-  const template = JSON.parse(fs.readFileSync(TEMPLATE_PATH, 'utf-8'));
+  const template = JSON.parse(fs.readFileSync(TEMPLATE_PATH, "utf-8"));
   let categoryMap = {};
   try {
-    categoryMap = JSON.parse(fs.readFileSync(CATEGORY_MAP_PATH, 'utf-8'));
+    categoryMap = JSON.parse(fs.readFileSync(CATEGORY_MAP_PATH, "utf-8"));
   } catch (e) {
     // If file doesn't exist or can't be read, return empty object
     console.error(`Error: Category map file not found: ${CATEGORY_MAP_PATH}`);
   }
-  
+
   const groups = [];
-  
+
   if (docsContent.functions.length > 0 && categoryMap.functions) {
     groups.push({
-      group: getGroupName('functions', categoryMap),
+      group: getGroupName("functions", categoryMap),
       pages: docsContent.functions,
     });
   }
-  
+
   if (docsContent.interfaces.length > 0 && categoryMap.interfaces) {
     groups.push({
-      group: getGroupName('interfaces', categoryMap),
+      group: getGroupName("interfaces", categoryMap),
       pages: docsContent.interfaces,
     });
   }
-  
+
   if (docsContent.classes.length > 0 && categoryMap.classes) {
     groups.push({
-      group: getGroupName('classes', categoryMap),
+      group: getGroupName("classes", categoryMap),
       pages: docsContent.classes,
     });
   }
-  
-  if (docsContent.typeAliases.length > 0 && categoryMap['type-aliases']) {
+
+  if (docsContent.typeAliases.length > 0 && categoryMap["type-aliases"]) {
     groups.push({
-      group: getGroupName('typeAliases', categoryMap),
+      group: getGroupName("typeAliases", categoryMap),
       pages: docsContent.typeAliases,
     });
   }
-  
+
   // Find or create SDK Reference tab
-  let sdkTab = template.navigation.tabs.find(tab => tab.tab === 'SDK Reference');
+  let sdkTab = template.navigation.tabs.find(
+    (tab) => tab.tab === "SDK Reference"
+  );
   if (!sdkTab) {
-    sdkTab = { tab: 'SDK Reference', groups: [] };
+    sdkTab = { tab: "SDK Reference", groups: [] };
     template.navigation.tabs.push(sdkTab);
   }
-  
+
   sdkTab.groups = groups;
-  
-  const docsJsonPath = path.join(DOCS_DIR, 'docs.json');
-  fs.writeFileSync(docsJsonPath, JSON.stringify(template, null, 2) + '\n', 'utf-8');
+
+  const docsJsonPath = path.join(DOCS_DIR, "docs.json");
+  fs.writeFileSync(
+    docsJsonPath,
+    JSON.stringify(template, null, 2) + "\n",
+    "utf-8"
+  );
   console.log(`Generated docs.json`);
 }
 
@@ -187,7 +281,7 @@ function generateDocsJson(docsContent) {
  * Copy styling.css to docs directory
  */
 function copyStylingCss() {
-  const targetPath = path.join(DOCS_DIR, 'styling.css');
+  const targetPath = path.join(DOCS_DIR, "styling.css");
   fs.copyFileSync(STYLING_CSS_PATH, targetPath);
   console.log(`Copied styling.css`);
 }
@@ -196,10 +290,12 @@ function copyStylingCss() {
  * Recursively process all MDX files
  */
 function isTypeDocPath(relativePath) {
-  const normalized = relativePath.split(path.sep).join('/');
-  return normalized.startsWith('content/interfaces/') ||
-         normalized.startsWith('content/type-aliases/') ||
-         normalized.startsWith('content/classes/');
+  const normalized = relativePath.split(path.sep).join("/");
+  return (
+    normalized.startsWith("content/interfaces/") ||
+    normalized.startsWith("content/type-aliases/") ||
+    normalized.startsWith("content/classes/")
+  );
 }
 
 /**
@@ -207,20 +303,26 @@ function isTypeDocPath(relativePath) {
  */
 function processAllFiles(dir, linkedTypeNames, exposedTypeNames) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
-  
+
   for (const entry of entries) {
     const entryPath = path.join(dir, entry.name);
-    
+
     if (entry.isDirectory()) {
       processAllFiles(entryPath, linkedTypeNames, exposedTypeNames);
-    } else if (entry.isFile() && (entry.name.endsWith('.mdx') || entry.name.endsWith('.md'))) {
+    } else if (
+      entry.isFile() &&
+      (entry.name.endsWith(".mdx") || entry.name.endsWith(".md"))
+    ) {
       // Extract the type name from the file path
       // e.g., "docs/interfaces/LoginViaEmailPasswordResponse.mdx" -> "LoginViaEmailPasswordResponse"
       const fileName = path.basename(entryPath, path.extname(entryPath));
       const relativePath = path.relative(DOCS_DIR, entryPath);
       const isTypeDoc = isTypeDocPath(relativePath);
-      const isExposedType = !isTypeDoc || exposedTypeNames.has(fileName);
-      
+
+      // Check if exposed. Handle renamed modules by checking reverse map.
+      const originalName = REVERSE_MODULE_RENAMES[fileName] || fileName;
+      const isExposedType = !isTypeDoc || exposedTypeNames.has(originalName);
+
       // Remove any type doc files that are not explicitly exposed
       if (isTypeDoc && !isExposedType) {
         fs.unlinkSync(entryPath);
@@ -244,14 +346,14 @@ function processAllFiles(dir, linkedTypeNames, exposedTypeNames) {
 
 function loadAppendedArticlesConfig() {
   try {
-    const content = fs.readFileSync(APPENDED_ARTICLES_PATH, 'utf-8');
+    const content = fs.readFileSync(APPENDED_ARTICLES_PATH, "utf-8");
     const parsed = JSON.parse(content);
-    if (parsed && typeof parsed === 'object') {
+    if (parsed && typeof parsed === "object") {
       const normalized = {};
       for (const [host, value] of Object.entries(parsed)) {
         if (Array.isArray(value)) {
           normalized[host] = value;
-        } else if (typeof value === 'string' && value.trim()) {
+        } else if (typeof value === "string" && value.trim()) {
           normalized[host] = [value];
         }
       }
@@ -264,10 +366,10 @@ function loadAppendedArticlesConfig() {
 }
 
 function stripFrontMatter(content) {
-  if (!content.startsWith('---')) {
+  if (!content.startsWith("---")) {
     return { title: null, content: content.trimStart() };
   }
-  const endIndex = content.indexOf('\n---', 3);
+  const endIndex = content.indexOf("\n---", 3);
   if (endIndex === -1) {
     return { title: null, content: content.trimStart() };
   }
@@ -276,23 +378,23 @@ function stripFrontMatter(content) {
   const titleMatch = frontMatter.match(/title:\s*["']?([^"'\n]+)["']?/i);
   return {
     title: titleMatch ? titleMatch[1].trim() : null,
-    content: rest
+    content: rest,
   };
 }
 
 function removeFirstPanelBlock(content) {
-  const panelStart = content.indexOf('<Panel>');
-  const panelEnd = content.indexOf('</Panel>');
+  const panelStart = content.indexOf("<Panel>");
+  const panelEnd = content.indexOf("</Panel>");
   if (panelStart === -1 || panelEnd === -1 || panelEnd < panelStart) {
     return content;
   }
   const before = content.slice(0, panelStart);
-  const after = content.slice(panelEnd + '</Panel>'.length);
+  const after = content.slice(panelEnd + "</Panel>".length);
   return (before + after).trimStart();
 }
 
 function normalizeHeadings(content) {
-  const lines = content.split('\n');
+  const lines = content.split("\n");
   const headingRegex = /^(#{1,6})\s+(.*)$/;
   let minLevel = Infinity;
   for (const line of lines) {
@@ -316,22 +418,22 @@ function normalizeHeadings(content) {
     newLevel = Math.max(baseLevel, Math.min(6, newLevel));
     const text = match[2].trim();
     headings.push({ text, level: newLevel });
-    return `${'#'.repeat(newLevel)} ${text}`;
+    return `${"#".repeat(newLevel)} ${text}`;
   });
-  return { content: adjusted.join('\n').trim(), headings };
+  return { content: adjusted.join("\n").trim(), headings };
 }
 
 function slugifyHeading(text) {
   return text
     .toLowerCase()
-    .replace(/[`~!@#$%^&*()+={}\[\]|\\:;"'<>,.?]/g, '')
-    .replace(/\s+/g, '-');
+    .replace(/[`~!@#$%^&*()+={}\[\]|\\:;"'<>,.?]/g, "")
+    .replace(/\s+/g, "-");
 }
 
 function ensurePanelSpacing(content) {
   const panelRegex = /(<Panel>[\s\S]*?)(\n*)(<\/Panel>)/;
   return content.replace(panelRegex, (match, body, newlineSection, closing) => {
-    const trimmedBody = body.replace(/\s+$/, '');
+    const trimmedBody = body.replace(/\s+$/, "");
     return `${trimmedBody}\n\n${closing}`;
   });
 }
@@ -340,11 +442,11 @@ function updatePanelWithHeadings(hostContent, headings) {
   if (!headings || headings.length === 0) {
     return ensurePanelSpacing(hostContent);
   }
-  const panelStart = hostContent.indexOf('<Panel>');
+  const panelStart = hostContent.indexOf("<Panel>");
   if (panelStart === -1) {
     return ensurePanelSpacing(hostContent);
   }
-  const panelEnd = hostContent.indexOf('</Panel>', panelStart);
+  const panelEnd = hostContent.indexOf("</Panel>", panelStart);
   if (panelEnd === -1) {
     return ensurePanelSpacing(hostContent);
   }
@@ -352,7 +454,7 @@ function updatePanelWithHeadings(hostContent, headings) {
   const panelBlock = hostContent.slice(panelStart, panelEnd);
   const afterPanel = hostContent.slice(panelEnd);
 
-  const panelLines = panelBlock.split('\n');
+  const panelLines = panelBlock.split("\n");
   const existingSlugs = new Set();
   const slugMatchRegex = /- \[[^\]]+\]\(#([^)]+)\)/;
   for (const line of panelLines) {
@@ -378,20 +480,23 @@ function updatePanelWithHeadings(hostContent, headings) {
     return ensurePanelSpacing(hostContent);
   }
 
-  const insertion = (panelBlock.endsWith('\n') ? '' : '\n') + newEntries.join('\n');
+  const insertion =
+    (panelBlock.endsWith("\n") ? "" : "\n") + newEntries.join("\n");
   const updatedPanelBlock = panelBlock + insertion;
   const updatedContent = beforePanel + updatedPanelBlock + afterPanel;
   return ensurePanelSpacing(updatedContent);
 }
 
 function prepareAppendedSection(appendPath) {
-  const rawContent = fs.readFileSync(appendPath, 'utf-8');
+  const rawContent = fs.readFileSync(appendPath, "utf-8");
   const { title, content: withoutFrontMatter } = stripFrontMatter(rawContent);
   const withoutPanel = removeFirstPanelBlock(withoutFrontMatter);
-  const { content: normalizedContent, headings } = normalizeHeadings(withoutPanel);
-  const fileTitle = title || path.basename(appendPath, path.extname(appendPath));
+  const { content: normalizedContent, headings } =
+    normalizeHeadings(withoutPanel);
+  const fileTitle =
+    title || path.basename(appendPath, path.extname(appendPath));
   const sectionHeading = `## ${fileTitle.trim()}`;
-  const trimmedContent = normalizedContent ? `\n\n${normalizedContent}` : '';
+  const trimmedContent = normalizedContent ? `\n\n${normalizedContent}` : "";
   const section = `${sectionHeading}${trimmedContent}\n`;
   const headingList = [{ text: fileTitle.trim(), level: 2 }, ...headings];
   return { section, headings: headingList };
@@ -409,20 +514,43 @@ function applyAppendedArticles(appendedArticles) {
       continue;
     }
 
-    const hostPath = path.join(CONTENT_DIR, `${hostKey}.mdx`);
+    // Check if host was renamed
+    let effectiveHostKey = hostKey;
+    const pathParts = hostKey.split("/");
+    const hostName = pathParts[pathParts.length - 1];
+    if (MODULE_RENAMES[hostName]) {
+      pathParts[pathParts.length - 1] = MODULE_RENAMES[hostName];
+      effectiveHostKey = pathParts.join("/");
+    }
+
+    const hostPath = path.join(CONTENT_DIR, `${effectiveHostKey}.mdx`);
     if (!fs.existsSync(hostPath)) {
-      console.warn(`Warning: Host article not found for append: ${hostKey}`);
+      // Try checking if it exists as .md just in case, though we standardized on .mdx
+      console.warn(
+        `Warning: Host article not found for append: ${hostKey} (checked ${effectiveHostKey}.mdx)`
+      );
       continue;
     }
 
-    let hostContent = fs.readFileSync(hostPath, 'utf-8');
-    let combinedSections = '';
+    let hostContent = fs.readFileSync(hostPath, "utf-8");
+    let combinedSections = "";
     const collectedHeadings = [];
 
     for (const appendKey of appendList) {
-      const appendPath = path.join(CONTENT_DIR, `${appendKey}.mdx`);
+      // Check if appended file was renamed (unlikely for EntityHandler but good for consistency)
+      let effectiveAppendKey = appendKey;
+      const appendParts = appendKey.split("/");
+      const appendName = appendParts[appendParts.length - 1];
+      if (MODULE_RENAMES[appendName]) {
+        appendParts[appendParts.length - 1] = MODULE_RENAMES[appendName];
+        effectiveAppendKey = appendParts.join("/");
+      }
+
+      const appendPath = path.join(CONTENT_DIR, `${effectiveAppendKey}.mdx`);
       if (!fs.existsSync(appendPath)) {
-        console.warn(`Warning: Appended article not found: ${appendKey}`);
+        console.warn(
+          `Warning: Appended article not found: ${appendKey} (checked ${effectiveAppendKey}.mdx)`
+        );
         continue;
       }
 
@@ -432,9 +560,13 @@ function applyAppendedArticles(appendedArticles) {
 
       try {
         fs.unlinkSync(appendPath);
-        console.log(`Appended ${appendKey}.mdx -> ${hostKey}.mdx`);
+        console.log(
+          `Appended ${effectiveAppendKey}.mdx -> ${effectiveHostKey}.mdx`
+        );
       } catch (e) {
-        console.warn(`Warning: Unable to remove appended article ${appendKey}.mdx`);
+        console.warn(
+          `Warning: Unable to remove appended article ${effectiveAppendKey}.mdx`
+        );
       }
     }
 
@@ -442,9 +574,9 @@ function applyAppendedArticles(appendedArticles) {
       continue;
     }
 
-    hostContent = hostContent.trimEnd() + combinedSections + '\n';
+    hostContent = hostContent.trimEnd() + combinedSections + "\n";
     hostContent = updatePanelWithHeadings(hostContent, collectedHeadings);
-    fs.writeFileSync(hostPath, hostContent, 'utf-8');
+    fs.writeFileSync(hostPath, hostContent, "utf-8");
   }
 }
 
@@ -452,18 +584,25 @@ function applyAppendedArticles(appendedArticles) {
  * Main function
  */
 function main() {
-  console.log('Processing TypeDoc MDX files for Mintlify...\n');
-  
+  console.log("Processing TypeDoc MDX files for Mintlify...\n");
+
   if (!fs.existsSync(DOCS_DIR)) {
     console.error(`Error: Documentation directory not found: ${DOCS_DIR}`);
     console.error('Please run "npm run docs:generate" first.');
     process.exit(1);
   }
-  
+
   // Get list of linked types to suppress
   const linkedTypeNames = getLinkedTypeNames();
   const exposedTypeNames = getTypesToExpose();
-  
+
+  // First, perform module renames (EntitiesModule -> entities, etc.)
+  if (fs.existsSync(CONTENT_DIR)) {
+    performModuleRenames(CONTENT_DIR);
+  } else {
+    performModuleRenames(DOCS_DIR);
+  }
+
   // Process all files (remove suppressed ones and fix links)
   // Process content directory specifically
   if (fs.existsSync(CONTENT_DIR)) {
@@ -476,7 +615,7 @@ function main() {
   // Append configured articles
   const appendedArticles = loadAppendedArticlesConfig();
   applyAppendedArticles(appendedArticles);
-  
+
   // Clean up the linked types file
   try {
     if (fs.existsSync(LINKED_TYPES_FILE)) {
@@ -485,14 +624,14 @@ function main() {
   } catch (e) {
     // Ignore errors
   }
-  
+
   // Scan content and generate docs.json
   const docsContent = scanDocsContent();
   generateDocsJson(docsContent);
-  
+
   // Copy styling.css
   copyStylingCss();
-  
+
   console.log(`\n✓ Post-processing complete!`);
   console.log(`  Documentation directory: ${DOCS_DIR}`);
 }
