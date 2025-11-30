@@ -25,6 +25,22 @@ The names of the TypeDoc output folders are: `classes`, `functions`, `interfaces
 ## Control which types appear in the docs
 `scripts/mintlify-post-processing/types-to-expose.json` lists the TypeDoc types that the post-processing script keeps in the generated reference. Add or remove type names in that file to expose different SDK areas (for example, to surface a new type or hide one that is not ready for publication). After editing the list, rerun `npm run create-docs` so the Mintlify-ready content reflects the updated exposure set.
 
+## Append additional articles to an existing page
+Sometimes TypeDoc produces a helper interface or type that should live inside a broader article instead of owning its own page (for example, the `EntityHandler` interface that belongs with the `EntitiesModule`). Use `scripts/mintlify-post-processing/appended-articles.json` to stitch those auxiliary pages into a host article during post-processing.
+
+The file maps the host doc (left side) to one or more articles to append (right side). Paths are relative to `docs/content` and omit the `.mdx` extension. You can provide either a string or an array of strings:
+
+```json
+{
+  "interfaces/EntitiesModule": [
+    "interfaces/EntityHandler",
+    "interfaces/EntityFilterOptions"
+  ]
+}
+```
+
+When you run `npm run create-docs`, the post-processing script appends each listed article to the host page under a new `##` heading, updates the panel/table-of-contents links, and then deletes the standalone appended files so they no longer appear in navigation. Edit the JSON mapping and rerun the command anytime you want to combine or separate pages.
+
 ## Push SDK docs to the Mintlify docs repository
 
 After generating and reviewing the docs, you can push them to the `base44/mintlify-docs` repo to deploy them.

@@ -4,7 +4,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { extractPropertiesFromLinkedType } from './typedoc-mintlify-linked-types.js';
+import { extractPropertiesFromLinkedType, getLinkedTypeDescription } from './typedoc-mintlify-linked-types.js';
 import { escapeAttribute } from './typedoc-mintlify-utils.js';
 
 const PRIMITIVE_TYPES = [
@@ -19,6 +19,49 @@ const PRIMITIVE_TYPES = [
   'Array',
   'Promise',
 ];
+
+function extractReturnsDescription(page) {
+  if (!page?.model) {
+    return '';
+  }
+
+  const signature = Array.isArray(page.model.signatures) && page.model.signatures.length > 0
+    ? page.model.signatures[0]
+    : null;
+
+  const returnsTag = signature?.comment?.blockTags?.find(
+    (tag) => tag.tag === '@returns' || tag.tag === '@return'
+  );
+
+  if (!returnsTag || !returnsTag.content) {
+    return '';
+  }
+
+  return renderCommentParts(returnsTag.content).trim();
+}
+
+function renderCommentParts(parts) {
+  if (!Array.isArray(parts)) {
+    return '';
+  }
+
+  return parts.map((part) => {
+    if (!part) return '';
+    switch (part.kind) {
+      case 'text':
+        return part.text || '';
+      case 'code':
+        return part.text ? '`' + part.text + '`' : '';
+      case 'inline-tag':
+        if (part.tag === '@link') {
+          return (part.text || part.target?.name || '').trim();
+        }
+        return part.text || '';
+      default:
+        return part.text || '';
+    }
+  }).join('');
+}
 
 /**
  * Extract signature information from content lines
@@ -278,7 +321,7 @@ function rewriteReturnSections(content, options) {
           }
         }
         
-        const { fields, leadingText, extractedTypeName } = parseReturnFields(
+        const { fields, leadingText, extractedTypeName, typeDescription } = parseReturnFields(
           sectionContent, 
           fieldHeading, 
           nestedHeading, 
@@ -291,13 +334,27 @@ function rewriteReturnSections(content, options) {
         if (fields.length === 0) {
           result.push(...sectionLines);
         } else {
-          if (leadingText) {
-            result.push('');
-            result.push(leadingText);
-          }
-          // Use extractedTypeName if available, otherwise fallback to returnTypeName
           const typeNameForDisplay = extractedTypeName || returnTypeName;
-          const fieldsBlock = formatReturnFieldsOutput(fields, typeNameForDisplay, linkedTypeNames, writeLinkedTypesFile);
+          if (typeNameForDisplay) {
+            result.push('');
+            result.push(`\`${typeNameForDisplay}\``);
+          }
+          const descriptionParts = [];
+          if (typeDescription) {
+            descriptionParts.push(typeDescription);
+          }
+          if (leadingText) {
+            descriptionParts.push(leadingText);
+          }
+          const returnsDescription = extractReturnsDescription(page);
+          if (returnsDescription) {
+            descriptionParts.push(returnsDescription);
+          }
+          if (descriptionParts.length > 0) {
+            result.push('');
+            result.push(descriptionParts.join('\n\n'));
+          }
+          const fieldsBlock = formatReturnFieldsOutput(fields, null, linkedTypeNames, writeLinkedTypesFile);
           if (fieldsBlock) {
             result.push('');
             result.push(fieldsBlock);
@@ -341,7 +398,7 @@ function rewriteReturnSections(content, options) {
         }
       }
       
-      const { fields, leadingText, extractedTypeName } = parseReturnFields(
+      const { fields, leadingText, extractedTypeName, typeDescription } = parseReturnFields(
         sectionContent, 
         fieldHeading, 
         nestedHeading, 
@@ -354,13 +411,23 @@ function rewriteReturnSections(content, options) {
       if (fields.length === 0) {
         result.push(...sectionLines);
       } else {
-        if (leadingText) {
-          result.push('');
-          result.push(leadingText);
-        }
-        // Use extractedTypeName if available, otherwise fallback to returnTypeName
         const typeNameForDisplay = extractedTypeName || returnTypeName;
-        const fieldsBlock = formatReturnFieldsOutput(fields, typeNameForDisplay, linkedTypeNames, writeLinkedTypesFile);
+        if (typeNameForDisplay) {
+          result.push('');
+          result.push(`\`${typeNameForDisplay}\``);
+        }
+        const descriptionParts = [];
+        if (typeDescription) {
+          descriptionParts.push(typeDescription);
+        }
+        if (leadingText) {
+          descriptionParts.push(leadingText);
+        }
+        if (descriptionParts.length > 0) {
+          result.push('');
+          result.push(descriptionParts.join('\n\n'));
+        }
+        const fieldsBlock = formatReturnFieldsOutput(fields, null, linkedTypeNames, writeLinkedTypesFile);
         if (fieldsBlock) {
           result.push('');
           result.push(fieldsBlock);
@@ -378,6 +445,7 @@ function rewriteReturnSections(content, options) {
 }
 
 function parseReturnFields(sectionContent, fieldHeading, nestedHeading, returnTypeFromSignature = null, linkedTypeInfo = null, context = null, linkedTypeNames = null, writeLinkedTypesFile = null) {
+  let infoForDescription = linkedTypeInfo;
   if (!sectionContent) {
     // If we have a linked type but no section content, try to extract from the linked type
     if (linkedTypeInfo && context) {
@@ -400,11 +468,12 @@ function parseReturnFields(sectionContent, fieldHeading, nestedHeading, returnTy
         return {
           fields: resultFields,
           leadingText: '',
-          extractedTypeName: linkedTypeInfo.typeName
+          extractedTypeName: linkedTypeInfo.typeName,
+          typeDescription: getLinkedTypeDescription(linkedTypeInfo, context) || ''
         };
       }
     }
-    return { fields: [], leadingText: '', extractedTypeName: null };
+    return { fields: [], leadingText: '', extractedTypeName: null, typeDescription: getLinkedTypeDescription(infoForDescription, context) || '' };
   }
 
   const lines = sectionContent.split('\n');
@@ -472,7 +541,6 @@ function parseReturnFields(sectionContent, fieldHeading, nestedHeading, returnTy
   // If no field headings found, treat as simple return
   if (!headingPrefix || index >= lines.length) {
     let type = returnTypeFromSignature || 'any';
-    let typeLink = null;
     const descriptionLines = [];
     
     // Check if there's an existing ResponseField in the content
@@ -492,12 +560,7 @@ function parseReturnFields(sectionContent, fieldHeading, nestedHeading, returnTy
       }
       const maybeType = extractTypeFromLine(line);
       if (maybeType && type === 'any') {
-        if (typeof maybeType === 'object') {
-          type = maybeType.type;
-          typeLink = maybeType.link;
-        } else {
-          type = maybeType;
-        }
+        type = typeof maybeType === 'object' ? maybeType.type : maybeType;
         continue;
       }
       if (line.trim() && !line.trim().startsWith('`') && !line.trim().startsWith('<')) {
@@ -519,6 +582,9 @@ function parseReturnFields(sectionContent, fieldHeading, nestedHeading, returnTy
         } else if (simpleTypeName) {
           // Even if we can't resolve the path, try with just the name
           typeInfoToUse = { typeName: simpleTypeName, typePath: simpleTypeName };
+        }
+        if (typeInfoToUse) {
+          infoForDescription = typeInfoToUse;
         }
         
         // Track resolved linked type
@@ -551,19 +617,12 @@ function parseReturnFields(sectionContent, fieldHeading, nestedHeading, returnTy
         return {
           fields: resultFields,
           leadingText: '',
-          extractedTypeName: typeInfoToUse.typeName // Pass the type name for display
+          extractedTypeName: typeInfoToUse.typeName, // Pass the type name for display
+          typeDescription: getLinkedTypeDescription(typeInfoToUse, context) || ''
         };
       }
     }
     
-    // Add "See [TypeName](link)" to description if there's a type link
-    if (typeLink) {
-      if (description) {
-        description += '\n\nSee [' + type + '](' + typeLink + ')';
-      } else {
-        description = 'See [' + type + '](' + typeLink + ')';
-      }
-    }
     // Use 'result' as default name, or extract from description
     let name = 'result';
     if (description) {
@@ -585,6 +644,7 @@ function parseReturnFields(sectionContent, fieldHeading, nestedHeading, returnTy
       ],
       leadingText: '',
       extractedTypeName: null,
+      typeDescription: getLinkedTypeDescription(infoForDescription || typeInfoToUse, context) || ''
     };
   }
 
@@ -606,16 +666,10 @@ function parseReturnFields(sectionContent, fieldHeading, nestedHeading, returnTy
     }
 
     let type = 'any';
-    let typeLink = null;
     if (index < lines.length) {
       const maybeType = extractTypeFromLine(lines[index]);
       if (maybeType) {
-        if (typeof maybeType === 'object') {
-          type = maybeType.type;
-          typeLink = maybeType.link;
-        } else {
-          type = maybeType;
-        }
+        type = typeof maybeType === 'object' ? maybeType.type : maybeType;
         index++;
       }
     }
@@ -649,17 +703,11 @@ function parseReturnFields(sectionContent, fieldHeading, nestedHeading, returnTy
         index++;
       }
 
-      let nestedType = 'any';
-      let nestedTypeLink = null;
+    let nestedType = 'any';
       if (index < lines.length) {
         const maybeNestedType = extractTypeFromLine(lines[index]);
         if (maybeNestedType) {
-          if (typeof maybeNestedType === 'object') {
-            nestedType = maybeNestedType.type;
-            nestedTypeLink = maybeNestedType.link;
-          } else {
-            nestedType = maybeNestedType;
-          }
+        nestedType = typeof maybeNestedType === 'object' ? maybeNestedType.type : maybeNestedType;
           index++;
         }
       }
@@ -678,33 +726,15 @@ function parseReturnFields(sectionContent, fieldHeading, nestedHeading, returnTy
         index++;
       }
 
-      // Add "See [TypeName](link)" to nested description if there's a type link
-      let nestedDescription = nestedDescLines.join('\n').trim();
-      if (nestedTypeLink) {
-        if (nestedDescription) {
-          nestedDescription += '\n\nSee [' + nestedType + '](' + nestedTypeLink + ')';
-        } else {
-          nestedDescription = 'See [' + nestedType + '](' + nestedTypeLink + ')';
-        }
-      }
-
       nested.push({
         name: nestedName,
         type: nestedType,
-        description: nestedDescription,
+        description: nestedDescLines.join('\n').trim(),
         optional: nestedOptional,
       });
     }
 
-    // Add "See [TypeName](link)" to description if there's a type link
     let description = descriptionLines.join('\n').trim();
-    if (typeLink) {
-      if (description) {
-        description += '\n\nSee [' + type + '](' + typeLink + ')';
-      } else {
-        description = 'See [' + type + '](' + typeLink + ')';
-      }
-    }
 
     fields.push({
       name,
@@ -715,7 +745,7 @@ function parseReturnFields(sectionContent, fieldHeading, nestedHeading, returnTy
     });
   }
 
-  return { fields, leadingText: leadingLines.join('\n').trim(), extractedTypeName: null };
+  return { fields, leadingText: leadingLines.join('\n').trim(), extractedTypeName: null, typeDescription: getLinkedTypeDescription(infoForDescription, context) || '' };
 }
 
 function buildResponseFieldsSection(fields, linkedTypeNames = null, writeLinkedTypesFile = null) {

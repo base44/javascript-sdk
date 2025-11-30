@@ -7,10 +7,10 @@ import { extractPropertiesFromLinkedType } from './typedoc-mintlify-linked-types
 import * as fs from 'fs';
 import * as path from 'path';
 
+const PRIMITIVE_TYPES = ['any', 'string', 'number', 'boolean', 'void', 'null', 'undefined', 'object', 'Array', 'Promise'];
+
 // Helper function to resolve type paths (similar to returns file)
 function resolveTypePath(typeName, app, currentPagePath = null) {
-  const PRIMITIVE_TYPES = ['any', 'string', 'number', 'boolean', 'void', 'null', 'undefined', 'object', 'Array', 'Promise'];
-  
   // Skip primitive types
   if (PRIMITIVE_TYPES.includes(typeName)) {
     return null;
@@ -237,22 +237,8 @@ function parseParametersWithExpansion(paramContent, paramLevel, nestedLevel, con
     }
 
     // Check if we should expand this type inline
-    let linkedTypeInfo = typeLink ? { typeName: type, typePath: typeLink } : null;
+    let linkedTypeInfo = getLinkedTypeInfo(type, typeLink, context);
     let nested = [];
-    
-    // If we don't have a link but have a non-primitive type, try to resolve it
-    if (!linkedTypeInfo && type && type !== 'any' && context && context.app) {
-      const simpleTypeName = type.replace(/[<>\[\]]/g, '').trim();
-      const PRIMITIVE_TYPES = ['any', 'string', 'number', 'boolean', 'void', 'null', 'undefined', 'object', 'Array', 'Promise'];
-      if (simpleTypeName && !PRIMITIVE_TYPES.includes(simpleTypeName)) {
-        // Try to resolve the type path
-        const typePath = resolveTypePath(simpleTypeName, context.app, context.currentPagePath);
-        // Track the type even if we can't resolve the path - it might be a linked type
-        linkedTypeInfo = { typeName: simpleTypeName, typePath: typePath || simpleTypeName };
-        
-        // Track linked types for suppression
-      }
-    }
     
     // Track linked types for suppression (for types with explicit links)
     
@@ -260,13 +246,7 @@ function parseParametersWithExpansion(paramContent, paramLevel, nestedLevel, con
     if (linkedTypeInfo && context) {
       const properties = extractPropertiesFromLinkedType(linkedTypeInfo, context);
       if (properties.length > 0) {
-        // Convert properties to nested format
-        nested = properties.map(prop => ({
-          name: prop.name,
-          type: prop.type,
-          description: prop.description,
-          optional: prop.optional
-        }));
+        nested = normalizePropertiesForParams(properties);
       }
     }
     
@@ -283,11 +263,13 @@ function parseParametersWithExpansion(paramContent, paramLevel, nestedLevel, con
         }
 
         let nestedType = 'any';
+        let nestedTypeLink = null;
         if (i < lines.length) {
           const maybeNestedType = extractType(lines[i]);
           if (maybeNestedType) {
             if (typeof maybeNestedType === 'object') {
               nestedType = maybeNestedType.type;
+              nestedTypeLink = maybeNestedType.link;
             } else {
               nestedType = maybeNestedType;
             }
@@ -305,12 +287,25 @@ function parseParametersWithExpansion(paramContent, paramLevel, nestedLevel, con
           i++;
         }
 
-        nested.push({
+        const nestedField = {
           name: nestedName,
           type: nestedType,
           description: nestedDescLines.join('\n').trim(),
-          optional: nestedOptional
-        });
+          optional: nestedOptional,
+          nested: []
+        };
+
+        if (nestedField.nested.length === 0) {
+          const nestedLinkedInfo = getLinkedTypeInfo(nestedType, nestedTypeLink, context);
+          if (nestedLinkedInfo && context) {
+            const nestedProps = extractPropertiesFromLinkedType(nestedLinkedInfo, context);
+            if (nestedProps.length > 0) {
+              nestedField.nested = normalizePropertiesForParams(nestedProps);
+            }
+          }
+        }
+
+        nested.push(nestedField);
       }
     }
 
@@ -414,20 +409,14 @@ function parseParameters(paramContent, paramLevel, nestedLevel, context = null, 
     }
 
     // Check if we should expand this type inline
-    const linkedTypeInfo = typeLink ? { typeName: type, typePath: typeLink } : null;
+    const linkedTypeInfo = getLinkedTypeInfo(type, typeLink, context);
     let nested = [];
     
     // Try to extract properties from the linked type
     if (linkedTypeInfo && context) {
       const properties = extractPropertiesFromLinkedType(linkedTypeInfo, context);
       if (properties.length > 0) {
-        // Convert properties to nested format
-        nested = properties.map(prop => ({
-          name: prop.name,
-          type: prop.type,
-          description: prop.description,
-          optional: prop.optional
-        }));
+        nested = normalizePropertiesForParams(properties);
         // Keep the type as the original type name (without expanding to 'object')
         // This preserves the type name in the ParamField
       }
@@ -446,11 +435,13 @@ function parseParameters(paramContent, paramLevel, nestedLevel, context = null, 
         }
 
         let nestedType = 'any';
+        let nestedTypeLink = null;
         if (i < lines.length) {
           const maybeNestedType = extractType(lines[i]);
           if (maybeNestedType) {
             if (typeof maybeNestedType === 'object') {
               nestedType = maybeNestedType.type;
+              nestedTypeLink = maybeNestedType.link;
             } else {
               nestedType = maybeNestedType;
             }
@@ -468,12 +459,25 @@ function parseParameters(paramContent, paramLevel, nestedLevel, context = null, 
           i++;
         }
 
-        nested.push({
+        const nestedField = {
           name: nestedName,
           type: nestedType,
           description: nestedDescLines.join('\n').trim(),
-          optional: nestedOptional
-        });
+          optional: nestedOptional,
+          nested: []
+        };
+
+        if (nestedField.nested.length === 0) {
+          const nestedLinkedInfo = getLinkedTypeInfo(nestedType, nestedTypeLink, context);
+          if (nestedLinkedInfo && context) {
+            const nestedProps = extractPropertiesFromLinkedType(nestedLinkedInfo, context);
+            if (nestedProps.length > 0) {
+              nestedField.nested = normalizePropertiesForParams(nestedProps);
+            }
+          }
+        }
+
+        nested.push(nestedField);
       }
     }
 
@@ -496,9 +500,7 @@ function buildParamFieldsSection(params, linkedTypeNames = null, writeLinkedType
   if (!params || params.length === 0) {
     return '';
   }
-  
-  const PRIMITIVE_TYPES = ['any', 'string', 'number', 'boolean', 'void', 'null', 'undefined', 'object', 'Array', 'Promise'];
-  
+
   let fieldsOutput = '';
   
   for (const param of params) {
@@ -519,18 +521,9 @@ function buildParamFieldsSection(params, linkedTypeNames = null, writeLinkedType
     if (param.nested.length > 0) {
       // Accordion title is always "Properties"
       fieldsOutput += `\n<Accordion title="Properties">\n\n`;
-      
-      for (const nested of param.nested) {
-        const requiredAttr = nested.optional ? '' : ' required';
-        fieldsOutput += `<ParamField body="${escapeAttribute(nested.name)}" type="${escapeAttribute(nested.type)}"${requiredAttr}>\n`;
-        
-        if (nested.description) {
-          fieldsOutput += `\n${nested.description}\n`;
-        }
-        
-        fieldsOutput += '\n</ParamField>\n\n';
-      }
-      
+
+      fieldsOutput += renderNestedParamFields(param.nested);
+
       fieldsOutput += '</Accordion>\n\n';
     } else {
       fieldsOutput += '\n';
@@ -545,6 +538,79 @@ function buildParamFieldsSection(params, linkedTypeNames = null, writeLinkedType
   }
   
   return fieldsOutput;
+}
+
+function renderNestedParamFields(fields) {
+  if (!fields || fields.length === 0) {
+    return '';
+  }
+
+  let output = '';
+  for (const field of fields) {
+    const requiredAttr = field.optional ? '' : ' required';
+    output += `<ParamField body="${escapeAttribute(field.name)}" type="${escapeAttribute(field.type)}"${requiredAttr}>\n`;
+
+    if (field.description) {
+      output += `\n${field.description}\n`;
+    }
+
+    if (Array.isArray(field.nested) && field.nested.length > 0) {
+      output += `\n<Accordion title="Properties">\n\n`;
+      output += renderNestedParamFields(field.nested);
+      output += '</Accordion>\n';
+    }
+
+    output += '\n</ParamField>\n\n';
+  }
+
+  return output;
+}
+
+function getLinkedTypeInfo(typeName, typeLink, context) {
+  if (!typeName) {
+    return null;
+  }
+
+  if (typeLink) {
+    const simpleFromLink = simplifyTypeName(typeName) || typeName;
+    return { typeName: simpleFromLink, typePath: typeLink };
+  }
+
+  if (!context) {
+    return null;
+  }
+
+  const simpleTypeName = simplifyTypeName(typeName);
+  if (!simpleTypeName || PRIMITIVE_TYPES.includes(simpleTypeName)) {
+    return null;
+  }
+
+  const typePath = resolveTypePath(simpleTypeName, context.app, context.currentPagePath);
+  return { typeName: simpleTypeName, typePath: typePath || simpleTypeName };
+}
+
+function simplifyTypeName(typeName) {
+  if (!typeName) {
+    return null;
+  }
+
+  // Remove generics/array indicators and take the first union/intersection entry
+  const cleaned = typeName.replace(/[\[\]]/g, '').split('|')[0].split('&')[0].trim();
+  return cleaned.replace(/<.*?>/g, '').trim();
+}
+
+function normalizePropertiesForParams(properties) {
+  if (!Array.isArray(properties)) {
+    return [];
+  }
+
+  return properties.map((prop) => ({
+    name: prop.name,
+    type: prop.type || 'any',
+    description: prop.description || '',
+    optional: !!prop.optional,
+    nested: normalizePropertiesForParams(prop.nested || [])
+  }));
 }
 
 

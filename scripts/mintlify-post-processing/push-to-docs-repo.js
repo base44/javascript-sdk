@@ -55,9 +55,10 @@ function updateDocsJson(repoDir, sdkFiles) {
     const docs = JSON.parse(docsContent);
     
     // Find the "SDK Reference" tab
-    let sdkTab = docs.navigation.tabs.find(tab => tab.tab === 'SDK Reference');
+    const sdkTabIndex = docs.navigation.tabs.findIndex(tab => tab.tab === 'SDK Reference');
+    let sdkTab = docs.navigation.tabs[sdkTabIndex];
     
-    if (!sdkTab) {
+    if (sdkTabIndex === -1) {
      console.log("Could not find 'SDK Reference' tab in docs.json. Creating it...");
      sdkTab = {
         tab: 'SDK Reference',
@@ -96,8 +97,30 @@ function updateDocsJson(repoDir, sdkFiles) {
       });
     }
     
-    sdkTab.groups = newGroups;
-    docs.navigation.tabs.push(sdkTab);
+    const newGroupNames = new Set(newGroups.map(group => group.group));
+    const preservedGroups = [];
+    let insertionIndex;
+
+    for (const existingGroup of sdkTab.groups ?? []) {
+      if (newGroupNames.has(existingGroup.group)) {
+        if (insertionIndex === undefined) {
+          insertionIndex = preservedGroups.length;
+        }
+        continue;
+      }
+      preservedGroups.push(existingGroup);
+    }
+
+    const finalGroups = [...preservedGroups];
+    const targetIndex = insertionIndex ?? finalGroups.length;
+    finalGroups.splice(targetIndex, 0, ...newGroups);
+    sdkTab.groups = finalGroups;
+
+    if (sdkTabIndex === -1) {
+      docs.navigation.tabs.push(sdkTab);
+    } else {
+      docs.navigation.tabs[sdkTabIndex] = sdkTab;
+    }
 
     console.debug(`New groups for docs.json: ${JSON.stringify(newGroups, null, 2)}`);
 
@@ -167,6 +190,21 @@ function main() {
   // Commit the changes
   execSync(`git add docs.json`, { cwd: tempRepoDir });
   execSync(`git add sdk-docs`, { cwd: tempRepoDir });
+
+  const stagedOutput = execSync(`git diff --cached --name-only`, {
+    cwd: tempRepoDir,
+    encoding: 'utf8'
+  });
+
+  const stagedChanges = stagedOutput.trim();
+
+  if (!stagedChanges.length) {
+    console.log("No staged changes detected (docs.json / sdk-docs). Skipping commit and push.");
+    return;
+  }
+
+  console.log(`Changes staged for commit:\n${stagedChanges}`);
+
   execSync(`git commit -m "Auto-updates to SDK Reference Docs"`, { cwd: tempRepoDir });
   execSync(`git push --set-upstream origin ${branch}`, { cwd: tempRepoDir });
 

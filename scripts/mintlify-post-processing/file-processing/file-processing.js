@@ -25,6 +25,7 @@ const TEMPLATE_PATH = path.join(__dirname, 'docs-json-template.json');
 const STYLING_CSS_PATH = path.join(__dirname, 'styling.css');
 const CATEGORY_MAP_PATH = path.join(__dirname, '../category-map.json');
 const TYPES_TO_EXPOSE_PATH = path.join(__dirname, '..', 'types-to-expose.json');
+const APPENDED_ARTICLES_PATH = path.join(__dirname, '../appended-articles.json');
 
 /**
  * Get list of linked type names that should be suppressed
@@ -241,6 +242,212 @@ function processAllFiles(dir, linkedTypeNames, exposedTypeNames) {
   }
 }
 
+function loadAppendedArticlesConfig() {
+  try {
+    const content = fs.readFileSync(APPENDED_ARTICLES_PATH, 'utf-8');
+    const parsed = JSON.parse(content);
+    if (parsed && typeof parsed === 'object') {
+      const normalized = {};
+      for (const [host, value] of Object.entries(parsed)) {
+        if (Array.isArray(value)) {
+          normalized[host] = value;
+        } else if (typeof value === 'string' && value.trim()) {
+          normalized[host] = [value];
+        }
+      }
+      return normalized;
+    }
+  } catch (e) {
+    // Missing or invalid config is not fatal; simply skip appends
+  }
+  return {};
+}
+
+function stripFrontMatter(content) {
+  if (!content.startsWith('---')) {
+    return { title: null, content: content.trimStart() };
+  }
+  const endIndex = content.indexOf('\n---', 3);
+  if (endIndex === -1) {
+    return { title: null, content: content.trimStart() };
+  }
+  const frontMatter = content.slice(0, endIndex + 4);
+  const rest = content.slice(endIndex + 4).trimStart();
+  const titleMatch = frontMatter.match(/title:\s*["']?([^"'\n]+)["']?/i);
+  return {
+    title: titleMatch ? titleMatch[1].trim() : null,
+    content: rest
+  };
+}
+
+function removeFirstPanelBlock(content) {
+  const panelStart = content.indexOf('<Panel>');
+  const panelEnd = content.indexOf('</Panel>');
+  if (panelStart === -1 || panelEnd === -1 || panelEnd < panelStart) {
+    return content;
+  }
+  const before = content.slice(0, panelStart);
+  const after = content.slice(panelEnd + '</Panel>'.length);
+  return (before + after).trimStart();
+}
+
+function normalizeHeadings(content) {
+  const lines = content.split('\n');
+  const headingRegex = /^(#{1,6})\s+(.*)$/;
+  let minLevel = Infinity;
+  for (const line of lines) {
+    const match = line.match(headingRegex);
+    if (match) {
+      minLevel = Math.min(minLevel, match[1].length);
+    }
+  }
+  if (minLevel === Infinity) {
+    return { content: content.trim(), headings: [] };
+  }
+  const baseLevel = 3; // appended section starts at H2, so nested headings start at H3+
+  const headings = [];
+  const adjusted = lines.map((line) => {
+    const match = line.match(headingRegex);
+    if (!match) {
+      return line;
+    }
+    const originalLevel = match[1].length;
+    let newLevel = originalLevel - minLevel + baseLevel;
+    newLevel = Math.max(baseLevel, Math.min(6, newLevel));
+    const text = match[2].trim();
+    headings.push({ text, level: newLevel });
+    return `${'#'.repeat(newLevel)} ${text}`;
+  });
+  return { content: adjusted.join('\n').trim(), headings };
+}
+
+function slugifyHeading(text) {
+  return text
+    .toLowerCase()
+    .replace(/[`~!@#$%^&*()+={}\[\]|\\:;"'<>,.?]/g, '')
+    .replace(/\s+/g, '-');
+}
+
+function ensurePanelSpacing(content) {
+  const panelRegex = /(<Panel>[\s\S]*?)(\n*)(<\/Panel>)/;
+  return content.replace(panelRegex, (match, body, newlineSection, closing) => {
+    const trimmedBody = body.replace(/\s+$/, '');
+    return `${trimmedBody}\n\n${closing}`;
+  });
+}
+
+function updatePanelWithHeadings(hostContent, headings) {
+  if (!headings || headings.length === 0) {
+    return ensurePanelSpacing(hostContent);
+  }
+  const panelStart = hostContent.indexOf('<Panel>');
+  if (panelStart === -1) {
+    return ensurePanelSpacing(hostContent);
+  }
+  const panelEnd = hostContent.indexOf('</Panel>', panelStart);
+  if (panelEnd === -1) {
+    return ensurePanelSpacing(hostContent);
+  }
+  const beforePanel = hostContent.slice(0, panelStart);
+  const panelBlock = hostContent.slice(panelStart, panelEnd);
+  const afterPanel = hostContent.slice(panelEnd);
+
+  const panelLines = panelBlock.split('\n');
+  const existingSlugs = new Set();
+  const slugMatchRegex = /- \[[^\]]+\]\(#([^)]+)\)/;
+  for (const line of panelLines) {
+    const match = line.match(slugMatchRegex);
+    if (match) {
+      existingSlugs.add(match[1]);
+    }
+  }
+
+  const newEntries = [];
+  for (const heading of headings) {
+    const text = heading.text.trim();
+    if (!text) continue;
+    const slug = slugifyHeading(text);
+    if (existingSlugs.has(slug)) {
+      continue;
+    }
+    existingSlugs.add(slug);
+    newEntries.push(`- [${text}](#${slug})`);
+  }
+
+  if (newEntries.length === 0) {
+    return ensurePanelSpacing(hostContent);
+  }
+
+  const insertion = (panelBlock.endsWith('\n') ? '' : '\n') + newEntries.join('\n');
+  const updatedPanelBlock = panelBlock + insertion;
+  const updatedContent = beforePanel + updatedPanelBlock + afterPanel;
+  return ensurePanelSpacing(updatedContent);
+}
+
+function prepareAppendedSection(appendPath) {
+  const rawContent = fs.readFileSync(appendPath, 'utf-8');
+  const { title, content: withoutFrontMatter } = stripFrontMatter(rawContent);
+  const withoutPanel = removeFirstPanelBlock(withoutFrontMatter);
+  const { content: normalizedContent, headings } = normalizeHeadings(withoutPanel);
+  const fileTitle = title || path.basename(appendPath, path.extname(appendPath));
+  const sectionHeading = `## ${fileTitle.trim()}`;
+  const trimmedContent = normalizedContent ? `\n\n${normalizedContent}` : '';
+  const section = `${sectionHeading}${trimmedContent}\n`;
+  const headingList = [{ text: fileTitle.trim(), level: 2 }, ...headings];
+  return { section, headings: headingList };
+}
+
+function applyAppendedArticles(appendedArticles) {
+  const hosts = Object.keys(appendedArticles);
+  if (hosts.length === 0) {
+    return;
+  }
+
+  for (const hostKey of hosts) {
+    const appendList = appendedArticles[hostKey];
+    if (!Array.isArray(appendList) || appendList.length === 0) {
+      continue;
+    }
+
+    const hostPath = path.join(CONTENT_DIR, `${hostKey}.mdx`);
+    if (!fs.existsSync(hostPath)) {
+      console.warn(`Warning: Host article not found for append: ${hostKey}`);
+      continue;
+    }
+
+    let hostContent = fs.readFileSync(hostPath, 'utf-8');
+    let combinedSections = '';
+    const collectedHeadings = [];
+
+    for (const appendKey of appendList) {
+      const appendPath = path.join(CONTENT_DIR, `${appendKey}.mdx`);
+      if (!fs.existsSync(appendPath)) {
+        console.warn(`Warning: Appended article not found: ${appendKey}`);
+        continue;
+      }
+
+      const { section, headings } = prepareAppendedSection(appendPath);
+      combinedSections += `\n\n${section}`;
+      collectedHeadings.push(...headings);
+
+      try {
+        fs.unlinkSync(appendPath);
+        console.log(`Appended ${appendKey}.mdx -> ${hostKey}.mdx`);
+      } catch (e) {
+        console.warn(`Warning: Unable to remove appended article ${appendKey}.mdx`);
+      }
+    }
+
+    if (!combinedSections) {
+      continue;
+    }
+
+    hostContent = hostContent.trimEnd() + combinedSections + '\n';
+    hostContent = updatePanelWithHeadings(hostContent, collectedHeadings);
+    fs.writeFileSync(hostPath, hostContent, 'utf-8');
+  }
+}
+
 /**
  * Main function
  */
@@ -265,6 +472,10 @@ function main() {
     // Fallback to processing entire docs directory
     processAllFiles(DOCS_DIR, linkedTypeNames, exposedTypeNames);
   }
+
+  // Append configured articles
+  const appendedArticles = loadAppendedArticlesConfig();
+  applyAppendedArticles(appendedArticles);
   
   // Clean up the linked types file
   try {

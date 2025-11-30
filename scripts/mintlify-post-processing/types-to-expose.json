@@ -4,6 +4,7 @@
   "AuthModule",
   "ConnectorsModule",
   "EntitiesModule",
+  "EntityHandler",
   "FunctionsModule",
   "IntegrationsModule",
   "SsoModule"

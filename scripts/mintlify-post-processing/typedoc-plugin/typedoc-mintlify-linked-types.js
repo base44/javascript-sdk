@@ -6,80 +6,193 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ReflectionKind } from 'typedoc';
 
+const TYPES_TO_EXPOSE_PATH = path.resolve(process.cwd(), 'scripts/mintlify-post-processing/types-to-expose.json');
+let exposedTypeNames = null;
+try {
+  const raw = fs.readFileSync(TYPES_TO_EXPOSE_PATH, 'utf-8');
+  const parsed = JSON.parse(raw);
+  if (Array.isArray(parsed)) {
+    exposedTypeNames = new Set(parsed);
+  }
+} catch (err) {
+  // Ignore; fall back to linking based on path existence
+  exposedTypeNames = null;
+}
+
+const PROPERTY_KINDS = new Set([
+  ReflectionKind.Property,
+  ReflectionKind.PropertySignature
+]);
+
+const PRIMITIVE_REFERENCES = new Set([
+  'any',
+  'string',
+  'number',
+  'boolean',
+  'void',
+  'null',
+  'undefined',
+  'object',
+  'Array',
+  'Promise',
+  'Record',
+  'Map',
+  'Set',
+  'Date'
+]);
+
+const KIND_DIRECTORY_MAP = {
+  [ReflectionKind.Class]: 'classes',
+  [ReflectionKind.Interface]: 'interfaces',
+  [ReflectionKind.TypeAlias]: 'type-aliases'
+};
+
+function resolveTypePath(typeName, context, targetKind = null) {
+  if (!context?.app || !typeName) {
+    return null;
+  }
+
+  if (exposedTypeNames && !exposedTypeNames.has(typeName)) {
+    return null;
+  }
+
+  const { app, currentPagePath } = context;
+  const outputDir = app.options.getValue('out') || 'docs';
+
+  const directory = KIND_DIRECTORY_MAP[targetKind] || 'interfaces';
+  const filePath = path.join(outputDir, directory, `${typeName}.mdx`);
+
+  if (currentPagePath) {
+    const currentDir = path.dirname(path.join(outputDir, currentPagePath));
+    const relativePath = path.relative(currentDir, filePath).replace(/\\/g, '/');
+    return relativePath.startsWith('.') ? relativePath : `./${relativePath}`;
+  }
+
+  return path.relative(outputDir, filePath).replace(/\\/g, '/');
+}
+
 /**
  * Extract properties from a linked type using TypeDoc's reflection API
  */
-export function extractPropertiesFromLinkedType(linkedTypeInfo, context) {
+export function extractPropertiesFromLinkedType(linkedTypeInfo, context, visited = new Set()) {
   if (!linkedTypeInfo || !context) {
     return [];
   }
 
   const { typeName } = linkedTypeInfo;
-  const { app, page } = context;
+  const visitKey = typeName;
+
+  if (!typeName || visited.has(visitKey)) {
+    return [];
+  }
+
+  visited.add(visitKey);
 
   try {
     // First, try to get the type from TypeDoc's reflection API
-    if (app && page && page.model) {
-      const properties = extractPropertiesFromReflection(typeName, app, page);
-      if (properties.length > 0) {
-        return properties;
+    const { properties: reflectionProps, description: reflectionDescription } = extractPropertiesFromReflection(typeName, context, visited);
+    if (reflectionProps.length > 0) {
+      if (reflectionDescription && linkedTypeInfo) {
+        linkedTypeInfo.description = reflectionDescription;
       }
+      return reflectionProps;
     }
 
     // Fallback: try to read from generated markdown file
-    return extractPropertiesFromMarkdownFile(linkedTypeInfo, context);
+    const { properties: markdownProps, description: markdownDescription } = extractPropertiesFromMarkdownFile(linkedTypeInfo, context);
+    if (markdownDescription && linkedTypeInfo) {
+      linkedTypeInfo.description = markdownDescription;
+    }
+    return markdownProps;
   } catch (error) {
     console.warn(`Error extracting properties for type ${typeName}:`, error.message);
     return [];
+  } finally {
+    visited.delete(visitKey);
   }
+}
+
+export function getLinkedTypeDescription(linkedTypeInfo, context) {
+  if (!linkedTypeInfo || !context) {
+    return '';
+  }
+  if (linkedTypeInfo.description) {
+    return linkedTypeInfo.description;
+  }
+
+  const { typeName } = linkedTypeInfo;
+  if (!typeName) {
+    return '';
+  }
+
+  try {
+    const project = context.page?.model?.project || context.app?.converter?.project;
+    if (project) {
+      const reflection = findReflectionByName(project, typeName);
+      if (reflection) {
+        const description = getCommentSummary(reflection, context);
+        if (description) {
+          linkedTypeInfo.description = description;
+          return description;
+        }
+      }
+    }
+  } catch {
+    // ignore reflection lookup issues
+  }
+
+  try {
+    const { description } = extractPropertiesFromMarkdownFile(linkedTypeInfo, context);
+    if (description) {
+      linkedTypeInfo.description = description;
+      return description;
+    }
+  } catch {
+    // ignore markdown fallback issues
+  }
+
+  return '';
 }
 
 /**
  * Extract properties from TypeDoc's reflection API (preferred method)
  */
-function extractPropertiesFromReflection(typeName, app, page) {
+function extractPropertiesFromReflection(typeName, context, visited) {
+  if (!context) {
+    return { properties: [], description: '' };
+  }
+
+  const { app, page } = context;
+
   try {
     // Access the project through the page's model
-    const project = page.model?.project;
+    const project = page?.model?.project || app?.converter?.project;
     if (!project) {
-      return [];
+      return { properties: [], description: '' };
     }
 
     // Find the type reflection in the project
     const typeReflection = findReflectionByName(project, typeName);
     if (!typeReflection) {
-      return [];
+      return { properties: [], description: '' };
     }
 
     // Extract properties from the reflection
     const properties = [];
+    const propertyNodes = getPropertyNodesFromReflection(typeReflection);
 
-    // For interfaces and type aliases with properties
-    if (typeReflection.children) {
-      for (const child of typeReflection.children) {
-        if (child.kind === ReflectionKind.Property) {
-          const property = {
-            name: child.name,
-            type: getTypeString(child.type),
-            description: child.comment?.summary?.map(p => p.text).join('') || '',
-            optional: isOptional(child),
-            nested: []
-          };
-
-          // Check for nested properties if the type is an object
-          if (child.type && isObjectLikeType(child.type)) {
-            property.nested = extractNestedProperties(child.type);
-          }
-
-          properties.push(property);
-        }
+    for (const child of propertyNodes) {
+      const property = buildPropertyFromReflection(child, context, visited);
+      if (property) {
+        properties.push(property);
       }
     }
 
-    return properties;
+    const description = getCommentSummary(typeReflection, context);
+    return { properties, description };
   } catch (error) {
     console.warn(`Error extracting properties from reflection for ${typeName}:`, error.message);
-    return [];
+    return { properties: [], description: '' };
   }
 }
 
@@ -111,7 +224,7 @@ function getTypeString(type) {
     case 'intrinsic':
       return type.name;
     case 'reference':
-      return type.name;
+      return formatReferenceType(type);
     case 'array':
       return `${getTypeString(type.elementType)}[]`;
     case 'union':
@@ -138,13 +251,13 @@ function isOptional(child) {
  * Check if a type is object-like (has properties)
  */
 function isObjectLikeType(type) {
-  return type.type === 'reflection' && type.declaration?.children;
+  return type?.type === 'reflection' && type.declaration?.children;
 }
 
 /**
  * Extract nested properties from an object type
  */
-function extractNestedProperties(type) {
+function extractNestedPropertiesFromReflectionType(type, context, visited) {
   if (!isObjectLikeType(type)) {
     return [];
   }
@@ -152,13 +265,9 @@ function extractNestedProperties(type) {
   const nested = [];
   if (type.declaration?.children) {
     for (const child of type.declaration.children) {
-      if (child.kind === ReflectionKind.Property) {
-        nested.push({
-          name: child.name,
-          type: getTypeString(child.type),
-          description: child.comment?.summary?.map(p => p.text).join('') || '',
-          optional: isOptional(child)
-        });
+      const property = buildPropertyFromReflection(child, context, visited);
+      if (property) {
+        nested.push(property);
       }
     }
   }
@@ -174,7 +283,7 @@ function extractPropertiesFromMarkdownFile(linkedTypeInfo, context) {
   const { currentPagePath, app } = context;
 
   if (!app || !app.options) {
-    return [];
+    return { properties: [], description: '' };
   }
 
   try {
@@ -235,14 +344,14 @@ function extractPropertiesFromMarkdownFile(linkedTypeInfo, context) {
     // Check if file exists
     if (!fs.existsSync(filePath)) {
       // Don't warn during generation - the file might not exist yet
-      return [];
+      return { properties: [], description: '' };
     }
 
     const content = fs.readFileSync(filePath, 'utf-8');
     return parsePropertiesFromTypeFile(content);
   } catch (error) {
     // Silent failure during generation
-    return [];
+    return { properties: [], description: '' };
   }
 }
 
@@ -253,6 +362,10 @@ function parsePropertiesFromTypeFile(content) {
   const properties = [];
   const lines = content.split('\n');
   
+  // Collect intro description until Properties section
+  const introLines = [];
+  let descriptionCaptured = false;
+
   // Find the Properties section
   let inPropertiesSection = false;
   let i = 0;
@@ -265,6 +378,15 @@ function parsePropertiesFromTypeFile(content) {
       inPropertiesSection = true;
       i++;
       continue;
+    }
+    
+    if (!inPropertiesSection) {
+      if (line.trim()) {
+        introLines.push(line);
+        descriptionCaptured = true;
+      } else if (descriptionCaptured) {
+        introLines.push('');
+      }
     }
     
     // Stop at next top-level heading (##)
@@ -378,6 +500,177 @@ function parsePropertiesFromTypeFile(content) {
     i++;
   }
   
-  return properties;
+  const description = introLines.join('\n').trim();
+  return { properties, description };
+}
+
+function buildPropertyFromReflection(child, context, visited) {
+  if (!child || !PROPERTY_KINDS.has(child.kind)) {
+    return null;
+  }
+
+  const property = {
+    name: child.name,
+    type: getTypeString(child.type),
+    description: getCommentSummary(child, context),
+    optional: isOptional(child),
+    nested: []
+  };
+
+  const nestedFromType = extractNestedPropertiesFromType(child.type, context, visited);
+  if (nestedFromType.length > 0) {
+    property.nested = nestedFromType;
+  }
+
+  return property;
+}
+
+function getPropertyNodesFromReflection(reflection) {
+  if (!reflection) {
+    return [];
+  }
+
+  if (Array.isArray(reflection.children) && reflection.children.length > 0) {
+    return reflection.children;
+  }
+
+  if (reflection.type?.declaration?.children?.length) {
+    return reflection.type.declaration.children;
+  }
+
+  if (reflection.declaration?.children?.length) {
+    return reflection.declaration.children;
+  }
+
+  return [];
+}
+
+function extractNestedPropertiesFromType(type, context, visited) {
+  if (!type) {
+    return [];
+  }
+
+  switch (type.type) {
+    case 'reference': {
+      const referencedName = getReferenceTypeName(type);
+      if (!referencedName || PRIMITIVE_REFERENCES.has(referencedName)) {
+        return [];
+      }
+      return extractPropertiesFromLinkedType(
+        { typeName: referencedName, typePath: referencedName },
+        context,
+        visited
+      );
+    }
+    case 'array':
+      return extractNestedPropertiesFromType(type.elementType, context, visited);
+    case 'union':
+    case 'intersection': {
+      if (!Array.isArray(type.types)) {
+        return [];
+      }
+      for (const subType of type.types) {
+        const nested = extractNestedPropertiesFromType(subType, context, visited);
+        if (nested.length > 0) {
+          return nested;
+        }
+      }
+      return [];
+    }
+    case 'reflection':
+      return extractNestedPropertiesFromReflectionType(type, context, visited);
+    default:
+      return [];
+  }
+}
+
+function getReferenceTypeName(type) {
+  if (!type) {
+    return null;
+  }
+
+  if (typeof type.name === 'string' && type.name) {
+    return type.name;
+  }
+
+  if (typeof type.qualifiedName === 'string' && type.qualifiedName) {
+    const segments = type.qualifiedName.split('.');
+    return segments[segments.length - 1];
+  }
+
+  if (type.reflection?.name) {
+    return type.reflection.name;
+  }
+
+  return null;
+}
+
+function getCommentSummary(reflection, context) {
+  if (!reflection?.comment) {
+    return '';
+  }
+
+  const parts = [];
+  if (Array.isArray(reflection.comment.summary)) {
+    parts.push(...reflection.comment.summary);
+  }
+  if (reflection.comment.blockTags) {
+    for (const tag of reflection.comment.blockTags) {
+      if (tag.tag === '@remarks' && Array.isArray(tag.content)) {
+        parts.push(...tag.content);
+      }
+      if ((tag.tag === '@see' || tag.tag === '@link' || tag.tag === '@linkcode' || tag.tag === '@returns') && Array.isArray(tag.content)) {
+        parts.push(...tag.content);
+      }
+    }
+  }
+
+  if (parts.length === 0) {
+    return '';
+  }
+
+  return parts.map((part) => renderCommentPart(part, context)).join('') || '';
+}
+
+function renderCommentPart(part, context) {
+  if (!part) {
+    return '';
+  }
+
+  switch (part.kind) {
+    case 'text':
+      return part.text || '';
+    case 'code':
+      return part.text ? `\`${part.text}\`` : '';
+    case 'inline-tag':
+      if (part.tag === '@link') {
+        const linkText = (part.text || part.target?.name || '').trim();
+        const typeName = part.target?.name || null;
+        const linkTarget = typeName ? resolveTypePath(typeName, context, part.target?.kind) : null;
+        if (linkTarget && linkText) {
+          return `[${linkText}](${linkTarget})`;
+        }
+        if (linkText) {
+          return linkText;
+        }
+        return typeName || '';
+      }
+      return part.text || '';
+    default:
+      return part.text || '';
+  }
+}
+
+function formatReferenceType(type) {
+  if (!type) {
+    return 'any';
+  }
+
+  let typeName = type.name || 'any';
+  if (type.typeArguments && type.typeArguments.length > 0) {
+    const args = type.typeArguments.map((arg) => getTypeString(arg)).join(', ');
+    typeName += `<${args}>`;
+  }
+  return typeName;
 }
 
