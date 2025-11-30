@@ -828,6 +828,17 @@ function formatReturnFieldsOutput(fields, returnType = null, linkedTypeNames = n
     return '';
   }
 
+  const isSingleSimpleField =
+    fields.length === 1 &&
+    (!fields[0].nested || fields[0].nested.length === 0);
+
+  if (isSingleSimpleField) {
+    // For a single, non-object field, we only need to return its description text.
+    // The type is already rendered separately (`typeNameForDisplay`), so avoid wrapping
+    // it in a ResponseField to keep the output concise.
+    return fields[0].description || '';
+  }
+
   const fieldsBlock = buildResponseFieldsSection(fields, linkedTypeNames, writeLinkedTypesFile).trimEnd();
   if (!fieldsBlock) {
     return '';
