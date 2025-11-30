@@ -1,4 +1,4 @@
-[**@base44/sdk**](../README.md)
+[**@base44/sdk**](../README)
 
 ***
 
@@ -20,7 +20,7 @@ The URL to redirect to after successful login.
 
 ### options
 
-[`GetLoginUrlOptions`](../interfaces/GetLoginUrlOptions.md)
+[`GetLoginUrlOptions`](../interfaces/GetLoginUrlOptions)
 
 Configuration options.
 

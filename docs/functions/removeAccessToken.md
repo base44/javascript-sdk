@@ -1,4 +1,4 @@
-[**@base44/sdk**](../README.md)
+[**@base44/sdk**](../README)
 
 ***
 
@@ -14,7 +14,7 @@ Low-level utility for manually removing tokens from the browser's local storage.
 
 ### options
 
-[`RemoveAccessTokenOptions`](../interfaces/RemoveAccessTokenOptions.md)
+[`RemoveAccessTokenOptions`](../interfaces/RemoveAccessTokenOptions)
 
 Configuration options for token removal.
 

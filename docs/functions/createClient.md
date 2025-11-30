@@ -1,20 +1,20 @@
-[**@base44/sdk**](../README.md)
+[**@base44/sdk**](../README)
 
 ***
 
 # Function: createClient()
 
-> **createClient**(`config`): [`Base44Client`](../interfaces/Base44Client.md)
+> **createClient**(`config`): [`Base44Client`](../interfaces/Base44Client)
 
 Creates a Base44 SDK client instance.
 
-This is the main entry point for the Base44 SDK. It creates a client that provides access to the SDK's modules, such as [`entities`](../interfaces/EntitiesModule.md), [`auth`](../interfaces/AuthModule.md), and [`functions`](../interfaces/FunctionsModule.md).
+This is the main entry point for the Base44 SDK. It creates a client that provides access to the SDK's modules, such as [`entities`](../interfaces/entities), [`auth`](../interfaces/auth), and [`functions`](../interfaces/functions).
 
 The client supports two authentication modes:
 - **User authentication** (default): Access modules with user-level permissions using `base44.moduleName`.
 - **Service role authentication**: Access modules with elevated permissions using `base44.asServiceRole.moduleName`.
 
-For example, when using the [`entities`](../interfaces/EntitiesModule.md) module with user authentication you'll only have access to the current user's data. With service role authentication, you'll have access to all data across the entire app.
+For example, when using the [`entities`](../interfaces/entities) module with user authentication you'll only have access to the current user's data. With service role authentication, you'll have access to all data across the entire app.
 
 Most modules are available in both modes, but with different permission levels. However, some modules are only available in one authentication mode.
 
@@ -24,13 +24,13 @@ To use the service role authentication mode, you need to provide a service role 
 
 ### config
 
-[`CreateClientConfig`](../interfaces/CreateClientConfig.md)
+[`CreateClientConfig`](../interfaces/CreateClientConfig)
 
 Configuration object for the client.
 
 ## Returns
 
-[`Base44Client`](../interfaces/Base44Client.md)
+[`Base44Client`](../interfaces/Base44Client)
 
 A configured Base44 client instance with access to all SDK modules.
 

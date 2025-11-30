@@ -1,4 +1,4 @@
-[**@base44/sdk**](../README.md)
+[**@base44/sdk**](../README)
 
 ***
 
@@ -15,7 +15,7 @@ token management automatically. This function is useful for custom authenticatio
 
 ### options
 
-[`GetAccessTokenOptions`](../interfaces/GetAccessTokenOptions.md) = `{}`
+[`GetAccessTokenOptions`](../interfaces/GetAccessTokenOptions) = `{}`
 
 Configuration options for token retrieval.
 

@@ -1,10 +1,10 @@
-[**@base44/sdk**](../README.md)
+[**@base44/sdk**](../README)
 
 ***
 
 # Function: createClientFromRequest()
 
-> **createClientFromRequest**(`request`): [`Base44Client`](../interfaces/Base44Client.md)
+> **createClientFromRequest**(`request`): [`Base44Client`](../interfaces/Base44Client)
 
 Creates a Base44 client from an HTTP request.
 
@@ -20,7 +20,7 @@ The incoming HTTP request object containing Base44 authentication headers.
 
 ## Returns
 
-[`Base44Client`](../interfaces/Base44Client.md)
+[`Base44Client`](../interfaces/Base44Client)
 
 A configured Base44 client instance with authentication from the incoming request.
 

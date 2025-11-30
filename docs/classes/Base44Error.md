@@ -1,4 +1,4 @@
-[**@base44/sdk**](../README.md)
+[**@base44/sdk**](../README)
 
 ***
 
@@ -63,7 +63,7 @@ The original error object from Axios.
 
 ### toJSON()
 
-> **toJSON**(): [`Base44ErrorJSON`](../interfaces/Base44ErrorJSON.md)
+> **toJSON**(): [`Base44ErrorJSON`](../interfaces/Base44ErrorJSON)
 
 Serializes the error to a JSON-safe object.
 
@@ -72,7 +72,7 @@ without circular reference issues.
 
 #### Returns
 
-[`Base44ErrorJSON`](../interfaces/Base44ErrorJSON.md)
+[`Base44ErrorJSON`](../interfaces/Base44ErrorJSON)
 
 JSON-safe representation of the error.
 

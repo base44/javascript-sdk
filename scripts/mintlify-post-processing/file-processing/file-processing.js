@@ -93,7 +93,13 @@ function processLinksInFile(filePath) {
 
   // Remove .md and .mdx extensions from markdown links
   // This handles both relative and absolute paths
-  const linkRegex = /\[([^\]]+)\]\(([^)]+)(\.mdx?)\)/g;
+  // Regex breakdown:
+  // \[([^\]]+)\] : Match [LinkText]
+  // \( : Match opening (
+  // ([^)]+) : Match path (Group 2)
+  // (\.mdx?)? : Optionally match .md or .mdx extension (Group 3), making it optional to catch links that might have already lost extension or never had it if inconsistent
+  // \) : Match closing )
+  const linkRegex = /\[([^\]]+)\]\(([^)]+?)(\.mdx?)?\)/g;
   let newContent = content.replace(
     linkRegex,
     (match, linkText, linkPath, ext) => {
@@ -103,10 +109,16 @@ function processLinksInFile(filePath) {
       const pathParts = linkPath.split("/");
       const filename = pathParts[pathParts.length - 1];
 
-      if (MODULE_RENAMES[filename]) {
-        pathParts[pathParts.length - 1] = MODULE_RENAMES[filename];
+      // If filename has extension, strip it for checking map
+      const nameWithoutExt = filename.replace(/\.mdx?$/, "");
+
+      if (MODULE_RENAMES[nameWithoutExt]) {
+        pathParts[pathParts.length - 1] = MODULE_RENAMES[nameWithoutExt];
         linkPath = pathParts.join("/");
       }
+
+      // Handle relative links that might be missing context (basic cleanup)
+      // e.g. if linkPath is just "entities" but it should be relative
 
       return `[${linkText}](${linkPath})`;
     }
@@ -147,25 +159,42 @@ function performModuleRenames(dir) {
         path.extname(entry.name)
       );
 
+      // Check if it's a renamed file or one that needs renaming
+      // e.g. "EntitiesModule" needs renaming. "entities" might need title update.
+
+      let targetName = nameWithoutExt;
+      let needsRename = false;
+
       if (MODULE_RENAMES[nameWithoutExt]) {
-        const newName = MODULE_RENAMES[nameWithoutExt];
-        const newPath = path.join(dir, `${newName}.mdx`); // Always use .mdx for new files
+        targetName = MODULE_RENAMES[nameWithoutExt];
+        needsRename = true;
+      } else if (REVERSE_MODULE_RENAMES[nameWithoutExt]) {
+        // It's already renamed (e.g. "entities"), but we should ensure title is correct
+        targetName = nameWithoutExt;
+      }
+
+      if (needsRename || REVERSE_MODULE_RENAMES[targetName]) {
+        const newPath = path.join(dir, `${targetName}.mdx`); // Always use .mdx
 
         let content = fs.readFileSync(entryPath, "utf-8");
 
         // Update title in frontmatter
         const titleRegex = /^title:\s*["']?([^"'\n]+)["']?/m;
         if (titleRegex.test(content)) {
-          content = content.replace(titleRegex, `title: "${newName}"`);
+          // Force the title to be the target name
+          content = content.replace(titleRegex, `title: "${targetName}"`);
         }
 
-        // Write to new path
+        // Write to new path (if renaming) or overwrite (if just updating title)
         fs.writeFileSync(newPath, content, "utf-8");
 
         // Delete old file if name is different
         if (entryPath !== newPath) {
           fs.unlinkSync(entryPath);
-          console.log(`Renamed module: ${entry.name} -> ${newName}.mdx`);
+          console.log(`Renamed module: ${entry.name} -> ${targetName}.mdx`);
+        } else {
+          // If we just updated the title in place
+          // console.log(`Updated title for: ${targetName}`);
         }
       }
     }
@@ -546,12 +575,33 @@ function applyAppendedArticles(appendedArticles) {
         effectiveAppendKey = appendParts.join("/");
       }
 
-      const appendPath = path.join(CONTENT_DIR, `${effectiveAppendKey}.mdx`);
+      // Try looking in CONTENT_DIR with .mdx (default)
+      let appendPath = path.join(CONTENT_DIR, `${effectiveAppendKey}.mdx`);
+      let foundExtension = ".mdx";
+
       if (!fs.existsSync(appendPath)) {
-        console.warn(
-          `Warning: Appended article not found: ${appendKey} (checked ${effectiveAppendKey}.mdx)`
-        );
-        continue;
+        // Try .md in CONTENT_DIR
+        appendPath = path.join(CONTENT_DIR, `${effectiveAppendKey}.md`);
+        foundExtension = ".md";
+
+        if (!fs.existsSync(appendPath)) {
+          // Try looking in DOCS_DIR directly (for un-moved files)
+          // Assuming the key (e.g. interfaces/EntityHandler) is relative to DOCS_DIR too
+          appendPath = path.join(DOCS_DIR, `${effectiveAppendKey}.mdx`);
+          foundExtension = ".mdx";
+
+          if (!fs.existsSync(appendPath)) {
+            appendPath = path.join(DOCS_DIR, `${effectiveAppendKey}.md`);
+            foundExtension = ".md";
+
+            if (!fs.existsSync(appendPath)) {
+              console.warn(
+                `Warning: Appended article not found: ${appendKey} (checked content/ and docs/ roots)`
+              );
+              continue;
+            }
+          }
+        }
       }
 
       const { section, headings } = prepareAppendedSection(appendPath);
@@ -561,11 +611,11 @@ function applyAppendedArticles(appendedArticles) {
       try {
         fs.unlinkSync(appendPath);
         console.log(
-          `Appended ${effectiveAppendKey}.mdx -> ${effectiveHostKey}.mdx`
+          `Appended ${effectiveAppendKey}${foundExtension} -> ${effectiveHostKey}.mdx`
         );
       } catch (e) {
         console.warn(
-          `Warning: Unable to remove appended article ${effectiveAppendKey}.mdx`
+          `Warning: Unable to remove appended article ${effectiveAppendKey}${foundExtension}`
         );
       }
     }
@@ -597,20 +647,10 @@ function main() {
   const exposedTypeNames = getTypesToExpose();
 
   // First, perform module renames (EntitiesModule -> entities, etc.)
-  if (fs.existsSync(CONTENT_DIR)) {
-    performModuleRenames(CONTENT_DIR);
-  } else {
-    performModuleRenames(DOCS_DIR);
-  }
+  performModuleRenames(DOCS_DIR);
 
   // Process all files (remove suppressed ones and fix links)
-  // Process content directory specifically
-  if (fs.existsSync(CONTENT_DIR)) {
-    processAllFiles(CONTENT_DIR, linkedTypeNames, exposedTypeNames);
-  } else {
-    // Fallback to processing entire docs directory
-    processAllFiles(DOCS_DIR, linkedTypeNames, exposedTypeNames);
-  }
+  processAllFiles(DOCS_DIR, linkedTypeNames, exposedTypeNames);
 
   // Append configured articles
   const appendedArticles = loadAppendedArticlesConfig();

@@ -1,4 +1,4 @@
-[**@base44/sdk**](../README.md)
+[**@base44/sdk**](../README)
 
 ***
 
@@ -37,6 +37,6 @@ Service role authentication token. Use this in the backend when you need elevate
 
 ### options?
 
-> `optional` **options**: [`CreateClientOptions`](CreateClientOptions.md)
+> `optional` **options**: [`CreateClientOptions`](CreateClientOptions)
 
 Additional client options.

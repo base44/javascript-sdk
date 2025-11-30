@@ -1,4 +1,4 @@
-[**@base44/sdk**](../README.md)
+[**@base44/sdk**](../README)
 
 ***
 
@@ -20,7 +20,7 @@ The access token string to save.
 
 ### options
 
-[`SaveAccessTokenOptions`](../interfaces/SaveAccessTokenOptions.md)
+[`SaveAccessTokenOptions`](../interfaces/SaveAccessTokenOptions)
 
 Configuration options for saving the token.
 
