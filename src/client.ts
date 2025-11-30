@@ -32,7 +32,10 @@ export type { Base44Client, CreateClientConfig, CreateClientOptions };
  *
  * <Info> Typically, you create a client with service role authentication using the {@linkcode createClientFromRequest | createClientFromRequest()} function in your backend functions.</Info>
  *
- * For example, when using the {@linkcode EntitiesModule | entities} module anonymously you can only read public data. With user authentication, you'll have access to the current user's data. With service role authentication, you'll have access to all data that admins can access.
+ * For example, when using the {@linkcode EntitiesModule | entities} module:
+ * - **Anonymous**: Can only read public data.
+ * - **User authentication**: Can access the current user's data.
+ * - **Service role authentication**: Can access all data that admins can access.
  *
  * Most modules are available in all three modes, but with different permission levels. However, some modules are only available in specific authentication modes.
  *
