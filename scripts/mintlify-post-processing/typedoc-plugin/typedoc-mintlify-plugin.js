@@ -11,6 +11,9 @@ import { convertFunctionParameters, convertInterfaceMethodParameters, convertCla
 import { convertFunctionReturns, convertInterfaceMethodReturns, convertClassMethodReturns } from './typedoc-mintlify-returns.js';
 import { convertExamplesToCodeGroup, addMintlifyFrontmatter, addHeadingsToCodeGroups } from './typedoc-mintlify-content.js';
 
+// Shared flag with the post-processing script so Panel output can be toggled.
+const PANELS_ENABLED = process.env.MINTLIFY_INCLUDE_PANELS === 'true';
+
 /**
  * Plugin load function called by TypeDoc
  */
@@ -67,7 +70,9 @@ export function load(app) {
     content = content.replace(/\[([^\]]+)\]\(([^)]+)\.mdx?\)/g, '[$1]($2)');
     
     // 6. Add on-page navigation panel
-    content = addOnThisPagePanel(content, page);
+    if (PANELS_ENABLED) {
+      content = addOnThisPagePanel(content, page);
+    }
     
     // 7. Add frontmatter
     content = addMintlifyFrontmatter(content, page);
@@ -116,6 +121,9 @@ function createWriteLinkedTypesFile(app) {
  * Insert a Mintlify Panel with links to method headings (###) for type docs
  */
 function addOnThisPagePanel(content, page) {
+  if (!PANELS_ENABLED) {
+    return content;
+  }
   const links = getPanelLinksForPage(page, content);
   if (!links || links.length === 0) {
     return content;

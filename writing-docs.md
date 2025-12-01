@@ -41,6 +41,14 @@ The file maps the host doc (left side) to one or more articles to append (right 
 
 When you run `npm run create-docs`, the post-processing script appends each listed article to the host page under a new `##` heading, updates the panel/table-of-contents links, and then deletes the standalone appended files so they no longer appear in navigation. Edit the JSON mapping and rerun the command anytime you want to combine or separate pages.
 
+### Toggle Mintlify Panel output
+Both the TypeDoc plugin and the post-processing scripts can insert Mintlify `Panel` components (used for the “On this page” navigation). This behavior is now optional and **disabled by default** so the generated docs contain no panels unless explicitly requested.
+
+- Leave `MINTLIFY_INCLUDE_PANELS` unset (default) to skip inserting panels anywhere in the pipeline.
+- Set `MINTLIFY_INCLUDE_PANELS=true` before running `npm run create-docs` if you want to re-enable the legacy Panel output for a run.
+
+Because both the TypeDoc plugin and the appended-article merger consult the same environment variable, flipping it on/off controls the entire docs build without needing code changes.
+
 ## Push SDK docs to the Mintlify docs repository
 
 After generating and reviewing the docs, you can push them to the `base44/mintlify-docs` repo to deploy them.

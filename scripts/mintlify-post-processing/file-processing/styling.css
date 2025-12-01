@@ -112,3 +112,9 @@ a:has(code) {
   text-decoration: none !important;
   color: #FF8844 !important; /* light orange */
 }
+
+/* Hide nested TOC items on interface pages */
+body:has([data-page-href*="/content/interfaces/"]) .toc li[data-depth]:not([data-depth="1"]) {
+  display: none !important;
+}
+

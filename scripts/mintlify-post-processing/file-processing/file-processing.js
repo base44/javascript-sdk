@@ -30,6 +30,9 @@ const APPENDED_ARTICLES_PATH = path.join(
   "../appended-articles.json"
 );
 
+// Controlled via env var so we can re-enable Panel injection when needed.
+const PANELS_ENABLED = process.env.MINTLIFY_INCLUDE_PANELS === "true";
+
 const MODULE_RENAMES = {
   AgentsModule: "agents",
   AppLogsModule: "app-logs",
@@ -435,7 +438,7 @@ function normalizeHeadings(content) {
   if (minLevel === Infinity) {
     return { content: content.trim(), headings: [] };
   }
-  const baseLevel = 3; // appended section starts at H2, so nested headings start at H3+
+  const baseLevel = 2; // clamp appended content so its top-level headings render as H2
   const headings = [];
   const adjusted = lines.map((line) => {
     const match = line.match(headingRegex);
@@ -468,6 +471,9 @@ function ensurePanelSpacing(content) {
 }
 
 function updatePanelWithHeadings(hostContent, headings) {
+  if (!PANELS_ENABLED) {
+    return hostContent;
+  }
   if (!headings || headings.length === 0) {
     return ensurePanelSpacing(hostContent);
   }
@@ -563,7 +569,7 @@ function applyAppendedArticles(appendedArticles) {
 
     let hostContent = fs.readFileSync(hostPath, "utf-8");
     let combinedSections = "";
-    const collectedHeadings = [];
+    const collectedHeadings = PANELS_ENABLED ? [] : null;
 
     for (const appendKey of appendList) {
       // Check if appended file was renamed (unlikely for EntityHandler but good for consistency)
@@ -606,7 +612,9 @@ function applyAppendedArticles(appendedArticles) {
 
       const { section, headings } = prepareAppendedSection(appendPath);
       combinedSections += `\n\n${section}`;
-      collectedHeadings.push(...headings);
+      if (PANELS_ENABLED && collectedHeadings) {
+        collectedHeadings.push(...headings);
+      }
 
       try {
         fs.unlinkSync(appendPath);
@@ -627,6 +635,52 @@ function applyAppendedArticles(appendedArticles) {
     hostContent = hostContent.trimEnd() + combinedSections + "\n";
     hostContent = updatePanelWithHeadings(hostContent, collectedHeadings);
     fs.writeFileSync(hostPath, hostContent, "utf-8");
+  }
+}
+
+function demoteNonCallableHeadings(content) {
+  const lines = content.split("\n");
+  let inFence = false;
+  let modified = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    if (trimmed.startsWith("```")) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) {
+      continue;
+    }
+    if (line.startsWith("### ")) {
+      const headingText = line.slice(4).trim();
+      if (!headingText.includes("(")) {
+        lines[i] = `#### ${headingText}`;
+        modified = true;
+      }
+    }
+  }
+  return { content: lines.join("\n"), modified };
+}
+
+function applyHeadingDemotion(dir) {
+  if (!fs.existsSync(dir)) return;
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      applyHeadingDemotion(entryPath);
+    } else if (
+      entry.isFile() &&
+      (entry.name.endsWith(".mdx") || entry.name.endsWith(".md"))
+    ) {
+      const content = fs.readFileSync(entryPath, "utf-8");
+      const { content: updated, modified } = demoteNonCallableHeadings(content);
+      if (modified) {
+        fs.writeFileSync(entryPath, updated, "utf-8");
+        console.log(`Adjusted headings: ${path.relative(DOCS_DIR, entryPath)}`);
+      }
+    }
   }
 }
 
@@ -655,6 +709,8 @@ function main() {
   // Append configured articles
   const appendedArticles = loadAppendedArticlesConfig();
   applyAppendedArticles(appendedArticles);
+
+  applyHeadingDemotion(DOCS_DIR);
 
   // Clean up the linked types file
   try {
