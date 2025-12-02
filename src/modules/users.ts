@@ -21,7 +21,7 @@ export function createUsersModule(axios: AxiosInstance, appId: string) {
         );
       }
 
-      const response = await axios.post(`/apps/${appId}/users/invite-user`, { user_email, role });
+      const response = await axios.post(`/apps/${appId}/runtime/users/invite-user`, { user_email, role });
       return response;
     },
   };
