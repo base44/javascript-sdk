@@ -52,6 +52,20 @@ export type {
   IntegrationsModule,
   IntegrationPackage,
   IntegrationEndpointFunction,
+  CoreIntegrations,
+  InvokeLLMParams,
+  GenerateImageParams,
+  GenerateImageResult,
+  UploadFileParams,
+  UploadFileResult,
+  SendEmailParams,
+  SendEmailResult,
+  ExtractDataFromUploadedFileParams,
+  ExtractDataFromUploadedFileResult,
+  UploadPrivateFileParams,
+  UploadPrivateFileResult,
+  CreateFileSignedUrlParams,
+  CreateFileSignedUrlResult,
 } from "./modules/integrations.types.js";
 
 export type { FunctionsModule } from "./modules/functions.types.js";

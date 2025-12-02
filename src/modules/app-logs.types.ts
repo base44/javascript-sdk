@@ -39,62 +39,27 @@ export interface GetStatsParams {
 /**
  * App Logs module for tracking and analyzing app usage.
  *
- * This module provides methods to log user activity, fetch logs, and retrieve
- * statistics about the app's usage. Useful for analytics, monitoring,
- * and understanding user behavior.
+ * This module provides a method to log user activity. The logs are reflected in the Analytics page in the app dashboard.
  *
- * This module is available to use with a client in all authentication modes:
- *
- * - **Anonymous or User authentication** (`base44.appLogs`): Access is scoped to the current user's permissions. Anonymous users can create logs but cannot retrieve them, while authenticated users can create logs and retrieve only their own logs and statistics.
- * - **Service role authentication** (`base44.asServiceRole.appLogs`): Operations have elevated admin-level permissions. Can access all logs and statistics that the app's admin role has access to. This is useful for admin dashboards, analytics, and monitoring overall usage patterns.
- *
- * @example
- * ```typescript
- * // Log user visiting a page
- * await base44.appLogs.logUserInApp('dashboard');
- * ```
- *
- * @example
- * ```typescript
- * // Fetch recent logs
- * const logs = await base44.appLogs.fetchLogs({
- *   limit: 100,
- *   sort: '-timestamp'
- * });
- * ```
- *
- * @example
- * ```typescript
- * // Get app statistics
- * const stats = await base44.appLogs.getStats({
- *   startDate: '2024-01-01',
- *   endDate: '2024-01-31'
- * });
- * ```
+ * This module is available to use with a client in all authentication modes.
  */
 export interface AppLogsModule {
   /**
    * Log user activity in the app.
    *
-   * Records when a user visits a specific page or section of the app.
-   * Useful for tracking user navigation patterns and popular features.
+   * Records when a user visits a specific page or section of the app. Useful for tracking user navigation patterns and popular features. The logs are reflected in the Analytics page in the app dashboard.
+   *
+   * The specified page name doesn't have to be the name of an actual page in the app, it can be any string you want to use to track the activity.
    *
    * @param pageName - Name of the page or section being visited.
    * @returns Promise that resolves when the log is recorded.
    *
    * @example
    * ```typescript
-   * // Log page visit
+   * // Log page visit or feature usage
    * await base44.appLogs.logUserInApp('home');
-   * await base44.appLogs.logUserInApp('profile');
-   * await base44.appLogs.logUserInApp('settings');
-   * ```
-   *
-   * @example
-   * ```typescript
-   * // Log specific feature usage
-   * await base44.appLogs.logUserInApp('checkout-page');
-   * await base44.appLogs.logUserInApp('product-details');
+   * await base44.appLogs.logUserInApp('features-section');
+   * await base44.appLogs.logUserInApp('button-click');
    * ```
    */
   logUserInApp(pageName: string): Promise<void>;
@@ -140,6 +105,7 @@ export interface AppLogsModule {
    *   endDate: '2024-01-31'
    * });
    * ```
+   * @internal
    */
   fetchLogs(params?: FetchLogsParams): Promise<any>;
 
@@ -183,6 +149,7 @@ export interface AppLogsModule {
    *   metric: 'active_users'
    * });
    * ```
+   * @internal
    */
   getStats(params?: GetStatsParams): Promise<any>;
 }

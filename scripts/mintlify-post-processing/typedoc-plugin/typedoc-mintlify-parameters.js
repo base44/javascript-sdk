@@ -2,13 +2,30 @@
  * Parameter conversion functions for TypeDoc Mintlify plugin
  */
 
-import { escapeAttribute } from './typedoc-mintlify-utils.js';
-import { extractPropertiesFromLinkedType } from './typedoc-mintlify-linked-types.js';
-import * as fs from 'fs';
-import * as path from 'path';
+import { escapeAttribute } from "./typedoc-mintlify-utils.js";
+import { extractPropertiesFromLinkedType } from "./typedoc-mintlify-linked-types.js";
+import * as fs from "fs";
+import * as path from "path";
 
-const PRIMITIVE_TYPES = ['any', 'string', 'number', 'boolean', 'void', 'null', 'undefined', 'object', 'Array', 'Promise'];
-const WRAPPER_TYPE_NAMES = new Set(['Partial', 'Required', 'Readonly', 'Omit', 'Pick']);
+const PRIMITIVE_TYPES = [
+  "any",
+  "string",
+  "number",
+  "boolean",
+  "void",
+  "null",
+  "undefined",
+  "object",
+  "Array",
+  "Promise",
+];
+const WRAPPER_TYPE_NAMES = new Set([
+  "Partial",
+  "Required",
+  "Readonly",
+  "Omit",
+  "Pick",
+]);
 
 // Helper function to resolve type paths (similar to returns file)
 function resolveTypePath(typeName, app, currentPagePath = null) {
@@ -16,102 +33,162 @@ function resolveTypePath(typeName, app, currentPagePath = null) {
   if (PRIMITIVE_TYPES.includes(typeName)) {
     return null;
   }
-  
+
   if (!app || !app.options) {
     return null;
   }
-  
-  const outputDir = app.options.getValue('out') || 'docs';
-  
+
+  const outputDir = app.options.getValue("out") || "docs";
+
   // Try interfaces/ first, then type-aliases/
-  let filePath = path.join(outputDir, 'interfaces', typeName + '.mdx');
+  let filePath = path.join(outputDir, "interfaces", typeName + ".mdx");
   if (!fs.existsSync(filePath)) {
-    filePath = path.join(outputDir, 'interfaces', typeName + '.md');
+    filePath = path.join(outputDir, "interfaces", typeName + ".md");
   }
   if (!fs.existsSync(filePath)) {
-    filePath = path.join(outputDir, 'type-aliases', typeName + '.mdx');
+    filePath = path.join(outputDir, "type-aliases", typeName + ".mdx");
   }
   if (!fs.existsSync(filePath)) {
-    filePath = path.join(outputDir, 'type-aliases', typeName + '.md');
+    filePath = path.join(outputDir, "type-aliases", typeName + ".md");
   }
-  
+
   if (fs.existsSync(filePath)) {
     // Convert to relative path from current page if possible
     if (currentPagePath) {
       const currentDir = path.dirname(path.join(outputDir, currentPagePath));
-      const relativePath = path.relative(currentDir, filePath).replace(/\\/g, '/');
-      return relativePath.startsWith('.') ? relativePath : './' + relativePath;
+      const relativePath = path
+        .relative(currentDir, filePath)
+        .replace(/\\/g, "/");
+      return relativePath.startsWith(".") ? relativePath : "./" + relativePath;
     }
     // Otherwise return path relative to outputDir
-    return path.relative(outputDir, filePath).replace(/\\/g, '/');
+    return path.relative(outputDir, filePath).replace(/\\/g, "/");
   }
-  
+
   return null;
 }
 
 /**
  * Convert top-level function parameters (## Parameters with ### param names)
  */
-export function convertFunctionParameters(content, app = null, page = null, linkedTypeNames = null, writeLinkedTypesFile = null) {
+export function convertFunctionParameters(
+  content,
+  app = null,
+  page = null,
+  linkedTypeNames = null,
+  writeLinkedTypesFile = null
+) {
   // Split content by ## headings to isolate the Parameters section
   const sections = content.split(/\n(?=##\s+\w)/);
-  
-  return sections.map(section => {
-    // Only process ## Parameters sections (must start with exactly ##, not ###)
-    if (!section.match(/^##\s+Parameters\s*$/m)) {
-      return section;
-    }
-    
-    // Extract the content after "## Parameters"
-    const lines = section.split('\n');
-    const paramStartIdx = lines.findIndex(l => l.match(/^##\s+Parameters\s*$/));
-    
-    if (paramStartIdx === -1) return section;
-    
-    // Get everything after "## Parameters" line
-    const paramLines = lines.slice(paramStartIdx + 1);
-    const paramContent = paramLines.join('\n');
-    
-    // Parse parameters with context for linked type resolution
-    const context = app && page ? { app, page, currentPagePath: page.url } : null;
-    const params = parseParametersWithExpansion(paramContent, '###', '####', context, linkedTypeNames, writeLinkedTypesFile);
-    
-    if (params.length === 0) return section;
-    
-    // Rebuild section with ParamFields
-    const beforeParams = lines.slice(0, paramStartIdx + 1).join('\n');
-    return beforeParams + '\n\n' + buildParamFieldsSection(params, linkedTypeNames, writeLinkedTypesFile);
-  }).join('\n');
+
+  return sections
+    .map((section) => {
+      // Only process ## Parameters sections (must start with exactly ##, not ###)
+      if (!section.match(/^##\s+Parameters\s*$/m)) {
+        return section;
+      }
+
+      // Extract the content after "## Parameters"
+      const lines = section.split("\n");
+      const paramStartIdx = lines.findIndex((l) =>
+        l.match(/^##\s+Parameters\s*$/)
+      );
+
+      if (paramStartIdx === -1) return section;
+
+      // Get everything after "## Parameters" line
+      const paramLines = lines.slice(paramStartIdx + 1);
+      const paramContent = paramLines.join("\n");
+
+      // Parse parameters with context for linked type resolution
+      const context =
+        app && page ? { app, page, currentPagePath: page.url } : null;
+      const params = parseParametersWithExpansion(
+        paramContent,
+        "###",
+        "####",
+        context,
+        linkedTypeNames,
+        writeLinkedTypesFile
+      );
+
+      if (params.length === 0) return section;
+
+      // Rebuild section with ParamFields
+      const beforeParams = lines.slice(0, paramStartIdx + 1).join("\n");
+      return (
+        beforeParams +
+        "\n\n" +
+        buildParamFieldsSection(params, linkedTypeNames, writeLinkedTypesFile)
+      );
+    })
+    .join("\n");
 }
 
 /**
  * Convert interface method parameters (#### Parameters with ##### param names)
  */
-export function convertInterfaceMethodParameters(content, app = null, page = null, linkedTypeNames = null, writeLinkedTypesFile = null) {
+export function convertInterfaceMethodParameters(
+  content,
+  app = null,
+  page = null,
+  linkedTypeNames = null,
+  writeLinkedTypesFile = null
+) {
   const context = app && page ? { app, page, currentPagePath: page.url } : null;
-  return rewriteParameterSections(content, '#### Parameters', '#####', '######', context, linkedTypeNames, writeLinkedTypesFile);
+  return rewriteParameterSections(
+    content,
+    "#### Parameters",
+    "#####",
+    "######",
+    context,
+    linkedTypeNames,
+    writeLinkedTypesFile
+  );
 }
 
 /**
  * Convert class method parameters (#### Parameters with ##### param names)
  */
-export function convertClassMethodParameters(content, app = null, page = null, linkedTypeNames = null, writeLinkedTypesFile = null) {
+export function convertClassMethodParameters(
+  content,
+  app = null,
+  page = null,
+  linkedTypeNames = null,
+  writeLinkedTypesFile = null
+) {
   const context = app && page ? { app, page, currentPagePath: page.url } : null;
-  return rewriteParameterSections(content, '#### Parameters', '#####', '######', context, linkedTypeNames, writeLinkedTypesFile);
+  return rewriteParameterSections(
+    content,
+    "#### Parameters",
+    "#####",
+    "######",
+    context,
+    linkedTypeNames,
+    writeLinkedTypesFile
+  );
 }
 
-function rewriteParameterSections(content, sectionHeading, paramLevel, nestedLevel, context = null, linkedTypeNames = null, writeLinkedTypesFile = null) {
-  const lines = content.split('\n');
+function rewriteParameterSections(
+  content,
+  sectionHeading,
+  paramLevel,
+  nestedLevel,
+  context = null,
+  linkedTypeNames = null,
+  writeLinkedTypesFile = null
+) {
+  const lines = content.split("\n");
   const result = [];
   let i = 0;
 
   const isTerminatorLine = (line) => {
     return (
-      line.startsWith('#### Returns') ||
-      line.startsWith('#### Example') ||
-      line === '***' ||
-      line.startsWith('### ') ||
-      line.startsWith('## ')
+      line.startsWith("#### Returns") ||
+      line.startsWith("#### Example") ||
+      line === "***" ||
+      line.startsWith("### ") ||
+      line.startsWith("## ")
     );
   };
 
@@ -125,17 +202,35 @@ function rewriteParameterSections(content, sectionHeading, paramLevel, nestedLev
         i++;
       }
       const sectionContentLines = lines.slice(sectionStart, i);
-      const sectionContent = sectionContentLines.join('\n').trim();
+      const sectionContent = sectionContentLines.join("\n").trim();
       // Use parseParametersWithExpansion if context is available, otherwise use parseParameters
-      const params = context 
-        ? parseParametersWithExpansion(sectionContent, paramLevel, nestedLevel, context, linkedTypeNames, writeLinkedTypesFile)
-        : parseParameters(sectionContent, paramLevel, nestedLevel, context, linkedTypeNames, writeLinkedTypesFile);
+      const params = context
+        ? parseParametersWithExpansion(
+            sectionContent,
+            paramLevel,
+            nestedLevel,
+            context,
+            linkedTypeNames,
+            writeLinkedTypesFile
+          )
+        : parseParameters(
+            sectionContent,
+            paramLevel,
+            nestedLevel,
+            context,
+            linkedTypeNames,
+            writeLinkedTypesFile
+          );
       if (params.length > 0) {
-        const block = buildParamFieldsSection(params, linkedTypeNames, writeLinkedTypesFile).trim();
+        const block = buildParamFieldsSection(
+          params,
+          linkedTypeNames,
+          writeLinkedTypesFile
+        ).trim();
         if (block) {
-          result.push('');
-          result.push(...block.split('\n'));
-          result.push('');
+          result.push("");
+          result.push(...block.split("\n"));
+          result.push("");
         }
       } else {
         result.push(...sectionContentLines);
@@ -147,27 +242,43 @@ function rewriteParameterSections(content, sectionHeading, paramLevel, nestedLev
     i++;
   }
 
-  return result.join('\n');
+  return result.join("\n");
 }
 
 /**
  * Parse parameters with type expansion (for functions)
  */
-function parseParametersWithExpansion(paramContent, paramLevel, nestedLevel, context = null, linkedTypeNames = null, writeLinkedTypesFile = null) {
-  const lines = paramContent.split('\n');
+function parseParametersWithExpansion(
+  paramContent,
+  paramLevel,
+  nestedLevel,
+  context = null,
+  linkedTypeNames = null,
+  writeLinkedTypesFile = null
+) {
+  const lines = paramContent.split("\n");
   const params = [];
 
-  const isParamHeading = (line) => line.startsWith(paramLevel + ' ');
-  const isNestedHeading = nestedLevel ? (line) => line.startsWith(nestedLevel + ' ') : () => false;
+  const isParamHeading = (line) => line.startsWith(paramLevel + " ");
+  const isNestedHeading = nestedLevel
+    ? (line) => line.startsWith(nestedLevel + " ")
+    : () => false;
   const isTerminator = (line) => {
     const trimmed = line.trim();
     if (!trimmed) return false;
-    if (trimmed.startsWith('#### Returns') || trimmed.startsWith('#### Example') || trimmed === '***') {
+    if (
+      trimmed.startsWith("#### Returns") ||
+      trimmed.startsWith("#### Example") ||
+      trimmed === "***"
+    ) {
       return true;
     }
-    const nestedPrefix = nestedLevel ? nestedLevel + ' ' : null;
+    const nestedPrefix = nestedLevel ? nestedLevel + " " : null;
     if (/^#{1,3}\s+/.test(trimmed)) {
-      if (!trimmed.startsWith(paramLevel + ' ') && !(nestedPrefix && trimmed.startsWith(nestedPrefix))) {
+      if (
+        !trimmed.startsWith(paramLevel + " ") &&
+        !(nestedPrefix && trimmed.startsWith(nestedPrefix))
+      ) {
         return true;
       }
     }
@@ -177,11 +288,14 @@ function parseParametersWithExpansion(paramContent, paramLevel, nestedLevel, con
   const extractType = (line) => {
     if (!line) return null;
     const trimmed = line.trim();
-    
+
     // Handle [`TypeName`](link) format first (backticks inside the link)
     const linkWithBackticksMatch = trimmed.match(/^\[`([^`]+)`\]\(([^)]+)\)$/);
     if (linkWithBackticksMatch) {
-      return { type: linkWithBackticksMatch[1], link: linkWithBackticksMatch[2] };
+      return {
+        type: linkWithBackticksMatch[1],
+        link: linkWithBackticksMatch[2],
+      };
     }
 
     // Handle [TypeName](link) format
@@ -189,7 +303,7 @@ function parseParametersWithExpansion(paramContent, paramLevel, nestedLevel, con
     if (linkMatch) {
       return { type: linkMatch[1], link: linkMatch[2] };
     }
-    
+
     // Handle simple `TypeName` format
     const simpleMatch = trimmed.match(/^`([^`]+)`$/);
     if (simpleMatch) {
@@ -197,12 +311,12 @@ function parseParametersWithExpansion(paramContent, paramLevel, nestedLevel, con
     }
 
     // Fallback: sanitize markdown-heavy type definitions such as `Partial`<[`Type`](link)>
-    if (trimmed.startsWith('`')) {
+    if (trimmed.startsWith("`")) {
       const sanitized = trimmed
-        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1')
-        .replace(/`/g, '')
-        .replace(/\\/g, '')
-        .replace(/\s+/g, ' ')
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1")
+        .replace(/`/g, "")
+        .replace(/\\/g, "")
+        .replace(/\s+/g, " ")
         .trim();
       if (sanitized) {
         return { type: sanitized, link: null };
@@ -221,21 +335,21 @@ function parseParametersWithExpansion(paramContent, paramLevel, nestedLevel, con
     }
 
     let rawName = line.slice(paramLevel.length).trim();
-    const optional = rawName.endsWith('?');
+    const optional = rawName.endsWith("?");
     const cleanName = optional ? rawName.slice(0, -1).trim() : rawName.trim();
     i++;
 
     // Skip blank lines
-    while (i < lines.length && lines[i].trim() === '') {
+    while (i < lines.length && lines[i].trim() === "") {
       i++;
     }
 
-    let type = 'any';
+    let type = "any";
     let typeLink = null;
     if (i < lines.length) {
       const maybeType = extractType(lines[i]);
       if (maybeType) {
-        if (typeof maybeType === 'object') {
+        if (typeof maybeType === "object") {
           type = maybeType.type;
           typeLink = maybeType.link;
         } else {
@@ -246,12 +360,35 @@ function parseParametersWithExpansion(paramContent, paramLevel, nestedLevel, con
     }
 
     // Skip blank lines after type
-    while (i < lines.length && lines[i].trim() === '') {
+    while (i < lines.length && lines[i].trim() === "") {
       i++;
     }
 
+    // Check if the next line has an array indicator (...[])
+    if (i < lines.length && lines[i].trim() === "...[]") {
+      // If type is still 'any' (default), it means no type was specified
+      // TypeDoc-Markdown sometimes omits the type line for arrays
+      // Default to 'string' as the base type in this case
+      if (type === "any") {
+        type = "string[]";
+      } else {
+        type = type + "[]";
+      }
+      i++; // Skip the array indicator line
+
+      // Skip blank lines after array indicator
+      while (i < lines.length && lines[i].trim() === "") {
+        i++;
+      }
+    }
+
     const descriptionLines = [];
-    while (i < lines.length && !isParamHeading(lines[i]) && !isNestedHeading(lines[i]) && !isTerminator(lines[i])) {
+    while (
+      i < lines.length &&
+      !isParamHeading(lines[i]) &&
+      !isNestedHeading(lines[i]) &&
+      !isTerminator(lines[i])
+    ) {
       descriptionLines.push(lines[i]);
       i++;
     }
@@ -259,35 +396,40 @@ function parseParametersWithExpansion(paramContent, paramLevel, nestedLevel, con
     // Check if we should expand this type inline
     let linkedTypeInfo = getLinkedTypeInfo(type, typeLink, context);
     let nested = [];
-    
+
     // Track linked types for suppression (for types with explicit links)
-    
+
     // Try to extract properties from the linked type
     if (linkedTypeInfo && context) {
-      const properties = extractPropertiesFromLinkedType(linkedTypeInfo, context);
+      const properties = extractPropertiesFromLinkedType(
+        linkedTypeInfo,
+        context
+      );
       if (properties.length > 0) {
         nested = normalizePropertiesForParams(properties);
       }
     }
-    
+
     // If no linked properties were found, check for manually specified nested fields
     if (nested.length === 0) {
       while (i < lines.length && isNestedHeading(lines[i])) {
         let nestedRawName = lines[i].slice(nestedLevel.length).trim();
-        const nestedOptional = nestedRawName.endsWith('?');
-        const nestedName = nestedOptional ? nestedRawName.slice(0, -1).trim() : nestedRawName.trim();
+        const nestedOptional = nestedRawName.endsWith("?");
+        const nestedName = nestedOptional
+          ? nestedRawName.slice(0, -1).trim()
+          : nestedRawName.trim();
         i++;
 
-        while (i < lines.length && lines[i].trim() === '') {
+        while (i < lines.length && lines[i].trim() === "") {
           i++;
         }
 
-        let nestedType = 'any';
+        let nestedType = "any";
         let nestedTypeLink = null;
         if (i < lines.length) {
           const maybeNestedType = extractType(lines[i]);
           if (maybeNestedType) {
-            if (typeof maybeNestedType === 'object') {
+            if (typeof maybeNestedType === "object") {
               nestedType = maybeNestedType.type;
               nestedTypeLink = maybeNestedType.link;
             } else {
@@ -297,12 +439,35 @@ function parseParametersWithExpansion(paramContent, paramLevel, nestedLevel, con
           }
         }
 
-        while (i < lines.length && lines[i].trim() === '') {
+        while (i < lines.length && lines[i].trim() === "") {
           i++;
         }
 
+        // Check if the next line has an array indicator (...[])
+        if (i < lines.length && lines[i].trim() === "...[]") {
+          // If type is still 'any' (default), it means no type was specified
+          // TypeDoc-Markdown sometimes omits the type line for arrays
+          // Default to 'string' as the base type in this case
+          if (nestedType === "any") {
+            nestedType = "string[]";
+          } else {
+            nestedType = nestedType + "[]";
+          }
+          i++; // Skip the array indicator line
+
+          // Skip blank lines after array indicator
+          while (i < lines.length && lines[i].trim() === "") {
+            i++;
+          }
+        }
+
         const nestedDescLines = [];
-        while (i < lines.length && !isNestedHeading(lines[i]) && !isParamHeading(lines[i]) && !isTerminator(lines[i])) {
+        while (
+          i < lines.length &&
+          !isNestedHeading(lines[i]) &&
+          !isParamHeading(lines[i]) &&
+          !isTerminator(lines[i])
+        ) {
           nestedDescLines.push(lines[i]);
           i++;
         }
@@ -310,15 +475,22 @@ function parseParametersWithExpansion(paramContent, paramLevel, nestedLevel, con
         const nestedField = {
           name: nestedName,
           type: nestedType,
-          description: nestedDescLines.join('\n').trim(),
+          description: nestedDescLines.join("\n").trim(),
           optional: nestedOptional,
-          nested: []
+          nested: [],
         };
 
         if (nestedField.nested.length === 0) {
-          const nestedLinkedInfo = getLinkedTypeInfo(nestedType, nestedTypeLink, context);
+          const nestedLinkedInfo = getLinkedTypeInfo(
+            nestedType,
+            nestedTypeLink,
+            context
+          );
           if (nestedLinkedInfo && context) {
-            const nestedProps = extractPropertiesFromLinkedType(nestedLinkedInfo, context);
+            const nestedProps = extractPropertiesFromLinkedType(
+              nestedLinkedInfo,
+              context
+            );
             if (nestedProps.length > 0) {
               nestedField.nested = normalizePropertiesForParams(nestedProps);
             }
@@ -332,9 +504,9 @@ function parseParametersWithExpansion(paramContent, paramLevel, nestedLevel, con
     params.push({
       name: cleanName,
       type: type,
-      description: descriptionLines.join('\n').trim(),
+      description: descriptionLines.join("\n").trim(),
       optional,
-      nested
+      nested,
     });
   }
 
@@ -344,21 +516,37 @@ function parseParametersWithExpansion(paramContent, paramLevel, nestedLevel, con
 /**
  * Parse parameters from markdown content (for interface/class methods - no expansion)
  */
-function parseParameters(paramContent, paramLevel, nestedLevel, context = null, linkedTypeNames = null, writeLinkedTypesFile = null) {
-  const lines = paramContent.split('\n');
+function parseParameters(
+  paramContent,
+  paramLevel,
+  nestedLevel,
+  context = null,
+  linkedTypeNames = null,
+  writeLinkedTypesFile = null
+) {
+  const lines = paramContent.split("\n");
   const params = [];
 
-  const isParamHeading = (line) => line.startsWith(paramLevel + ' ');
-  const isNestedHeading = nestedLevel ? (line) => line.startsWith(nestedLevel + ' ') : () => false;
+  const isParamHeading = (line) => line.startsWith(paramLevel + " ");
+  const isNestedHeading = nestedLevel
+    ? (line) => line.startsWith(nestedLevel + " ")
+    : () => false;
   const isTerminator = (line) => {
     const trimmed = line.trim();
     if (!trimmed) return false;
-    if (trimmed.startsWith('#### Returns') || trimmed.startsWith('#### Example') || trimmed === '***') {
+    if (
+      trimmed.startsWith("#### Returns") ||
+      trimmed.startsWith("#### Example") ||
+      trimmed === "***"
+    ) {
       return true;
     }
-    const nestedPrefix = nestedLevel ? nestedLevel + ' ' : null;
+    const nestedPrefix = nestedLevel ? nestedLevel + " " : null;
     if (/^#{1,3}\s+/.test(trimmed)) {
-      if (!trimmed.startsWith(paramLevel + ' ') && !(nestedPrefix && trimmed.startsWith(nestedPrefix))) {
+      if (
+        !trimmed.startsWith(paramLevel + " ") &&
+        !(nestedPrefix && trimmed.startsWith(nestedPrefix))
+      ) {
         return true;
       }
     }
@@ -368,11 +556,14 @@ function parseParameters(paramContent, paramLevel, nestedLevel, context = null, 
   const extractType = (line) => {
     if (!line) return null;
     const trimmed = line.trim();
-    
+
     // Handle [`TypeName`](link) format first (backticks inside the link)
     const linkWithBackticksMatch = trimmed.match(/^\[`([^`]+)`\]\(([^)]+)\)$/);
     if (linkWithBackticksMatch) {
-      return { type: linkWithBackticksMatch[1], link: linkWithBackticksMatch[2] };
+      return {
+        type: linkWithBackticksMatch[1],
+        link: linkWithBackticksMatch[2],
+      };
     }
 
     // Handle [TypeName](link) format
@@ -380,7 +571,7 @@ function parseParameters(paramContent, paramLevel, nestedLevel, context = null, 
     if (linkMatch) {
       return { type: linkMatch[1], link: linkMatch[2] };
     }
-    
+
     // Handle simple `TypeName` format
     const simpleMatch = trimmed.match(/^`([^`]+)`$/);
     if (simpleMatch) {
@@ -388,12 +579,12 @@ function parseParameters(paramContent, paramLevel, nestedLevel, context = null, 
     }
 
     // Fallback: sanitize markdown-heavy type definitions such as `Partial`<[`Type`](link)>
-    if (trimmed.startsWith('`')) {
+    if (trimmed.startsWith("`")) {
       const sanitized = trimmed
-        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1')
-        .replace(/`/g, '')
-        .replace(/\\/g, '')
-        .replace(/\s+/g, ' ')
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1")
+        .replace(/`/g, "")
+        .replace(/\\/g, "")
+        .replace(/\s+/g, " ")
         .trim();
       if (sanitized) {
         return { type: sanitized, link: null };
@@ -412,21 +603,21 @@ function parseParameters(paramContent, paramLevel, nestedLevel, context = null, 
     }
 
     let rawName = line.slice(paramLevel.length).trim();
-    const optional = rawName.endsWith('?');
+    const optional = rawName.endsWith("?");
     const cleanName = optional ? rawName.slice(0, -1).trim() : rawName.trim();
     i++;
 
     // Skip blank lines
-    while (i < lines.length && lines[i].trim() === '') {
+    while (i < lines.length && lines[i].trim() === "") {
       i++;
     }
 
-    let type = 'any';
+    let type = "any";
     let typeLink = null;
     if (i < lines.length) {
       const maybeType = extractType(lines[i]);
       if (maybeType) {
-        if (typeof maybeType === 'object') {
+        if (typeof maybeType === "object") {
           type = maybeType.type;
           typeLink = maybeType.link;
         } else {
@@ -437,12 +628,35 @@ function parseParameters(paramContent, paramLevel, nestedLevel, context = null, 
     }
 
     // Skip blank lines after type
-    while (i < lines.length && lines[i].trim() === '') {
+    while (i < lines.length && lines[i].trim() === "") {
       i++;
     }
 
+    // Check if the next line has an array indicator (...[])
+    if (i < lines.length && lines[i].trim() === "...[]") {
+      // If type is still 'any' (default), it means no type was specified
+      // TypeDoc-Markdown sometimes omits the type line for arrays
+      // Default to 'string' as the base type in this case
+      if (type === "any") {
+        type = "string[]";
+      } else {
+        type = type + "[]";
+      }
+      i++; // Skip the array indicator line
+
+      // Skip blank lines after array indicator
+      while (i < lines.length && lines[i].trim() === "") {
+        i++;
+      }
+    }
+
     const descriptionLines = [];
-    while (i < lines.length && !isParamHeading(lines[i]) && !isNestedHeading(lines[i]) && !isTerminator(lines[i])) {
+    while (
+      i < lines.length &&
+      !isParamHeading(lines[i]) &&
+      !isNestedHeading(lines[i]) &&
+      !isTerminator(lines[i])
+    ) {
       descriptionLines.push(lines[i]);
       i++;
     }
@@ -450,35 +664,40 @@ function parseParameters(paramContent, paramLevel, nestedLevel, context = null, 
     // Check if we should expand this type inline
     const linkedTypeInfo = getLinkedTypeInfo(type, typeLink, context);
     let nested = [];
-    
+
     // Try to extract properties from the linked type
     if (linkedTypeInfo && context) {
-      const properties = extractPropertiesFromLinkedType(linkedTypeInfo, context);
+      const properties = extractPropertiesFromLinkedType(
+        linkedTypeInfo,
+        context
+      );
       if (properties.length > 0) {
         nested = normalizePropertiesForParams(properties);
         // Keep the type as the original type name (without expanding to 'object')
         // This preserves the type name in the ParamField
       }
     }
-    
+
     // If no linked properties were found, check for manually specified nested fields
     if (nested.length === 0) {
       while (i < lines.length && isNestedHeading(lines[i])) {
         let nestedRawName = lines[i].slice(nestedLevel.length).trim();
-        const nestedOptional = nestedRawName.endsWith('?');
-        const nestedName = nestedOptional ? nestedRawName.slice(0, -1).trim() : nestedRawName.trim();
+        const nestedOptional = nestedRawName.endsWith("?");
+        const nestedName = nestedOptional
+          ? nestedRawName.slice(0, -1).trim()
+          : nestedRawName.trim();
         i++;
 
-        while (i < lines.length && lines[i].trim() === '') {
+        while (i < lines.length && lines[i].trim() === "") {
           i++;
         }
 
-        let nestedType = 'any';
+        let nestedType = "any";
         let nestedTypeLink = null;
         if (i < lines.length) {
           const maybeNestedType = extractType(lines[i]);
           if (maybeNestedType) {
-            if (typeof maybeNestedType === 'object') {
+            if (typeof maybeNestedType === "object") {
               nestedType = maybeNestedType.type;
               nestedTypeLink = maybeNestedType.link;
             } else {
@@ -488,12 +707,35 @@ function parseParameters(paramContent, paramLevel, nestedLevel, context = null, 
           }
         }
 
-        while (i < lines.length && lines[i].trim() === '') {
+        while (i < lines.length && lines[i].trim() === "") {
           i++;
         }
 
+        // Check if the next line has an array indicator (...[])
+        if (i < lines.length && lines[i].trim() === "...[]") {
+          // If type is still 'any' (default), it means no type was specified
+          // TypeDoc-Markdown sometimes omits the type line for arrays
+          // Default to 'string' as the base type in this case
+          if (nestedType === "any") {
+            nestedType = "string[]";
+          } else {
+            nestedType = nestedType + "[]";
+          }
+          i++; // Skip the array indicator line
+
+          // Skip blank lines after array indicator
+          while (i < lines.length && lines[i].trim() === "") {
+            i++;
+          }
+        }
+
         const nestedDescLines = [];
-        while (i < lines.length && !isNestedHeading(lines[i]) && !isParamHeading(lines[i]) && !isTerminator(lines[i])) {
+        while (
+          i < lines.length &&
+          !isNestedHeading(lines[i]) &&
+          !isParamHeading(lines[i]) &&
+          !isTerminator(lines[i])
+        ) {
           nestedDescLines.push(lines[i]);
           i++;
         }
@@ -501,15 +743,22 @@ function parseParameters(paramContent, paramLevel, nestedLevel, context = null, 
         const nestedField = {
           name: nestedName,
           type: nestedType,
-          description: nestedDescLines.join('\n').trim(),
+          description: nestedDescLines.join("\n").trim(),
           optional: nestedOptional,
-          nested: []
+          nested: [],
         };
 
         if (nestedField.nested.length === 0) {
-          const nestedLinkedInfo = getLinkedTypeInfo(nestedType, nestedTypeLink, context);
+          const nestedLinkedInfo = getLinkedTypeInfo(
+            nestedType,
+            nestedTypeLink,
+            context
+          );
           if (nestedLinkedInfo && context) {
-            const nestedProps = extractPropertiesFromLinkedType(nestedLinkedInfo, context);
+            const nestedProps = extractPropertiesFromLinkedType(
+              nestedLinkedInfo,
+              context
+            );
             if (nestedProps.length > 0) {
               nestedField.nested = normalizePropertiesForParams(nestedProps);
             }
@@ -523,9 +772,9 @@ function parseParameters(paramContent, paramLevel, nestedLevel, context = null, 
     params.push({
       name: cleanName,
       type: nested.length > 0 ? type : type, // Keep original type name
-      description: descriptionLines.join('\n').trim(),
+      description: descriptionLines.join("\n").trim(),
       optional,
-      nested
+      nested,
     });
   }
 
@@ -535,27 +784,31 @@ function parseParameters(paramContent, paramLevel, nestedLevel, context = null, 
 /**
  * Build ParamField components from parsed parameters
  */
-function buildParamFieldsSection(params, linkedTypeNames = null, writeLinkedTypesFile = null) {
+function buildParamFieldsSection(
+  params,
+  linkedTypeNames = null,
+  writeLinkedTypesFile = null
+) {
   if (!params || params.length === 0) {
-    return '';
+    return "";
   }
 
-  let fieldsOutput = '';
-  
+  let fieldsOutput = "";
+
   for (const param of params) {
-    const requiredAttr = param.optional ? '' : ' required';
-    
+    const requiredAttr = param.optional ? "" : " required";
+
     // Track non-primitive parameter types for suppression
-    
+
     fieldsOutput += `<ParamField body="${param.name}" type="${param.type}"${requiredAttr}>\n`;
-    
+
     // Always show description in ParamField if it exists
     if (param.description) {
       fieldsOutput += `\n${param.description}\n`;
     }
-    
-    fieldsOutput += '\n</ParamField>\n';
-    
+
+    fieldsOutput += "\n</ParamField>\n";
+
     // If param has nested fields, wrap them in an Accordion
     if (param.nested.length > 0) {
       // Accordion title is always "Properties"
@@ -563,31 +816,33 @@ function buildParamFieldsSection(params, linkedTypeNames = null, writeLinkedType
 
       fieldsOutput += renderNestedParamFields(param.nested);
 
-      fieldsOutput += '</Accordion>\n\n';
+      fieldsOutput += "</Accordion>\n\n";
     } else {
-      fieldsOutput += '\n';
+      fieldsOutput += "\n";
     }
   }
-  
+
   // Wrap multiple parameters in an Accordion (but not single parameters, even if they have nested fields)
   const hasMultipleParams = params.length > 1;
-  
+
   if (hasMultipleParams) {
     return `<Accordion title="Properties">\n\n${fieldsOutput.trim()}\n</Accordion>`;
   }
-  
+
   return fieldsOutput;
 }
 
 function renderNestedParamFields(fields) {
   if (!fields || fields.length === 0) {
-    return '';
+    return "";
   }
 
-  let output = '';
+  let output = "";
   for (const field of fields) {
-    const requiredAttr = field.optional ? '' : ' required';
-    output += `<ParamField body="${escapeAttribute(field.name)}" type="${escapeAttribute(field.type)}"${requiredAttr}>\n`;
+    const requiredAttr = field.optional ? "" : " required";
+    output += `<ParamField body="${escapeAttribute(
+      field.name
+    )}" type="${escapeAttribute(field.type)}"${requiredAttr}>\n`;
 
     if (field.description) {
       output += `\n${field.description}\n`;
@@ -596,10 +851,10 @@ function renderNestedParamFields(fields) {
     if (Array.isArray(field.nested) && field.nested.length > 0) {
       output += `\n<Accordion title="Properties">\n\n`;
       output += renderNestedParamFields(field.nested);
-      output += '</Accordion>\n';
+      output += "</Accordion>\n";
     }
 
-    output += '\n</ParamField>\n\n';
+    output += "\n</ParamField>\n\n";
   }
 
   return output;
@@ -624,7 +879,11 @@ function getLinkedTypeInfo(typeName, typeLink, context) {
     return null;
   }
 
-  const typePath = resolveTypePath(simpleTypeName, context.app, context.currentPagePath);
+  const typePath = resolveTypePath(
+    simpleTypeName,
+    context.app,
+    context.currentPagePath
+  );
   return { typeName: simpleTypeName, typePath: typePath || simpleTypeName };
 }
 
@@ -639,8 +898,12 @@ function simplifyTypeName(typeName) {
   cleaned = unwrapHelperType(cleaned);
 
   // Remove generics/array indicators and take the first union/intersection entry
-  cleaned = cleaned.replace(/[\[\]]/g, '').split('|')[0].split('&')[0].trim();
-  return cleaned.replace(/<.*?>/g, '').trim();
+  cleaned = cleaned
+    .replace(/[\[\]]/g, "")
+    .split("|")[0]
+    .split("&")[0]
+    .trim();
+  return cleaned.replace(/<.*?>/g, "").trim();
 }
 
 function unwrapHelperType(typeName) {
@@ -674,26 +937,26 @@ function unwrapHelperType(typeName) {
 
 function getFirstGenericArgument(genericBlock) {
   if (!genericBlock) {
-    return '';
+    return "";
   }
 
   let depth = 0;
-  let buffer = '';
+  let buffer = "";
   for (let i = 0; i < genericBlock.length; i++) {
     const char = genericBlock[i];
-    if (char === '<') {
+    if (char === "<") {
       depth++;
       buffer += char;
       continue;
     }
-    if (char === '>') {
+    if (char === ">") {
       if (depth > 0) {
         depth--;
       }
       buffer += char;
       continue;
     }
-    if (char === ',' && depth === 0) {
+    if (char === "," && depth === 0) {
       return buffer.trim();
     }
     buffer += char;
@@ -709,11 +972,9 @@ function normalizePropertiesForParams(properties) {
 
   return properties.map((prop) => ({
     name: prop.name,
-    type: prop.type || 'any',
-    description: prop.description || '',
+    type: prop.type || "any",
+    description: prop.description || "",
     optional: !!prop.optional,
-    nested: normalizePropertiesForParams(prop.nested || [])
+    nested: normalizePropertiesForParams(prop.nested || []),
   }));
 }
-
-

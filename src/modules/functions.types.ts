@@ -7,24 +7,6 @@
  *
  * - **Anonymous or User authentication** (`base44.functions`): Functions are invoked with the current user's permissions. Anonymous users invoke functions without authentication, while authenticated users invoke functions with their authentication context.
  * - **Service role authentication** (`base44.asServiceRole.functions`): Functions are invoked with elevated admin-level permissions. The function code receives a request with admin authentication context.
- *
- * @example
- * ```typescript
- * // Invoke a function with parameters
- * const result = await base44.functions.invoke('calculateTotal', {
- *   items: ['item1', 'item2'],
- *   discount: 0.1
- * });
- * console.log(result.data);
- * ```
- *
- * @example
- * ```typescript
- * // Invoke with service role
- * const adminResult = await base44.asServiceRole.functions.invoke('adminTask', {
- *   action: 'cleanup'
- * });
- * ```
  */
 export interface FunctionsModule {
   /**

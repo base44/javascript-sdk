@@ -7,7 +7,6 @@
   "EntityHandler",
   "FunctionsModule",
   "IntegrationsModule",
+  "CoreIntegrations",
   "SsoModule"
 ]
-
-

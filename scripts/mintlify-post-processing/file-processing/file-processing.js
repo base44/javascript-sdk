@@ -94,6 +94,62 @@ function processLinksInFile(filePath) {
   let content = fs.readFileSync(filePath, "utf-8");
   let modified = false;
 
+  // Remove undesirable lines like "> **IntegrationsModule** = `object` & `object`"
+  // This typically appears in type alias files using intersection types
+  const typeDefinitionRegex = /^> \*\*\w+\*\* = `object` & `object`\s*$/m;
+  if (typeDefinitionRegex.test(content)) {
+    content = content.replace(typeDefinitionRegex, "");
+    modified = true;
+  }
+
+  // Manually add Indexable section if missing for IntegrationsModule
+  if (
+    filePath.includes("integrations.mdx") &&
+    !content.includes("## Indexable")
+  ) {
+    const indexableSection = `
+## Indexable
+
+\\[\`packageName\`: \`string\`\\]: [\`IntegrationPackage\`](IntegrationPackage)
+
+Access to additional integration packages.
+
+### Example
+
+<CodeGroup>
+
+\`\`\`typescript Access additional packages
+// Access a custom integration package
+base44.integrations.MyCustomPackage.MyFunction({ param: 'value' });
+\`\`\`
+
+</CodeGroup>
+`;
+    // Append it before the "Type Declaration" or "Core" section if possible, or just at the end before methods if any
+    // Finding a good insertion point
+    const typeDeclarationIndex = content.indexOf("## Type Declaration");
+    if (typeDeclarationIndex !== -1) {
+      content =
+        content.slice(0, typeDeclarationIndex) +
+        indexableSection +
+        "\n" +
+        content.slice(typeDeclarationIndex);
+      modified = true;
+    } else {
+      // If no Type Declaration, maybe append after the main description?
+      // Look for the first horizontal rule or similar
+      const firstHR = content.indexOf("***", 10); // skip first few chars
+      if (firstHR !== -1) {
+        content =
+          content.slice(0, firstHR) +
+          indexableSection +
+          "\n" +
+          content.slice(firstHR);
+        modified = true;
+      }
+    }
+  }
+
   // Remove .md and .mdx extensions from markdown links
   // This handles both relative and absolute paths
   // Regex breakdown:
@@ -283,10 +339,20 @@ function generateDocsJson(docsContent) {
   }
 
   if (docsContent.typeAliases.length > 0 && categoryMap["type-aliases"]) {
-    groups.push({
-      group: getGroupName("typeAliases", categoryMap),
-      pages: docsContent.typeAliases,
-    });
+    // Merge into existing group if name matches
+    const groupName = getGroupName("type-aliases", categoryMap);
+    // "type-aliases" key in categoryMap is "Modules", so groupName is "Modules".
+    const existingGroup = groups.find((g) => g.group === groupName);
+
+    if (existingGroup) {
+      existingGroup.pages.push(...docsContent.typeAliases);
+      existingGroup.pages.sort(); // Sort combined pages alphabetically
+    } else {
+      groups.push({
+        group: groupName,
+        pages: docsContent.typeAliases,
+      });
+    }
   }
 
   // Find or create SDK Reference tab
@@ -326,7 +392,11 @@ function isTypeDocPath(relativePath) {
   return (
     normalized.startsWith("content/interfaces/") ||
     normalized.startsWith("content/type-aliases/") ||
-    normalized.startsWith("content/classes/")
+    normalized.startsWith("content/classes/") ||
+    // Also check root level for when fallback processing happens
+    normalized.startsWith("interfaces/") ||
+    normalized.startsWith("type-aliases/") ||
+    normalized.startsWith("classes/")
   );
 }
 
@@ -352,8 +422,17 @@ function processAllFiles(dir, linkedTypeNames, exposedTypeNames) {
       const isTypeDoc = isTypeDocPath(relativePath);
 
       // Check if exposed. Handle renamed modules by checking reverse map.
+      // Use both the raw filename and any potential original name
       const originalName = REVERSE_MODULE_RENAMES[fileName] || fileName;
-      const isExposedType = !isTypeDoc || exposedTypeNames.has(originalName);
+
+      // If it's a renamed module (e.g. "entities"), treat it as exposed if "EntitiesModule" is exposed
+      const isRenamedModule = !!REVERSE_MODULE_RENAMES[fileName];
+
+      const isExposedType =
+        !isTypeDoc ||
+        exposedTypeNames.has(originalName) ||
+        exposedTypeNames.has(fileName) ||
+        isRenamedModule;
 
       // Remove any type doc files that are not explicitly exposed
       if (isTypeDoc && !isExposedType) {

@@ -1,4 +1,5 @@
 {
-   "functions": "Client",
-   "interfaces": "Modules"
+  "functions": "Client",
+  "interfaces": "Modules",
+  "type-aliases": "Modules"
 }

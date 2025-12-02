@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Wix+Madefor+Display:wght@400..800&family=Wix+Madefor+Text:ital,wght@0,400..800;1,400..800&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Wix+Madefor+Display:wght@400..800&family=Wix+Madefor+Text:ital,wght@0,400..800;1,400..800&display=swap");
 
 /* Apply Wix Madefor Text for body text */
 body,
@@ -10,7 +10,9 @@ body,
 }
 
 /* Apply Wix Madefor Display for headings */
-h1, h2, h3 {
+h1,
+h2,
+h3 {
   font-family: "Wix Madefor Display", sans-serif;
   font-weight: 600;
   font-style: normal;
@@ -20,16 +22,17 @@ h1, h2, h3 {
 @media (prefers-color-scheme: light) {
   body,
   .mint-container,
-  h1, h2, h3 {
+  h1,
+  h2,
+  h3 {
     color: #111111;
   }
 }
 
-
 /* Mintlify primary navbar CTA button color override */
 .mint-navbar .mint-button-primary,
 .mint-navbar li#topbar-cta-button a > span.bg-primary-dark {
-  background-color: #FF5500 !important; /* updated brand orange */
+  background-color: #ff5500 !important; /* updated brand orange */
   color: #111111 !important;
   font-weight: 600;
   border: none;
@@ -58,11 +61,11 @@ a[href*="base44.com"] .text-white,
 }
 /* Force the ">" icon in the Base44 button to orange for consistency and accessibility */
 a[href*="base44.com"] svg,
-a[href*="base44.com"] .text-white, 
+a[href*="base44.com"] .text-white,
 a[href*="base44.com"] svg path,
 .mint-navbar a svg.text-white {
-  color: #111111 !important;  /* Works if color is set by text utility */
-  fill: #111111 !important;   /* Ensures SVG/path fill is overridden */
+  color: #111111 !important; /* Works if color is set by text utility */
+  fill: #111111 !important; /* Ensures SVG/path fill is overridden */
 }
 /* Restore thin chevron style for the navbar's "Base44" button arrow */
 a[href*="base44.com"] svg,
@@ -90,7 +93,7 @@ a[href*="base44.com"] svg path,
   color: #111111 !important;
   fill: none !important;
   stroke: currentColor !important;
-  stroke-width: 1.5 !important;     /* set to the original */
+  stroke-width: 1.5 !important; /* set to the original */
   stroke-linecap: round !important; /* keep the smooth end */
 }
 
@@ -98,7 +101,8 @@ a[href*="base44.com"] svg path,
 
 /* Always use Mintlify's built-in theme variables! */
 div.prose.mt-1.font-normal.text-sm.leading-6.text-gray-600.dark\:text-gray-400,
-div.prose.mt-1.font-normal.text-sm.leading-6.text-gray-600.dark\:text-gray-400 span,
+div.prose.mt-1.font-normal.text-sm.leading-6.text-gray-600.dark\:text-gray-400
+  span,
 .card .prose,
 .card .prose span,
 .mint-card .prose,
@@ -110,7 +114,7 @@ div.prose.mt-1.font-normal.text-sm.leading-6.text-gray-600.dark\:text-gray-400 s
 a:has(code) {
   border-bottom: none !important;
   text-decoration: none !important;
-  color: #FF8844 !important; /* light orange */
+  color: #ff8844 !important; /* light orange */
 }
 
 /* Hide nested TOC items on interface pages */

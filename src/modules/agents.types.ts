@@ -176,42 +176,6 @@ export interface AgentsModuleConfig {
  * - **Anonymous or User authentication** (`base44.agents`): Access is scoped to the current user's permissions. Anonymous users can create conversations but cannot retrieve them later, while authenticated users can access conversations they created.
  * - **Service role authentication** (`base44.asServiceRole.agents`): Operations have elevated admin-level permissions. Can access all conversations that the app's admin role has access to.
  *
- * @example
- * ```typescript
- * // Create a new conversation
- * const conversation = await base44.agents.createConversation({
- *   agent_name: 'support-agent',
- *   metadata: {
- *     ticket_id: 'SUPP-1234',
- *     category: 'billing',
- *     priority: 'high'
- *   }
- * });
- * ```
- *
- * @example
- * ```typescript
- * // Send a message
- * await base44.agents.addMessage(conversation, {
- *   role: 'user',
- *   content: 'Hello, I need help!'
- * });
- * ```
- *
- * @example
- * ```typescript
- * // Subscribe to real-time updates
- * const unsubscribe = base44.agents.subscribeToConversation(
- *   conversation.id,
- *   (updatedConversation) => {
- *     console.log('New messages:', updatedConversation.messages);
- *   }
- * );
- *
- * // Clean up subscription later
- * unsubscribe();
- * ```
- *
  */
 export interface AgentsModule {
   /**
