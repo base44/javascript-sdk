@@ -28,9 +28,7 @@ export type { Base44Client, CreateClientConfig, CreateClientOptions };
  * The client supports three authentication modes:
  * - **Anonymous**: Access modules anonymously without authentication using `base44.moduleName`. Operations are scoped to public data and permissions.
  * - **User authentication**: Access modules with user-level permissions using `base44.moduleName`. Operations are scoped to the authenticated user's data and permissions.
- * - **Service role authentication**: Access modules with elevated permissions using `base44.asServiceRole.moduleName`. Operations can access data across all users.
- *
- * <Info> Typically, you create a client with service role authentication using the {@linkcode createClientFromRequest | createClientFromRequest()} function in your backend functions.</Info>
+ * - **Service role authentication**: Access modules with elevated permissions using `base44.asServiceRole.moduleName`. Operations can access data across all users. Can only be used in the backend. Typically, you create a client with service role authentication using the {@linkcode createClientFromRequest | createClientFromRequest()} function in your backend functions.
  *
  * For example, when using the {@linkcode EntitiesModule | entities} module:
  * - **Anonymous**: Can only read public data.
@@ -41,6 +39,19 @@ export type { Base44Client, CreateClientConfig, CreateClientOptions };
  *
  * @param config - Configuration object for the client.
  * @returns A configured Base44 client instance with access to all SDK modules.
+ *
+ * @example
+ * ```typescript
+ * // Create a client for your app
+ * import { createClient } from '@base44/sdk';
+ *
+ * const base44 = createClient({
+ *   appId: 'my-app-id'
+ * });
+ *
+ * // Use the client to access your data
+ * const products = await base44.entities.Products.list();
+ * ```
  */
 export function createClient(config: CreateClientConfig): Base44Client {
   const {

@@ -277,11 +277,23 @@ export interface EntityHandler {
  * - **Anonymous or User authentication** (`base44.entities`): Access is scoped to the current user's permissions. Anonymous users can only access public entities, while authenticated users can access entities they have permission to view or modify.
  * - **Service role authentication** (`base44.asServiceRole.entities`): Operations have elevated admin-level permissions. Can access all entities that the app's admin role has access to.
  *
+ * ## Built-in User Entity
+ *
+ * Every app includes a built-in `User` entity that stores user account information. This entity has special security rules that cannot be changed.
+ *
+ * Regular users can only read and update their own user record. With service role authentication, you can read, update, and delete any user. You cannot create users using the entities module. Instead, use the functions of the {@link AuthModule | auth module} to invite or register new users.
+ *
  * @example
  * ```typescript
  * // Get all records from the MyEntity entity
  * // Get all records the current user has permissions to view
  * const myRecords = await base44.entities.MyEntity.list();
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // List all users (admin only)
+ * const allUsers = await base44.asServiceRole.entities.User.list();
  * ```
  */
 export interface EntitiesModule {

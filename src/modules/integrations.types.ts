@@ -371,7 +371,7 @@ export interface CoreIntegrations {
  *
  * This module provides access to integration endpoints for interacting with external
  * services. Integrations are organized into packages. Base44 provides built-in integrations
- * in the "Core" package, and you can install additional integration packages for other services.
+ * in the `Core` package.
  *
  * Unlike the connectors module that gives you raw OAuth tokens, integrations provide
  * pre-built functions that Base44 executes on your behalf.

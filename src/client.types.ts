@@ -43,7 +43,7 @@ export interface CreateClientConfig {
    */
   token?: string;
   /**
-   * Service role authentication token. Use this in the backend when you need elevated permissions to access data across all users or perform admin operations. This token should be kept secret and never exposed in the app's frontend.
+   * Service role authentication token. Use this in the backend when you need elevated permissions to access data across all users or perform admin operations. This token should be kept secret and never exposed in the app's frontend. Typically, you get this token from a request to a backend function using {@linkcode createClientFromRequest | createClientFromRequest()}.
    */
   serviceToken?: string;
   /**
@@ -70,10 +70,7 @@ export interface CreateClientConfig {
 /**
  * The Base44 client instance.
  *
- * Provides access to all SDK modules and methods for interacting with the app.
- *
- * This is the main client object returned by {@linkcode createClient} and {@linkcode createClientFromRequest}.
- * It includes all SDK modules and utility methods for managing authentication and configuration.
+ * Provides access to all SDK modules for interacting with the app.
  */
 export interface Base44Client {
   /** {@link EntitiesModule | Entities module} for CRUD operations on your data models. */
@@ -118,7 +115,9 @@ export interface Base44Client {
     entities: EntitiesModule;
     /** {@link IntegrationsModule | Integrations module} with elevated permissions. */
     integrations: IntegrationsModule;
-    /** {@link SsoModule | SSO module} for generating SSO tokens. */
+    /** {@link SsoModule | SSO module} for generating SSO tokens.
+     * @internal
+     */
     sso: SsoModule;
     /** {@link ConnectorsModule | Connectors module} for OAuth token retrieval. */
     connectors: ConnectorsModule;

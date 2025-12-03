@@ -6,24 +6,30 @@ import { AxiosInstance } from "axios";
 export interface User {
   /** Unique user identifier. */
   id: string;
+  /** When the user was created. */
+  created_date: string;
+  /** When the user was last updated. */
+  updated_date: string;
   /** User's email address. */
   email: string;
   /** User's full name. */
-  name?: string;
-  /** User's first name. */
-  first_name?: string;
-  /** User's last name. */
-  last_name?: string;
-  /** URL to user's profile picture. */
-  avatar_url?: string;
+  full_name: string | null;
+  /** Whether the user is disabled. */
+  disabled: boolean | null;
+  /** Whether the user's email has been verified. */
+  is_verified: boolean;
+  /** The app ID this user belongs to. */
+  app_id: string;
+  /** Whether this is a service account. */
+  is_service: boolean;
+  /** Internal app role.
+   * @internal
+   */
+  _app_role: string;
   /**
    * User's role in the app. Roles are configured in the app settings and determine the user's permissions and access levels.
    */
-  role?: string;
-  /** Timestamp when the user was created. */
-  created_at?: string;
-  /** Timestamp when the user was last updated. */
-  updated_at?: string;
+  role: string;
   /**
    * Additional custom fields defined in the user schema. Any custom properties added to the user schema in the app will be available here with their configured types and values.
    */
@@ -108,39 +114,6 @@ export interface AuthModuleOptions {
  * - User invitations
  *
  * The auth module is only available in user authentication mode (`base44.auth`).
- *
- * @example
- * ```typescript
- * // Login with email and password
- * const { access_token, user } = await base44.auth.loginViaEmailPassword(
- *   'user@example.com',
- *   'password123'
- * );
- * ```
- *
- * @example
- * ```typescript
- * // Check if user is authenticated
- * const isAuth = await base44.auth.isAuthenticated();
- * ```
- *
- * @example
- * ```typescript
- * // Get current user profile
- * const currentUser = await base44.auth.me();
- * ```
- *
- * @example
- * ```typescript
- * // Logout and reload page
- * base44.auth.logout();
- * ```
- *
- * @example
- * ```typescript
- * // Logout and redirect to login page
- * base44.auth.logout('/login');
- * ```
  */
 export interface AuthModule {
   /**
@@ -162,7 +135,7 @@ export interface AuthModule {
    * Updates the current authenticated user's information.
    *
    * Only the fields included in the data object will be updated.
-   * Commonly updated fields include `name`, `avatar_url`, and custom profile fields.
+   * Commonly updated fields include `full_name` and custom profile fields.
    *
    * @param data - Object containing the fields to update.
    * @returns Promise resolving to the updated user data.
@@ -171,10 +144,9 @@ export interface AuthModule {
    * ```typescript
    * // Update specific fields
    * const updatedUser = await base44.auth.updateMe({
-   *   name: 'John Doe',
-   *   avatar_url: 'https://example.com/avatar.jpg'
+   *   full_name: 'John Doe'
    * });
-   * console.log(`Updated user: ${updatedUser.name}`);
+   * console.log(`Updated user: ${updatedUser.full_name}`);
    * ```
    *
    * @example
@@ -188,7 +160,7 @@ export interface AuthModule {
    * ```
    */
   updateMe(
-    data: Partial<Omit<User, "id" | "created_at" | "updated_at">>
+    data: Partial<Omit<User, "id" | "created_date" | "updated_date">>
   ): Promise<User>;
 
   /**

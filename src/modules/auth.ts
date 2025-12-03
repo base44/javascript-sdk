@@ -31,9 +31,7 @@ export function createAuthModule(
     },
 
     // Update current user data
-    async updateMe(
-      data: Partial<Omit<User, "id" | "created_at" | "updated_at">>
-    ) {
+    async updateMe(data: Record<string, any>) {
       return axios.put(`/apps/${appId}/entities/User/me`, data);
     },
 

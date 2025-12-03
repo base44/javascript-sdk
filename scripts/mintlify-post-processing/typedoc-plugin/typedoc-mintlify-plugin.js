@@ -24,7 +24,7 @@ import {
 } from "./typedoc-mintlify-content.js";
 
 // Shared flag with the post-processing script so Panel output can be toggled.
-const PANELS_ENABLED = process.env.MINTLIFY_INCLUDE_PANELS === 'true';
+const PANELS_ENABLED = process.env.MINTLIFY_INCLUDE_PANELS === "true";
 
 /**
  * Plugin load function called by TypeDoc

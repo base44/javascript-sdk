@@ -31,7 +31,7 @@ export interface AgentMessageToolCall {
   /** Status of the tool call. */
   status: "running" | "success" | "error" | "stopped";
   /** Results from the tool call. */
-  results?: string | null;
+  results?: string;
 }
 
 /**
@@ -69,7 +69,7 @@ export interface AgentMessageMetadata {
   /** Email of the user who created the message. */
   created_by_email: string;
   /** Full name of the user who created the message. */
-  created_by_full_name: string | null;
+  created_by_full_name: string;
 }
 
 /**
@@ -98,24 +98,28 @@ export interface AgentMessage {
   id: string;
   /** Role of the message sender. */
   role: "user" | "assistant" | "system";
+  /** When the message was created. */
+  created_date: string;
+  /** When the message was last updated. */
+  updated_date: string;
   /** Optional reasoning information for the message. */
   reasoning?: AgentMessageReasoning;
   /** Message content. */
-  content?: string | Record<string, any> | null;
+  content?: string | Record<string, any>;
   /** URLs to files attached to the message. */
-  file_urls?: string[] | null;
+  file_urls?: string[];
   /** Tool calls made by the agent. */
-  tool_calls?: AgentMessageToolCall[] | null;
+  tool_calls?: AgentMessageToolCall[];
   /** Token usage statistics. */
-  usage?: AgentMessageUsage | null;
+  usage?: AgentMessageUsage;
   /** Whether the message is hidden from the user. */
   hidden?: boolean;
   /** Custom context provided with the message. */
-  custom_context?: AgentMessageCustomContext[] | null;
+  custom_context?: AgentMessageCustomContext[];
   /** Model used to generate the message. */
-  model?: string | null;
+  model?: string;
   /** Checkpoint ID for the message. */
-  checkpoint_id?: string | null;
+  checkpoint_id?: string;
   /** Metadata about when and by whom the message was created. */
   metadata?: AgentMessageMetadata;
   /** Additional custom parameters for the message. */
@@ -179,7 +183,7 @@ export interface AgentsModuleConfig {
  */
 export interface AgentsModule {
   /**
-   * Gets all conversations.
+   * Gets all conversations from all agents in the app.
    *
    * Retrieves all conversations. Use {@linkcode listConversations | listConversations()} to filter which conversations are returned, apply sorting, or paginate results. Use {@linkcode getConversation | getConversation()} to retrieve a specific conversation by ID.
    *

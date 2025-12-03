@@ -2,39 +2,43 @@
  * Return/Response field conversion functions for TypeDoc Mintlify plugin
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-import { extractPropertiesFromLinkedType, getLinkedTypeDescription } from './typedoc-mintlify-linked-types.js';
-import { escapeAttribute } from './typedoc-mintlify-utils.js';
+import * as fs from "fs";
+import * as path from "path";
+import {
+  extractPropertiesFromLinkedType,
+  getLinkedTypeDescription,
+} from "./typedoc-mintlify-linked-types.js";
+import { escapeAttribute } from "./typedoc-mintlify-utils.js";
 
 const PRIMITIVE_TYPES = [
-  'any',
-  'string',
-  'number',
-  'boolean',
-  'void',
-  'null',
-  'undefined',
-  'object',
-  'Array',
-  'Promise',
+  "any",
+  "string",
+  "number",
+  "boolean",
+  "void",
+  "null",
+  "undefined",
+  "object",
+  "Array",
+  "Promise",
 ];
 
 function extractReturnsDescription(page) {
   if (!page?.model) {
-    return '';
+    return "";
   }
 
-  const signature = Array.isArray(page.model.signatures) && page.model.signatures.length > 0
-    ? page.model.signatures[0]
-    : null;
+  const signature =
+    Array.isArray(page.model.signatures) && page.model.signatures.length > 0
+      ? page.model.signatures[0]
+      : null;
 
   const returnsTag = signature?.comment?.blockTags?.find(
-    (tag) => tag.tag === '@returns' || tag.tag === '@return'
+    (tag) => tag.tag === "@returns" || tag.tag === "@return"
   );
 
   if (!returnsTag || !returnsTag.content) {
-    return '';
+    return "";
   }
 
   return renderCommentParts(returnsTag.content).trim();
@@ -42,25 +46,27 @@ function extractReturnsDescription(page) {
 
 function renderCommentParts(parts) {
   if (!Array.isArray(parts)) {
-    return '';
+    return "";
   }
 
-  return parts.map((part) => {
-    if (!part) return '';
-    switch (part.kind) {
-      case 'text':
-        return part.text || '';
-      case 'code':
-        return part.text ? '`' + part.text + '`' : '';
-      case 'inline-tag':
-        if (part.tag === '@link') {
-          return (part.text || part.target?.name || '').trim();
-        }
-        return part.text || '';
-      default:
-        return part.text || '';
-    }
-  }).join('');
+  return parts
+    .map((part) => {
+      if (!part) return "";
+      switch (part.kind) {
+        case "text":
+          return part.text || "";
+        case "code":
+          return part.text ? "`" + part.text + "`" : "";
+        case "inline-tag":
+          if (part.tag === "@link") {
+            return (part.text || part.target?.name || "").trim();
+          }
+          return part.text || "";
+        default:
+          return part.text || "";
+      }
+    })
+    .join("");
 }
 
 /**
@@ -74,53 +80,63 @@ function resolveTypePath(typeName, app, currentPagePath = null) {
   if (PRIMITIVE_TYPES.includes(typeName)) {
     return null;
   }
-  
+
   if (!app || !app.options) {
     return null;
   }
-  
-  const outputDir = app.options.getValue('out') || 'docs';
-  
+
+  const outputDir = app.options.getValue("out") || "docs";
+
   // Try interfaces/ first, then type-aliases/
-  let filePath = path.join(outputDir, 'interfaces', typeName + '.mdx');
+  let filePath = path.join(outputDir, "interfaces", typeName + ".mdx");
   if (!fs.existsSync(filePath)) {
-    filePath = path.join(outputDir, 'interfaces', typeName + '.md');
+    filePath = path.join(outputDir, "interfaces", typeName + ".md");
   }
   if (!fs.existsSync(filePath)) {
-    filePath = path.join(outputDir, 'type-aliases', typeName + '.mdx');
+    filePath = path.join(outputDir, "type-aliases", typeName + ".mdx");
   }
   if (!fs.existsSync(filePath)) {
-    filePath = path.join(outputDir, 'type-aliases', typeName + '.md');
+    filePath = path.join(outputDir, "type-aliases", typeName + ".md");
   }
-  
+
   if (fs.existsSync(filePath)) {
     // Convert to relative path from current page if possible
     if (currentPagePath) {
       const currentDir = path.dirname(path.join(outputDir, currentPagePath));
-      const relativePath = path.relative(currentDir, filePath).replace(/\\/g, '/');
-      return relativePath.startsWith('.') ? relativePath : './' + relativePath;
+      const relativePath = path
+        .relative(currentDir, filePath)
+        .replace(/\\/g, "/");
+      return relativePath.startsWith(".") ? relativePath : "./" + relativePath;
     }
     // Otherwise return path relative to outputDir
-    return path.relative(outputDir, filePath).replace(/\\/g, '/');
+    return path.relative(outputDir, filePath).replace(/\\/g, "/");
   }
-  
+
   return null;
 }
 
-export function extractSignatureInfo(lines, linkedTypeNames, writeLinkedTypesFile, app, currentPagePath = null) {
+export function extractSignatureInfo(
+  lines,
+  linkedTypeNames,
+  writeLinkedTypesFile,
+  app,
+  currentPagePath = null
+) {
   const signatureMap = new Map();
   const linkedTypeMap = new Map();
-  
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     // Match function signature: > **methodName**(...): `returnType` or `returnType`\<`generic`\>
     // Handle both simple types and generic types like `Promise`\<`any`\> or `Promise`\<[`TypeName`](link)\>
-    const sigMatch = line.match(/^>\s*\*\*(\w+)\*\*\([^)]*\):\s*`([^`]+)`(?:\\<(.+?)\\>)?/);
+    const sigMatch = line.match(
+      /^>\s*\*\*(\w+)\*\*\([^)]*\):\s*`([^`]+)`(?:\\<(.+?)\\>)?/
+    );
     if (sigMatch) {
       const methodName = sigMatch[1];
       let returnType = sigMatch[2];
       const genericParam = sigMatch[3];
-      
+
       // Check if generic parameter is a markdown link: [`TypeName`](link)
       if (genericParam) {
         const linkMatch = genericParam.match(/\[`([^`]+)`\]\(([^)]+)\)/);
@@ -128,7 +144,10 @@ export function extractSignatureInfo(lines, linkedTypeNames, writeLinkedTypesFil
           const linkedTypeName = linkMatch[1];
           const linkedTypePath = linkMatch[2];
           returnType = `${returnType}<${linkedTypeName}>`;
-          linkedTypeMap.set(i, { typeName: linkedTypeName, typePath: linkedTypePath });
+          linkedTypeMap.set(i, {
+            typeName: linkedTypeName,
+            typePath: linkedTypePath,
+          });
           // Track this type name so we can suppress its documentation page
           if (linkedTypeNames) {
             linkedTypeNames.add(linkedTypeName);
@@ -136,13 +155,16 @@ export function extractSignatureInfo(lines, linkedTypeNames, writeLinkedTypesFil
           }
         } else {
           // Simple generic type without link - try to resolve it
-          const simpleGeneric = genericParam.replace(/`/g, '').trim();
+          const simpleGeneric = genericParam.replace(/`/g, "").trim();
           returnType = `${returnType}<${simpleGeneric}>`;
-          
+
           // Try to resolve the type to a documentation file
           const typePath = resolveTypePath(simpleGeneric, app, currentPagePath);
           if (typePath) {
-            linkedTypeMap.set(i, { typeName: simpleGeneric, typePath: typePath });
+            linkedTypeMap.set(i, {
+              typeName: simpleGeneric,
+              typePath: typePath,
+            });
             if (linkedTypeNames) {
               linkedTypeNames.add(simpleGeneric);
               if (writeLinkedTypesFile) writeLinkedTypesFile();
@@ -172,25 +194,37 @@ export function extractSignatureInfo(lines, linkedTypeNames, writeLinkedTypesFil
       }
     }
   }
-  
+
   return { signatureMap, linkedTypeMap };
 }
 
 /**
  * Convert function returns
  */
-export function convertFunctionReturns(content, app, page, linkedTypeNames = null, writeLinkedTypesFile = null) {
+export function convertFunctionReturns(
+  content,
+  app,
+  page,
+  linkedTypeNames = null,
+  writeLinkedTypesFile = null
+) {
   // For functions, we need to extract signature info with linked types
-  const lines = content.split('\n');
+  const lines = content.split("\n");
   // Use provided linkedTypeNames Set or create a local one
   const localLinkedTypeNames = linkedTypeNames || new Set();
   const localWriteLinkedTypesFile = writeLinkedTypesFile || (() => {});
-  const { signatureMap, linkedTypeMap } = extractSignatureInfo(lines, localLinkedTypeNames, localWriteLinkedTypesFile, app, page?.url);
-  
+  const { signatureMap, linkedTypeMap } = extractSignatureInfo(
+    lines,
+    localLinkedTypeNames,
+    localWriteLinkedTypesFile,
+    app,
+    page?.url
+  );
+
   return rewriteReturnSections(content, {
-    heading: '## Returns',
-    fieldHeading: '###',
-    nestedHeading: '####',
+    heading: "## Returns",
+    fieldHeading: "###",
+    nestedHeading: "####",
     stopOnLevel3: false,
     signatureMap,
     linkedTypeMap,
@@ -204,14 +238,26 @@ export function convertFunctionReturns(content, app, page, linkedTypeNames = nul
 /**
  * Convert interface method returns
  */
-export function convertInterfaceMethodReturns(content, app, page, linkedTypeNames, writeLinkedTypesFile) {
-  const lines = content.split('\n');
-  const { signatureMap, linkedTypeMap } = extractSignatureInfo(lines, linkedTypeNames, writeLinkedTypesFile, app, page?.url);
-  
+export function convertInterfaceMethodReturns(
+  content,
+  app,
+  page,
+  linkedTypeNames,
+  writeLinkedTypesFile
+) {
+  const lines = content.split("\n");
+  const { signatureMap, linkedTypeMap } = extractSignatureInfo(
+    lines,
+    linkedTypeNames,
+    writeLinkedTypesFile,
+    app,
+    page?.url
+  );
+
   return rewriteReturnSections(content, {
-    heading: '#### Returns',
-    fieldHeading: '#####',
-    nestedHeading: '######',
+    heading: "#### Returns",
+    fieldHeading: "#####",
+    nestedHeading: "######",
     stopOnLevel3: true,
     signatureMap,
     linkedTypeMap,
@@ -223,14 +269,26 @@ export function convertInterfaceMethodReturns(content, app, page, linkedTypeName
 /**
  * Convert class method returns
  */
-export function convertClassMethodReturns(content, app, page, linkedTypeNames, writeLinkedTypesFile) {
-  const lines = content.split('\n');
-  const { signatureMap, linkedTypeMap } = extractSignatureInfo(lines, linkedTypeNames, writeLinkedTypesFile, app, page?.url);
-  
+export function convertClassMethodReturns(
+  content,
+  app,
+  page,
+  linkedTypeNames,
+  writeLinkedTypesFile
+) {
+  const lines = content.split("\n");
+  const { signatureMap, linkedTypeMap } = extractSignatureInfo(
+    lines,
+    linkedTypeNames,
+    writeLinkedTypesFile,
+    app,
+    page?.url
+  );
+
   return rewriteReturnSections(content, {
-    heading: '#### Returns',
-    fieldHeading: '#####',
-    nestedHeading: '######',
+    heading: "#### Returns",
+    fieldHeading: "#####",
+    nestedHeading: "######",
     stopOnLevel3: true,
     signatureMap,
     linkedTypeMap,
@@ -240,36 +298,36 @@ export function convertClassMethodReturns(content, app, page, linkedTypeNames, w
 }
 
 function rewriteReturnSections(content, options) {
-  const { 
-    heading, 
-    fieldHeading, 
-    nestedHeading, 
-    stopOnLevel3, 
+  const {
+    heading,
+    fieldHeading,
+    nestedHeading,
+    stopOnLevel3,
     signatureMap = new Map(),
     linkedTypeMap = new Map(),
     app,
     page,
     linkedTypeNames = null,
-    writeLinkedTypesFile = null
+    writeLinkedTypesFile = null,
   } = options;
-  const lines = content.split('\n');
+  const lines = content.split("\n");
   const result = [];
   let i = 0;
 
   const isTerminatorLine = (line) => {
     const trimmed = line.trim();
     if (!trimmed) return false;
-    if (trimmed.match(/^#{2,4}\s+Examples?/i) || trimmed === '***') {
+    if (trimmed.match(/^#{2,4}\s+Examples?/i) || trimmed === "***") {
       return true;
     }
-    if (heading !== '## Returns' && trimmed.startsWith('## ')) {
+    if (heading !== "## Returns" && trimmed.startsWith("## ")) {
       return true;
     }
     // For function Returns, stop at nested method definitions (#### methodName())
-    if (heading === '## Returns' && trimmed.match(/^####\s+\w+\.?\w*\(\)/)) {
+    if (heading === "## Returns" && trimmed.match(/^####\s+\w+\.?\w*\(\)/)) {
       return true;
     }
-    if (stopOnLevel3 && trimmed.startsWith('### ')) {
+    if (stopOnLevel3 && trimmed.startsWith("### ")) {
       return true;
     }
     return false;
@@ -285,16 +343,19 @@ function rewriteReturnSections(content, options) {
         i++;
       }
       const sectionLines = lines.slice(sectionStart, i);
-      const sectionContent = sectionLines.join('\n').trim();
+      const sectionContent = sectionLines.join("\n").trim();
 
       // For function Returns sections, parse nested fields (### headings)
-      if (heading === '## Returns') {
+      if (heading === "## Returns") {
         // Look backwards to find the function signature
         let sigLineIdx = i - 2; // Go back past the Returns heading
-        while (sigLineIdx >= 0 && !lines[sigLineIdx].match(/^>\s*\*\*\w+\*\*\(/)) {
+        while (
+          sigLineIdx >= 0 &&
+          !lines[sigLineIdx].match(/^>\s*\*\*\w+\*\*\(/)
+        ) {
           sigLineIdx--;
         }
-        
+
         // If we didn't find it by pattern, try to find it in our signature map
         if (sigLineIdx < 0 || !signatureMap.has(sigLineIdx)) {
           // Try searching a bit further back (up to 10 lines)
@@ -305,14 +366,18 @@ function rewriteReturnSections(content, options) {
             }
           }
         }
-        
-        const returnTypeFromSignature = sigLineIdx >= 0 ? signatureMap.get(sigLineIdx) : null;
-        const linkedTypeInfo = sigLineIdx >= 0 ? linkedTypeMap.get(sigLineIdx) : null;
-        const context = app && page ? { app, page, currentPagePath: page.url } : null;
-        
+
+        const returnTypeFromSignature =
+          sigLineIdx >= 0 ? signatureMap.get(sigLineIdx) : null;
+        const linkedTypeInfo =
+          sigLineIdx >= 0 ? linkedTypeMap.get(sigLineIdx) : null;
+        const context =
+          app && page ? { app, page, currentPagePath: page.url } : null;
+
         // Get the type name for display - prefer linkedTypeInfo.typeName, fallback to returnTypeFromSignature
-        const returnTypeName = linkedTypeInfo?.typeName || returnTypeFromSignature;
-        
+        const returnTypeName =
+          linkedTypeInfo?.typeName || returnTypeFromSignature;
+
         // Track linked type if found
         if (linkedTypeInfo && linkedTypeNames) {
           linkedTypeNames.add(linkedTypeInfo.typeName);
@@ -320,23 +385,29 @@ function rewriteReturnSections(content, options) {
             writeLinkedTypesFile();
           }
         }
-        
-        const { fields, leadingText, extractedTypeName, typeDescription } = parseReturnFields(
-          sectionContent, 
-          fieldHeading, 
-          nestedHeading, 
+
+        const {
+          fields,
+          leadingText,
+          extractedTypeName,
+          typeDescription,
+          indexSignature,
+        } = parseReturnFields(
+          sectionContent,
+          fieldHeading,
+          nestedHeading,
           returnTypeFromSignature,
           linkedTypeInfo,
           context,
           linkedTypeNames,
           writeLinkedTypesFile
         );
-        if (fields.length === 0) {
+        if (fields.length === 0 && !indexSignature) {
           result.push(...sectionLines);
         } else {
           const typeNameForDisplay = extractedTypeName || returnTypeName;
           if (typeNameForDisplay) {
-            result.push('');
+            result.push("");
             result.push(`\`${typeNameForDisplay}\``);
           }
           const descriptionParts = [];
@@ -351,14 +422,20 @@ function rewriteReturnSections(content, options) {
             descriptionParts.push(returnsDescription);
           }
           if (descriptionParts.length > 0) {
-            result.push('');
-            result.push(descriptionParts.join('\n\n'));
+            result.push("");
+            result.push(descriptionParts.join("\n\n"));
           }
-          const fieldsBlock = formatReturnFieldsOutput(fields, null, linkedTypeNames, writeLinkedTypesFile);
+          const fieldsBlock = formatReturnFieldsOutput(
+            fields,
+            null,
+            linkedTypeNames,
+            writeLinkedTypesFile,
+            indexSignature
+          );
           if (fieldsBlock) {
-            result.push('');
+            result.push("");
             result.push(fieldsBlock);
-            result.push('');
+            result.push("");
           }
         }
         continue;
@@ -368,10 +445,13 @@ function rewriteReturnSections(content, options) {
       // The Returns section starts at i-1 (after the heading line)
       // Look backwards to find the function signature
       let sigLineIdx = i - 2; // Go back past the Returns heading
-      while (sigLineIdx >= 0 && !lines[sigLineIdx].match(/^>\s*\*\*\w+\*\*\(/)) {
+      while (
+        sigLineIdx >= 0 &&
+        !lines[sigLineIdx].match(/^>\s*\*\*\w+\*\*\(/)
+      ) {
         sigLineIdx--;
       }
-      
+
       // If we didn't find it by pattern, try to find it in our signature map
       // by checking a few lines before the Returns section
       if (sigLineIdx < 0 || !signatureMap.has(sigLineIdx)) {
@@ -383,13 +463,16 @@ function rewriteReturnSections(content, options) {
           }
         }
       }
-      
-      const returnTypeFromSignature = sigLineIdx >= 0 ? signatureMap.get(sigLineIdx) : null;
-      const linkedTypeInfo = sigLineIdx >= 0 ? linkedTypeMap.get(sigLineIdx) : null;
-      
+
+      const returnTypeFromSignature =
+        sigLineIdx >= 0 ? signatureMap.get(sigLineIdx) : null;
+      const linkedTypeInfo =
+        sigLineIdx >= 0 ? linkedTypeMap.get(sigLineIdx) : null;
+
       // Get the type name for display - prefer linkedTypeInfo.typeName, fallback to returnTypeFromSignature
-      const returnTypeName = linkedTypeInfo?.typeName || returnTypeFromSignature;
-      
+      const returnTypeName =
+        linkedTypeInfo?.typeName || returnTypeFromSignature;
+
       // Track linked type if found
       if (linkedTypeInfo && linkedTypeNames) {
         linkedTypeNames.add(linkedTypeInfo.typeName);
@@ -397,23 +480,29 @@ function rewriteReturnSections(content, options) {
           writeLinkedTypesFile();
         }
       }
-      
-      const { fields, leadingText, extractedTypeName, typeDescription } = parseReturnFields(
-        sectionContent, 
-        fieldHeading, 
-        nestedHeading, 
+
+      const {
+        fields,
+        leadingText,
+        extractedTypeName,
+        typeDescription,
+        indexSignature,
+      } = parseReturnFields(
+        sectionContent,
+        fieldHeading,
+        nestedHeading,
         returnTypeFromSignature,
         linkedTypeInfo,
         { app, page, currentPagePath: page.url },
         linkedTypeNames,
         writeLinkedTypesFile
       );
-      if (fields.length === 0) {
+      if (fields.length === 0 && !indexSignature) {
         result.push(...sectionLines);
       } else {
         const typeNameForDisplay = extractedTypeName || returnTypeName;
         if (typeNameForDisplay) {
-          result.push('');
+          result.push("");
           result.push(`\`${typeNameForDisplay}\``);
         }
         const descriptionParts = [];
@@ -424,14 +513,20 @@ function rewriteReturnSections(content, options) {
           descriptionParts.push(leadingText);
         }
         if (descriptionParts.length > 0) {
-          result.push('');
-          result.push(descriptionParts.join('\n\n'));
+          result.push("");
+          result.push(descriptionParts.join("\n\n"));
         }
-        const fieldsBlock = formatReturnFieldsOutput(fields, null, linkedTypeNames, writeLinkedTypesFile);
+        const fieldsBlock = formatReturnFieldsOutput(
+          fields,
+          null,
+          linkedTypeNames,
+          writeLinkedTypesFile,
+          indexSignature
+        );
         if (fieldsBlock) {
-          result.push('');
+          result.push("");
           result.push(fieldsBlock);
-          result.push('');
+          result.push("");
         }
       }
       continue;
@@ -441,20 +536,37 @@ function rewriteReturnSections(content, options) {
     i++;
   }
 
-  return result.join('\n');
+  return result.join("\n");
 }
 
-function parseReturnFields(sectionContent, fieldHeading, nestedHeading, returnTypeFromSignature = null, linkedTypeInfo = null, context = null, linkedTypeNames = null, writeLinkedTypesFile = null) {
+function parseReturnFields(
+  sectionContent,
+  fieldHeading,
+  nestedHeading,
+  returnTypeFromSignature = null,
+  linkedTypeInfo = null,
+  context = null,
+  linkedTypeNames = null,
+  writeLinkedTypesFile = null
+) {
   let infoForDescription = linkedTypeInfo;
-  
+
   if (!sectionContent) {
     // If we have a linked type but no section content, try to extract from the linked type
     if (linkedTypeInfo && context) {
-      const properties = extractPropertiesFromLinkedType(linkedTypeInfo, context);
-      if (properties.length > 0) {
+      const result = extractPropertiesFromLinkedType(
+        linkedTypeInfo,
+        context,
+        new Set(),
+        { includeIndexSignature: true }
+      );
+      const properties = result.properties || result;
+      const indexSignature = result.indexSignature || null;
+
+      if (properties.length > 0 || indexSignature) {
         // Return separate ResponseFields for each property (skip the default "result" field)
         const resultFields = [];
-        
+
         // Add a separate ResponseField for each property
         for (const prop of properties) {
           resultFields.push({
@@ -462,22 +574,31 @@ function parseReturnFields(sectionContent, fieldHeading, nestedHeading, returnTy
             type: prop.type,
             description: prop.description,
             optional: prop.optional,
-            nested: prop.nested || []
+            nested: prop.nested || [],
           });
         }
-        
+
         return {
           fields: resultFields,
-          leadingText: '',
+          leadingText: "",
           extractedTypeName: linkedTypeInfo.typeName,
-          typeDescription: getLinkedTypeDescription(linkedTypeInfo, context) || ''
+          typeDescription:
+            getLinkedTypeDescription(linkedTypeInfo, context) || "",
+          indexSignature,
         };
       }
     }
-    return { fields: [], leadingText: '', extractedTypeName: null, typeDescription: getLinkedTypeDescription(infoForDescription, context) || '' };
+    return {
+      fields: [],
+      leadingText: "",
+      extractedTypeName: null,
+      typeDescription:
+        getLinkedTypeDescription(infoForDescription, context) || "",
+      indexSignature: null,
+    };
   }
 
-  const lines = sectionContent.split('\n');
+  const lines = sectionContent.split("\n");
   const fields = [];
   const headingPrefix = fieldHeading ? `${fieldHeading} ` : null;
   const nestedPrefix = nestedHeading ? `${nestedHeading} ` : null;
@@ -486,11 +607,11 @@ function parseReturnFields(sectionContent, fieldHeading, nestedHeading, returnTy
     if (!line) return null;
     const trimmed = line.trim();
     if (!trimmed) return null;
-    if (trimmed.startsWith('>')) {
+    if (trimmed.startsWith(">")) {
       // Handle lines like: > **entities**: `object` or > **auth**: [`AuthMethods`](../interfaces/AuthMethods)
       const blockMatch = trimmed.match(/^>\s*\*\*([^*]+)\*\*:\s*(.+)$/);
       if (blockMatch) {
-        const typePart = blockMatch[2].replace(/`/g, '').trim();
+        const typePart = blockMatch[2].replace(/`/g, "").trim();
         // Check if it's a markdown link: [TypeName](link)
         const linkMatch = typePart.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
         if (linkMatch) {
@@ -499,7 +620,7 @@ function parseReturnFields(sectionContent, fieldHeading, nestedHeading, returnTy
         return { type: typePart, link: null };
       }
     }
-    if (trimmed.includes('`')) {
+    if (trimmed.includes("`")) {
       // Extract type from backticks, could be a link: [`AuthMethods`](../interfaces/AuthMethods)
       const typeMatch = trimmed.match(/`([^`]+)`/);
       if (typeMatch) {
@@ -525,8 +646,10 @@ function parseReturnFields(sectionContent, fieldHeading, nestedHeading, returnTy
     return null;
   };
 
-  const isHeadingLine = (line) => headingPrefix && line.startsWith(headingPrefix);
-  const isNestedHeadingLine = (line) => nestedPrefix && line.startsWith(nestedPrefix);
+  const isHeadingLine = (line) =>
+    headingPrefix && line.startsWith(headingPrefix);
+  const isNestedHeadingLine = (line) =>
+    nestedPrefix && line.startsWith(nestedPrefix);
 
   const leadingLines = [];
   let index = 0;
@@ -541,53 +664,69 @@ function parseReturnFields(sectionContent, fieldHeading, nestedHeading, returnTy
 
   // If no field headings found, treat as simple return
   if (!headingPrefix || index >= lines.length) {
-    let type = returnTypeFromSignature || 'any';
+    let type = returnTypeFromSignature || "any";
     const descriptionLines = [];
-    
+
     // Check if there's an existing ResponseField in the content
-    const responseFieldMatch = sectionContent.match(/<ResponseField[^>]*type="([^"]+)"[^>]*>/);
+    const responseFieldMatch = sectionContent.match(
+      /<ResponseField[^>]*type="([^"]+)"[^>]*>/
+    );
     if (responseFieldMatch) {
       // Extract type from existing ResponseField
       const existingType = responseFieldMatch[1];
-      if (existingType && existingType !== 'any') {
+      if (existingType && existingType !== "any") {
         type = existingType;
       }
     }
-    
+
     for (const line of lines) {
       // Skip ResponseField tags - we'll replace them
-      if (line.trim().startsWith('<ResponseField') || line.trim() === '</ResponseField>') {
+      if (
+        line.trim().startsWith("<ResponseField") ||
+        line.trim() === "</ResponseField>"
+      ) {
         continue;
       }
       const maybeType = extractTypeFromLine(line);
-      if (maybeType && type === 'any') {
-        type = typeof maybeType === 'object' ? maybeType.type : maybeType;
+      if (maybeType && type === "any") {
+        type = typeof maybeType === "object" ? maybeType.type : maybeType;
         continue;
       }
-      if (line.trim() && !line.trim().startsWith('`') && !line.trim().startsWith('<')) {
+      if (
+        line.trim() &&
+        !line.trim().startsWith("`") &&
+        !line.trim().startsWith("<")
+      ) {
         descriptionLines.push(line);
       }
     }
-    let description = descriptionLines.join('\n').trim();
-    
+    let description = descriptionLines.join("\n").trim();
+
     // Check if we have a linked type to inline
     let typeInfoToUse = linkedTypeInfo;
-    
+
     // If we don't have linkedTypeInfo but we have a type name, try to resolve it
     if (!typeInfoToUse && type && context && context.app) {
       const simpleTypeName = getSimpleTypeName(type);
       if (simpleTypeName && !PRIMITIVE_TYPES.includes(simpleTypeName)) {
-        const typePath = resolveTypePath(simpleTypeName, context.app, context.currentPagePath);
+        const typePath = resolveTypePath(
+          simpleTypeName,
+          context.app,
+          context.currentPagePath
+        );
         if (typePath) {
           typeInfoToUse = { typeName: simpleTypeName, typePath };
         } else if (simpleTypeName) {
           // Even if we can't resolve the path, try with just the name
-          typeInfoToUse = { typeName: simpleTypeName, typePath: simpleTypeName };
+          typeInfoToUse = {
+            typeName: simpleTypeName,
+            typePath: simpleTypeName,
+          };
         }
         if (typeInfoToUse) {
           infoForDescription = typeInfoToUse;
         }
-        
+
         // Track resolved linked type
         if (typeInfoToUse && linkedTypeNames) {
           linkedTypeNames.add(typeInfoToUse.typeName);
@@ -597,13 +736,21 @@ function parseReturnFields(sectionContent, fieldHeading, nestedHeading, returnTy
         }
       }
     }
-    
+
     if (typeInfoToUse && context) {
-      const properties = extractPropertiesFromLinkedType(typeInfoToUse, context);
-      if (properties.length > 0) {
+      const result = extractPropertiesFromLinkedType(
+        typeInfoToUse,
+        context,
+        new Set(),
+        { includeIndexSignature: true }
+      );
+      const properties = result.properties || result;
+      const indexSignature = result.indexSignature || null;
+
+      if (properties.length > 0 || indexSignature) {
         // Return separate ResponseFields for each property (skip the default "result" field)
         const resultFields = [];
-        
+
         // Add a separate ResponseField for each property
         for (const prop of properties) {
           resultFields.push({
@@ -611,21 +758,23 @@ function parseReturnFields(sectionContent, fieldHeading, nestedHeading, returnTy
             type: prop.type,
             description: prop.description,
             optional: prop.optional,
-            nested: prop.nested || []
+            nested: prop.nested || [],
           });
         }
-        
+
         return {
           fields: resultFields,
-          leadingText: '',
+          leadingText: "",
           extractedTypeName: typeInfoToUse.typeName, // Pass the type name for display
-          typeDescription: getLinkedTypeDescription(typeInfoToUse, context) || ''
+          typeDescription:
+            getLinkedTypeDescription(typeInfoToUse, context) || "",
+          indexSignature,
         };
       }
     }
-    
+
     // Use 'result' as default name, or extract from description
-    let name = 'result';
+    let name = "result";
     if (description) {
       // Check if description contains a type hint
       const typeHint = description.match(/(\w+)\s+(?:instance|object|value)/i);
@@ -643,9 +792,13 @@ function parseReturnFields(sectionContent, fieldHeading, nestedHeading, returnTy
           nested: [],
         },
       ],
-      leadingText: '',
+      leadingText: "",
       extractedTypeName: null,
-      typeDescription: getLinkedTypeDescription(infoForDescription || typeInfoToUse, context) || ''
+      typeDescription:
+        getLinkedTypeDescription(
+          infoForDescription || typeInfoToUse,
+          context
+        ) || "",
     };
   }
 
@@ -658,30 +811,30 @@ function parseReturnFields(sectionContent, fieldHeading, nestedHeading, returnTy
     }
 
     let rawName = headingLine.slice(headingPrefix.length).trim();
-    const optional = rawName.endsWith('?');
+    const optional = rawName.endsWith("?");
     const name = optional ? rawName.slice(0, -1).trim() : rawName.trim();
     index++;
 
-    while (index < lines.length && lines[index].trim() === '') {
+    while (index < lines.length && lines[index].trim() === "") {
       index++;
     }
 
-    let type = 'any';
+    let type = "any";
     if (index < lines.length) {
       const maybeType = extractTypeFromLine(lines[index]);
       if (maybeType) {
-        type = typeof maybeType === 'object' ? maybeType.type : maybeType;
+        type = typeof maybeType === "object" ? maybeType.type : maybeType;
         index++;
       }
     }
 
-    while (index < lines.length && lines[index].trim() === '') {
+    while (index < lines.length && lines[index].trim() === "") {
       index++;
     }
 
     const descriptionLines = [];
     const nested = [];
-    
+
     // Collect description and nested fields
     while (
       index < lines.length &&
@@ -696,24 +849,29 @@ function parseReturnFields(sectionContent, fieldHeading, nestedHeading, returnTy
     while (index < lines.length && isNestedHeadingLine(lines[index])) {
       const nestedHeadingLine = lines[index];
       let nestedRawName = nestedHeadingLine.slice(nestedPrefix.length).trim();
-      const nestedOptional = nestedRawName.endsWith('?');
-      const nestedName = nestedOptional ? nestedRawName.slice(0, -1).trim() : nestedRawName.trim();
+      const nestedOptional = nestedRawName.endsWith("?");
+      const nestedName = nestedOptional
+        ? nestedRawName.slice(0, -1).trim()
+        : nestedRawName.trim();
       index++;
 
-      while (index < lines.length && lines[index].trim() === '') {
+      while (index < lines.length && lines[index].trim() === "") {
         index++;
       }
 
-    let nestedType = 'any';
+      let nestedType = "any";
       if (index < lines.length) {
         const maybeNestedType = extractTypeFromLine(lines[index]);
         if (maybeNestedType) {
-        nestedType = typeof maybeNestedType === 'object' ? maybeNestedType.type : maybeNestedType;
+          nestedType =
+            typeof maybeNestedType === "object"
+              ? maybeNestedType.type
+              : maybeNestedType;
           index++;
         }
       }
 
-      while (index < lines.length && lines[index].trim() === '') {
+      while (index < lines.length && lines[index].trim() === "") {
         index++;
       }
 
@@ -730,37 +888,44 @@ function parseReturnFields(sectionContent, fieldHeading, nestedHeading, returnTy
       nested.push({
         name: nestedName,
         type: nestedType,
-        description: nestedDescLines.join('\n').trim(),
+        description: nestedDescLines.join("\n").trim(),
         optional: nestedOptional,
       });
     }
 
-    let description = descriptionLines.join('\n').trim();
+    let description = descriptionLines.join("\n").trim();
 
     // Check if this field's type is a linked type that should be expanded
     // Only expand if we don't already have nested fields from headings
-    if (nested.length === 0 && context && type && type !== 'any') {
+    if (nested.length === 0 && context && type && type !== "any") {
       const simpleTypeName = getSimpleTypeName(type);
       if (simpleTypeName && !PRIMITIVE_TYPES.includes(simpleTypeName)) {
         // Try to resolve the type to a linked type
-        const typePath = resolveTypePath(simpleTypeName, context.app, context.currentPagePath);
-        const linkedTypeInfo = typePath 
+        const typePath = resolveTypePath(
+          simpleTypeName,
+          context.app,
+          context.currentPagePath
+        );
+        const linkedTypeInfo = typePath
           ? { typeName: simpleTypeName, typePath }
           : { typeName: simpleTypeName, typePath: simpleTypeName };
-        
+
         // Extract properties from the linked type
-        const properties = extractPropertiesFromLinkedType(linkedTypeInfo, context);
+        const properties = extractPropertiesFromLinkedType(
+          linkedTypeInfo,
+          context
+        );
         if (properties.length > 0) {
           // Add properties as nested fields
           for (const prop of properties) {
             nested.push({
               name: prop.name,
               type: prop.type,
-              description: prop.description || '',
+              description: prop.description || "",
               optional: prop.optional,
             });
           }
-          
+
           // Track the linked type
           if (linkedTypeNames) {
             linkedTypeNames.add(simpleTypeName);
@@ -781,21 +946,49 @@ function parseReturnFields(sectionContent, fieldHeading, nestedHeading, returnTy
     });
   }
 
-  return { fields, leadingText: leadingLines.join('\n').trim(), extractedTypeName: null, typeDescription: getLinkedTypeDescription(infoForDescription, context) || '' };
+  return {
+    fields,
+    leadingText: leadingLines.join("\n").trim(),
+    extractedTypeName: null,
+    typeDescription:
+      getLinkedTypeDescription(infoForDescription, context) || "",
+    indexSignature: null,
+  };
 }
 
-function buildResponseFieldsSection(fields, linkedTypeNames = null, writeLinkedTypesFile = null) {
-  let output = '';
-  
-  const PRIMITIVE_TYPES = ['any', 'string', 'number', 'boolean', 'void', 'null', 'undefined', 'object', 'Array', 'Promise'];
+function buildResponseFieldsSection(
+  fields,
+  linkedTypeNames = null,
+  writeLinkedTypesFile = null
+) {
+  let output = "";
+
+  const PRIMITIVE_TYPES = [
+    "any",
+    "string",
+    "number",
+    "boolean",
+    "void",
+    "null",
+    "undefined",
+    "object",
+    "Array",
+    "Promise",
+  ];
 
   for (const field of fields) {
-    const requiredAttr = field.optional ? '' : ' required';
-    const defaultAttr = field.default ? ` default="${escapeAttribute(field.default)}"` : '';
-    
+    const requiredAttr = field.optional ? "" : " required";
+    const defaultAttr = field.default
+      ? ` default="${escapeAttribute(field.default)}"`
+      : "";
+
     // Track non-primitive return field types for suppression
-    if (linkedTypeNames && field.type && !PRIMITIVE_TYPES.includes(field.type)) {
-      const simpleTypeName = field.type.replace(/[<>\[\]]/g, '').trim();
+    if (
+      linkedTypeNames &&
+      field.type &&
+      !PRIMITIVE_TYPES.includes(field.type)
+    ) {
+      const simpleTypeName = field.type.replace(/[<>\[\]]/g, "").trim();
       if (simpleTypeName && !PRIMITIVE_TYPES.includes(simpleTypeName)) {
         linkedTypeNames.add(simpleTypeName);
         if (writeLinkedTypesFile) {
@@ -803,8 +996,10 @@ function buildResponseFieldsSection(fields, linkedTypeNames = null, writeLinkedT
         }
       }
     }
-    
-    output += `<ResponseField name="${escapeAttribute(field.name)}" type="${escapeAttribute(field.type)}"${defaultAttr}${requiredAttr}>\n`;
+
+    output += `<ResponseField name="${escapeAttribute(
+      field.name
+    )}" type="${escapeAttribute(field.type)}"${defaultAttr}${requiredAttr}>\n`;
 
     if (field.description) {
       output += `\n${field.description}\n`;
@@ -813,35 +1008,63 @@ function buildResponseFieldsSection(fields, linkedTypeNames = null, writeLinkedT
     if (field.nested && field.nested.length > 0) {
       // Wrap nested fields in an Accordion component
       output += `\n<Accordion title="Properties">\n\n`;
-      output += renderNestedResponseFields(field.nested, linkedTypeNames, writeLinkedTypesFile);
-      output += '</Accordion>\n';
+      output += renderNestedResponseFields(
+        field.nested,
+        linkedTypeNames,
+        writeLinkedTypesFile
+      );
+      output += "</Accordion>\n";
     }
 
-    output += '\n</ResponseField>\n\n';
+    output += "\n</ResponseField>\n\n";
   }
 
   return output;
 }
 
-function formatReturnFieldsOutput(fields, returnType = null, linkedTypeNames = null, writeLinkedTypesFile = null) {
-  if (!fields || fields.length === 0) {
-    return '';
+function formatReturnFieldsOutput(
+  fields,
+  returnType = null,
+  linkedTypeNames = null,
+  writeLinkedTypesFile = null,
+  indexSignature = null
+) {
+  if ((!fields || fields.length === 0) && !indexSignature) {
+    return "";
   }
 
   const isSingleSimpleField =
     fields.length === 1 &&
-    (!fields[0].nested || fields[0].nested.length === 0);
+    (!fields[0].nested || fields[0].nested.length === 0) &&
+    !indexSignature;
 
   if (isSingleSimpleField) {
     // For a single, non-object field, we only need to return its description text.
     // The type is already rendered separately (`typeNameForDisplay`), so avoid wrapping
     // it in a ResponseField to keep the output concise.
-    return fields[0].description || '';
+    return fields[0].description || "";
   }
 
-  const fieldsBlock = buildResponseFieldsSection(fields, linkedTypeNames, writeLinkedTypesFile).trimEnd();
-  if (!fieldsBlock) {
-    return '';
+  const fieldsBlock = buildResponseFieldsSection(
+    fields,
+    linkedTypeNames,
+    writeLinkedTypesFile
+  ).trimEnd();
+
+  // Build index signature as a ResponseField if present
+  let indexSignatureBlock = "";
+  if (indexSignature) {
+    const keyName = `[key: ${indexSignature.keyType}]`;
+    const description = indexSignature.description || "";
+    indexSignatureBlock = `<ResponseField name="${escapeAttribute(
+      keyName
+    )}" type="${escapeAttribute(
+      indexSignature.valueType
+    )}">\n\n${description}\n\n</ResponseField>\n\n`;
+  }
+
+  if (!fieldsBlock && !indexSignatureBlock) {
+    return "";
   }
 
   const hasMultipleFields = fields.length > 1;
@@ -849,39 +1072,49 @@ function formatReturnFieldsOutput(fields, returnType = null, linkedTypeNames = n
     (field) => Array.isArray(field.nested) && field.nested.length > 0
   );
 
-  if (hasMultipleFields || hasNestedFields) {
+  if (hasMultipleFields || hasNestedFields || indexSignature) {
     // Extract the simple type name to display above the Accordion
-    let typeDisplay = '';
+    let typeDisplay = "";
     if (returnType) {
       const simpleTypeName = getSimpleTypeName(returnType);
       if (simpleTypeName && !PRIMITIVE_TYPES.includes(simpleTypeName)) {
         typeDisplay = `\`${simpleTypeName}\`\n\n`;
       }
     }
-    // If we still don't have a type display and have multiple fields, 
+    // If we still don't have a type display and have multiple fields,
     // try to infer from the context (e.g., if all fields are from the same type)
     if (!typeDisplay && hasMultipleFields && fields.length > 0) {
       // Check if we can get a type hint from the first field's description or context
       // This is a fallback for cases where returnType wasn't passed correctly
     }
-    return `${typeDisplay}<Accordion title="Properties">\n\n${fieldsBlock}\n</Accordion>`;
+    return `${typeDisplay}<Accordion title="Properties">\n\n${fieldsBlock}${indexSignatureBlock}\n</Accordion>`;
   }
 
-  return fieldsBlock;
+  return fieldsBlock + indexSignatureBlock;
 }
 
-function renderNestedResponseFields(fields, linkedTypeNames = null, writeLinkedTypesFile = null) {
+function renderNestedResponseFields(
+  fields,
+  linkedTypeNames = null,
+  writeLinkedTypesFile = null
+) {
   if (!fields || fields.length === 0) {
-    return '';
+    return "";
   }
 
-  let output = '';
+  let output = "";
   for (const field of fields) {
-    const requiredAttr = field.optional ? '' : ' required';
-    const defaultAttr = field.default ? ` default="${escapeAttribute(field.default)}"` : '';
+    const requiredAttr = field.optional ? "" : " required";
+    const defaultAttr = field.default
+      ? ` default="${escapeAttribute(field.default)}"`
+      : "";
 
-    if (linkedTypeNames && field.type && !PRIMITIVE_TYPES.includes(field.type)) {
-      const simpleTypeName = field.type.replace(/[<>\[\]]/g, '').trim();
+    if (
+      linkedTypeNames &&
+      field.type &&
+      !PRIMITIVE_TYPES.includes(field.type)
+    ) {
+      const simpleTypeName = field.type.replace(/[<>\[\]]/g, "").trim();
       if (simpleTypeName && !PRIMITIVE_TYPES.includes(simpleTypeName)) {
         linkedTypeNames.add(simpleTypeName);
         if (writeLinkedTypesFile) {
@@ -890,7 +1123,9 @@ function renderNestedResponseFields(fields, linkedTypeNames = null, writeLinkedT
       }
     }
 
-    output += `<ResponseField name="${escapeAttribute(field.name)}" type="${escapeAttribute(field.type)}"${defaultAttr}${requiredAttr}>\n`;
+    output += `<ResponseField name="${escapeAttribute(
+      field.name
+    )}" type="${escapeAttribute(field.type)}"${defaultAttr}${requiredAttr}>\n`;
 
     if (field.description) {
       output += `\n${field.description}\n`;
@@ -898,11 +1133,15 @@ function renderNestedResponseFields(fields, linkedTypeNames = null, writeLinkedT
 
     if (field.nested && field.nested.length > 0) {
       output += `\n<Accordion title="Properties">\n\n`;
-      output += renderNestedResponseFields(field.nested, linkedTypeNames, writeLinkedTypesFile);
-      output += '</Accordion>\n';
+      output += renderNestedResponseFields(
+        field.nested,
+        linkedTypeNames,
+        writeLinkedTypesFile
+      );
+      output += "</Accordion>\n";
     }
 
-    output += '\n</ResponseField>\n\n';
+    output += "\n</ResponseField>\n\n";
   }
 
   return output;
@@ -914,10 +1153,9 @@ function getSimpleTypeName(typeName) {
   }
 
   // Remove generic arguments if they are still present (e.g., Promise<Base44Client>)
-  const withoutGenerics = typeName.split('<')[0].trim();
+  const withoutGenerics = typeName.split("<")[0].trim();
 
   // Type names can include dots for namespaces, so allow those
   const match = withoutGenerics.match(/^[A-Za-z0-9_.]+$/);
   return match ? match[0] : null;
 }
-
