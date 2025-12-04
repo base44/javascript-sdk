@@ -55,9 +55,6 @@ export interface GenerateImageParams {
   prompt: string;
 }
 
-/**
- * Return type for the GenerateImage function.
- */
 export interface GenerateImageResult {
   /** URL of the generated image. */
   url: string;
@@ -71,9 +68,6 @@ export interface UploadFileParams {
   file: File;
 }
 
-/**
- * Return type for the UploadFile function.
- */
 export interface UploadFileResult {
   /** URL of the uploaded file. */
   file_url: string;
@@ -93,9 +87,6 @@ export interface SendEmailParams {
   from_name?: string;
 }
 
-/**
- * Return type for the SendEmail function.
- */
 export type SendEmailResult = any;
 
 /**
@@ -108,9 +99,6 @@ export interface ExtractDataFromUploadedFileParams {
   json_schema: object;
 }
 
-/**
- * Return type for the ExtractDataFromUploadedFile function.
- */
 export type ExtractDataFromUploadedFileResult = object;
 
 /**
@@ -121,9 +109,6 @@ export interface UploadPrivateFileParams {
   file: File;
 }
 
-/**
- * Return type for the UploadPrivateFile function.
- */
 export interface UploadPrivateFileResult {
   /** URI of the uploaded private file, used to create a signed URL. */
   file_uri: string;
@@ -141,9 +126,6 @@ export interface CreateFileSignedUrlParams {
   expires_in?: number;
 }
 
-/**
- * Return type for the CreateFileSignedUrl function.
- */
 export interface CreateFileSignedUrlResult {
   /** Temporary signed URL to access the private file. */
   signed_url: string;

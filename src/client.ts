@@ -23,7 +23,7 @@ export type { Base44Client, CreateClientConfig, CreateClientOptions };
  *
  * This is the main entry point for the Base44 SDK. It creates a client that provides access to the SDK's modules, such as {@linkcode EntitiesModule | entities}, {@linkcode AuthModule | auth}, and {@linkcode FunctionsModule | functions}.
  *
- * Typically, you don't need to call this function directly. Base44 creates the client for you, which you can import and use to make API calls. The client takes care of managing authentication for you.
+ * Typically, you don't need to call this function because Base44 creates the client for you. You can then import and use the client to make API calls. The client takes care of managing authentication for you.
  *
  * The client supports three authentication modes:
  * - **Anonymous**: Access modules anonymously without authentication using `base44.moduleName`. Operations are scoped to public data and permissions.

@@ -310,6 +310,20 @@ function parseParametersWithExpansion(
       return { type: simpleMatch[1], link: null };
     }
 
+    // Handle function type format: (`param`) => `returnType` or (`param`: `Type`) => `returnType`
+    // e.g., (`conversation`) => `void` or (`error`: `Error`) => `void`
+    if (trimmed.startsWith("(") && trimmed.includes("=>")) {
+      const sanitized = trimmed
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1") // Remove markdown links
+        .replace(/`/g, "") // Remove backticks
+        .replace(/\\/g, "") // Remove escapes
+        .replace(/\s+/g, " ") // Normalize whitespace
+        .trim();
+      if (sanitized) {
+        return { type: sanitized, link: null };
+      }
+    }
+
     // Fallback: sanitize markdown-heavy type definitions such as `Partial`<[`Type`](link)>
     if (trimmed.startsWith("`")) {
       const sanitized = trimmed
@@ -576,6 +590,20 @@ function parseParameters(
     const simpleMatch = trimmed.match(/^`([^`]+)`$/);
     if (simpleMatch) {
       return { type: simpleMatch[1], link: null };
+    }
+
+    // Handle function type format: (`param`) => `returnType` or (`param`: `Type`) => `returnType`
+    // e.g., (`conversation`) => `void` or (`error`: `Error`) => `void`
+    if (trimmed.startsWith("(") && trimmed.includes("=>")) {
+      const sanitized = trimmed
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1") // Remove markdown links
+        .replace(/`/g, "") // Remove backticks
+        .replace(/\\/g, "") // Remove escapes
+        .replace(/\s+/g, " ") // Normalize whitespace
+        .trim();
+      if (sanitized) {
+        return { type: sanitized, link: null };
+      }
     }
 
     // Fallback: sanitize markdown-heavy type definitions such as `Partial`<[`Type`](link)>

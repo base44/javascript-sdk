@@ -39,7 +39,7 @@ export interface CreateClientConfig {
    */
   appId: string;
   /**
-   * User authentication token. Use this in the frontend when you want to authenticate as a specific user.
+   * User authentication token. Used to authenticate as a specific user.
    */
   token?: string;
   /**

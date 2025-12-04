@@ -320,8 +320,21 @@ function getTypeString(type) {
       return type.types?.map((t) => getTypeString(t)).join(" & ") || "any";
     case "literal":
       return JSON.stringify(type.value);
-    case "reflection":
+    case "reflection": {
+      // Check if this is a function type (has call signatures)
+      const decl = type.declaration;
+      if (decl?.signatures?.length > 0) {
+        const sig = decl.signatures[0];
+        const params =
+          sig.parameters
+            ?.map((p) => `${p.name}: ${getTypeString(p.type)}`)
+            .join(", ") || "";
+        const returnType = getTypeString(sig.type) || "void";
+        return `(${params}) => ${returnType}`;
+      }
+      // Otherwise it's an object type
       return "object";
+    }
     default:
       return type.name || "any";
   }
