@@ -49,7 +49,7 @@ export interface LoginResponse {
 /**
  * Payload for user registration.
  */
-export interface RegisterPayload {
+export interface RegisterParams {
   /** User's email address. */
   email: string;
   /** User's password. */
@@ -302,13 +302,13 @@ export interface AuthModule {
    * the user's permissions and access levels.
    *
    * @param userEmail - Email address of the user to invite.
-   * @param role - Role to assign to the invited user. Must match a role defined in the app. For example, `'admin'`, `'editor'`, `'viewer'`, or `'member'`.
+   * @param role - Role to assign to the invited user. Must match a role defined in the app. For example, `'admin'` or `'user'`.
    * @returns Promise that resolves when the invitation is sent successfully. Throws an error if the invitation fails.
    *
    * @example
    * ```typescript
    * try {
-   *   await base44.auth.inviteUser('newuser@example.com', 'editor');
+   *   await base44.auth.inviteUser('newuser@example.com', 'user');
    *   console.log('Invitation sent successfully!');
    * } catch (error) {
    *   console.error('Failed to send invitation:', error);
@@ -323,7 +323,7 @@ export interface AuthModule {
    * Creates a new user account with email and password. After successful registration,
    * use {@linkcode loginViaEmailPassword | loginViaEmailPassword()} to log in the user.
    *
-   * @param payload - Registration details including email, password, and optional fields.
+   * @param params - Registration details including email, password, and optional fields.
    * @returns Promise resolving to the registration response.
    *
    * @example
@@ -342,7 +342,7 @@ export interface AuthModule {
    * );
    * ```
    */
-  register(payload: RegisterPayload): Promise<any>;
+  register(params: RegisterParams): Promise<any>;
 
   /**
    * Verifies an OTP (One-time password) code.

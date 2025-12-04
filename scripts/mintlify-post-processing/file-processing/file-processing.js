@@ -2,7 +2,7 @@
 
 /**
  * Post-processing script for TypeDoc-generated MDX files
- *
+ * 
  * TypeDoc now emits .mdx files directly, so this script:
  * 1. Processes links to make them Mintlify-compatible
  * 2. Removes files for linked types that should be suppressed
@@ -149,7 +149,7 @@ base44.integrations.MyCustomPackage.MyFunction({ param: 'value' });
       }
     }
   }
-
+  
   // Remove .md and .mdx extensions from markdown links
   // This handles both relative and absolute paths
   // Regex breakdown:
@@ -162,7 +162,7 @@ base44.integrations.MyCustomPackage.MyFunction({ param: 'value' });
   let newContent = content.replace(
     linkRegex,
     (match, linkText, linkPath, ext) => {
-      modified = true;
+    modified = true;
 
       // Check if the link points to a renamed module
       const pathParts = linkPath.split("/");
@@ -179,7 +179,7 @@ base44.integrations.MyCustomPackage.MyFunction({ param: 'value' });
       // Handle relative links that might be missing context (basic cleanup)
       // e.g. if linkPath is just "entities" but it should be relative
 
-      return `[${linkText}](${linkPath})`;
+    return `[${linkText}](${linkPath})`;
     }
   );
 
@@ -187,12 +187,12 @@ base44.integrations.MyCustomPackage.MyFunction({ param: 'value' });
   // or if the above regex missed them (though it matches .mdx?)
   // The regex requires .md or .mdx extension. If links are already extensionless, this won't run.
   // But TypeDoc usually outputs links with extensions.
-
+  
   if (modified) {
     fs.writeFileSync(filePath, newContent, "utf-8");
     return true;
   }
-
+  
   return false;
 }
 
@@ -272,18 +272,18 @@ function scanDocsContent() {
   };
 
   const sections = ["functions", "interfaces", "classes", "type-aliases"];
-
+  
   for (const section of sections) {
     const sectionDir = path.join(CONTENT_DIR, section);
     if (!fs.existsSync(sectionDir)) continue;
-
+    
     const files = fs.readdirSync(sectionDir);
     const mdxFiles = files
       .filter((file) => file.endsWith(".mdx"))
       .map((file) => path.basename(file, ".mdx"))
       .sort()
       .map((fileName) => `content/${section}/${fileName}`);
-
+    
     const key = section === "type-aliases" ? "typeAliases" : section;
     result[key] = mdxFiles;
   }
@@ -298,7 +298,7 @@ function getGroupName(section, categoryMap) {
   if (categoryMap[section]) {
     return categoryMap[section];
   }
-
+  
   return section;
 }
 
@@ -314,30 +314,30 @@ function generateDocsJson(docsContent) {
     // If file doesn't exist or can't be read, return empty object
     console.error(`Error: Category map file not found: ${CATEGORY_MAP_PATH}`);
   }
-
+  
   const groups = [];
-
+  
   if (docsContent.functions.length > 0 && categoryMap.functions) {
     groups.push({
       group: getGroupName("functions", categoryMap),
       pages: docsContent.functions,
     });
   }
-
+  
   if (docsContent.interfaces.length > 0 && categoryMap.interfaces) {
     groups.push({
       group: getGroupName("interfaces", categoryMap),
       pages: docsContent.interfaces,
     });
   }
-
+  
   if (docsContent.classes.length > 0 && categoryMap.classes) {
     groups.push({
       group: getGroupName("classes", categoryMap),
       pages: docsContent.classes,
     });
   }
-
+  
   if (docsContent.typeAliases.length > 0 && categoryMap["type-aliases"]) {
     // Merge into existing group if name matches
     const groupName = getGroupName("type-aliases", categoryMap);
@@ -348,13 +348,13 @@ function generateDocsJson(docsContent) {
       existingGroup.pages.push(...docsContent.typeAliases);
       existingGroup.pages.sort(); // Sort combined pages alphabetically
     } else {
-      groups.push({
+    groups.push({
         group: groupName,
-        pages: docsContent.typeAliases,
-      });
+      pages: docsContent.typeAliases,
+    });
     }
   }
-
+  
   // Find or create SDK Reference tab
   let sdkTab = template.navigation.tabs.find(
     (tab) => tab.tab === "SDK Reference"
@@ -363,9 +363,9 @@ function generateDocsJson(docsContent) {
     sdkTab = { tab: "SDK Reference", groups: [] };
     template.navigation.tabs.push(sdkTab);
   }
-
+  
   sdkTab.groups = groups;
-
+  
   const docsJsonPath = path.join(DOCS_DIR, "docs.json");
   fs.writeFileSync(
     docsJsonPath,
@@ -405,10 +405,10 @@ function isTypeDocPath(relativePath) {
  */
 function processAllFiles(dir, linkedTypeNames, exposedTypeNames) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
-
+  
   for (const entry of entries) {
     const entryPath = path.join(dir, entry.name);
-
+    
     if (entry.isDirectory()) {
       processAllFiles(entryPath, linkedTypeNames, exposedTypeNames);
     } else if (
@@ -433,7 +433,7 @@ function processAllFiles(dir, linkedTypeNames, exposedTypeNames) {
         exposedTypeNames.has(originalName) ||
         exposedTypeNames.has(fileName) ||
         isRenamedModule;
-
+      
       // Remove any type doc files that are not explicitly exposed
       if (isTypeDoc && !isExposedType) {
         fs.unlinkSync(entryPath);
@@ -683,7 +683,7 @@ function applyAppendedArticles(appendedArticles) {
               console.warn(
                 `Warning: Appended article not found: ${appendKey} (checked content/ and docs/ roots)`
               );
-              continue;
+        continue;
             }
           }
         }
@@ -692,7 +692,7 @@ function applyAppendedArticles(appendedArticles) {
       const { section, headings } = prepareAppendedSection(appendPath);
       combinedSections += `\n\n${section}`;
       if (PANELS_ENABLED && collectedHeadings) {
-        collectedHeadings.push(...headings);
+      collectedHeadings.push(...headings);
       }
 
       try {
@@ -768,29 +768,29 @@ function applyHeadingDemotion(dir) {
  */
 function main() {
   console.log("Processing TypeDoc MDX files for Mintlify...\n");
-
+  
   if (!fs.existsSync(DOCS_DIR)) {
     console.error(`Error: Documentation directory not found: ${DOCS_DIR}`);
     console.error('Please run "npm run docs:generate" first.');
     process.exit(1);
   }
-
+  
   // Get list of linked types to suppress
   const linkedTypeNames = getLinkedTypeNames();
   const exposedTypeNames = getTypesToExpose();
 
   // First, perform module renames (EntitiesModule -> entities, etc.)
   performModuleRenames(DOCS_DIR);
-
+  
   // Process all files (remove suppressed ones and fix links)
-  processAllFiles(DOCS_DIR, linkedTypeNames, exposedTypeNames);
+    processAllFiles(DOCS_DIR, linkedTypeNames, exposedTypeNames);
 
   // Append configured articles
   const appendedArticles = loadAppendedArticlesConfig();
   applyAppendedArticles(appendedArticles);
 
   applyHeadingDemotion(DOCS_DIR);
-
+  
   // Clean up the linked types file
   try {
     if (fs.existsSync(LINKED_TYPES_FILE)) {
@@ -799,14 +799,14 @@ function main() {
   } catch (e) {
     // Ignore errors
   }
-
+  
   // Scan content and generate docs.json
   const docsContent = scanDocsContent();
   generateDocsJson(docsContent);
-
+  
   // Copy styling.css
   copyStylingCss();
-
+  
   console.log(`\n✓ Post-processing complete!`);
   console.log(`  Documentation directory: ${DOCS_DIR}`);
 }

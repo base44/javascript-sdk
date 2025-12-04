@@ -10,10 +10,10 @@ export interface EntityHandler {
    * Retrieves all records of this type with support for sorting,
    * pagination, and field selection.
    *
-   * @param sort - Sort parameter, such as `'-created_date'` for descending.
-   * @param limit - Maximum number of results to return.
-   * @param skip - Number of results to skip for pagination.
-   * @param fields - Array of field names to include in the response.
+   * @param sort - Sort parameter, such as `'-created_date'` for descending. Defaults to `'-created_date'`.
+   * @param limit - Maximum number of results to return. Defaults to `50`.
+   * @param skip - Number of results to skip for pagination. Defaults to `0`.
+   * @param fields - Array of field names to include in the response. Defaults to all fields.
    * @returns Promise resolving to an array of records.
    *
    * @example
@@ -57,10 +57,10 @@ export interface EntityHandler {
    * @param query - Query object with field-value pairs. Each key should be a field name
    * from your entity schema, and each value is the criteria to match. Records matching all
    * specified criteria are returned. Field names are case-sensitive.
-   * @param sort - Sort parameter, such as `'-created_date'` for descending.
-   * @param limit - Maximum number of results to return.
-   * @param skip - Number of results to skip for pagination.
-   * @param fields - Array of field names to include in the response.
+   * @param sort - Sort parameter, such as `'-created_date'` for descending. Defaults to `'-created_date'`.
+   * @param limit - Maximum number of results to return. Defaults to `50`.
+   * @param skip - Number of results to skip for pagination. Defaults to `0`.
+   * @param fields - Array of field names to include in the response. Defaults to all fields.
    * @returns Promise resolving to an array of filtered records.
    *
    * @example

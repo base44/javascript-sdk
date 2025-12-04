@@ -2,7 +2,6 @@ import { AxiosInstance } from "axios";
 import {
   AuthModule,
   AuthModuleOptions,
-  User,
   VerifyOtpParams,
   ChangePasswordParams,
   ResetPasswordParams,

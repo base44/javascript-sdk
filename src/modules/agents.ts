@@ -8,13 +8,6 @@ import {
   CreateConversationParams,
 } from "./agents.types.js";
 
-/**
- * Creates the agents module for the Base44 SDK.
- *
- * @param config - Configuration object containing axios, socket, appId, etc.
- * @returns Agents module with methods to manage AI agent conversations
- * @internal
- */
 export function createAgentsModule({
   axios,
   socket,
@@ -24,26 +17,22 @@ export function createAgentsModule({
 }: AgentsModuleConfig): AgentsModule {
   const baseURL = `/apps/${appId}/agents`;
 
-  // Get all conversations (current user with user auth, all users with service role)
   const getConversations = () => {
     return axios.get<any, AgentConversation[]>(`${baseURL}/conversations`);
   };
 
-  // Get a specific conversation by ID
   const getConversation = (conversationId: string) => {
     return axios.get<any, AgentConversation | undefined>(
       `${baseURL}/conversations/${conversationId}`
     );
   };
 
-  // List conversations with filtering and pagination
   const listConversations = (filterParams: ModelFilterParams) => {
     return axios.get<any, AgentConversation[]>(`${baseURL}/conversations`, {
       params: filterParams,
     });
   };
 
-  // Create a new conversation with an agent
   const createConversation = (conversation: CreateConversationParams) => {
     return axios.post<any, AgentConversation>(
       `${baseURL}/conversations`,
@@ -51,7 +40,6 @@ export function createAgentsModule({
     );
   };
 
-  // Add a message to a conversation
   const addMessage = async (
     conversation: AgentConversation,
     message: AgentMessage
@@ -67,7 +55,6 @@ export function createAgentsModule({
     );
   };
 
-  // Subscribe to real-time updates for a conversation
   const subscribeToConversation = (
     conversationId: string,
     onUpdate?: (conversation: AgentConversation) => void
@@ -82,7 +69,6 @@ export function createAgentsModule({
     });
   };
 
-  // Get WhatsApp connection URL for an agent
   const getWhatsAppConnectURL = (agentName: string) => {
     const baseUrl = `${serverUrl}/api/apps/${appId}/agents/${encodeURIComponent(
       agentName

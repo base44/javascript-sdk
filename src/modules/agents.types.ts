@@ -84,6 +84,10 @@ export interface AgentConversation {
   agent_name: string;
   /** ID of the user who created the conversation. */
   created_by_id: string;
+  /** When the conversation was created. */
+  created_date: string;
+  /** When the conversation was last updated. */
+  updated_date: string;
   /** Array of messages in the conversation. */
   messages: AgentMessage[];
   /** Optional metadata associated with the conversation. */
@@ -103,7 +107,7 @@ export interface AgentMessage {
   /** When the message was last updated. */
   updated_date: string;
   /** Optional reasoning information for the message. */
-  reasoning?: AgentMessageReasoning;
+  reasoning?: AgentMessageReasoning | null;
   /** Message content. */
   content?: string | Record<string, any>;
   /** URLs to files attached to the message. */

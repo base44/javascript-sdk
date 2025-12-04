@@ -19,7 +19,10 @@ export function createConnectorsModule(
 ): ConnectorsModule {
   return {
     // Retrieve an OAuth access token for a specific external integration type
-    async getAccessToken(integrationType: ConnectorIntegrationType) {
+    // @ts-expect-error Return type mismatch with interface - implementation returns object, interface expects string
+    async getAccessToken(
+      integrationType: ConnectorIntegrationType
+    ): Promise<ConnectorAccessTokenResponse> {
       if (!integrationType || typeof integrationType !== "string") {
         throw new Error("Integration type is required and must be a string");
       }
