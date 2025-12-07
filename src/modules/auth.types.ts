@@ -166,7 +166,7 @@ export interface AuthModule {
   /**
    * Redirects the user to the app's login page.
    *
-   * Redirects with a callback URL to return to after successful authentication. Requires a browser environment and cannot be used in the backend.
+   * Redirects with a callback URL to return to after successful authentication. Requires a browser environment and can't be used in the backend.
    *
    * @param nextUrl - URL to redirect to after successful login.
    * @throws {Error} When not in a browser environment.
@@ -188,7 +188,7 @@ export interface AuthModule {
   /**
    * Logs out the current user.
    *
-   * Removes the authentication token from local storage and Axios headers, then optionally redirects to a URL or reloads the page. Requires a browser environment and cannot be used in the backend.
+   * Removes the authentication token from local storage and Axios headers, then optionally redirects to a URL or reloads the page. Requires a browser environment and can't be used in the backend.
    *
    * @param redirectUrl - Optional URL to redirect to after logout. Reloads the page if not provided.
    *

@@ -243,7 +243,7 @@ export interface EntityHandler {
    * Imports records from a file.
    *
    * Imports records from a file, typically CSV or similar format.
-   * The file format should match your entity structure. Requires a browser environment and cannot be used in the backend.
+   * The file format should match your entity structure. Requires a browser environment and can't be used in the backend.
    *
    * @param file - File object to import.
    * @returns Promise resolving to the import result.
@@ -279,9 +279,9 @@ export interface EntityHandler {
  *
  * ## Built-in User Entity
  *
- * Every app includes a built-in `User` entity that stores user account information. This entity has special security rules that cannot be changed.
+ * Every app includes a built-in `User` entity that stores user account information. This entity has special security rules that can't be changed.
  *
- * Regular users can only read and update their own user record. With service role authentication, you can read, update, and delete any user. You cannot create users using the entities module. Instead, use the functions of the {@link AuthModule | auth module} to invite or register new users.
+ * Regular users can only read and update their own user record. With service role authentication, you can read, update, and delete any user. You can't create users using the entities module. Instead, use the functions of the {@link AuthModule | auth module} to invite or register new users.
  *
  * @example
  * ```typescript

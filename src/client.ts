@@ -257,7 +257,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
 /**
  * Creates a Base44 client from an HTTP request.
  *
- * Creates a client by automatically extracting authentication tokens from a request to a backend function. Base44 inserts the necessary headers when forwarding requests to backend functions.
+ * The client is created by automatically extracting authentication tokens from a request to a backend function. Base44 inserts the necessary headers when forwarding requests to backend functions.
  *
  * To learn more about the Base44 client, see {@linkcode createClient | createClient()}.
  *
