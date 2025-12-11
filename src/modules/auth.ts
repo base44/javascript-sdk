@@ -24,6 +24,7 @@ export function createAuthModule(
     async me() {
       return axios.get(`/apps/${appId}/entities/User/me`);
     },
+
     /**
      * Update current user data
      * @param {Object} data - Updated user data
@@ -57,6 +58,28 @@ export function createAuthModule(
       }/login?from_url=${encodeURIComponent(redirectUrl)}`;
 
       // Redirect to the login page
+      window.location.href = loginUrl;
+    },
+
+    /**
+     * Redirects the user to a provider's login page
+     * @param {string} provider - OAuth provider name (e.g., 'google', 'github')
+     * @param {string} fromUrl - Optional URL to redirect to after successful login (defaults to '/')
+     * @throws {Error} When not in a browser environment
+     */
+    loginWithProvider(provider: string, fromUrl: string = "/") {
+      // Build the full redirect URL
+      const redirectUrl = new URL(fromUrl, window.location.origin).toString();
+
+      // Build the provider login URL (google is the default, so no provider path needed)
+      const providerPath = provider === "google" ? "" : `/${provider}`;
+      const loginUrl = `${
+        options.serverUrl
+      }/api/apps/auth${providerPath}/login?appId=${appId}&from_url=${encodeURIComponent(
+        redirectUrl
+      )}`;
+
+      // Redirect to the provider login page
       window.location.href = loginUrl;
     },
 
