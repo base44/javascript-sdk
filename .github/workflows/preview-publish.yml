@@ -107,8 +107,6 @@ jobs:
             echo "❌ Package publish failed"
             exit 1
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Restore original package.json
         if: always()
@@ -208,3 +206,4 @@ jobs:
 permissions:
   contents: read
   pull-requests: write
+  id-token: write
