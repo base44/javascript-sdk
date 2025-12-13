@@ -75,7 +75,7 @@ export function createAuthModule(
       const providerPath = provider === "google" ? "" : `/${provider}`;
       const loginUrl = `${
         options.serverUrl
-      }/api/apps/auth${providerPath}/login?appId=${appId}&from_url=${encodeURIComponent(
+      }/api/apps/auth${providerPath}/login?app_id=${appId}&from_url=${encodeURIComponent(
         redirectUrl
       )}`;
 
