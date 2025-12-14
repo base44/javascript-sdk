@@ -79,8 +79,6 @@ jobs:
         if: github.event.inputs.dry_run == 'false'
         run: |
           npm publish --tag ${{ github.event.inputs.npm_tag }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Dry run publish
         if: github.event.inputs.dry_run == 'true'
