@@ -1,2 +1,3 @@
 export const isNode = typeof window === "undefined";
-export const isInIFrame = !isNode && window.self !== window.top;
+export const isBrowser = !isNode;
+export const isInIFrame = isBrowser && window.self !== window.top;
