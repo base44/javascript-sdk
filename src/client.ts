@@ -220,7 +220,7 @@ export function createClientFromRequest(request: Request) {
   const appId = request.headers.get("Base44-App-Id");
   const serverUrlHeader = request.headers.get("Base44-Api-Url");
   const functionsVersion = request.headers.get("Base44-Functions-Version");
-  const clientIpHeader = request.headers.get("Base44-Client-IP");
+  const stateHeader = request.headers.get("Base44-State");
 
   if (!appId) {
     throw new Error(
@@ -260,8 +260,8 @@ export function createClientFromRequest(request: Request) {
 
   // Prepare additional headers to propagate
   const additionalHeaders: Record<string, string> = {};
-  if (clientIpHeader) {
-    additionalHeaders["Base44-Client-IP"] = clientIpHeader;
+  if (stateHeader) {
+    additionalHeaders["Base44-State"] = stateHeader;
   }
 
   return createClient({

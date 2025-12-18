@@ -220,13 +220,13 @@ describe('createClientFromRequest', () => {
     expect(() => createClientFromRequest(mockRequest)).toThrow('Invalid authorization header format. Expected "Bearer <token>"');
   });
 
-  test('should propagate Base44-Client-IP header when present', () => {
+  test('should propagate Base44-State header when present', () => {
     const mockRequest = {
       headers: {
         get: (name) => {
           const headers = {
             'Base44-App-Id': 'test-app-id',
-            'Base44-Client-IP': '192.168.1.100'
+            'Base44-State': '192.168.1.100'
           };
           return headers[name] || null;
         }
@@ -240,7 +240,7 @@ describe('createClientFromRequest', () => {
     expect(config.appId).toBe('test-app-id');
   });
 
-  test('should work without Base44-Client-IP header', () => {
+  test('should work without Base44-State header', () => {
     const mockRequest = {
       headers: {
         get: (name) => {
@@ -454,7 +454,7 @@ describe('Service Role Authorization Headers', () => {
     expect(scope.isDone()).toBe(true);
   });
 
-  test('should propagate Base44-Client-IP header in API requests when created from request', async () => {
+  test('should propagate Base44-State header in API requests when created from request', async () => {
     const clientIp = '192.168.1.100';
     
     const mockRequest = {
@@ -464,7 +464,7 @@ describe('Service Role Authorization Headers', () => {
             'Authorization': 'Bearer user-token-123',
             'Base44-App-Id': appId,
             'Base44-Api-Url': serverUrl,
-            'Base44-Client-IP': clientIp
+            'Base44-State': clientIp
           };
           return headers[name] || null;
         }
@@ -473,9 +473,9 @@ describe('Service Role Authorization Headers', () => {
 
     const client = createClientFromRequest(mockRequest);
 
-    // Mock entities request and verify Base44-Client-IP header is present
+    // Mock entities request and verify Base44-State header is present
     scope.get(`/api/apps/${appId}/entities/Todo`)
-      .matchHeader('Base44-Client-IP', clientIp)
+      .matchHeader('Base44-State', clientIp)
       .matchHeader('Authorization', 'Bearer user-token-123')
       .reply(200, { items: [], total: 0 });
 
@@ -486,7 +486,7 @@ describe('Service Role Authorization Headers', () => {
     expect(scope.isDone()).toBe(true);
   });
 
-  test('should not include Base44-Client-IP header when not present in original request', async () => {
+  test('should not include Base44-State header when not present in original request', async () => {
     const mockRequest = {
       headers: {
         get: (name) => {
@@ -502,9 +502,9 @@ describe('Service Role Authorization Headers', () => {
 
     const client = createClientFromRequest(mockRequest);
 
-    // Mock entities request and verify Base44-Client-IP header is NOT present
+    // Mock entities request and verify Base44-State header is NOT present
     scope.get(`/api/apps/${appId}/entities/Todo`)
-      .matchHeader('Base44-Client-IP', (val) => !val) // Should not have this header
+      .matchHeader('Base44-State', (val) => !val) // Should not have this header
       .matchHeader('Authorization', 'Bearer user-token-123')
       .reply(200, { items: [], total: 0 });
 
@@ -515,7 +515,7 @@ describe('Service Role Authorization Headers', () => {
     expect(scope.isDone()).toBe(true);
   });
 
-  test('should propagate Base44-Client-IP header in service role API requests', async () => {
+  test('should propagate Base44-State header in service role API requests', async () => {
     const clientIp = '10.0.0.50';
     
     const mockRequest = {
@@ -525,7 +525,7 @@ describe('Service Role Authorization Headers', () => {
             'Base44-Service-Authorization': 'Bearer service-token-123',
             'Base44-App-Id': appId,
             'Base44-Api-Url': serverUrl,
-            'Base44-Client-IP': clientIp
+            'Base44-State': clientIp
           };
           return headers[name] || null;
         }
@@ -534,9 +534,9 @@ describe('Service Role Authorization Headers', () => {
 
     const client = createClientFromRequest(mockRequest);
 
-    // Mock service role entities request and verify Base44-Client-IP header is present
+    // Mock service role entities request and verify Base44-State header is present
     scope.get(`/api/apps/${appId}/entities/User/123`)
-      .matchHeader('Base44-Client-IP', clientIp)
+      .matchHeader('Base44-State', clientIp)
       .matchHeader('Authorization', 'Bearer service-token-123')
       .reply(200, { id: '123', name: 'Test User' });
 
