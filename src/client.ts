@@ -220,6 +220,7 @@ export function createClientFromRequest(request: Request) {
   const appId = request.headers.get("Base44-App-Id");
   const serverUrlHeader = request.headers.get("Base44-Api-Url");
   const functionsVersion = request.headers.get("Base44-Functions-Version");
+  const clientIpHeader = request.headers.get("Base44-Client-IP");
 
   if (!appId) {
     throw new Error(
@@ -257,11 +258,18 @@ export function createClientFromRequest(request: Request) {
     userToken = authHeader.split(" ")[1];
   }
 
+  // Prepare additional headers to propagate
+  const additionalHeaders: Record<string, string> = {};
+  if (clientIpHeader) {
+    additionalHeaders["Base44-Client-IP"] = clientIpHeader;
+  }
+
   return createClient({
     serverUrl: serverUrlHeader || "https://base44.app",
     appId,
     token: userToken,
     serviceToken: serviceRoleToken,
     functionsVersion: functionsVersion ?? undefined,
+    headers: additionalHeaders,
   });
 }
