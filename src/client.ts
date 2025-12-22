@@ -194,6 +194,7 @@ export function createClient(config: {
         serverUrl,
         appId,
         requiresAuth,
+        token,
       };
     },
 
