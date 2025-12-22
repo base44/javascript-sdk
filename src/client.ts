@@ -59,9 +59,16 @@ export function createClient(config: {
     token,
   };
 
-  const socket = RoomsSocket({
-    config: socketConfig,
-  });
+  let socket: ReturnType<typeof RoomsSocket> | null = null;
+
+  const getSocket = () => {
+    if (!socket) {
+      socket = RoomsSocket({
+        config: socketConfig,
+      });
+    }
+    return socket;
+  };
 
   const headers = {
     ...optionalHeaders,
@@ -114,7 +121,7 @@ export function createClient(config: {
     functions: createFunctionsModule(functionsAxiosClient, appId),
     agents: createAgentsModule({
       axios: axiosClient,
-      socket,
+      getSocket,
       appId,
       serverUrl,
       token,
@@ -122,7 +129,9 @@ export function createClient(config: {
     appLogs: createAppLogsModule(axiosClient, appId),
     users: createUsersModule(axiosClient, appId),
     cleanup: () => {
-      socket.disconnect();
+      if (socket) {
+        socket.disconnect();
+      }
     },
   };
 
@@ -134,14 +143,16 @@ export function createClient(config: {
     functions: createFunctionsModule(serviceRoleFunctionsAxiosClient, appId),
     agents: createAgentsModule({
       axios: serviceRoleAxiosClient,
-      socket,
+      getSocket,
       appId,
       serverUrl,
       token,
     }),
     appLogs: createAppLogsModule(serviceRoleAxiosClient, appId),
     cleanup: () => {
-      socket.disconnect();
+      if (socket) {
+        socket.disconnect();
+      }
     },
   };
 
@@ -180,9 +191,12 @@ export function createClient(config: {
      */
     setToken(newToken: string) {
       userModules.auth.setToken(newToken);
-      socket.updateConfig({
-        token: newToken,
-      });
+      if (socket) {
+        socket.updateConfig({
+          token: newToken,
+        });
+      }
+      socketConfig.token = newToken;
     },
 
     /**

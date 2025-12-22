@@ -6,7 +6,7 @@ import { getAccessToken } from "../utils/auth-utils.js";
 
 export type AgentsModuleConfig = {
   axios: AxiosInstance;
-  socket: ReturnType<typeof RoomsSocket>;
+  getSocket: () => ReturnType<typeof RoomsSocket>;
   appId: string;
   serverUrl?: string;
   token?: string;
@@ -14,7 +14,7 @@ export type AgentsModuleConfig = {
 
 export function createAgentsModule({
   axios,
-  socket,
+  getSocket,
   appId,
   serverUrl,
   token,
@@ -52,6 +52,7 @@ export function createAgentsModule({
     message: AgentMessage
   ) => {
     const room = `/agent-conversations/${conversation.id}`;
+    const socket = getSocket();
     await socket.updateModel(
       room,
       {
@@ -70,6 +71,7 @@ export function createAgentsModule({
     onUpdate?: (conversation: AgentConversation) => void
   ) => {
     const room = `/agent-conversations/${conversationId}`;
+    const socket = getSocket();
     return socket.subscribeToRoom(room, {
       connect: () => {},
       update_model: ({ data: jsonStr }) => {
