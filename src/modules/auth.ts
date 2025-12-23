@@ -125,13 +125,18 @@ export function createAuthModule(
      * Login via username and password
      * @param email - User email
      * @param password - User password
-     * @param turnstileToken - Optional Turnstile captcha token
+     * @param options - Optional login options
+     * @param options.turnstileToken - Optional Turnstile captcha token
+     * @param options.fromUrl - Optional URL to redirect to after login
      * @returns Login response with access_token and user
      */
     async loginViaEmailPassword(
       email: string,
       password: string,
-      turnstileToken?: string
+      options?: {
+        turnstileToken?: string;
+        fromUrl?: string;
+      }
     ) {
       try {
         const response: { access_token: string; user: any } = await axios.post(
@@ -139,7 +144,8 @@ export function createAuthModule(
           {
             email,
             password,
-            ...(turnstileToken && { turnstile_token: turnstileToken }),
+            ...(options?.turnstileToken && { turnstile_token: options.turnstileToken }),
+            ...(options?.fromUrl && { from_url: options.fromUrl }),
           }
         );
 
