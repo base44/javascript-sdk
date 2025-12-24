@@ -46,13 +46,10 @@ export function createAgentsModule({
   ) => {
     const room = `/agent-conversations/${conversation.id}`;
     const socket = getSocket();
-    await socket.updateModel(
-      room,
-      {
-        ...conversation,
-        messages: [...(conversation.messages || []), message],
-      }
-    );
+    await socket.updateModel(room, {
+      ...conversation,
+      messages: [...(conversation.messages || []), message],
+    });
     return axios.post<any, AgentMessage>(
       `${baseURL}/conversations/${conversation.id}/messages`,
       message
