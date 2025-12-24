@@ -10,7 +10,7 @@ import {
 
 export function createAgentsModule({
   axios,
-  socket,
+  getSocket,
   appId,
   serverUrl,
   token,
@@ -45,10 +45,14 @@ export function createAgentsModule({
     message: AgentMessage
   ) => {
     const room = `/agent-conversations/${conversation.id}`;
-    await socket.updateModel(room, {
-      ...conversation,
-      messages: [...(conversation.messages || []), message],
-    });
+    const socket = getSocket();
+    await socket.updateModel(
+      room,
+      {
+        ...conversation,
+        messages: [...(conversation.messages || []), message],
+      }
+    );
     return axios.post<any, AgentMessage>(
       `${baseURL}/conversations/${conversation.id}/messages`,
       message
@@ -60,6 +64,7 @@ export function createAgentsModule({
     onUpdate?: (conversation: AgentConversation) => void
   ) => {
     const room = `/agent-conversations/${conversationId}`;
+    const socket = getSocket();
     return socket.subscribeToRoom(room, {
       connect: () => {},
       update_model: ({ data: jsonStr }) => {

@@ -147,8 +147,8 @@ export interface CreateConversationParams {
 export interface AgentsModuleConfig {
   /** Axios instance for HTTP requests */
   axios: AxiosInstance;
-  /** WebSocket instance for real-time updates */
-  socket: ReturnType<typeof RoomsSocket>;
+  /** Function to get WebSocket instance for real-time updates (lazy initialization) */
+  getSocket: () => ReturnType<typeof RoomsSocket>;
   /** Application ID */
   appId: string;
   /** Server URL */

@@ -8,6 +8,7 @@ import { getAccessToken } from "./utils/auth-utils.js";
 import { createFunctionsModule } from "./modules/functions.js";
 import { createAgentsModule } from "./modules/agents.js";
 import { createAppLogsModule } from "./modules/app-logs.js";
+import { createUsersModule } from "./modules/users.js";
 import { RoomsSocket, RoomsSocketConfig } from "./utils/socket-utils.js";
 import type {
   Base44Client,
@@ -74,9 +75,16 @@ export function createClient(config: CreateClientConfig): Base44Client {
     token,
   };
 
-  const socket = RoomsSocket({
-    config: socketConfig,
-  });
+  let socket: ReturnType<typeof RoomsSocket> | null = null;
+
+  const getSocket = () => {
+    if (!socket) {
+      socket = RoomsSocket({
+        config: socketConfig,
+      });
+    }
+    return socket;
+  };
 
   const headers = {
     ...optionalHeaders,
@@ -129,14 +137,17 @@ export function createClient(config: CreateClientConfig): Base44Client {
     functions: createFunctionsModule(functionsAxiosClient, appId),
     agents: createAgentsModule({
       axios: axiosClient,
-      socket,
+      getSocket,
       appId,
       serverUrl,
       token,
     }),
     appLogs: createAppLogsModule(axiosClient, appId),
+    users: createUsersModule(axiosClient, appId),
     cleanup: () => {
-      socket.disconnect();
+      if (socket) {
+        socket.disconnect();
+      }
     },
   };
 
@@ -148,14 +159,16 @@ export function createClient(config: CreateClientConfig): Base44Client {
     functions: createFunctionsModule(serviceRoleFunctionsAxiosClient, appId),
     agents: createAgentsModule({
       axios: serviceRoleAxiosClient,
-      socket,
+      getSocket,
       appId,
       serverUrl,
       token,
     }),
     appLogs: createAppLogsModule(serviceRoleAxiosClient, appId),
     cleanup: () => {
-      socket.disconnect();
+      if (socket) {
+        socket.disconnect();
+      }
     },
   };
 
@@ -205,9 +218,12 @@ export function createClient(config: CreateClientConfig): Base44Client {
      */
     setToken(newToken: string) {
       userModules.auth.setToken(newToken);
-      socket.updateConfig({
-        token: newToken,
-      });
+      if (socket) {
+        socket.updateConfig({
+          token: newToken,
+        });
+      }
+      socketConfig.token = newToken;
     },
 
     /**
@@ -315,6 +331,7 @@ export function createClientFromRequest(request: Request): Base44Client {
   const appId = request.headers.get("Base44-App-Id");
   const serverUrlHeader = request.headers.get("Base44-Api-Url");
   const functionsVersion = request.headers.get("Base44-Functions-Version");
+  const stateHeader = request.headers.get("Base44-State");
 
   if (!appId) {
     throw new Error(
@@ -352,11 +369,18 @@ export function createClientFromRequest(request: Request): Base44Client {
     userToken = authHeader.split(" ")[1];
   }
 
+  // Prepare additional headers to propagate
+  const additionalHeaders: Record<string, string> = {};
+  if (stateHeader) {
+    additionalHeaders["Base44-State"] = stateHeader;
+  }
+
   return createClient({
     serverUrl: serverUrlHeader || "https://base44.app",
     appId,
     token: userToken,
     serviceToken: serviceRoleToken,
     functionsVersion: functionsVersion ?? undefined,
+    headers: additionalHeaders,
   });
 }
