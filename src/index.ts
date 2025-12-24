@@ -1,5 +1,11 @@
-import { createClient, createClientFromRequest, type Base44Client } from "./client.js";
-import { Base44Error } from "./utils/axios-client.js";
+import {
+  createClient,
+  createClientFromRequest,
+  type Base44Client,
+  type CreateClientConfig,
+  type CreateClientOptions,
+} from "./client.js";
+import { Base44Error, type Base44ErrorJSON } from "./utils/axios-client.js";
 import {
   getAccessToken,
   saveAccessToken,
@@ -17,6 +23,75 @@ export {
   getLoginUrl,
 };
 
-export type { Base44Client };
+export type {
+  Base44Client,
+  CreateClientConfig,
+  CreateClientOptions,
+  Base44ErrorJSON,
+};
 
 export * from "./types.js";
+
+// Module types
+export type {
+  EntitiesModule,
+  EntityHandler,
+} from "./modules/entities.types.js";
+
+export type {
+  AuthModule,
+  LoginResponse,
+  RegisterParams,
+  VerifyOtpParams,
+  ChangePasswordParams,
+  ResetPasswordParams,
+  User,
+} from "./modules/auth.types.js";
+
+export type {
+  IntegrationsModule,
+  IntegrationPackage,
+  IntegrationEndpointFunction,
+  CoreIntegrations,
+  InvokeLLMParams,
+  GenerateImageParams,
+  GenerateImageResult,
+  UploadFileParams,
+  UploadFileResult,
+  SendEmailParams,
+  SendEmailResult,
+  ExtractDataFromUploadedFileParams,
+  ExtractDataFromUploadedFileResult,
+  UploadPrivateFileParams,
+  UploadPrivateFileResult,
+  CreateFileSignedUrlParams,
+  CreateFileSignedUrlResult,
+} from "./modules/integrations.types.js";
+
+export type { FunctionsModule } from "./modules/functions.types.js";
+
+export type {
+  AgentsModule,
+  AgentConversation,
+  AgentMessage,
+  AgentMessageReasoning,
+  AgentMessageToolCall,
+  AgentMessageUsage,
+  AgentMessageCustomContext,
+  AgentMessageMetadata,
+  CreateConversationParams,
+} from "./modules/agents.types.js";
+
+export type { AppLogsModule } from "./modules/app-logs.types.js";
+
+export type { SsoModule, SsoAccessTokenResponse } from "./modules/sso.types.js";
+
+export type { ConnectorsModule } from "./modules/connectors.types.js";
+
+// Auth utils types
+export type {
+  GetAccessTokenOptions,
+  SaveAccessTokenOptions,
+  RemoveAccessTokenOptions,
+  GetLoginUrlOptions,
+} from "./utils/auth-utils.types.js";

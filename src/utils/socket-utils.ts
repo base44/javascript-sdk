@@ -1,13 +1,13 @@
 import { Socket, io } from "socket.io-client";
 import { getAccessToken } from "./auth-utils.js";
 
-export type RoomsSocketConfig = {
+export interface RoomsSocketConfig {
   serverUrl: string;
   mountPath: string;
   transports: string[];
   appId: string;
   token?: string;
-};
+}
 
 export type TSocketRoom = string;
 export type TJsonStr = string;

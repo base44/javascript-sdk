@@ -1,5 +1,6 @@
-
-
+/**
+ * @internal
+ */
 export interface AppMessageContent {
   content?: string;
   file_urls?: string[];
@@ -8,11 +9,17 @@ export interface AppMessageContent {
   [key: string]: unknown;
 }
 
+/**
+ * @internal
+ */
 export interface AppConversationMessage extends AppMessageContent {
   id?: string | null;
   role?: "user" | "assistant" | string;
 }
 
+/**
+ * @internal
+ */
 export interface AppConversationLike {
   id?: string | null;
   messages?: AppMessageContent[] | null;
@@ -20,15 +27,19 @@ export interface AppConversationLike {
   functions_fail_silently?: boolean;
 }
 
-
-export interface DenoProjectLike { 
-  project_id: string
-  project_name: string
-  app_id: string
-  deployment_name_to_info: Record<string, {id: string, code: string}>
-
+/**
+ * @internal
+ */
+export interface DenoProjectLike {
+  project_id: string;
+  project_name: string;
+  app_id: string;
+  deployment_name_to_info: Record<string, { id: string; code: string }>;
 }
 
+/**
+ * @internal
+ */
 export interface AppLike {
   id?: string;
   conversation?: AppConversationLike | null;
@@ -48,7 +59,12 @@ export interface AppLike {
   agents?: Record<string, any>;
   logo_url?: string;
   slug?: string;
-  public_settings?: "private_with_login" | "public_with_login" | "public_without_login" | "workspace_with_login" | string;
+  public_settings?:
+    | "private_with_login"
+    | "public_with_login"
+    | "public_without_login"
+    | "workspace_with_login"
+    | string;
   is_blocked?: boolean;
   github_repo_url?: string;
   main_page?: string;
@@ -79,13 +95,19 @@ export interface AppLike {
   function_names?: string[];
   user_entity?: UserEntityLike;
   app_code_hash?: string;
-  has_backend_functions_enabled?: boolean;   
+  has_backend_functions_enabled?: boolean;
 }
 
+/**
+ * @internal
+ */
 export interface UserLike {
   id?: string | null;
 }
 
+/**
+ * @internal
+ */
 export interface UserEntityLike {
   type: string;
   name: string;
@@ -108,7 +130,9 @@ export interface UserEntityLike {
   required: string[];
 }
 
-
+/**
+ * @internal
+ */
 export interface AuthConfigLike {
   enable_username_password?: boolean;
   enable_google_login?: boolean;
@@ -118,9 +142,9 @@ export interface AuthConfigLike {
   enable_sso_login?: boolean;
 }
 
-
-
-
+/**
+ * @internal
+ */
 export type LoginInfoResponse = Pick<
   AppLike,
   | "id"

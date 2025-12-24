@@ -1,13 +1,18 @@
 import { AxiosInstance } from "axios";
+import { IntegrationsModule } from "./integrations.types";
 
 /**
- * Creates the integrations module for the Base44 SDK
- * @param {import('axios').AxiosInstance} axios - Axios instance
- * @param {string|number} appId - Application ID
- * @returns {Object} Integrations module
+ * Creates the integrations module for the Base44 SDK.
+ *
+ * @param axios - Axios instance
+ * @param appId - Application ID
+ * @returns Integrations module with dynamic access to integration endpoints
+ * @internal
  */
-export function createIntegrationsModule(axios: AxiosInstance, appId: string) {
-  // Using nested Proxy objects to handle dynamic package and endpoint names
+export function createIntegrationsModule(
+  axios: AxiosInstance,
+  appId: string
+): IntegrationsModule {
   return new Proxy(
     {},
     {
@@ -36,6 +41,7 @@ export function createIntegrationsModule(axios: AxiosInstance, appId: string) {
               }
 
               // Return a function that calls the integration endpoint
+              // This allows: client.integrations.PackageName.EndpointName(data)
               return async (data: Record<string, any>) => {
                 // Validate input
                 if (typeof data === "string") {
@@ -93,5 +99,5 @@ export function createIntegrationsModule(axios: AxiosInstance, appId: string) {
         );
       },
     }
-  );
+  ) as IntegrationsModule;
 }

@@ -1,0 +1,128 @@
+@import url("https://fonts.googleapis.com/css2?family=Wix+Madefor+Display:wght@400..800&family=Wix+Madefor+Text:ital,wght@0,400..800;1,400..800&display=swap");
+
+/* Apply Wix Madefor Text for body text */
+body,
+.mint-container {
+  font-family: "Wix Madefor Text", sans-serif;
+  font-weight: 400;
+  font-style: normal;
+  font-optical-sizing: auto;
+}
+
+/* Apply Wix Madefor Display for headings */
+h1,
+h2,
+h3 {
+  font-family: "Wix Madefor Display", sans-serif;
+  font-weight: 600;
+  font-style: normal;
+  font-optical-sizing: auto;
+}
+
+@media (prefers-color-scheme: light) {
+  body,
+  .mint-container,
+  h1,
+  h2,
+  h3 {
+    color: #111111;
+  }
+}
+
+/* Mintlify primary navbar CTA button color override */
+.mint-navbar .mint-button-primary,
+.mint-navbar li#topbar-cta-button a > span.bg-primary-dark {
+  background-color: #ff5500 !important; /* updated brand orange */
+  color: #111111 !important;
+  font-weight: 600;
+  border: none;
+}
+
+/* If button has hover/focus/active states, ensure text stays black: */
+.mint-navbar .mint-navbarPrimaryButton:hover,
+.mint-navbar .mint-navbarPrimaryButton:focus,
+.mint-navbar .mint-navbarPrimaryButton:active,
+.mint-navbar .mint-button-primary:hover,
+.mint-navbar .mint-button-primary:focus,
+.mint-navbar .mint-button-primary:active {
+  color: #111111 !important;
+}
+
+/* Optional: Remove box-shadow on click, if present */
+.mint-navbar .mint-navbarPrimaryButton:active {
+  box-shadow: none !important;
+}
+
+/* ---- NEW: Force the Base44 button text to black ---- */
+a[href*="base44.com"] span,
+a[href*="base44.com"] .text-white,
+.mint-navbar a span.text-white {
+  color: #111111 !important;
+}
+/* Force the ">" icon in the Base44 button to orange for consistency and accessibility */
+a[href*="base44.com"] svg,
+a[href*="base44.com"] .text-white,
+a[href*="base44.com"] svg path,
+.mint-navbar a svg.text-white {
+  color: #111111 !important; /* Works if color is set by text utility */
+  fill: #111111 !important; /* Ensures SVG/path fill is overridden */
+}
+/* Restore thin chevron style for the navbar's "Base44" button arrow */
+a[href*="base44.com"] svg,
+.mint-navbar a svg {
+  color: #111111 !important;
+  fill: none !important;
+  stroke: currentColor !important;
+  stroke-width: 2px !important;
+}
+a[href*="base44.com"] path,
+.mint-navbar a svg path {
+  color: #111111 !important;
+  fill: none !important;
+  stroke: currentColor !important;
+  stroke-width: 2px !important;
+}
+/* Make the ">" icon (chevron) in Base44 navbar button thin and on-brand */
+a[href*="base44.com"] svg,
+.mint-navbar a svg {
+  color: #111111 !important;
+}
+
+a[href*="base44.com"] svg path,
+.mint-navbar a svg path {
+  color: #111111 !important;
+  fill: none !important;
+  stroke: currentColor !important;
+  stroke-width: 1.5 !important; /* set to the original */
+  stroke-linecap: round !important; /* keep the smooth end */
+}
+
+/* Optional: if you want it even thinner, try 1.2 or 1 */
+
+/* Always use Mintlify's built-in theme variables! */
+div.prose.mt-1.font-normal.text-sm.leading-6.text-gray-600.dark\:text-gray-400,
+div.prose.mt-1.font-normal.text-sm.leading-6.text-gray-600.dark\:text-gray-400
+  span,
+.card .prose,
+.card .prose span,
+.mint-card .prose,
+.mint-card .prose span {
+  color: var(--mint-text-secondary) !important;
+}
+
+/* Remove bottom border from anchor elements containing code elements */
+a:has(code) {
+  border-bottom: none !important;
+  text-decoration: none !important;
+  color: #ff8844 !important; /* light orange */
+}
+
+/* Hide nested TOC items on interface and type-alias pages */
+body:has([data-page-href*="/content/interfaces/"])
+  .toc
+  li[data-depth]:not([data-depth="1"]),
+body:has([data-page-href*="/content/type-aliases/"])
+  .toc
+  li[data-depth]:not([data-depth="1"]) {
+  display: none !important;
+}

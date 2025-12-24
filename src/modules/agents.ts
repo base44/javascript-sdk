@@ -1,16 +1,12 @@
-import { RoomsSocket } from "../utils/socket-utils.js";
-import { AgentConversation, AgentMessage } from "./agents.types.js";
-import { AxiosInstance } from "axios";
-import { ModelFilterParams } from "../types.js";
 import { getAccessToken } from "../utils/auth-utils.js";
-
-export type AgentsModuleConfig = {
-  axios: AxiosInstance;
-  getSocket: () => ReturnType<typeof RoomsSocket>;
-  appId: string;
-  serverUrl?: string;
-  token?: string;
-};
+import { ModelFilterParams } from "../types.js";
+import {
+  AgentConversation,
+  AgentMessage,
+  AgentsModule,
+  AgentsModuleConfig,
+  CreateConversationParams,
+} from "./agents.types.js";
 
 export function createAgentsModule({
   axios,
@@ -18,7 +14,7 @@ export function createAgentsModule({
   appId,
   serverUrl,
   token,
-}: AgentsModuleConfig) {
+}: AgentsModuleConfig): AgentsModule {
   const baseURL = `/apps/${appId}/agents`;
 
   const getConversations = () => {
@@ -37,29 +33,23 @@ export function createAgentsModule({
     });
   };
 
-  const createConversation = (conversation: {
-    agent_name: string;
-    metadata?: Record<string, any>;
-  }) => {
+  const createConversation = (conversation: CreateConversationParams) => {
     return axios.post<any, AgentConversation>(
       `${baseURL}/conversations`,
       conversation
     );
   };
- 
+
   const addMessage = async (
     conversation: AgentConversation,
     message: AgentMessage
   ) => {
     const room = `/agent-conversations/${conversation.id}`;
     const socket = getSocket();
-    await socket.updateModel(
-      room,
-      {
-        ...conversation,
-        messages: [...(conversation.messages || []), message],
-      }
-    );
+    await socket.updateModel(room, {
+      ...conversation,
+      messages: [...(conversation.messages || []), message],
+    });
     return axios.post<any, AgentMessage>(
       `${baseURL}/conversations/${conversation.id}/messages`,
       message
@@ -82,7 +72,9 @@ export function createAgentsModule({
   };
 
   const getWhatsAppConnectURL = (agentName: string) => {
-    const baseUrl = `${serverUrl}/api/apps/${appId}/agents/${encodeURIComponent(agentName)}/whatsapp`;
+    const baseUrl = `${serverUrl}/api/apps/${appId}/agents/${encodeURIComponent(
+      agentName
+    )}/whatsapp`;
     const accessToken = token ?? getAccessToken();
 
     if (accessToken) {

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Base44 Support Documentation",
+  "integrations": {
+    "mixpanel": {
+      "projectToken": "cc6e9e106e4b833fc3a3819c11b74138"
+    }
+  },
+  "colors": {
+    "primary": "#FF5500",
+    "light": "#EEE2C0",
+    "dark": "#FF5500"
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "SDK Reference",
+        "groups": [
+          {
+            "group": "Main Methods",
+            "pages": [
+              "content/functions/createClient",
+              "content/functions/createClientFromRequest",
+              "content/functions/getAccessToken",
+              "content/functions/saveAccessToken",
+              "content/functions/removeAccessToken",
+              "content/functions/getLoginUrl"
+            ]
+          },
+          {
+            "group": "Modules",
+            "pages": ["content/interfaces/Auth"]
+          }
+        ]
+      }
+    ]
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Support",
+        "href": "https://app.base44.com/support/conversations"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Base44",
+      "href": "https://base44.com/?utm_source=Mintlify&utm_medium=Main&utm_content=menu"
+    }
+  },
+  "footer": {
+    "socials": {
+      "twitter": "https://x.com/base_44",
+      "discord": "https://discord.com/invite/ThpYPZpVts",
+      "linkedin": "https://www.linkedin.com/company/base44"
+    }
+  },
+  "custom": {
+    "stylesheets": ["/styling.css"]
+  }
+}

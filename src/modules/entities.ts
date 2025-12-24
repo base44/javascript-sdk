@@ -1,12 +1,18 @@
 import { AxiosInstance } from "axios";
+import { EntitiesModule, EntityHandler } from "./entities.types";
 
 /**
- * Creates the entities module for the Base44 SDK
- * @param {import('axios').AxiosInstance} axios - Axios instance
- * @param {string|number} appId - Application ID
- * @returns {Object} Entities module
+ * Creates the entities module for the Base44 SDK.
+ *
+ * @param axios - Axios instance
+ * @param appId - Application ID
+ * @returns Entities module with dynamic entity access
+ * @internal
  */
-export function createEntitiesModule(axios: AxiosInstance, appId: string) {
+export function createEntitiesModule(
+  axios: AxiosInstance,
+  appId: string
+): EntitiesModule {
   // Using Proxy to dynamically handle entity names
   return new Proxy(
     {},
@@ -25,32 +31,27 @@ export function createEntitiesModule(axios: AxiosInstance, appId: string) {
         return createEntityHandler(axios, appId, entityName);
       },
     }
-  );
+  ) as EntitiesModule;
 }
 
 /**
- * Creates a handler for a specific entity
- * @param {import('axios').AxiosInstance} axios - Axios instance
- * @param {string|number} appId - Application ID
- * @param {string} entityName - Entity name
- * @returns {Object} Entity handler with CRUD methods
+ * Creates a handler for a specific entity.
+ *
+ * @param axios - Axios instance
+ * @param appId - Application ID
+ * @param entityName - Entity name
+ * @returns Entity handler with CRUD methods
+ * @internal
  */
 function createEntityHandler(
   axios: AxiosInstance,
   appId: string,
   entityName: string
-) {
+): EntityHandler {
   const baseURL = `/apps/${appId}/entities/${entityName}`;
 
   return {
-    /**
-     * List entities with optional pagination and sorting
-     * @param {string} [sort] - Sort parameter
-     * @param {number} [limit] - Limit results
-     * @param {number} [skip] - Skip results (pagination)
-     * @param {string[]} [fields] - Fields to include
-     * @returns {Promise<Array>} List of entities
-     */
+    // List entities with optional pagination and sorting
     async list(sort: string, limit: number, skip: number, fields: string[]) {
       const params: Record<string, string | number> = {};
       if (sort) params.sort = sort;
@@ -62,15 +63,7 @@ function createEntityHandler(
       return axios.get(baseURL, { params });
     },
 
-    /**
-     * Filter entities based on query
-     * @param {Object} query - Filter query
-     * @param {string} [sort] - Sort parameter
-     * @param {number} [limit] - Limit results
-     * @param {number} [skip] - Skip results (pagination)
-     * @param {string[]} [fields] - Fields to include
-     * @returns {Promise<Array>} Filtered entities
-     */
+    // Filter entities based on query
     async filter(
       query: Record<string, any>,
       sort: string,
@@ -91,66 +84,37 @@ function createEntityHandler(
       return axios.get(baseURL, { params });
     },
 
-    /**
-     * Get entity by ID
-     * @param {string} id - Entity ID
-     * @returns {Promise<Object>} Entity
-     */
+    // Get entity by ID
     async get(id: string) {
       return axios.get(`${baseURL}/${id}`);
     },
 
-    /**
-     * Create new entity
-     * @param {Object} data - Entity data
-     * @returns {Promise<Object>} Created entity
-     */
+    // Create new entity
     async create(data: Record<string, any>) {
       return axios.post(baseURL, data);
     },
 
-    /**
-     * Update entity by ID
-     * @param {string} id - Entity ID
-     * @param {Object} data - Updated entity data
-     * @returns {Promise<Object>} Updated entity
-     */
+    // Update entity by ID
     async update(id: string, data: Record<string, any>) {
       return axios.put(`${baseURL}/${id}`, data);
     },
 
-    /**
-     * Delete entity by ID
-     * @param {string} id - Entity ID
-     * @returns {Promise<void>}
-     */
+    // Delete entity by ID
     async delete(id: string) {
       return axios.delete(`${baseURL}/${id}`);
     },
 
-    /**
-     * Delete multiple entities based on query
-     * @param {Object} query - Delete query
-     * @returns {Promise<void>}
-     */
+    // Delete multiple entities based on query
     async deleteMany(query: Record<string, any>) {
       return axios.delete(baseURL, { data: query });
     },
 
-    /**
-     * Create multiple entities in a single request
-     * @param {Array} data - Array of entity data
-     * @returns {Promise<Array>} Created entities
-     */
+    // Create multiple entities in a single request
     async bulkCreate(data: Record<string, any>[]) {
       return axios.post(`${baseURL}/bulk`, data);
     },
 
-    /**
-     * Import entities from a file
-     * @param {File} file - File to import
-     * @returns {Promise<Object>} Import result
-     */
+    // Import entities from a file
     async importEntities(file: File) {
       const formData = new FormData();
       formData.append("file", file, file.name);

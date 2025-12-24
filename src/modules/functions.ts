@@ -1,14 +1,20 @@
 import { AxiosInstance } from "axios";
+import { FunctionsModule } from "./functions.types";
 
 /**
- * Creates the functions module for the Base44 SDK
- * @param {import('axios').AxiosInstance} axios - Axios instance
- * @param {string|number} appId - Application ID
- * @returns {Object} Functions module
+ * Creates the functions module for the Base44 SDK.
+ *
+ * @param axios - Axios instance
+ * @param appId - Application ID
+ * @returns Functions module with methods to invoke custom backend functions
+ * @internal
  */
-export function createFunctionsModule(axios: AxiosInstance, appId: string) {
-  // Using nested Proxy objects to handle dynamic function names
+export function createFunctionsModule(
+  axios: AxiosInstance,
+  appId: string
+): FunctionsModule {
   return {
+    // Invoke a custom backend function by name
     async invoke(functionName: string, data: Record<string, any>) {
       // Validate input
       if (typeof data === "string") {
