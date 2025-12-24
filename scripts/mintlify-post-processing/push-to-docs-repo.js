@@ -164,6 +164,13 @@ function main() {
     process.exit(1);
   }
 
+  if (!/^[a-zA-Z0-9\-_\/]+$/.test(branch)) {
+    console.error(
+      "Error: Invalid branch name. Branch name must contain only letters, numbers, hyphens, underscores, and forward slashes."
+    );
+    process.exit(1);
+  }
+
   console.log(`Branch: ${branch}`);
 
   if (
