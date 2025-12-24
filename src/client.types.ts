@@ -43,7 +43,7 @@ export interface CreateClientConfig {
    */
   token?: string;
   /**
-   * Service role authentication token. Use this in the backend when you need elevated permissions to access data across all users or perform admin operations. This token should be kept secret and never exposed in the app's frontend. Typically, you get this token from a request to a backend function using {@linkcode createClientFromRequest | createClientFromRequest()}.
+   * Service role authentication token. Use this in the backend when you need elevated permissions to access data available to the app's admin or perform admin operations. This token should be kept secret and never exposed in the app's frontend. Typically, you get this token from a request to a backend function using {@linkcode createClientFromRequest | createClientFromRequest()}.
    */
   serviceToken?: string;
   /**
@@ -106,7 +106,7 @@ export interface Base44Client {
   /**
    * Provides access to supported modules with elevated permissions.
    *
-   * Service role authentication provides elevated permissions for backend operations. Unlike user authentication, which is scoped to a specific user's permissions, service role authentication has access to data and operations across all users.
+   * Service role authentication provides elevated permissions for backend operations. Unlike user authentication, which is scoped to a specific user's permissions, service role authentication has access to the data and operations available to the app's admin.
    *
    * @throws {Error} When accessed without providing a serviceToken during client creation
    */

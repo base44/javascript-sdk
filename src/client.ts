@@ -28,7 +28,7 @@ export type { Base44Client, CreateClientConfig, CreateClientOptions };
  * The client supports three authentication modes:
  * - **Anonymous**: Access modules anonymously without authentication using `base44.moduleName`. Operations are scoped to public data and permissions.
  * - **User authentication**: Access modules with user-level permissions using `base44.moduleName`. Operations are scoped to the authenticated user's data and permissions.
- * - **Service role authentication**: Access modules with elevated permissions using `base44.asServiceRole.moduleName`. Operations can access data across all users. Can only be used in the backend. Typically, you create a client with service role authentication using the {@linkcode createClientFromRequest | createClientFromRequest()} function in your backend functions.
+ * - **Service role authentication**: Access modules with elevated permissions using `base44.asServiceRole.moduleName`. Operations can access any data available to the app's admin. Can only be used in the backend. Typically, you create a client with service role authentication using the {@linkcode createClientFromRequest | createClientFromRequest()} function in your backend functions.
  *
  * For example, when using the {@linkcode EntitiesModule | entities} module:
  * - **Anonymous**: Can only read public data.
@@ -226,7 +226,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     /**
      * Provides access to service role modules.
      *
-     * Service role authentication provides elevated permissions for server-side operations. Unlike user authentication, which is scoped to a specific user's permissions, service role authentication has access to data and operations across all users.
+     * Service role authentication provides elevated permissions for server-side operations. Unlike user authentication, which is scoped to a specific user's permissions, service role authentication has access to the data and operations available to the app's admin.
      *
      * @throws {Error} When accessed without providing a serviceToken during client creation.
      *
