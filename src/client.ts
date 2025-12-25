@@ -15,6 +15,7 @@ import type {
   CreateClientConfig,
   CreateClientOptions,
 } from "./client.types.js";
+import { createAnalyticsModule } from "./modules/analytics.js";
 
 // Re-export client types
 export type { Base44Client, CreateClientConfig, CreateClientOptions };
@@ -144,6 +145,11 @@ export function createClient(config: CreateClientConfig): Base44Client {
     }),
     appLogs: createAppLogsModule(axiosClient, appId),
     users: createUsersModule(axiosClient, appId),
+    analytics: createAnalyticsModule({
+      axiosClient,
+      appId,
+      options: options?.analytics,
+    }),
     cleanup: () => {
       if (socket) {
         socket.disconnect();
