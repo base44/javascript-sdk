@@ -6,11 +6,13 @@ import {
   AnalyticsApiBatchRequest,
   TrackEventIntrinsicData,
   AnalyticsModuleOptions,
+  SessionContext,
 } from "./analytics.types";
 import {
   getSharedInstance,
   getSharedInstanceRefCount,
 } from "../utils/singleton";
+import type { AuthModule } from "./auth.types";
 
 ///////////////////////////////////////////////
 //// shared queue for analytics events     ////
@@ -31,24 +33,39 @@ const analyticsSharedState = getSharedInstance<AnalyticsSharedState>(
 
 export interface AnalyticsModuleArgs {
   axiosClient: AxiosInstance;
+  serverUrl: string;
   appId: string;
-  options?: AnalyticsModuleOptions;
+  userAuthModule: AuthModule;
 }
 
 export const createAnalyticsModule = ({
   axiosClient,
+  serverUrl,
   appId,
-  options,
+  userAuthModule,
 }: AnalyticsModuleArgs) => {
   // prevent overflow of events //
-  const MAX_QUEUE_SIZE = 1000;
-  const isEnabled = options?.enabled !== false;
+  const {
+    enabled = true,
+    maxQueueSize = 1000,
+    throttleTime = 1000,
+    batchSize = 30,
+  } = getAnalyticsModuleOptionsFromUrlParams() ?? {};
+
+  const trackBatchUrl = `${serverUrl}/api/apps/${appId}/analytics/track/batch`;
+  let sessionContext: SessionContext | null = null;
+
+  const getSessionContext = async () => {
+    if (sessionContext) return sessionContext;
+    const user = await userAuthModule.me();
+    sessionContext = {
+      user_id: user.id,
+    };
+    return sessionContext;
+  };
 
   const track = (params: TrackEventParams) => {
-    if (
-      !isEnabled ||
-      analyticsSharedState.requestsQueue.length >= MAX_QUEUE_SIZE
-    ) {
+    if (!enabled || analyticsSharedState.requestsQueue.length >= maxQueueSize) {
       return;
     }
     const intrinsicData = getEventIntrinsicData();
@@ -58,21 +75,45 @@ export const createAnalyticsModule = ({
     });
   };
 
-  const flush = async (eventsData: TrackEventData[]) => {
-    const apiEvents = eventsData.map(transformEventDataToApiRequestData);
+  const batchRequestFallback = async (events: AnalyticsApiRequestData[]) => {
     await axiosClient.request({
       method: "POST",
       url: `/apps/${appId}/analytics/track/batch`,
-      data: { events: apiEvents },
+      data: { events },
     } as AnalyticsApiBatchRequest);
   };
 
+  const flush = async (eventsData: TrackEventData[]) => {
+    const sessionContext_ = sessionContext ?? (await getSessionContext());
+    const events = eventsData.map(
+      transformEventDataToApiRequestData(sessionContext_)
+    );
+    const beaconPayload = JSON.stringify({ events });
+
+    if (
+      typeof navigator === "undefined" ||
+      beaconPayload.length > 60000 ||
+      !navigator.sendBeacon(trackBatchUrl, beaconPayload)
+    ) {
+      // beacon didn't work, fallback to axios
+      await batchRequestFallback(events);
+    }
+  };
+
+  if (typeof window !== "undefined") {
+    window.addEventListener("visibilitychange", () => {
+      //  flush entire queue on visibility change and hope for the best //
+      const eventsData = analyticsSharedState.requestsQueue.splice(0);
+      flush(eventsData);
+    });
+  }
+
   // start analytics processor only if it's the first instance and analytics is enabled //
-  if (
-    getSharedInstanceRefCount(ANALYTICS_SHARED_STATE_NAME) <= 1 &&
-    isEnabled
-  ) {
-    startAnalyticsProcessor(flush, options?.trackService);
+  if (getSharedInstanceRefCount(ANALYTICS_SHARED_STATE_NAME) <= 1 && enabled) {
+    startAnalyticsProcessor(flush, {
+      throttleTime,
+      batchSize,
+    });
   }
 
   return {
@@ -109,13 +150,25 @@ function getEventIntrinsicData(): TrackEventIntrinsicData {
   };
 }
 
-function transformEventDataToApiRequestData(
-  eventData: TrackEventData
-): AnalyticsApiRequestData {
-  return {
+function transformEventDataToApiRequestData(sessionContext: SessionContext) {
+  return (eventData: TrackEventData): AnalyticsApiRequestData => ({
     event_name: eventData.eventName,
     properties: eventData.properties,
     timestamp: eventData.timestamp,
     page_url: eventData.pageUrl,
-  };
+    ...sessionContext,
+  });
+}
+
+export function getAnalyticsModuleOptionsFromUrlParams():
+  | AnalyticsModuleOptions
+  | undefined {
+  const urlParams = new URLSearchParams(window.location.search);
+  const jsonString = urlParams.get("analytics");
+  if (!jsonString) return undefined;
+  try {
+    return JSON.parse(jsonString);
+  } catch {
+    return undefined;
+  }
 }

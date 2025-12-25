@@ -17,12 +17,16 @@ export type TrackEventData = {
   eventName: string;
 } & TrackEventIntrinsicData;
 
+export type SessionContext = {
+  user_id?: string | null;
+};
+
 export type AnalyticsApiRequestData = {
   event_name: string;
   properties?: TrackEventProperties;
   timestamp?: string;
   page_url?: string | null;
-};
+} & SessionContext;
 
 export type AnalyticsApiBatchRequest = {
   method: "POST";
@@ -34,8 +38,7 @@ export type AnalyticsApiBatchRequest = {
 
 export type AnalyticsModuleOptions = {
   enabled?: boolean;
-  trackService?: {
-    throttleTime: number;
-    batchSize: number;
-  };
+  maxQueueSize?: number;
+  throttleTime?: number;
+  batchSize?: number;
 };

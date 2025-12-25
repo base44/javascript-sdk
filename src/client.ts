@@ -128,13 +128,20 @@ export function createClient(config: CreateClientConfig): Base44Client {
     interceptResponses: false,
   });
 
+  const userAuthModule = createAuthModule(
+    axiosClient,
+    functionsAxiosClient,
+    appId,
+    {
+      appBaseUrl,
+      serverUrl,
+    }
+  );
+
   const userModules = {
     entities: createEntitiesModule(axiosClient, appId),
     integrations: createIntegrationsModule(axiosClient, appId),
-    auth: createAuthModule(axiosClient, functionsAxiosClient, appId, {
-      appBaseUrl,
-      serverUrl,
-    }),
+    auth: userAuthModule,
     functions: createFunctionsModule(functionsAxiosClient, appId),
     agents: createAgentsModule({
       axios: axiosClient,
@@ -147,8 +154,9 @@ export function createClient(config: CreateClientConfig): Base44Client {
     users: createUsersModule(axiosClient, appId),
     analytics: createAnalyticsModule({
       axiosClient,
+      serverUrl,
       appId,
-      options: options?.analytics,
+      userAuthModule,
     }),
     cleanup: () => {
       if (socket) {

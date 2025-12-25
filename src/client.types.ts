@@ -6,7 +6,6 @@ import type { ConnectorsModule } from "./modules/connectors.types.js";
 import type { FunctionsModule } from "./modules/functions.types.js";
 import type { AgentsModule } from "./modules/agents.types.js";
 import type { AppLogsModule } from "./modules/app-logs.types.js";
-import type { AnalyticsModuleOptions } from "./modules/analytics.types.js";
 
 /**
  * Options for creating a Base44 client.
@@ -16,7 +15,6 @@ export interface CreateClientOptions {
    * Optional error handler that will be called whenever an API error occurs.
    */
   onError?: (error: Error) => void;
-  analytics?: AnalyticsModuleOptions;
 }
 
 /**
