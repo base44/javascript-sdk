@@ -105,7 +105,7 @@ export const createAnalyticsModule = ({
   };
 
   const onDocHidden = () => {
-    analyticsSharedState.isProcessing = false;
+    stopAnalyticsProcessor();
     //  flush entire queue on visibility change and hope for the best //
     const eventsData = analyticsSharedState.requestsQueue.splice(0);
     flush(eventsData);
@@ -139,10 +139,21 @@ export const createAnalyticsModule = ({
     });
   }
 
+  const cleanup = () => {
+    if (typeof window === "undefined") return;
+    window.removeEventListener("visibilitychange", onVisibilityChange);
+    stopAnalyticsProcessor();
+  };
+
   return {
     track,
+    cleanup,
   };
 };
+
+function stopAnalyticsProcessor() {
+  analyticsSharedState.isProcessing = false;
+}
 
 async function startAnalyticsProcessor(
   handleTrack: (eventsData: TrackEventData[]) => Promise<void>,
