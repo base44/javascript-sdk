@@ -17,18 +17,17 @@ import type { AuthModule } from "./auth.types";
 ///////////////////////////////////////////////
 //// shared queue for analytics events     ////
 ///////////////////////////////////////////////
-type AnalyticsSharedState = {
-  requestsQueue: TrackEventData[];
-};
 
 const ANALYTICS_SHARED_STATE_NAME = "analytics";
 // shared state//
-const analyticsSharedState = getSharedInstance<AnalyticsSharedState>(
+const analyticsSharedState = getSharedInstance(
   ANALYTICS_SHARED_STATE_NAME,
   () => ({
-    requestsQueue: [],
+    requestsQueue: [] as TrackEventData[],
+    isProcessing: false,
   })
 );
+
 ///////////////////////////////////////////////
 
 export interface AnalyticsModuleArgs {
@@ -100,16 +99,24 @@ export const createAnalyticsModule = ({
     }
   };
 
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && enabled) {
     window.addEventListener("visibilitychange", () => {
-      //  flush entire queue on visibility change and hope for the best //
-      const eventsData = analyticsSharedState.requestsQueue.splice(0);
-      flush(eventsData);
+      if (document.visibilityState === "hidden") {
+        analyticsSharedState.isProcessing = false;
+        //  flush entire queue on visibility change and hope for the best //
+        const eventsData = analyticsSharedState.requestsQueue.splice(0);
+        flush(eventsData);
+      } else if (document.visibilityState === "visible") {
+        startAnalyticsProcessor(flush, {
+          throttleTime,
+          batchSize,
+        });
+      }
     });
   }
 
   // start analytics processor only if it's the first instance and analytics is enabled //
-  if (getSharedInstanceRefCount(ANALYTICS_SHARED_STATE_NAME) <= 1 && enabled) {
+  if (enabled) {
     startAnalyticsProcessor(flush, {
       throttleTime,
       batchSize,
@@ -122,15 +129,18 @@ export const createAnalyticsModule = ({
 };
 
 async function startAnalyticsProcessor(
-  handleTrack: (trackRequest: TrackEventData[]) => Promise<void>,
+  handleTrack: (eventsData: TrackEventData[]) => Promise<void>,
   options?: {
     throttleTime: number;
     batchSize: number;
   }
 ) {
+  if (analyticsSharedState.isProcessing) {
+    return;
+  }
+  analyticsSharedState.isProcessing = true;
   const { throttleTime = 1000, batchSize = 30 } = options ?? {};
-  while (true) {
-    await new Promise((resolve) => setTimeout(resolve, throttleTime));
+  while (analyticsSharedState.isProcessing) {
     const requests = analyticsSharedState.requestsQueue.splice(0, batchSize);
     if (requests.length > 0) {
       try {
@@ -140,13 +150,14 @@ async function startAnalyticsProcessor(
         console.error("Error processing analytics request:", error);
       }
     }
+    await new Promise((resolve) => setTimeout(resolve, throttleTime));
   }
 }
 
 function getEventIntrinsicData(): TrackEventIntrinsicData {
   return {
     timestamp: new Date().toISOString(),
-    pageUrl: typeof window !== "undefined" ? window.location.href : null,
+    pageUrl: typeof window !== "undefined" ? window.location.pathname : null,
   };
 }
 
