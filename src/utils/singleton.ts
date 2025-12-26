@@ -1,26 +1,27 @@
-
-
+const windowObj: {
+  base44SharedInstances?: {
+    [key: string]: { instance: any; _refCount: number };
+  };
+} =
+  typeof window !== "undefined"
+    ? (window as any)
+    : { base44SharedInstances: {} };
 
 // Singleton (shared between sdk instances)//
 export function getSharedInstance<T>(name: string, factory: () => T): T {
-  const windowObj: Window & {
-    base44?: { [key: string]: { instance: T; _refCount: number } };
-  } = typeof window !== "undefined" ? (window as any) : { base44: {} };
-
-  if (!windowObj.base44) {
-    windowObj.base44 = {};
+  if (!windowObj.base44SharedInstances) {
+    windowObj.base44SharedInstances = {};
   }
-  if (!windowObj.base44[name]) {
-    windowObj.base44[name] = { instance: factory(), _refCount: 0 };
+  if (!windowObj.base44SharedInstances[name]) {
+    windowObj.base44SharedInstances[name] = {
+      instance: factory(),
+      _refCount: 0,
+    };
   }
-  windowObj.base44[name]._refCount++;
-  return windowObj.base44[name].instance;
+  windowObj.base44SharedInstances[name]._refCount++;
+  return windowObj.base44SharedInstances[name].instance;
 }
 
 export function getSharedInstanceRefCount<T>(name: string): number {
-  const windowObj: Window & {
-    base44?: { [key: string]: { instance: T; _refCount: number } };
-  } = typeof window !== "undefined" ? (window as any) : { base44: {} };
-
-  return windowObj.base44?.[name]?._refCount ?? 0;
+  return windowObj.base44SharedInstances?.[name]?._refCount ?? 0;
 }

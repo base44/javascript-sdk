@@ -99,20 +99,31 @@ export const createAnalyticsModule = ({
     }
   };
 
-  if (typeof window !== "undefined" && enabled) {
-    window.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "hidden") {
-        analyticsSharedState.isProcessing = false;
-        //  flush entire queue on visibility change and hope for the best //
-        const eventsData = analyticsSharedState.requestsQueue.splice(0);
-        flush(eventsData);
-      } else if (document.visibilityState === "visible") {
-        startAnalyticsProcessor(flush, {
-          throttleTime,
-          batchSize,
-        });
-      }
+  const onDocHidden = () => {
+    analyticsSharedState.isProcessing = false;
+    //  flush entire queue on visibility change and hope for the best //
+    const eventsData = analyticsSharedState.requestsQueue.splice(0);
+    flush(eventsData);
+  };
+
+  const onDocVisible = () => {
+    startAnalyticsProcessor(flush, {
+      throttleTime,
+      batchSize,
     });
+  };
+
+  const onVisibilityChange = () => {
+    if (typeof window === "undefined") return;
+    if (document.visibilityState === "hidden") {
+      onDocHidden();
+    } else if (document.visibilityState === "visible") {
+      onDocVisible();
+    }
+  };
+
+  if (typeof window !== "undefined" && enabled) {
+    window.addEventListener("visibilitychange", onVisibilityChange);
   }
 
   // start analytics processor only if it's the first instance and analytics is enabled //
@@ -174,6 +185,7 @@ function transformEventDataToApiRequestData(sessionContext: SessionContext) {
 export function getAnalyticsModuleOptionsFromUrlParams():
   | AnalyticsModuleOptions
   | undefined {
+  if (typeof window === "undefined") return undefined;
   const urlParams = new URLSearchParams(window.location.search);
   const jsonString = urlParams.get("analytics");
   if (!jsonString) return undefined;
