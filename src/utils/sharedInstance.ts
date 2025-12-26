@@ -1,6 +1,6 @@
 const windowObj: {
   base44SharedInstances?: {
-    [key: string]: { instance: any; _refCount: number };
+    [key: string]: { instance: any };
   };
 } =
   typeof window !== "undefined"
@@ -15,13 +15,7 @@ export function getSharedInstance<T>(name: string, factory: () => T): T {
   if (!windowObj.base44SharedInstances[name]) {
     windowObj.base44SharedInstances[name] = {
       instance: factory(),
-      _refCount: 0,
     };
   }
-  windowObj.base44SharedInstances[name]._refCount++;
   return windowObj.base44SharedInstances[name].instance;
-}
-
-export function getSharedInstanceRefCount<T>(name: string): number {
-  return windowObj.base44SharedInstances?.[name]?._refCount ?? 0;
 }

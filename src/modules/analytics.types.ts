@@ -42,3 +42,7 @@ export type AnalyticsModuleOptions = {
   throttleTime?: number;
   batchSize?: number;
 };
+
+export type AnalyticsModule = {
+  track: (params: TrackEventParams) => void;
+};

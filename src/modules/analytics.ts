@@ -8,11 +8,15 @@ import {
   AnalyticsModuleOptions,
   SessionContext,
 } from "./analytics.types";
-import {
-  getSharedInstance,
-  getSharedInstanceRefCount,
-} from "../utils/singleton";
+import { getSharedInstance } from "../utils/sharedInstance";
 import type { AuthModule } from "./auth.types";
+
+const defaultConfiguration: AnalyticsModuleOptions = {
+  enabled: true,
+  maxQueueSize: 1000,
+  throttleTime: 1000,
+  batchSize: 30,
+};
 
 ///////////////////////////////////////////////
 //// shared queue for analytics events     ////
@@ -25,6 +29,11 @@ const analyticsSharedState = getSharedInstance(
   () => ({
     requestsQueue: [] as TrackEventData[],
     isProcessing: false,
+    sessionContext: null as SessionContext | null,
+    config: {
+      ...defaultConfiguration,
+      ...getAnalyticsModuleOptionsFromUrlParams(),
+    } as Required<AnalyticsModuleOptions>,
   })
 );
 
@@ -44,23 +53,19 @@ export const createAnalyticsModule = ({
   userAuthModule,
 }: AnalyticsModuleArgs) => {
   // prevent overflow of events //
-  const {
-    enabled = true,
-    maxQueueSize = 1000,
-    throttleTime = 1000,
-    batchSize = 30,
-  } = getAnalyticsModuleOptionsFromUrlParams() ?? {};
+  const { enabled, maxQueueSize, throttleTime, batchSize } =
+    analyticsSharedState.config;
 
   const trackBatchUrl = `${serverUrl}/api/apps/${appId}/analytics/track/batch`;
-  let sessionContext: SessionContext | null = null;
 
   const getSessionContext = async () => {
-    if (sessionContext) return sessionContext;
-    const user = await userAuthModule.me();
-    sessionContext = {
-      user_id: user.id,
-    };
-    return sessionContext;
+    if (!analyticsSharedState.sessionContext) {
+      const user = await userAuthModule.me();
+      analyticsSharedState.sessionContext = {
+        user_id: user.id,
+      };
+    }
+    return analyticsSharedState.sessionContext;
   };
 
   const track = (params: TrackEventParams) => {
@@ -83,7 +88,7 @@ export const createAnalyticsModule = ({
   };
 
   const flush = async (eventsData: TrackEventData[]) => {
-    const sessionContext_ = sessionContext ?? (await getSessionContext());
+    const sessionContext_ = await getSessionContext();
     const events = eventsData.map(
       transformEventDataToApiRequestData(sessionContext_)
     );
