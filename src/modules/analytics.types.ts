@@ -41,6 +41,8 @@ export type AnalyticsModuleOptions = {
   maxQueueSize?: number;
   throttleTime?: number;
   batchSize?: number;
+  // used for live users count tracking
+  heartBeatInterval?: number;
 };
 
 export type AnalyticsModule = {

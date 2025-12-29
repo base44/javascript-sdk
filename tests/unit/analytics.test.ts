@@ -50,6 +50,7 @@ describe("Analytics Module", () => {
       maxQueueSize: 1000,
       throttleTime: 1000,
       batchSize: 2,
+      heartBeatInterval: undefined,
     };
 
     base44 = createClient({
