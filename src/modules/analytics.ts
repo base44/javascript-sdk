@@ -68,17 +68,6 @@ export const createAnalyticsModule = ({
     return analyticsSharedState.sessionContext;
   };
 
-  const track = (params: TrackEventParams) => {
-    if (!enabled || analyticsSharedState.requestsQueue.length >= maxQueueSize) {
-      return;
-    }
-    const intrinsicData = getEventIntrinsicData();
-    analyticsSharedState.requestsQueue.push({
-      ...params,
-      ...intrinsicData,
-    });
-  };
-
   const batchRequestFallback = async (events: AnalyticsApiRequestData[]) => {
     await axiosClient.request({
       method: "POST",
@@ -131,19 +120,34 @@ export const createAnalyticsModule = ({
     window.addEventListener("visibilitychange", onVisibilityChange);
   }
 
-  // start analytics processor only if it's the first instance and analytics is enabled //
-  if (enabled) {
+  const startProcessing = () => {
+    if (!enabled) return;
     startAnalyticsProcessor(flush, {
       throttleTime,
       batchSize,
     });
-  }
+  };
+
+  const track = (params: TrackEventParams) => {
+    if (!enabled || analyticsSharedState.requestsQueue.length >= maxQueueSize) {
+      return;
+    }
+    const intrinsicData = getEventIntrinsicData();
+    analyticsSharedState.requestsQueue.push({
+      ...params,
+      ...intrinsicData,
+    });
+    startProcessing();
+  };
 
   const cleanup = () => {
     if (typeof window === "undefined") return;
     window.removeEventListener("visibilitychange", onVisibilityChange);
     stopAnalyticsProcessor();
   };
+
+  // start the flusing process ///
+  startProcessing();
 
   return {
     track,
@@ -163,11 +167,16 @@ async function startAnalyticsProcessor(
   }
 ) {
   if (analyticsSharedState.isProcessing) {
+    // only one instance of the analytics processor can be running at a time //
     return;
   }
   analyticsSharedState.isProcessing = true;
+
   const { throttleTime = 1000, batchSize = 30 } = options ?? {};
-  while (analyticsSharedState.isProcessing) {
+  while (
+    analyticsSharedState.isProcessing &&
+    analyticsSharedState.requestsQueue.length > 0
+  ) {
     const requests = analyticsSharedState.requestsQueue.splice(0, batchSize);
     if (requests.length > 0) {
       try {
@@ -179,6 +188,7 @@ async function startAnalyticsProcessor(
     }
     await new Promise((resolve) => setTimeout(resolve, throttleTime));
   }
+  analyticsSharedState.isProcessing = false;
 }
 
 function getEventIntrinsicData(): TrackEventIntrinsicData {
