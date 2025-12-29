@@ -36,6 +36,11 @@ export * from "./types.js";
 export type {
   EntitiesModule,
   EntityHandler,
+  RealtimeEventType,
+  RealtimeEvent,
+  RealtimeCallback,
+  SubscribeOptions,
+  Subscription,
 } from "./modules/entities.types.js";
 
 export type {

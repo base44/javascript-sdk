@@ -1,5 +1,35 @@
 import { AxiosInstance } from "axios";
-import { EntitiesModule, EntityHandler } from "./entities.types";
+import {
+  EntitiesModule,
+  EntityHandler,
+  RealtimeCallback,
+  RealtimeEvent,
+  RealtimeEventType,
+  SubscribeOptions,
+  Subscription,
+} from "./entities.types";
+import { RoomsSocket } from "../utils/socket-utils";
+
+/**
+ * Configuration for the entities module.
+ * @internal
+ */
+export interface EntitiesModuleConfig {
+  axios: AxiosInstance;
+  appId: string;
+  getSocket: () => ReturnType<typeof RoomsSocket>;
+}
+
+/**
+ * Creates the entities module for the Base44 SDK.
+ *
+ * @param config - Configuration object containing axios, appId, and getSocket
+ * @returns Entities module with dynamic entity access
+ * @internal
+ */
+export function createEntitiesModule(
+  config: EntitiesModuleConfig
+): EntitiesModule;
 
 /**
  * Creates the entities module for the Base44 SDK.
@@ -8,11 +38,32 @@ import { EntitiesModule, EntityHandler } from "./entities.types";
  * @param appId - Application ID
  * @returns Entities module with dynamic entity access
  * @internal
+ * @deprecated Use the config object overload instead
  */
 export function createEntitiesModule(
   axios: AxiosInstance,
   appId: string
+): EntitiesModule;
+
+export function createEntitiesModule(
+  configOrAxios: EntitiesModuleConfig | AxiosInstance,
+  appIdArg?: string
 ): EntitiesModule {
+  // Handle both old and new signatures for backwards compatibility
+  const config: EntitiesModuleConfig =
+    "axios" in configOrAxios
+      ? configOrAxios
+      : {
+          axios: configOrAxios,
+          appId: appIdArg!,
+          getSocket: () => {
+            throw new Error(
+              "Realtime subscriptions are not available. Please update your client configuration."
+            );
+          },
+        };
+
+  const { axios, appId, getSocket } = config;
   // Using Proxy to dynamically handle entity names
   return new Proxy(
     {},
@@ -28,10 +79,48 @@ export function createEntitiesModule(
         }
 
         // Create entity handler
-        return createEntityHandler(axios, appId, entityName);
+        return createEntityHandler(axios, appId, entityName, getSocket);
       },
     }
   ) as EntitiesModule;
+}
+
+/**
+ * Creates a stable hash from a query object for room naming.
+ * @internal
+ */
+function hashQuery(query: Record<string, any>): string {
+  const sortedKeys = Object.keys(query).sort();
+  const normalized = sortedKeys
+    .map((k) => `${k}:${JSON.stringify(query[k])}`)
+    .join("|");
+  // Simple hash function
+  let hash = 0;
+  for (let i = 0; i < normalized.length; i++) {
+    const char = normalized.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString(36);
+}
+
+/**
+ * Parses the realtime message data and extracts event information.
+ * @internal
+ */
+function parseRealtimeMessage(dataStr: string): RealtimeEvent | null {
+  try {
+    const parsed = JSON.parse(dataStr);
+    return {
+      type: parsed.type as RealtimeEventType,
+      data: parsed.data,
+      id: parsed.id || parsed.data?.id,
+      timestamp: parsed.timestamp || new Date().toISOString(),
+      previousData: parsed.previousData,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -40,13 +129,15 @@ export function createEntitiesModule(
  * @param axios - Axios instance
  * @param appId - Application ID
  * @param entityName - Entity name
+ * @param getSocket - Function to get the socket instance
  * @returns Entity handler with CRUD methods
  * @internal
  */
 function createEntityHandler(
   axios: AxiosInstance,
   appId: string,
-  entityName: string
+  entityName: string,
+  getSocket: () => ReturnType<typeof RoomsSocket>
 ): EntityHandler {
   const baseURL = `/apps/${appId}/entities/${entityName}`;
 
@@ -124,6 +215,61 @@ function createEntityHandler(
           "Content-Type": "multipart/form-data",
         },
       });
+    },
+
+    // Subscribe to realtime updates
+    subscribe(
+      callbackOrIdOrQuery: RealtimeCallback | string | Record<string, any>,
+      callbackOrOptions?: RealtimeCallback | SubscribeOptions,
+      optionsArg?: SubscribeOptions
+    ): Subscription {
+      let room: string;
+      let callback: RealtimeCallback;
+      let options: SubscribeOptions | undefined;
+
+      // Parse overloaded arguments
+      if (typeof callbackOrIdOrQuery === "function") {
+        // subscribe(callback, options?)
+        room = `entities:${appId}:${entityName}`;
+        callback = callbackOrIdOrQuery as RealtimeCallback;
+        options = callbackOrOptions as SubscribeOptions | undefined;
+      } else if (typeof callbackOrIdOrQuery === "string") {
+        // subscribe(id, callback, options?)
+        room = `entities:${appId}:${entityName}:${callbackOrIdOrQuery}`;
+        callback = callbackOrOptions as RealtimeCallback;
+        options = optionsArg;
+      } else {
+        // subscribe(query, callback, options?)
+        const queryHash = hashQuery(callbackOrIdOrQuery);
+        room = `entities:${appId}:${entityName}:query:${queryHash}`;
+        callback = callbackOrOptions as RealtimeCallback;
+        options = optionsArg;
+      }
+
+      const eventFilter = options?.events;
+
+      // Get the socket and subscribe to the room
+      const socket = getSocket();
+      const unsubscribe = socket.subscribeToRoom(room, {
+        update_model: (msg) => {
+          // Only process messages for our room
+          if (msg.room !== room) return;
+
+          const event = parseRealtimeMessage(msg.data);
+          if (!event) return;
+
+          // Apply event type filter if specified
+          if (eventFilter && !eventFilter.includes(event.type)) {
+            return;
+          }
+
+          callback(event);
+        },
+      });
+
+      return {
+        unsubscribe,
+      };
     },
   };
 }
