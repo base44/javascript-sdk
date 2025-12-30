@@ -13,7 +13,7 @@ import type { AuthModule } from "./auth.types";
 import { generateUuid } from "../utils/common";
 
 export const USER_HEARTBEAT_EVENT_NAME = "__user_heartbeat_event__";
-export const ANALYTICS_CONFIG_LOCAL_STORAGE_KEY = "base44_analytics_config";
+export const ANALYTICS_CONFIG_WINDOW_KEY = "base44_analytics_config";
 export const ANALYTICS_SESSION_ID_LOCAL_STORAGE_KEY =
   "base44_analytics_session_id";
 
@@ -40,7 +40,7 @@ const analyticsSharedState = getSharedInstance(
     sessionContext: null as SessionContext | null,
     config: {
       ...defaultConfiguration,
-      ...getAnalyticsModuleOptionsFromLocalStorage(),
+      ...getAnalyticsModuleOptionsFromWindow(),
     } as Required<AnalyticsModuleOptions>,
   })
 );
@@ -256,17 +256,11 @@ async function getSessionContext(
   return analyticsSharedState.sessionContext;
 }
 
-export function getAnalyticsModuleOptionsFromLocalStorage():
+export function getAnalyticsModuleOptionsFromWindow():
   | AnalyticsModuleOptions
   | undefined {
   if (typeof window === "undefined") return undefined;
-  try {
-    const jsonString = localStorage.getItem(ANALYTICS_CONFIG_LOCAL_STORAGE_KEY);
-    if (!jsonString) return undefined;
-    return JSON.parse(jsonString);
-  } catch {
-    return undefined;
-  }
+  return (window as any)[ANALYTICS_CONFIG_WINDOW_KEY];
 }
 
 export function getAnalyticsSessionId(): string {
