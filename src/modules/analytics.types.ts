@@ -19,6 +19,7 @@ export type TrackEventData = {
 
 export type SessionContext = {
   user_id?: string | null;
+  session_id?: string | null;
 };
 
 export type AnalyticsApiRequestData = {

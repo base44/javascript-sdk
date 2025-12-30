@@ -10,8 +10,12 @@ import {
 } from "./analytics.types";
 import { getSharedInstance } from "../utils/sharedInstance";
 import type { AuthModule } from "./auth.types";
+import { generateUuid } from "../utils/common";
 
 export const USER_HEARTBEAT_EVENT_NAME = "__user_heartbeat_event__";
+export const ANALYTICS_CONFIG_LOCAL_STORAGE_KEY = "base44_analytics_config";
+export const ANALYTICS_SESSION_ID_LOCAL_STORAGE_KEY =
+  "base44_analytics_session_id";
 
 const defaultConfiguration: AnalyticsModuleOptions = {
   enabled: true,
@@ -57,8 +61,15 @@ export const createAnalyticsModule = ({
   userAuthModule,
 }: AnalyticsModuleArgs) => {
   // prevent overflow of events //
-  const { enabled, maxQueueSize, throttleTime, batchSize } =
-    analyticsSharedState.config;
+  const { maxQueueSize, throttleTime, batchSize } = analyticsSharedState.config;
+
+  if (!analyticsSharedState.config?.enabled) {
+    return {
+      track: () => {},
+      cleanup: () => {},
+    };
+  }
+
   let clearHeartBeatProcessor: (() => void) | undefined = undefined;
   const trackBatchUrl = `${serverUrl}/api/apps/${appId}/analytics/track/batch`;
 
@@ -91,7 +102,6 @@ export const createAnalyticsModule = ({
   };
 
   const startProcessing = () => {
-    if (!enabled) return;
     startAnalyticsProcessor(flush, {
       throttleTime,
       batchSize,
@@ -99,7 +109,7 @@ export const createAnalyticsModule = ({
   };
 
   const track = (params: TrackEventParams) => {
-    if (!enabled || analyticsSharedState.requestsQueue.length >= maxQueueSize) {
+    if (analyticsSharedState.requestsQueue.length >= maxQueueSize) {
       return;
     }
     const intrinsicData = getEventIntrinsicData();
@@ -148,7 +158,7 @@ export const createAnalyticsModule = ({
   // start the heart beat processor //
   clearHeartBeatProcessor = startHeartBeatProcessor(track);
   // start the visibility change listener //
-  if (typeof window !== "undefined" && enabled) {
+  if (typeof window !== "undefined") {
     window.addEventListener("visibilitychange", onVisibilityChange);
   }
 
@@ -224,16 +234,21 @@ function transformEventDataToApiRequestData(sessionContext: SessionContext) {
 }
 
 let sessionContextPromise: Promise<SessionContext> | null = null;
-async function getSessionContext(userAuthModule: AuthModule) {
+async function getSessionContext(
+  userAuthModule: AuthModule
+): Promise<SessionContext> {
   if (!analyticsSharedState.sessionContext) {
     if (!sessionContextPromise) {
+      const sessionId = getAnalyticsSessionId();
       sessionContextPromise = userAuthModule
         .me()
         .then((user) => ({
           user_id: user.id,
+          session_id: sessionId,
         }))
         .catch(() => ({
-          user_id: "unknown: error getting session context",
+          user_id: null,
+          session_id: sessionId,
         }));
     }
     analyticsSharedState.sessionContext = await sessionContextPromise;
@@ -246,10 +261,32 @@ export function getAnalyticsModuleOptionsFromLocalStorage():
   | undefined {
   if (typeof window === "undefined") return undefined;
   try {
-    const jsonString = localStorage.getItem("base44_analytics_config");
+    const jsonString = localStorage.getItem(ANALYTICS_CONFIG_LOCAL_STORAGE_KEY);
     if (!jsonString) return undefined;
     return JSON.parse(jsonString);
   } catch {
     return undefined;
+  }
+}
+
+export function getAnalyticsSessionId(): string {
+  if (typeof window === "undefined") {
+    return generateUuid();
+  }
+  try {
+    const sessionId = localStorage.getItem(
+      ANALYTICS_SESSION_ID_LOCAL_STORAGE_KEY
+    );
+    if (!sessionId) {
+      const newSessionId = generateUuid();
+      localStorage.setItem(
+        ANALYTICS_SESSION_ID_LOCAL_STORAGE_KEY,
+        newSessionId
+      );
+      return newSessionId;
+    }
+    return sessionId;
+  } catch {
+    return generateUuid();
   }
 }
