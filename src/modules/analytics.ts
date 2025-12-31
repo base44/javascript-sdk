@@ -13,7 +13,7 @@ import type { AuthModule } from "./auth.types";
 import { generateUuid } from "../utils/common";
 
 export const USER_HEARTBEAT_EVENT_NAME = "__user_heartbeat_event__";
-export const ANALYTICS_CONFIG_WINDOW_KEY = "base44_analytics_config";
+export const ANALYTICS_CONFIG_URL_PARAM_KEY = "analytics-disable";
 export const ANALYTICS_SESSION_ID_LOCAL_STORAGE_KEY =
   "base44_analytics_session_id";
 
@@ -40,7 +40,7 @@ const analyticsSharedState = getSharedInstance(
     sessionContext: null as SessionContext | null,
     config: {
       ...defaultConfiguration,
-      ...getAnalyticsModuleOptionsFromWindow(),
+      ...getAnalyticsConfigFromUrlParams(),
     } as Required<AnalyticsModuleOptions>,
   })
 );
@@ -81,23 +81,27 @@ export const createAnalyticsModule = ({
     } as AnalyticsApiBatchRequest);
   };
 
+  const beaconRequest = async (events: AnalyticsApiRequestData[]) => {
+    const beaconPayload = JSON.stringify({ events });
+    try {
+      const blob = new Blob([beaconPayload], { type: "application/json" });
+      return (
+        typeof navigator === "undefined" ||
+        beaconPayload.length > 60000 ||
+        !navigator.sendBeacon(trackBatchUrl, blob)
+      );
+    } catch {
+      return false;
+    }
+  };
+
   const flush = async (eventsData: TrackEventData[]) => {
     const sessionContext_ = await getSessionContext(userAuthModule);
     const events = eventsData.map(
       transformEventDataToApiRequestData(sessionContext_)
     );
-    const beaconPayload = JSON.stringify({ events });
-    try {
-      if (
-        typeof navigator === "undefined" ||
-        beaconPayload.length > 60000 ||
-        !navigator.sendBeacon(trackBatchUrl, beaconPayload)
-      ) {
-        // beacon didn't work, fallback to axios
-        await batchRequestFallback(events);
-      }
-    } catch {
-      // TODO: think about retries if needed
+    if (!(await beaconRequest(events))) {
+      return batchRequestFallback(events);
     }
   };
 
@@ -256,11 +260,26 @@ async function getSessionContext(
   return analyticsSharedState.sessionContext;
 }
 
-export function getAnalyticsModuleOptionsFromWindow():
+export function getAnalyticsConfigFromUrlParams():
   | AnalyticsModuleOptions
   | undefined {
   if (typeof window === "undefined") return undefined;
-  return (window as any)[ANALYTICS_CONFIG_WINDOW_KEY];
+  const urlParams = new URLSearchParams(window.location.search);
+  const analyticsDisable = urlParams.get(ANALYTICS_CONFIG_URL_PARAM_KEY);
+
+  // if the url param is not set, return undefined //
+  if (analyticsDisable == null || !analyticsDisable.length) return undefined;
+
+  // remove the url param from the url //
+  const newUrlParams = new URLSearchParams(window.location.search);
+  newUrlParams.delete(ANALYTICS_CONFIG_URL_PARAM_KEY);
+  const newUrl =
+    window.location.pathname +
+    (newUrlParams.toString() ? "?" + newUrlParams.toString() : "");
+  window.history.replaceState({}, "", newUrl);
+
+  // return the config object //
+  return analyticsDisable === "true" ? { enabled: false } : undefined;
 }
 
 export function getAnalyticsSessionId(): string {
