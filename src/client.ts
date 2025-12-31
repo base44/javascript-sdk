@@ -15,6 +15,7 @@ import type {
   CreateClientConfig,
   CreateClientOptions,
 } from "./client.types.js";
+import { createAnalyticsModule } from "./modules/analytics.js";
 
 // Re-export client types
 export type { Base44Client, CreateClientConfig, CreateClientOptions };
@@ -127,13 +128,20 @@ export function createClient(config: CreateClientConfig): Base44Client {
     interceptResponses: false,
   });
 
+  const userAuthModule = createAuthModule(
+    axiosClient,
+    functionsAxiosClient,
+    appId,
+    {
+      appBaseUrl,
+      serverUrl,
+    }
+  );
+
   const userModules = {
     entities: createEntitiesModule(axiosClient, appId),
     integrations: createIntegrationsModule(axiosClient, appId),
-    auth: createAuthModule(axiosClient, functionsAxiosClient, appId, {
-      appBaseUrl,
-      serverUrl,
-    }),
+    auth: userAuthModule,
     functions: createFunctionsModule(functionsAxiosClient, appId),
     agents: createAgentsModule({
       axios: axiosClient,
@@ -144,7 +152,14 @@ export function createClient(config: CreateClientConfig): Base44Client {
     }),
     appLogs: createAppLogsModule(axiosClient, appId),
     users: createUsersModule(axiosClient, appId),
+    analytics: createAnalyticsModule({
+      axiosClient,
+      serverUrl,
+      appId,
+      userAuthModule,
+    }),
     cleanup: () => {
+      userModules.analytics.cleanup();
       if (socket) {
         socket.disconnect();
       }

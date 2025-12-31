@@ -12,6 +12,7 @@ describe('Client Creation', () => {
     expect(client.entities).toBeDefined();
     expect(client.integrations).toBeDefined();
     expect(client.auth).toBeDefined();
+    expect(client.analytics).toBeDefined();
     
     const config = client.getConfig();
     expect(config.appId).toBe('test-app-id');

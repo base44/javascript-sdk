@@ -6,6 +6,7 @@ import type { ConnectorsModule } from "./modules/connectors.types.js";
 import type { FunctionsModule } from "./modules/functions.types.js";
 import type { AgentsModule } from "./modules/agents.types.js";
 import type { AppLogsModule } from "./modules/app-logs.types.js";
+import type { AnalyticsModule } from "./modules/analytics.types.js";
 
 /**
  * Options for creating a Base44 client.
@@ -85,6 +86,8 @@ export interface Base44Client {
   agents: AgentsModule;
   /** {@link AppLogsModule | App logs module} for tracking app usage. */
   appLogs: AppLogsModule;
+  /** {@link AnalyticsModule | Analytics module} for tracking app usage. */
+  analytics: AnalyticsModule;
   /** Cleanup function to disconnect WebSocket connections. Call when you're done with the client. */
   cleanup: () => void;
 
