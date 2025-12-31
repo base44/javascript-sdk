@@ -236,6 +236,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
         serverUrl,
         appId,
         requiresAuth,
+        token,
       };
     },
 

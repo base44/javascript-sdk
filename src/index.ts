@@ -12,6 +12,7 @@ import {
   removeAccessToken,
   getLoginUrl,
 } from "./utils/auth-utils.js";
+import { appParams } from "./utils/app-params.js";
 
 export {
   createClient,
@@ -21,6 +22,7 @@ export {
   saveAccessToken,
   removeAccessToken,
   getLoginUrl,
+  appParams
 };
 
 export type {
