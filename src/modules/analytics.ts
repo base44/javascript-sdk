@@ -13,12 +13,14 @@ import type { AuthModule } from "./auth.types";
 import { generateUuid } from "../utils/common";
 
 export const USER_HEARTBEAT_EVENT_NAME = "__user_heartbeat_event__";
-export const ANALYTICS_CONFIG_URL_PARAM_KEY = "analytics-disable";
+export const ANALYTICS_CONFIG_ENABLE_URL_PARAM_KEY = "analytics-enable";
+
 export const ANALYTICS_SESSION_ID_LOCAL_STORAGE_KEY =
   "base44_analytics_session_id";
 
 const defaultConfiguration: AnalyticsModuleOptions = {
-  enabled: true,
+  // default to disabled //
+  enabled: false,
   maxQueueSize: 1000,
   throttleTime: 1000,
   batchSize: 30,
@@ -81,6 +83,7 @@ export const createAnalyticsModule = ({
     } as AnalyticsApiBatchRequest);
   };
 
+  // currently disabled, until fully tested  //
   const beaconRequest = async (events: AnalyticsApiRequestData[]) => {
     const beaconPayload = JSON.stringify({ events });
     try {
@@ -100,8 +103,10 @@ export const createAnalyticsModule = ({
     const events = eventsData.map(
       transformEventDataToApiRequestData(sessionContext_)
     );
-    if (!(await beaconRequest(events))) {
+    try {
       return batchRequestFallback(events);
+    } catch {
+      // do nothing
     }
   };
 
@@ -265,21 +270,21 @@ export function getAnalyticsConfigFromUrlParams():
   | undefined {
   if (typeof window === "undefined") return undefined;
   const urlParams = new URLSearchParams(window.location.search);
-  const analyticsDisable = urlParams.get(ANALYTICS_CONFIG_URL_PARAM_KEY);
+  const analyticsEnable = urlParams.get(ANALYTICS_CONFIG_ENABLE_URL_PARAM_KEY);
 
   // if the url param is not set, return undefined //
-  if (analyticsDisable == null || !analyticsDisable.length) return undefined;
+  if (analyticsEnable == null || !analyticsEnable.length) return undefined;
 
   // remove the url param from the url //
   const newUrlParams = new URLSearchParams(window.location.search);
-  newUrlParams.delete(ANALYTICS_CONFIG_URL_PARAM_KEY);
+  newUrlParams.delete(ANALYTICS_CONFIG_ENABLE_URL_PARAM_KEY);
   const newUrl =
     window.location.pathname +
     (newUrlParams.toString() ? "?" + newUrlParams.toString() : "");
   window.history.replaceState({}, "", newUrl);
 
   // return the config object //
-  return analyticsDisable === "true" ? { enabled: false } : undefined;
+  return { enabled: analyticsEnable === "true" };
 }
 
 export function getAnalyticsSessionId(): string {
