@@ -84,9 +84,9 @@ export const createAnalyticsModule = ({
   };
 
   // currently disabled, until fully tested  //
-  const beaconRequest = async (events: AnalyticsApiRequestData[]) => {
-    const beaconPayload = JSON.stringify({ events });
+  const beaconRequest = (events: AnalyticsApiRequestData[]) => {
     try {
+      const beaconPayload = JSON.stringify({ events });
       const blob = new Blob([beaconPayload], { type: "application/json" });
       return (
         typeof navigator === "undefined" ||
@@ -98,13 +98,21 @@ export const createAnalyticsModule = ({
     }
   };
 
-  const flush = async (eventsData: TrackEventData[]) => {
+  const flush = async (
+    eventsData: TrackEventData[],
+    options: { isBeacon?: boolean } = {}
+  ) => {
+    if (eventsData.length === 0) return;
+
     const sessionContext_ = await getSessionContext(userAuthModule);
     const events = eventsData.map(
       transformEventDataToApiRequestData(sessionContext_)
     );
+
     try {
-      return batchRequestFallback(events);
+      if (!options.isBeacon || !beaconRequest(events)) {
+        await batchRequestFallback(events);
+      }
     } catch {
       // do nothing
     }
@@ -139,10 +147,10 @@ export const createAnalyticsModule = ({
 
   const onDocHidden = () => {
     stopAnalyticsProcessor();
+    clearHeartBeatProcessor?.();
     //  flush entire queue on visibility change and hope for the best //
     const eventsData = analyticsSharedState.requestsQueue.splice(0);
-    flush(eventsData);
-    clearHeartBeatProcessor?.();
+    flush(eventsData, { isBeacon: true });
   };
 
   const onVisibilityChange = () => {
