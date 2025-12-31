@@ -266,6 +266,8 @@ export function getAnalyticsConfigFromUrlParams():
   if (typeof window === "undefined") return undefined;
   const urlParams = new URLSearchParams(window.location.search);
   const analyticsDisable = urlParams.get(ANALYTICS_CONFIG_URL_PARAM_KEY);
+  if (analyticsDisable == null || !analyticsDisable.length) return undefined;
+
   const newUrlParams = new URLSearchParams(window.location.search);
   newUrlParams.delete(ANALYTICS_CONFIG_URL_PARAM_KEY);
   const newUrl = `${window.location.pathname}?${newUrlParams.toString()}`;
