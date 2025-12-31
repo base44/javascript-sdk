@@ -266,12 +266,19 @@ export function getAnalyticsConfigFromUrlParams():
   if (typeof window === "undefined") return undefined;
   const urlParams = new URLSearchParams(window.location.search);
   const analyticsDisable = urlParams.get(ANALYTICS_CONFIG_URL_PARAM_KEY);
+
+  // if the url param is not set, return undefined //
   if (analyticsDisable == null || !analyticsDisable.length) return undefined;
 
+  // remove the url param from the url //
   const newUrlParams = new URLSearchParams(window.location.search);
   newUrlParams.delete(ANALYTICS_CONFIG_URL_PARAM_KEY);
-  const newUrl = `${window.location.pathname}?${newUrlParams.toString()}`;
-  window.history.replaceState({}, document.title, newUrl);
+  const newUrl =
+    window.location.pathname +
+    (newUrlParams.toString() ? "?" + newUrlParams.toString() : "");
+  window.history.replaceState({}, "", newUrl);
+
+  // return the config object //
   return analyticsDisable === "true" ? { enabled: false } : undefined;
 }
 
