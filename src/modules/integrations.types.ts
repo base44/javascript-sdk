@@ -1,3 +1,5 @@
+import { CustomIntegrationsModule } from "./custom-integrations.types.js";
+
 /**
  * Function signature for calling an integration endpoint.
  *
@@ -371,6 +373,26 @@ export type IntegrationsModule = {
    * Core package containing built-in Base44 integration functions.
    */
   Core: CoreIntegrations;
+
+  /**
+   * Custom integrations module for calling workspace-level API integrations.
+   *
+   * Allows calling external APIs that workspace admins have configured
+   * by importing OpenAPI specifications.
+   *
+   * @example
+   * ```typescript
+   * const response = await base44.integrations.custom.call(
+   *   "github",        // integration slug
+   *   "listIssues",    // operation ID
+   *   {
+   *     pathParams: { owner: "myorg", repo: "myrepo" },
+   *     queryParams: { state: "open" }
+   *   }
+   * );
+   * ```
+   */
+  custom: CustomIntegrationsModule;
 } & {
   /**
    * Access to additional integration packages.

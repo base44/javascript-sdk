@@ -88,6 +88,12 @@ export type { SsoModule, SsoAccessTokenResponse } from "./modules/sso.types.js";
 
 export type { ConnectorsModule } from "./modules/connectors.types.js";
 
+export type {
+  CustomIntegrationsModule,
+  CustomIntegrationCallParams,
+  CustomIntegrationCallResponse,
+} from "./modules/custom-integrations.types.js";
+
 // Auth utils types
 export type {
   GetAccessTokenOptions,
