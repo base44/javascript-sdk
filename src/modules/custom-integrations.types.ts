@@ -1,8 +1,5 @@
 /**
  * Parameters for calling a custom integration endpoint.
- *
- * Supports both camelCase and snake_case parameter names for developer convenience.
- * The SDK will normalize to snake_case before sending to the API.
  */
 export interface CustomIntegrationCallParams {
   /**
@@ -12,25 +9,11 @@ export interface CustomIntegrationCallParams {
 
   /**
    * Path parameters to substitute in the URL (e.g., `{ owner: "user", repo: "repo" }`).
-   * Can use either `pathParams` (camelCase) or `path_params` (snake_case).
-   */
-  pathParams?: Record<string, string>;
-
-  /**
-   * Path parameters to substitute in the URL (snake_case variant).
-   * @see {@link pathParams}
    */
   path_params?: Record<string, string>;
 
   /**
    * Query string parameters to append to the URL.
-   * Can use either `queryParams` (camelCase) or `query_params` (snake_case).
-   */
-  queryParams?: Record<string, any>;
-
-  /**
-   * Query string parameters (snake_case variant).
-   * @see {@link queryParams}
    */
   query_params?: Record<string, any>;
 
@@ -81,8 +64,8 @@ export interface CustomIntegrationCallResponse {
  *   "github",        // integration slug (defined by workspace admin)
  *   "listIssues",    // operation ID from the OpenAPI spec
  *   {
- *     pathParams: { owner: "myorg", repo: "myrepo" },
- *     queryParams: { state: "open", per_page: 100 }
+ *     path_params: { owner: "myorg", repo: "myrepo" },
+ *     query_params: { state: "open", per_page: 100 }
  *   }
  * );
  *
@@ -100,7 +83,7 @@ export interface CustomIntegrationCallResponse {
  *   "github",
  *   "createIssue",
  *   {
- *     pathParams: { owner: "myorg", repo: "myrepo" },
+ *     path_params: { owner: "myorg", repo: "myrepo" },
  *     payload: {
  *       title: "Bug report",
  *       body: "Something is broken",
@@ -131,4 +114,3 @@ export interface CustomIntegrationsModule {
     params?: CustomIntegrationCallParams
   ): Promise<CustomIntegrationCallResponse>;
 }
-

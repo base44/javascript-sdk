@@ -56,42 +56,6 @@ describe('Custom Integrations Module', () => {
     expect(scope.isDone()).toBe(true);
   });
 
-  test('custom.call() should support camelCase parameter names', async () => {
-    const slug = 'github';
-    const operationId = 'getRepo';
-    const params = {
-      pathParams: { owner: 'testuser', repo: 'testrepo' },
-      queryParams: { include: 'stats' },
-    };
-
-    // Expected body should have snake_case keys
-    const expectedBody = {
-      path_params: { owner: 'testuser', repo: 'testrepo' },
-      query_params: { include: 'stats' },
-    };
-
-    const mockResponse = {
-      success: true,
-      status_code: 200,
-      data: { name: 'testrepo', stars: 100 },
-    };
-
-    // Mock the API response - expecting snake_case in the body
-    scope
-      .post(`/api/apps/${appId}/integrations/custom/${slug}/${operationId}`, expectedBody)
-      .reply(200, mockResponse);
-
-    // Call with camelCase params
-    const result = await base44.integrations.custom.call(slug, operationId, params);
-
-    // Verify the response
-    expect(result.success).toBe(true);
-    expect(result.data.name).toBe('testrepo');
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
-  });
-
   test('custom.call() should work with empty params', async () => {
     const slug = 'github';
     const operationId = 'getAuthenticatedUser';
@@ -255,4 +219,3 @@ describe('Custom Integrations Module', () => {
     expect(scope.isDone()).toBe(true);
   });
 });
-
