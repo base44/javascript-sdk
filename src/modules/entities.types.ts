@@ -25,12 +25,9 @@ export type RealtimeCallback<T = Record<string, any>> = (
 ) => void;
 
 /**
- * Handle returned from subscribe, used to unsubscribe.
+ * Function returned from subscribe, call it to unsubscribe.
  */
-export interface Subscription {
-  /** Stops listening to updates and cleans up the subscription. */
-  unsubscribe: () => void;
-}
+export type Subscription = () => void;
 
 /**
  * Entity handler providing CRUD operations for a specific entity type.
@@ -302,17 +299,17 @@ export interface EntityHandler {
    * Receives notifications whenever any record is created, updated, or deleted.
    *
    * @param callback - Function called when an entity changes.
-   * @returns Subscription handle with an unsubscribe method.
+   * @returns Unsubscribe function to stop listening.
    *
    * @example
    * ```typescript
    * // Subscribe to all Task changes
-   * const subscription = base44.entities.Task.subscribe((event) => {
+   * const unsubscribe = base44.entities.Task.subscribe((event) => {
    *   console.log(`Task ${event.id} was ${event.type}d:`, event.data);
    * });
    *
    * // Later, unsubscribe
-   * subscription.unsubscribe();
+   * unsubscribe();
    * ```
    */
   subscribe(callback: RealtimeCallback): Subscription;

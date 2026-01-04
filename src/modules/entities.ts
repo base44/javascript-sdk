@@ -218,9 +218,7 @@ function createEntityHandler(
         },
       });
 
-      return {
-        unsubscribe,
-      };
+      return unsubscribe;
     },
   };
 }
