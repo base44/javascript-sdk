@@ -14,6 +14,8 @@ import { generateUuid } from "../utils/common.js";
 
 export const USER_HEARTBEAT_EVENT_NAME = "__user_heartbeat_event__";
 export const ANALYTICS_REFERRER_EVENT_NAME = "__referrer_event__";
+export const ANALYTICS_SESSION_DURATION_EVENT_NAME =
+  "__session_duration_event__";
 export const ANALYTICS_CONFIG_ENABLE_URL_PARAM_KEY = "analytics-enable";
 
 export const ANALYTICS_SESSION_ID_LOCAL_STORAGE_KEY =
@@ -42,6 +44,7 @@ const analyticsSharedState = getSharedInstance(
     isHeartBeatProcessing: false,
     wasReferrerTracked: false,
     sessionContext: null as SessionContext | null,
+    sessionStartTime: null as string | null,
     config: {
       ...defaultConfiguration,
       ...getAnalyticsConfigFromUrlParams(),
@@ -145,11 +148,14 @@ export const createAnalyticsModule = ({
       batchSize,
     });
     clearHeartBeatProcessor = startHeartBeatProcessor(track);
+    setSessionDurationTimerStart();
   };
 
   const onDocHidden = () => {
     stopAnalyticsProcessor();
     clearHeartBeatProcessor?.();
+    trackSessionDurationEvent(track);
+
     //  flush entire queue on visibility change and hope for the best //
     const eventsData = analyticsSharedState.requestsQueue.splice(0);
     flush(eventsData, { isBeacon: true });
@@ -244,6 +250,31 @@ function trackReferrerEvent(track: (params: TrackEventParams) => void) {
   const referrer = document?.referrer;
   if (!referrer) return;
   track({ eventName: ANALYTICS_REFERRER_EVENT_NAME, properties: { referrer } });
+}
+
+function setSessionDurationTimerStart() {
+  if (
+    typeof window === "undefined" ||
+    analyticsSharedState.sessionStartTime !== null
+  ) {
+    return;
+  }
+  analyticsSharedState.sessionStartTime = new Date().toISOString();
+}
+function trackSessionDurationEvent(track: (params: TrackEventParams) => void) {
+  if (
+    typeof window === "undefined" ||
+    analyticsSharedState.sessionStartTime === null
+  )
+    return;
+  const sessionDuration =
+    new Date().getTime() -
+    new Date(analyticsSharedState.sessionStartTime).getTime();
+  analyticsSharedState.sessionStartTime = null;
+  track({
+    eventName: ANALYTICS_SESSION_DURATION_EVENT_NAME,
+    properties: { sessionDuration },
+  });
 }
 
 function getEventIntrinsicData(): TrackEventIntrinsicData {
