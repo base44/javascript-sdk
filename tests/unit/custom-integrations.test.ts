@@ -148,15 +148,77 @@ describe('Custom Integrations Module', () => {
   test('custom.call() should throw error when slug is missing', async () => {
     // @ts-expect-error Testing invalid input
     await expect(base44.integrations.custom.call()).rejects.toThrow(
-      'Integration slug is required'
+      'Integration slug is required and cannot be empty'
     );
   });
 
   test('custom.call() should throw error when operationId is missing', async () => {
     // @ts-expect-error Testing invalid input
     await expect(base44.integrations.custom.call('github')).rejects.toThrow(
-      'Operation ID is required'
+      'Operation ID is required and cannot be empty'
     );
+  });
+
+  test('custom.call() should throw error when slug is empty string', async () => {
+    await expect(base44.integrations.custom.call('', 'listIssues')).rejects.toThrow(
+      'Integration slug is required and cannot be empty'
+    );
+  });
+
+  test('custom.call() should throw error when slug is whitespace only', async () => {
+    await expect(base44.integrations.custom.call('   ', 'listIssues')).rejects.toThrow(
+      'Integration slug is required and cannot be empty'
+    );
+  });
+
+  test('custom.call() should throw error when operationId is empty string', async () => {
+    await expect(base44.integrations.custom.call('github', '')).rejects.toThrow(
+      'Operation ID is required and cannot be empty'
+    );
+  });
+
+  test('custom.call() should throw error when operationId is whitespace only', async () => {
+    await expect(base44.integrations.custom.call('github', '  \t\n  ')).rejects.toThrow(
+      'Operation ID is required and cannot be empty'
+    );
+  });
+
+  test('custom.call() should handle large payloads', async () => {
+    const slug = 'myapi';
+    const operationId = 'bulkCreate';
+    
+    // Create a large payload with many items
+    const largeArray = Array.from({ length: 1000 }, (_, i) => ({
+      id: i,
+      name: `Item ${i}`,
+      description: 'A'.repeat(100),
+      metadata: { key: `value_${i}` },
+    }));
+    
+    const params = {
+      payload: { items: largeArray },
+    };
+
+    const mockResponse = {
+      success: true,
+      status_code: 200,
+      data: { created: 1000 },
+    };
+
+    // Mock the API response
+    scope
+      .post(`/api/apps/${appId}/integrations/custom/${slug}/${operationId}`, params)
+      .reply(200, mockResponse);
+
+    // Call the API with large payload
+    const result = await base44.integrations.custom.call(slug, operationId, params);
+
+    // Verify the response
+    expect(result.success).toBe(true);
+    expect(result.data.created).toBe(1000);
+
+    // Verify all mocks were called
+    expect(scope.isDone()).toBe(true);
   });
 
   test('custom.call() should include custom headers in request', async () => {
@@ -182,6 +244,40 @@ describe('Custom Integrations Module', () => {
 
     // Verify the response
     expect(result.success).toBe(true);
+
+    // Verify all mocks were called
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test('custom.call() should pass through multiple headers', async () => {
+    const slug = 'myapi';
+    const operationId = 'secureEndpoint';
+    const params = {
+      headers: {
+        'X-API-Key': 'secret-key-123',
+        'X-Request-ID': 'req-456',
+        'Accept-Language': 'en-US',
+        'X-Custom-Auth': 'Bearer token123',
+      },
+    };
+
+    const mockResponse = {
+      success: true,
+      status_code: 200,
+      data: { authenticated: true },
+    };
+
+    // Mock the API response - verify all headers are passed in the body
+    scope
+      .post(`/api/apps/${appId}/integrations/custom/${slug}/${operationId}`, params)
+      .reply(200, mockResponse);
+
+    // Call the API
+    const result = await base44.integrations.custom.call(slug, operationId, params);
+
+    // Verify the response
+    expect(result.success).toBe(true);
+    expect(result.data.authenticated).toBe(true);
 
     // Verify all mocks were called
     expect(scope.isDone()).toBe(true);

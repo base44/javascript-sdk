@@ -24,21 +24,21 @@ export function createCustomIntegrationsModule(
       params?: CustomIntegrationCallParams
     ): Promise<CustomIntegrationCallResponse> {
       // Validate required parameters
-      if (!slug) {
-        throw new Error("Integration slug is required");
+      if (!slug?.trim()) {
+        throw new Error("Integration slug is required and cannot be empty");
       }
-      if (!operationId) {
-        throw new Error("Operation ID is required");
+      if (!operationId?.trim()) {
+        throw new Error("Operation ID is required and cannot be empty");
       }
 
       // Make the API call
-      const response = await axios.post<CustomIntegrationCallResponse>(
+      // Note: axios interceptor extracts response.data, so we get the payload directly
+      const response = await axios.post(
         `/apps/${appId}/integrations/custom/${slug}/${operationId}`,
         params ?? {}
       );
 
-      // Return the response data
-      // Note: axios interceptor already extracts data from response
+      // The axios interceptor extracts response.data, so we get the payload directly
       return response as unknown as CustomIntegrationCallResponse;
     },
   };
