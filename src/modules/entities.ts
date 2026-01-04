@@ -5,7 +5,6 @@ import {
   RealtimeCallback,
   RealtimeEvent,
   RealtimeEventType,
-  SubscribeOptions,
   Subscription,
 } from "./entities.types";
 import { RoomsSocket } from "../utils/socket-utils";
@@ -86,25 +85,6 @@ export function createEntitiesModule(
 }
 
 /**
- * Creates a stable hash from a query object for room naming.
- * @internal
- */
-function hashQuery(query: Record<string, any>): string {
-  const sortedKeys = Object.keys(query).sort();
-  const normalized = sortedKeys
-    .map((k) => `${k}:${JSON.stringify(query[k])}`)
-    .join("|");
-  // Simple hash function
-  let hash = 0;
-  for (let i = 0; i < normalized.length; i++) {
-    const char = normalized.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  return Math.abs(hash).toString(36);
-}
-
-/**
  * Parses the realtime message data and extracts event information.
  * @internal
  */
@@ -116,7 +96,6 @@ function parseRealtimeMessage(dataStr: string): RealtimeEvent | null {
       data: parsed.data,
       id: parsed.id || parsed.data?.id,
       timestamp: parsed.timestamp || new Date().toISOString(),
-      previousData: parsed.previousData,
     };
   } catch {
     return null;
@@ -218,48 +197,20 @@ function createEntityHandler(
     },
 
     // Subscribe to realtime updates
-    subscribe(
-      callbackOrIdOrQuery: RealtimeCallback | string | Record<string, any>,
-      callbackOrOptions?: RealtimeCallback | SubscribeOptions,
-      optionsArg?: SubscribeOptions
-    ): Subscription {
-      let room: string;
-      let callback: RealtimeCallback;
-      let options: SubscribeOptions | undefined;
-
-      // Parse overloaded arguments
-      if (typeof callbackOrIdOrQuery === "function") {
-        // subscribe(callback, options?)
-        room = `entities:${appId}:${entityName}`;
-        callback = callbackOrIdOrQuery as RealtimeCallback;
-        options = callbackOrOptions as SubscribeOptions | undefined;
-      } else if (typeof callbackOrIdOrQuery === "string") {
-        // subscribe(id, callback, options?)
-        room = `entities:${appId}:${entityName}:${callbackOrIdOrQuery}`;
-        callback = callbackOrOptions as RealtimeCallback;
-        options = optionsArg;
-      } else {
-        // subscribe(query, callback, options?)
-        const queryHash = hashQuery(callbackOrIdOrQuery);
-        room = `entities:${appId}:${entityName}:query:${queryHash}`;
-        callback = callbackOrOptions as RealtimeCallback;
-        options = optionsArg;
-      }
-
-      const eventFilter = options?.events;
+    subscribe(callback: RealtimeCallback): Subscription {
+      const room = `entities:${appId}:${entityName}`;
 
       // Get the socket and subscribe to the room
       const socket = getSocket();
       const unsubscribe = socket.subscribeToRoom(room, {
         update_model: (msg) => {
           // Only process messages for our room
-          if (msg.room !== room) return;
+          if (msg.room !== room) {
+            return;
+          }
 
           const event = parseRealtimeMessage(msg.data);
-          if (!event) return;
-
-          // Apply event type filter if specified
-          if (eventFilter && !eventFilter.includes(event.type)) {
+          if (!event) {
             return;
           }
 
