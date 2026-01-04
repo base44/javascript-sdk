@@ -241,7 +241,7 @@ function trackReferrerEvent(track: (params: TrackEventParams) => void) {
   if (typeof window === "undefined" || analyticsSharedState.wasReferrerTracked)
     return;
   analyticsSharedState.wasReferrerTracked = true;
-  const referrer = document.referrer;
+  const referrer = document?.referrer;
   if (!referrer) return;
   track({ eventName: ANALYTICS_REFERRER_EVENT_NAME, properties: { referrer } });
 }
