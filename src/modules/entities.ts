@@ -49,6 +49,13 @@ function createEntityHandler(
   entityName: string
 ): EntityHandler {
   const baseURL = `/apps/${appId}/entities/${entityName}`;
+  const isDevMode = new URLSearchParams(window.location.search).get("use_dev_table") === "true";
+
+  axios.interceptors.request.use((config) => {
+    config.headers = config.headers ?? {};
+    config.headers["X-Dev-Mode"] = String(isDevMode);
+    return config;
+  });
 
   return {
     // List entities with optional pagination and sorting
