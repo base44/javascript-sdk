@@ -1,6 +1,6 @@
 import { AxiosInstance } from "axios";
-import { RoomsSocket } from "../utils/socket-utils";
-import { ModelFilterParams } from "../types";
+import { RoomsSocket } from "../utils/socket-utils.js";
+import { ModelFilterParams } from "../types.js";
 
 /**
  * Reasoning information for an agent message.

@@ -8,9 +8,9 @@ import {
   AnalyticsModuleOptions,
   SessionContext,
 } from "./analytics.types";
-import { getSharedInstance } from "../utils/sharedInstance";
+import { getSharedInstance } from "../utils/sharedInstance.js";
 import type { AuthModule } from "./auth.types";
-import { generateUuid } from "../utils/common";
+import { generateUuid } from "../utils/common.js";
 
 export const USER_HEARTBEAT_EVENT_NAME = "__user_heartbeat_event__";
 export const ANALYTICS_REFERRER_EVENT_NAME = "__referrer_event__";
