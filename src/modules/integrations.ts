@@ -1,5 +1,6 @@
 import { AxiosInstance } from "axios";
-import { IntegrationsModule } from "./integrations.types";
+import { IntegrationsModule } from "./integrations.types.js";
+import { createCustomIntegrationsModule } from "./custom-integrations.js";
 
 /**
  * Creates the integrations module for the Base44 SDK.
@@ -13,6 +14,9 @@ export function createIntegrationsModule(
   axios: AxiosInstance,
   appId: string
 ): IntegrationsModule {
+  // Create the custom integrations module once
+  const customModule = createCustomIntegrationsModule(axios, appId);
+
   return new Proxy(
     {},
     {
@@ -24,6 +28,11 @@ export function createIntegrationsModule(
           packageName.startsWith("_")
         ) {
           return undefined;
+        }
+
+        // Handle 'custom' specially - return the custom integrations module
+        if (packageName === "custom") {
+          return customModule;
         }
 
         // Create a proxy for integration endpoints
