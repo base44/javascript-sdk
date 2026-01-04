@@ -31,11 +31,18 @@ export function createCustomIntegrationsModule(
         throw new Error("Operation ID is required and cannot be empty");
       }
 
+      // Convert camelCase to snake_case for Python backend
+      const { pathParams, queryParams, ...rest } = params ?? {};
+      const body = {
+        ...rest,
+        ...(pathParams && { path_params: pathParams }),
+        ...(queryParams && { query_params: queryParams }),
+      };
+
       // Make the API call
-      // Note: axios interceptor extracts response.data, so we get the payload directly
       const response = await axios.post(
         `/apps/${appId}/integrations/custom/${slug}/${operationId}`,
-        params ?? {}
+        body
       );
 
       // The axios interceptor extracts response.data, so we get the payload directly

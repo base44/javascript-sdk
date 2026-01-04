@@ -24,10 +24,19 @@ describe('Custom Integrations Module', () => {
     nock.cleanAll();
   });
 
-  test('custom.call() should send POST request to correct endpoint', async () => {
+  test('custom.call() should convert camelCase params to snake_case for backend', async () => {
     const slug = 'github';
     const operationId = 'listIssues';
-    const params = {
+    
+    // SDK call uses camelCase (JS convention)
+    const sdkParams = {
+      payload: { title: 'Test Issue' },
+      pathParams: { owner: 'testuser', repo: 'testrepo' },
+      queryParams: { state: 'open' },
+    };
+
+    // Backend expects snake_case (Python convention)
+    const expectedBody = {
       payload: { title: 'Test Issue' },
       path_params: { owner: 'testuser', repo: 'testrepo' },
       query_params: { state: 'open' },
@@ -39,13 +48,13 @@ describe('Custom Integrations Module', () => {
       data: { issues: [{ id: 1, title: 'Test Issue' }] },
     };
 
-    // Mock the API response
+    // Mock expects snake_case body
     scope
-      .post(`/api/apps/${appId}/integrations/custom/${slug}/${operationId}`, params)
+      .post(`/api/apps/${appId}/integrations/custom/${slug}/${operationId}`, expectedBody)
       .reply(200, mockResponse);
 
-    // Call the API
-    const result = await base44.integrations.custom.call(slug, operationId, params);
+    // SDK call uses camelCase
+    const result = await base44.integrations.custom.call(slug, operationId, sdkParams);
 
     // Verify the response
     expect(result.success).toBe(true);
@@ -195,7 +204,7 @@ describe('Custom Integrations Module', () => {
       metadata: { key: `value_${i}` },
     }));
     
-    const params = {
+    const sdkParams = {
       payload: { items: largeArray },
     };
 
@@ -207,11 +216,11 @@ describe('Custom Integrations Module', () => {
 
     // Mock the API response
     scope
-      .post(`/api/apps/${appId}/integrations/custom/${slug}/${operationId}`, params)
+      .post(`/api/apps/${appId}/integrations/custom/${slug}/${operationId}`, sdkParams)
       .reply(200, mockResponse);
 
     // Call the API with large payload
-    const result = await base44.integrations.custom.call(slug, operationId, params);
+    const result = await base44.integrations.custom.call(slug, operationId, sdkParams);
 
     // Verify the response
     expect(result.success).toBe(true);
@@ -224,7 +233,7 @@ describe('Custom Integrations Module', () => {
   test('custom.call() should include custom headers in request', async () => {
     const slug = 'myapi';
     const operationId = 'getData';
-    const params = {
+    const sdkParams = {
       headers: { 'X-Custom-Header': 'custom-value' },
     };
 
@@ -236,11 +245,11 @@ describe('Custom Integrations Module', () => {
 
     // Mock the API response
     scope
-      .post(`/api/apps/${appId}/integrations/custom/${slug}/${operationId}`, params)
+      .post(`/api/apps/${appId}/integrations/custom/${slug}/${operationId}`, sdkParams)
       .reply(200, mockResponse);
 
     // Call the API
-    const result = await base44.integrations.custom.call(slug, operationId, params);
+    const result = await base44.integrations.custom.call(slug, operationId, sdkParams);
 
     // Verify the response
     expect(result.success).toBe(true);
@@ -252,7 +261,7 @@ describe('Custom Integrations Module', () => {
   test('custom.call() should pass through multiple headers', async () => {
     const slug = 'myapi';
     const operationId = 'secureEndpoint';
-    const params = {
+    const sdkParams = {
       headers: {
         'X-API-Key': 'secret-key-123',
         'X-Request-ID': 'req-456',
@@ -269,17 +278,47 @@ describe('Custom Integrations Module', () => {
 
     // Mock the API response - verify all headers are passed in the body
     scope
-      .post(`/api/apps/${appId}/integrations/custom/${slug}/${operationId}`, params)
+      .post(`/api/apps/${appId}/integrations/custom/${slug}/${operationId}`, sdkParams)
       .reply(200, mockResponse);
 
     // Call the API
-    const result = await base44.integrations.custom.call(slug, operationId, params);
+    const result = await base44.integrations.custom.call(slug, operationId, sdkParams);
 
     // Verify the response
     expect(result.success).toBe(true);
     expect(result.data.authenticated).toBe(true);
 
     // Verify all mocks were called
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test('custom.call() should only include defined params in body', async () => {
+    const slug = 'github';
+    const operationId = 'getUser';
+    
+    // SDK call with only pathParams
+    const sdkParams = {
+      pathParams: { username: 'octocat' },
+    };
+
+    // Expected body should only have path_params, not empty payload/query_params/headers
+    const expectedBody = {
+      path_params: { username: 'octocat' },
+    };
+
+    const mockResponse = {
+      success: true,
+      status_code: 200,
+      data: { login: 'octocat' },
+    };
+
+    scope
+      .post(`/api/apps/${appId}/integrations/custom/${slug}/${operationId}`, expectedBody)
+      .reply(200, mockResponse);
+
+    const result = await base44.integrations.custom.call(slug, operationId, sdkParams);
+
+    expect(result.success).toBe(true);
     expect(scope.isDone()).toBe(true);
   });
 

@@ -10,12 +10,12 @@ export interface CustomIntegrationCallParams {
   /**
    * Path parameters to substitute in the URL (e.g., `{ owner: "user", repo: "repo" }`).
    */
-  path_params?: Record<string, string>;
+  pathParams?: Record<string, string>;
 
   /**
    * Query string parameters to append to the URL.
    */
-  query_params?: Record<string, any>;
+  queryParams?: Record<string, any>;
 
   /**
    * Additional headers to send with this specific request.
@@ -64,8 +64,8 @@ export interface CustomIntegrationCallResponse {
  *   "github",        // integration slug (defined by workspace admin)
  *   "listIssues",    // operation ID from the OpenAPI spec
  *   {
- *     path_params: { owner: "myorg", repo: "myrepo" },
- *     query_params: { state: "open", per_page: 100 }
+ *     pathParams: { owner: "myorg", repo: "myrepo" },
+ *     queryParams: { state: "open", per_page: 100 }
  *   }
  * );
  *
@@ -83,7 +83,7 @@ export interface CustomIntegrationCallResponse {
  *   "github",
  *   "createIssue",
  *   {
- *     path_params: { owner: "myorg", repo: "myrepo" },
+ *     pathParams: { owner: "myorg", repo: "myrepo" },
  *     payload: {
  *       title: "Bug report",
  *       body: "Something is broken",
@@ -99,7 +99,7 @@ export interface CustomIntegrationsModule {
    *
    * @param slug - The integration's unique identifier (slug), as defined by the workspace admin.
    * @param operationId - The operation ID from the OpenAPI spec (e.g., "listIssues", "getUser").
-   * @param params - Optional parameters including payload, path params, query params, and headers.
+   * @param params - Optional parameters including payload, pathParams, queryParams, and headers.
    * @returns Promise resolving to the integration call response.
    *
    * @throws {Error} If slug is not provided.
