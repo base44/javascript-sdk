@@ -204,11 +204,6 @@ function createEntityHandler(
       const socket = getSocket();
       const unsubscribe = socket.subscribeToRoom(room, {
         update_model: (msg) => {
-          // Only process messages for our room
-          if (msg.room !== room) {
-            return;
-          }
-
           const event = parseRealtimeMessage(msg.data);
           if (!event) {
             return;
