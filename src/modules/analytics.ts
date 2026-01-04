@@ -13,6 +13,7 @@ import type { AuthModule } from "./auth.types";
 import { generateUuid } from "../utils/common";
 
 export const USER_HEARTBEAT_EVENT_NAME = "__user_heartbeat_event__";
+export const ANALYTICS_REFERRER_EVENT_NAME = "__referrer_event__";
 export const ANALYTICS_CONFIG_ENABLE_URL_PARAM_KEY = "analytics-enable";
 
 export const ANALYTICS_SESSION_ID_LOCAL_STORAGE_KEY =
@@ -39,6 +40,7 @@ const analyticsSharedState = getSharedInstance(
     requestsQueue: [] as TrackEventData[],
     isProcessing: false,
     isHeartBeatProcessing: false,
+    wasReferrerTracked: false,
     sessionContext: null as SessionContext | null,
     config: {
       ...defaultConfiguration,
@@ -174,6 +176,8 @@ export const createAnalyticsModule = ({
   startProcessing();
   // start the heart beat processor //
   clearHeartBeatProcessor = startHeartBeatProcessor(track);
+  // track the referrer event //
+  trackReferrerEvent(track);
   // start the visibility change listener //
   if (typeof window !== "undefined") {
     window.addEventListener("visibilitychange", onVisibilityChange);
@@ -231,6 +235,15 @@ function startHeartBeatProcessor(track: (params: TrackEventParams) => void) {
     clearInterval(interval);
     analyticsSharedState.isHeartBeatProcessing = false;
   };
+}
+
+function trackReferrerEvent(track: (params: TrackEventParams) => void) {
+  if (typeof window === "undefined" || analyticsSharedState.wasReferrerTracked)
+    return;
+  analyticsSharedState.wasReferrerTracked = true;
+  const referrer = document.referrer;
+  if (!referrer) return;
+  track({ eventName: ANALYTICS_REFERRER_EVENT_NAME, properties: { referrer } });
 }
 
 function getEventIntrinsicData(): TrackEventIntrinsicData {
