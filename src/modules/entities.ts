@@ -50,9 +50,9 @@ function createEntityHandler(
 ): EntityHandler {
   const baseURL = `/apps/${appId}/entities/${entityName}`;
   const isDevMode = typeof window !== "undefined" 
-    ? new URLSearchParams(window.location.search).get("use_dev_table") === "true"
+    ? new URLSearchParams(window.location.search).get("use_staging_db") === "true"
     : false;
-  const headers = { "X-Dev-Mode": String(isDevMode) };
+  const headers = { "X-Use-Staging-DB": String(isDevMode) };
 
   return {
     // List entities with optional pagination and sorting
