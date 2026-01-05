@@ -52,7 +52,7 @@ function createEntityHandler(
   const isDevMode = typeof window !== "undefined" 
     ? new URLSearchParams(window.location.search).get("use_dev_table") === "true"
     : false;
-  const headers = { "X-Use-Dev-Table": String(isDevMode) };
+  const headers = { "X-Dev-Mode": String(isDevMode) };
 
   return {
     // List entities with optional pagination and sorting
