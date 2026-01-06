@@ -55,10 +55,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/base44/sdk.git"
+    "url": "git+https://github.com/base44/javascript-sdk.git"
   },
   "bugs": {
-    "url": "https://github.com/base44/sdk/issues"
+    "url": "https://github.com/base44/javascript-sdk/issues"
   },
-  "homepage": "https://github.com/base44/sdk#readme"
+  "homepage": "https://github.com/base44/javascript-sdk#readme"
 }
