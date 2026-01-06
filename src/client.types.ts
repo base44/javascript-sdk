@@ -63,6 +63,11 @@ export interface CreateClientConfig {
    */
   headers?: Record<string, string>;
   /**
+   * Whether to use the staging database. Defaults to false.
+   * When true, API requests will use the staging database instead of production.
+   */
+  useStagingDb?: boolean;
+  /**
    * Additional client options.
    */
   options?: CreateClientOptions;
