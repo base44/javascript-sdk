@@ -2,7 +2,7 @@
 
 /**
  * Post-processing script for TypeDoc-generated MDX files
- * 
+ *
  * TypeDoc now emits .mdx files directly, so this script:
  * 1. Processes links to make them Mintlify-compatible
  * 2. Removes files for linked types that should be suppressed
@@ -94,6 +94,15 @@ function processLinksInFile(filePath) {
   let content = fs.readFileSync(filePath, "utf-8");
   let modified = false;
 
+  // Rename "Type Declaration" to "Type Declarations" (TypeDoc outputs singular)
+  if (content.includes("## Type Declaration\n")) {
+    content = content.replace(
+      "## Type Declaration\n",
+      "## Type Declarations\n"
+    );
+    modified = true;
+  }
+
   // Remove undesirable lines like "> **IntegrationsModule** = `object` & `object`"
   // This typically appears in type alias files using intersection types
   const typeDefinitionRegex = /^> \*\*\w+\*\* = `object` & `object`\s*$/m;
@@ -113,21 +122,10 @@ function processLinksInFile(filePath) {
 \\[\`packageName\`: \`string\`\\]: [\`IntegrationPackage\`](IntegrationPackage)
 
 Access to additional integration packages.
-
-### Example
-
-<CodeGroup>
-
-\`\`\`typescript Access additional packages
-// Access a custom integration package
-base44.integrations.MyCustomPackage.MyFunction({ param: 'value' });
-\`\`\`
-
-</CodeGroup>
 `;
-    // Append it before the "Type Declaration" or "Core" section if possible, or just at the end before methods if any
+    // Append it before the "Type Declarations" or "Core" section if possible, or just at the end before methods if any
     // Finding a good insertion point
-    const typeDeclarationIndex = content.indexOf("## Type Declaration");
+    const typeDeclarationIndex = content.indexOf("## Type Declarations");
     if (typeDeclarationIndex !== -1) {
       content =
         content.slice(0, typeDeclarationIndex) +
@@ -136,7 +134,7 @@ base44.integrations.MyCustomPackage.MyFunction({ param: 'value' });
         content.slice(typeDeclarationIndex);
       modified = true;
     } else {
-      // If no Type Declaration, maybe append after the main description?
+      // If no Type Declarations, maybe append after the main description?
       // Look for the first horizontal rule or similar
       const firstHR = content.indexOf("***", 10); // skip first few chars
       if (firstHR !== -1) {
@@ -149,7 +147,7 @@ base44.integrations.MyCustomPackage.MyFunction({ param: 'value' });
       }
     }
   }
-  
+
   // Remove .md and .mdx extensions from markdown links
   // This handles both relative and absolute paths
   // Regex breakdown:
@@ -162,7 +160,7 @@ base44.integrations.MyCustomPackage.MyFunction({ param: 'value' });
   let newContent = content.replace(
     linkRegex,
     (match, linkText, linkPath, ext) => {
-    modified = true;
+      modified = true;
 
       // Check if the link points to a renamed module
       const pathParts = linkPath.split("/");
@@ -179,7 +177,7 @@ base44.integrations.MyCustomPackage.MyFunction({ param: 'value' });
       // Handle relative links that might be missing context (basic cleanup)
       // e.g. if linkPath is just "entities" but it should be relative
 
-    return `[${linkText}](${linkPath})`;
+      return `[${linkText}](${linkPath})`;
     }
   );
 
@@ -187,12 +185,12 @@ base44.integrations.MyCustomPackage.MyFunction({ param: 'value' });
   // or if the above regex missed them (though it matches .mdx?)
   // The regex requires .md or .mdx extension. If links are already extensionless, this won't run.
   // But TypeDoc usually outputs links with extensions.
-  
+
   if (modified) {
     fs.writeFileSync(filePath, newContent, "utf-8");
     return true;
   }
-  
+
   return false;
 }
 
@@ -272,18 +270,18 @@ function scanDocsContent() {
   };
 
   const sections = ["functions", "interfaces", "classes", "type-aliases"];
-  
+
   for (const section of sections) {
     const sectionDir = path.join(CONTENT_DIR, section);
     if (!fs.existsSync(sectionDir)) continue;
-    
+
     const files = fs.readdirSync(sectionDir);
     const mdxFiles = files
       .filter((file) => file.endsWith(".mdx"))
       .map((file) => path.basename(file, ".mdx"))
       .sort()
       .map((fileName) => `content/${section}/${fileName}`);
-    
+
     const key = section === "type-aliases" ? "typeAliases" : section;
     result[key] = mdxFiles;
   }
@@ -298,7 +296,7 @@ function getGroupName(section, categoryMap) {
   if (categoryMap[section]) {
     return categoryMap[section];
   }
-  
+
   return section;
 }
 
@@ -314,30 +312,30 @@ function generateDocsJson(docsContent) {
     // If file doesn't exist or can't be read, return empty object
     console.error(`Error: Category map file not found: ${CATEGORY_MAP_PATH}`);
   }
-  
+
   const groups = [];
-  
+
   if (docsContent.functions.length > 0 && categoryMap.functions) {
     groups.push({
       group: getGroupName("functions", categoryMap),
       pages: docsContent.functions,
     });
   }
-  
+
   if (docsContent.interfaces.length > 0 && categoryMap.interfaces) {
     groups.push({
       group: getGroupName("interfaces", categoryMap),
       pages: docsContent.interfaces,
     });
   }
-  
+
   if (docsContent.classes.length > 0 && categoryMap.classes) {
     groups.push({
       group: getGroupName("classes", categoryMap),
       pages: docsContent.classes,
     });
   }
-  
+
   if (docsContent.typeAliases.length > 0 && categoryMap["type-aliases"]) {
     // Merge into existing group if name matches
     const groupName = getGroupName("type-aliases", categoryMap);
@@ -348,13 +346,13 @@ function generateDocsJson(docsContent) {
       existingGroup.pages.push(...docsContent.typeAliases);
       existingGroup.pages.sort(); // Sort combined pages alphabetically
     } else {
-    groups.push({
+      groups.push({
         group: groupName,
-      pages: docsContent.typeAliases,
-    });
+        pages: docsContent.typeAliases,
+      });
     }
   }
-  
+
   // Find or create SDK Reference tab
   let sdkTab = template.navigation.tabs.find(
     (tab) => tab.tab === "SDK Reference"
@@ -363,9 +361,9 @@ function generateDocsJson(docsContent) {
     sdkTab = { tab: "SDK Reference", groups: [] };
     template.navigation.tabs.push(sdkTab);
   }
-  
+
   sdkTab.groups = groups;
-  
+
   const docsJsonPath = path.join(DOCS_DIR, "docs.json");
   fs.writeFileSync(
     docsJsonPath,
@@ -405,10 +403,10 @@ function isTypeDocPath(relativePath) {
  */
 function processAllFiles(dir, linkedTypeNames, exposedTypeNames) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
-  
+
   for (const entry of entries) {
     const entryPath = path.join(dir, entry.name);
-    
+
     if (entry.isDirectory()) {
       processAllFiles(entryPath, linkedTypeNames, exposedTypeNames);
     } else if (
@@ -433,7 +431,7 @@ function processAllFiles(dir, linkedTypeNames, exposedTypeNames) {
         exposedTypeNames.has(originalName) ||
         exposedTypeNames.has(fileName) ||
         isRenamedModule;
-      
+
       // Remove any type doc files that are not explicitly exposed
       if (isTypeDoc && !isExposedType) {
         fs.unlinkSync(entryPath);
@@ -683,7 +681,7 @@ function applyAppendedArticles(appendedArticles) {
               console.warn(
                 `Warning: Appended article not found: ${appendKey} (checked content/ and docs/ roots)`
               );
-        continue;
+              continue;
             }
           }
         }
@@ -692,7 +690,7 @@ function applyAppendedArticles(appendedArticles) {
       const { section, headings } = prepareAppendedSection(appendPath);
       combinedSections += `\n\n${section}`;
       if (PANELS_ENABLED && collectedHeadings) {
-      collectedHeadings.push(...headings);
+        collectedHeadings.push(...headings);
       }
 
       try {
@@ -764,33 +762,196 @@ function applyHeadingDemotion(dir) {
 }
 
 /**
+ * Link type names in the Type Declarations section to their corresponding ## headings on the page
+ */
+function linkTypeDeclarationToSections(content) {
+  // Find all ## headings on the page (these are potential link targets)
+  const sectionHeadingRegex = /^## (\w+)\s*$/gm;
+  const sectionNames = new Set();
+  let match;
+  while ((match = sectionHeadingRegex.exec(content)) !== null) {
+    sectionNames.add(match[1]);
+  }
+
+  if (sectionNames.size === 0) {
+    return { content, modified: false };
+  }
+
+  // Find the Type Declarations section
+  const typeDeclarationStart = content.indexOf("## Type Declarations");
+  if (typeDeclarationStart === -1) {
+    return { content, modified: false };
+  }
+
+  // Find the end of Type Declarations section (next ## heading or end of file)
+  const afterTypeDeclaration = content.slice(
+    typeDeclarationStart + "## Type Declarations".length
+  );
+  const nextSectionMatch = afterTypeDeclaration.match(/\n## /);
+  const typeDeclarationEnd = nextSectionMatch
+    ? typeDeclarationStart +
+      "## Type Declarations".length +
+      nextSectionMatch.index
+    : content.length;
+
+  const beforeSection = content.slice(0, typeDeclarationStart);
+  const typeDeclarationSection = content.slice(
+    typeDeclarationStart,
+    typeDeclarationEnd
+  );
+  const afterSection = content.slice(typeDeclarationEnd);
+
+  // In the Type Declarations section, find type names in backticks on blockquote lines
+  // Pattern: > **propertyName**: `TypeName`
+  let modified = false;
+  const updatedSection = typeDeclarationSection.replace(
+    /^(>\s*\*\*\w+\*\*:\s*)`(\w+)`/gm,
+    (match, prefix, typeName) => {
+      if (sectionNames.has(typeName)) {
+        modified = true;
+        const anchor = typeName.toLowerCase();
+        return `${prefix}[\`${typeName}\`](#${anchor})`;
+      }
+      return match;
+    }
+  );
+
+  if (!modified) {
+    return { content, modified: false };
+  }
+
+  return {
+    content: beforeSection + updatedSection + afterSection,
+    modified: true,
+  };
+}
+
+/**
+ * Apply type declarations linking to all files
+ */
+function applyTypeDeclarationLinking(dir) {
+  if (!fs.existsSync(dir)) return;
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      applyTypeDeclarationLinking(entryPath);
+    } else if (
+      entry.isFile() &&
+      (entry.name.endsWith(".mdx") || entry.name.endsWith(".md"))
+    ) {
+      const content = fs.readFileSync(entryPath, "utf-8");
+      const { content: updated, modified } =
+        linkTypeDeclarationToSections(content);
+      if (modified) {
+        fs.writeFileSync(entryPath, updated, "utf-8");
+        console.log(
+          `Linked type declarations: ${path.relative(DOCS_DIR, entryPath)}`
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Remove links to types that are not in the exposed types list.
+ * Converts [TypeName](path) or [`TypeName`](path) to just TypeName or `TypeName`.
+ */
+function removeNonExposedTypeLinks(content, exposedTypeNames) {
+  // Match markdown links where the link text is a type name (with or without backticks)
+  // Pattern: [TypeName](some/path/TypeName) or [`TypeName`](some/path/TypeName)
+  const linkRegex = /\[(`?)([A-Z][A-Za-z0-9]*)\1\]\(([^)]+)\)/g;
+
+  let modified = false;
+  const updatedContent = content.replace(
+    linkRegex,
+    (match, backtick, typeName, linkPath) => {
+      // Check if this looks like a type doc link (path ends with the type name)
+      const pathEnd = linkPath
+        .split("/")
+        .pop()
+        .replace(/\.mdx?$/, "");
+
+      // If the link path ends with a type name that's NOT exposed, remove the link
+      if (pathEnd === typeName && !exposedTypeNames.has(typeName)) {
+        modified = true;
+        // Keep the type name with backticks if it had them, otherwise plain
+        return backtick ? `\`${typeName}\`` : typeName;
+      }
+
+      return match;
+    }
+  );
+
+  return { content: updatedContent, modified };
+}
+
+/**
+ * Apply non-exposed type link removal to all files
+ */
+function applyNonExposedTypeLinkRemoval(dir, exposedTypeNames) {
+  if (!fs.existsSync(dir)) return;
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      applyNonExposedTypeLinkRemoval(entryPath, exposedTypeNames);
+    } else if (
+      entry.isFile() &&
+      (entry.name.endsWith(".mdx") || entry.name.endsWith(".md"))
+    ) {
+      const content = fs.readFileSync(entryPath, "utf-8");
+      const { content: updated, modified } = removeNonExposedTypeLinks(
+        content,
+        exposedTypeNames
+      );
+      if (modified) {
+        fs.writeFileSync(entryPath, updated, "utf-8");
+        console.log(
+          `Removed non-exposed type links: ${path.relative(
+            DOCS_DIR,
+            entryPath
+          )}`
+        );
+      }
+    }
+  }
+}
+
+/**
  * Main function
  */
 function main() {
   console.log("Processing TypeDoc MDX files for Mintlify...\n");
-  
+
   if (!fs.existsSync(DOCS_DIR)) {
     console.error(`Error: Documentation directory not found: ${DOCS_DIR}`);
     console.error('Please run "npm run docs:generate" first.');
     process.exit(1);
   }
-  
+
   // Get list of linked types to suppress
   const linkedTypeNames = getLinkedTypeNames();
   const exposedTypeNames = getTypesToExpose();
 
   // First, perform module renames (EntitiesModule -> entities, etc.)
   performModuleRenames(DOCS_DIR);
-  
+
   // Process all files (remove suppressed ones and fix links)
-    processAllFiles(DOCS_DIR, linkedTypeNames, exposedTypeNames);
+  processAllFiles(DOCS_DIR, linkedTypeNames, exposedTypeNames);
 
   // Append configured articles
   const appendedArticles = loadAppendedArticlesConfig();
   applyAppendedArticles(appendedArticles);
 
   applyHeadingDemotion(DOCS_DIR);
-  
+
+  // Link type names in Type Declarations sections to their corresponding headings
+  applyTypeDeclarationLinking(DOCS_DIR);
+
+  // Remove links to types that aren't exposed (would 404)
+  applyNonExposedTypeLinkRemoval(DOCS_DIR, exposedTypeNames);
+
   // Clean up the linked types file
   try {
     if (fs.existsSync(LINKED_TYPES_FILE)) {
@@ -799,14 +960,14 @@ function main() {
   } catch (e) {
     // Ignore errors
   }
-  
+
   // Scan content and generate docs.json
   const docsContent = scanDocsContent();
   generateDocsJson(docsContent);
-  
+
   // Copy styling.css
   copyStylingCss();
-  
+
   console.log(`\n✓ Post-processing complete!`);
   console.log(`  Documentation directory: ${DOCS_DIR}`);
 }

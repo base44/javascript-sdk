@@ -13,9 +13,7 @@ export interface ConnectorAccessTokenResponse {
 /**
  * Connectors module for managing OAuth tokens for external services.
  *
- * This module allows you to retrieve OAuth access tokens for external services
- * that the app has connected to. Use these tokens to make API
- * calls to external services.
+ * This module allows you to retrieve OAuth access tokens for external services that the app has connected to. Connectors are app-scoped. When an app builder connects an integration like Google Calendar or Slack, all users of the app share that same connection.
  *
  * Unlike the integrations module that provides pre-built functions, connectors give you
  * raw OAuth tokens so you can call external service APIs directly with full control over
@@ -28,9 +26,9 @@ export interface ConnectorsModule {
   /**
    * Retrieves an OAuth access token for a specific external integration type.
    *
-   * Returns the OAuth token string for an external service that the app
-   * has connected to. You can then use this token to make authenticated API calls
-   * to that external service.
+   * Returns the OAuth token string for an external service that an app builder
+   * has connected to. This token represents the connected app builder's account
+   * and can be used to make authenticated API calls to that external service on behalf of the app.
    *
    * @param integrationType - The type of integration, such as `'googlecalendar'`, `'slack'`, or `'github'`.
    * @returns Promise resolving to the access token string.
