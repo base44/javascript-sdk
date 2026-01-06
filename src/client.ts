@@ -56,11 +56,6 @@ export type { Base44Client, CreateClientConfig, CreateClientOptions };
  * ```
  */
 export function createClient(config: CreateClientConfig): Base44Client {
-  // Auto-detect staging mode from URL if in browser and not explicitly set
-  const autoDetectStagingDb = typeof window !== "undefined"
-    ? new URLSearchParams(window.location.search).get("use_staging_db") === "true"
-    : false;
-
   const {
     serverUrl = "https://base44.app",
     appId,
@@ -71,8 +66,13 @@ export function createClient(config: CreateClientConfig): Base44Client {
     options,
     functionsVersion,
     headers: optionalHeaders,
-    useStagingDb = autoDetectStagingDb,
+    useStagingDb: configUseStagingDb = false,
   } = config;
+
+  // URL param is source of truth for staging DB in browser
+  const urlHasStagingDb = typeof window !== "undefined"
+    && new URLSearchParams(window.location.search).get("use_staging_db") === "true";
+  const useStagingDb = urlHasStagingDb || configUseStagingDb;
 
   const socketConfig: RoomsSocketConfig = {
     serverUrl,
