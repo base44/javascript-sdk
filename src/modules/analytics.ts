@@ -13,7 +13,7 @@ import type { AuthModule } from "./auth.types";
 import { generateUuid } from "../utils/common.js";
 
 export const USER_HEARTBEAT_EVENT_NAME = "__user_heartbeat_event__";
-export const ANALYTICS_REFERRER_EVENT_NAME = "__referrer_event__";
+export const ANALYTICS_INITIALIZTION_EVENT_NAME = "__initialization_event__";
 export const ANALYTICS_SESSION_DURATION_EVENT_NAME =
   "__session_duration_event__";
 export const ANALYTICS_CONFIG_ENABLE_URL_PARAM_KEY = "analytics-enable";
@@ -42,7 +42,7 @@ const analyticsSharedState = getSharedInstance(
     requestsQueue: [] as TrackEventData[],
     isProcessing: false,
     isHeartBeatProcessing: false,
-    wasReferrerTracked: false,
+    wasInitializationTracked: false,
     sessionContext: null as SessionContext | null,
     sessionStartTime: null as string | null,
     config: {
@@ -183,7 +183,7 @@ export const createAnalyticsModule = ({
   // start the heart beat processor //
   clearHeartBeatProcessor = startHeartBeatProcessor(track);
   // track the referrer event //
-  trackReferrerEvent(track);
+  trackInitializationEvent(track);
   // start the visibility change listener //
   if (typeof window !== "undefined") {
     window.addEventListener("visibilitychange", onVisibilityChange);
@@ -243,13 +243,19 @@ function startHeartBeatProcessor(track: (params: TrackEventParams) => void) {
   };
 }
 
-function trackReferrerEvent(track: (params: TrackEventParams) => void) {
-  if (typeof window === "undefined" || analyticsSharedState.wasReferrerTracked)
+function trackInitializationEvent(track: (params: TrackEventParams) => void) {
+  if (
+    typeof window === "undefined" ||
+    analyticsSharedState.wasInitializationTracked
+  )
     return;
-  analyticsSharedState.wasReferrerTracked = true;
-  const referrer = document?.referrer;
-  if (!referrer) return;
-  track({ eventName: ANALYTICS_REFERRER_EVENT_NAME, properties: { referrer } });
+  analyticsSharedState.wasInitializationTracked = true;
+  track({
+    eventName: ANALYTICS_INITIALIZTION_EVENT_NAME,
+    properties: {
+      referrer: document?.referrer,
+    },
+  });
 }
 
 function setSessionDurationTimerStart() {
