@@ -13,7 +13,7 @@ import type { AuthModule } from "./auth.types";
 import { generateUuid } from "../utils/common.js";
 
 export const USER_HEARTBEAT_EVENT_NAME = "__user_heartbeat_event__";
-export const ANALYTICS_INITIALIZTION_EVENT_NAME = "__initialization_event__";
+export const ANALYTICS_INITIALIZATION_EVENT_NAME = "__initialization_event__";
 export const ANALYTICS_SESSION_DURATION_EVENT_NAME =
   "__session_duration_event__";
 export const ANALYTICS_CONFIG_ENABLE_URL_PARAM_KEY = "analytics-enable";
@@ -247,11 +247,13 @@ function trackInitializationEvent(track: (params: TrackEventParams) => void) {
   if (
     typeof window === "undefined" ||
     analyticsSharedState.wasInitializationTracked
-  )
+  ) {
     return;
+  }
+
   analyticsSharedState.wasInitializationTracked = true;
   track({
-    eventName: ANALYTICS_INITIALIZTION_EVENT_NAME,
+    eventName: ANALYTICS_INITIALIZATION_EVENT_NAME,
     properties: {
       referrer: document?.referrer,
     },
