@@ -254,7 +254,46 @@ describe('createClientFromRequest', () => {
     };
 
     const client = createClientFromRequest(mockRequest);
-    
+
+    expect(client).toBeDefined();
+    const config = client.getConfig();
+    expect(config.appId).toBe('test-app-id');
+  });
+
+  test('should propagate Base44-Use-Staging-DB header when present', () => {
+    const mockRequest = {
+      headers: {
+        get: (name) => {
+          const headers = {
+            'Base44-App-Id': 'test-app-id',
+            'Base44-Use-Staging-DB': 'true'
+          };
+          return headers[name] || null;
+        }
+      }
+    };
+
+    const client = createClientFromRequest(mockRequest);
+
+    expect(client).toBeDefined();
+    const config = client.getConfig();
+    expect(config.appId).toBe('test-app-id');
+  });
+
+  test('should work without Base44-Use-Staging-DB header', () => {
+    const mockRequest = {
+      headers: {
+        get: (name) => {
+          const headers = {
+            'Base44-App-Id': 'test-app-id'
+          };
+          return headers[name] || null;
+        }
+      }
+    };
+
+    const client = createClientFromRequest(mockRequest);
+
     expect(client).toBeDefined();
     const config = client.getConfig();
     expect(config.appId).toBe('test-app-id');
@@ -538,6 +577,69 @@ describe('Service Role Authorization Headers', () => {
     // Mock service role entities request and verify Base44-State header is present
     scope.get(`/api/apps/${appId}/entities/User/123`)
       .matchHeader('Base44-State', clientIp)
+      .matchHeader('Authorization', 'Bearer service-token-123')
+      .reply(200, { id: '123', name: 'Test User' });
+
+    // Make request using service role
+    const result = await client.asServiceRole.entities.User.get('123');
+
+    // Verify response
+    expect(result.id).toBe('123');
+
+    // Verify all mocks were called (including header match)
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test('should propagate Base44-Use-Staging-DB header in API requests when created from request', async () => {
+    const mockRequest = {
+      headers: {
+        get: (name) => {
+          const headers = {
+            'Authorization': 'Bearer user-token-123',
+            'Base44-App-Id': appId,
+            'Base44-Api-Url': serverUrl,
+            'Base44-Use-Staging-DB': 'true'
+          };
+          return headers[name] || null;
+        }
+      }
+    };
+
+    const client = createClientFromRequest(mockRequest);
+
+    // Mock entities request and verify Base44-Use-Staging-DB header is present
+    scope.get(`/api/apps/${appId}/entities/Todo`)
+      .matchHeader('Base44-Use-Staging-DB', 'true')
+      .matchHeader('Authorization', 'Bearer user-token-123')
+      .reply(200, { items: [], total: 0 });
+
+    // Make request
+    await client.entities.Todo.list();
+
+    // Verify all mocks were called (including header match)
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test('should propagate Base44-Use-Staging-DB header in service role API requests', async () => {
+    const mockRequest = {
+      headers: {
+        get: (name) => {
+          const headers = {
+            'Base44-Service-Authorization': 'Bearer service-token-123',
+            'Base44-App-Id': appId,
+            'Base44-Api-Url': serverUrl,
+            'Base44-Use-Staging-DB': 'true'
+          };
+          return headers[name] || null;
+        }
+      }
+    };
+
+    const client = createClientFromRequest(mockRequest);
+
+    // Mock service role entities request and verify Base44-Use-Staging-DB header is present
+    scope.get(`/api/apps/${appId}/entities/User/123`)
+      .matchHeader('Base44-Use-Staging-DB', 'true')
       .matchHeader('Authorization', 'Bearer service-token-123')
       .reply(200, { id: '123', name: 'Test User' });
 
