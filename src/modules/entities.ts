@@ -49,10 +49,6 @@ function createEntityHandler(
   entityName: string
 ): EntityHandler {
   const baseURL = `/apps/${appId}/entities/${entityName}`;
-  const isDevMode = typeof window !== "undefined" 
-    ? new URLSearchParams(window.location.search).get("use_staging_db") === "true"
-    : false;
-  const headers = { "X-Use-Staging-DB": String(isDevMode) };
 
   return {
     // List entities with optional pagination and sorting
@@ -64,7 +60,7 @@ function createEntityHandler(
       if (fields)
         params.fields = Array.isArray(fields) ? fields.join(",") : fields;
 
-      return axios.get(baseURL, { params, headers });
+      return axios.get(baseURL, { params });
     },
 
     // Filter entities based on query
@@ -85,37 +81,37 @@ function createEntityHandler(
       if (fields)
         params.fields = Array.isArray(fields) ? fields.join(",") : fields;
 
-      return axios.get(baseURL, { params, headers });
+      return axios.get(baseURL, { params });
     },
 
     // Get entity by ID
     async get(id: string) {
-      return axios.get(`${baseURL}/${id}`, { headers });
+      return axios.get(`${baseURL}/${id}`);
     },
 
     // Create new entity
     async create(data: Record<string, any>) {
-      return axios.post(baseURL, data, { headers });
+      return axios.post(baseURL, data);
     },
 
     // Update entity by ID
     async update(id: string, data: Record<string, any>) {
-      return axios.put(`${baseURL}/${id}`, data, { headers });
+      return axios.put(`${baseURL}/${id}`, data);
     },
 
     // Delete entity by ID
     async delete(id: string) {
-      return axios.delete(`${baseURL}/${id}`, { headers });
+      return axios.delete(`${baseURL}/${id}`);
     },
 
     // Delete multiple entities based on query
     async deleteMany(query: Record<string, any>) {
-      return axios.delete(baseURL, { data: query, headers });
+      return axios.delete(baseURL, { data: query });
     },
 
     // Create multiple entities in a single request
     async bulkCreate(data: Record<string, any>[]) {
-      return axios.post(`${baseURL}/bulk`, data, { headers });
+      return axios.post(`${baseURL}/bulk`, data);
     },
 
     // Import entities from a file
@@ -125,7 +121,6 @@ function createEntityHandler(
 
       return axios.post(`${baseURL}/import`, formData, {
         headers: {
-          ...headers,
           "Content-Type": "multipart/form-data",
         },
       });

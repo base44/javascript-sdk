@@ -56,6 +56,11 @@ export type { Base44Client, CreateClientConfig, CreateClientOptions };
  * ```
  */
 export function createClient(config: CreateClientConfig): Base44Client {
+  // Auto-detect staging mode from URL if in browser and not explicitly set
+  const autoDetectStagingDb = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("use_staging_db") === "true"
+    : false;
+
   const {
     serverUrl = "https://base44.app",
     appId,
@@ -66,6 +71,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     options,
     functionsVersion,
     headers: optionalHeaders,
+    useStagingDb = autoDetectStagingDb,
   } = config;
 
   const socketConfig: RoomsSocketConfig = {
@@ -90,6 +96,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
   const headers = {
     ...optionalHeaders,
     "X-App-Id": String(appId),
+    "Base44-Use-Staging-DB": String(useStagingDb),
   };
 
   const functionHeaders = functionsVersion
@@ -346,6 +353,7 @@ export function createClientFromRequest(request: Request): Base44Client {
   const appId = request.headers.get("Base44-App-Id");
   const serverUrlHeader = request.headers.get("Base44-Api-Url");
   const functionsVersion = request.headers.get("Base44-Functions-Version");
+  const useStagingDb = request.headers.get("Base44-Use-Staging-DB") === "true";
   const stateHeader = request.headers.get("Base44-State");
 
   if (!appId) {
@@ -396,6 +404,7 @@ export function createClientFromRequest(request: Request): Base44Client {
     token: userToken,
     serviceToken: serviceRoleToken,
     functionsVersion: functionsVersion ?? undefined,
+    useStagingDb: useStagingDb ?? undefined,
     headers: additionalHeaders,
   });
 }
