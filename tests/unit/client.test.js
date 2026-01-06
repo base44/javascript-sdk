@@ -254,7 +254,46 @@ describe('createClientFromRequest', () => {
     };
 
     const client = createClientFromRequest(mockRequest);
-    
+
+    expect(client).toBeDefined();
+    const config = client.getConfig();
+    expect(config.appId).toBe('test-app-id');
+  });
+
+  test('should propagate Base44-Use-Staging-DB header when present', () => {
+    const mockRequest = {
+      headers: {
+        get: (name) => {
+          const headers = {
+            'Base44-App-Id': 'test-app-id',
+            'Base44-Use-Staging-DB': 'true'
+          };
+          return headers[name] || null;
+        }
+      }
+    };
+
+    const client = createClientFromRequest(mockRequest);
+
+    expect(client).toBeDefined();
+    const config = client.getConfig();
+    expect(config.appId).toBe('test-app-id');
+  });
+
+  test('should work without Base44-Use-Staging-DB header', () => {
+    const mockRequest = {
+      headers: {
+        get: (name) => {
+          const headers = {
+            'Base44-App-Id': 'test-app-id'
+          };
+          return headers[name] || null;
+        }
+      }
+    };
+
+    const client = createClientFromRequest(mockRequest);
+
     expect(client).toBeDefined();
     const config = client.getConfig();
     expect(config.appId).toBe('test-app-id');
