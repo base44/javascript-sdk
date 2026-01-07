@@ -97,7 +97,8 @@ function parseRealtimeMessage(dataStr: string): RealtimeEvent | null {
       id: parsed.id || parsed.data?.id,
       timestamp: parsed.timestamp || new Date().toISOString(),
     };
-  } catch {
+  } catch (error) {
+    console.warn("[Base44 SDK] Failed to parse realtime message:", error);
     return null;
   }
 }
