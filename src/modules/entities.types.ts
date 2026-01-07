@@ -297,12 +297,12 @@ export interface EntityHandler {
    * Receives notifications whenever any record is created, updated, or deleted.
    *
    * @param callback - Function called when an entity changes.
-   * @returns Promise resolving to an unsubscribe function to stop listening.
+   * @returns Unsubscribe function to stop listening.
    *
    * @example
    * ```typescript
    * // Subscribe to all Task changes
-   * const unsubscribe = await base44.entities.Task.subscribe((event) => {
+   * const unsubscribe = base44.entities.Task.subscribe((event) => {
    *   console.log(`Task ${event.id} was ${event.type}d:`, event.data);
    * });
    *
@@ -310,7 +310,7 @@ export interface EntityHandler {
    * unsubscribe();
    * ```
    */
-  subscribe(callback: RealtimeCallback): Promise<Subscription>;
+  subscribe(callback: RealtimeCallback): Subscription;
 }
 
 /**

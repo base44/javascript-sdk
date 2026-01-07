@@ -33,7 +33,7 @@ describe("Entities Module - subscribe()", () => {
     };
   }
 
-  test("subscribe() should return a Promise that resolves to an unsubscribe function", async () => {
+  test("subscribe() should return an unsubscribe function", () => {
     const mockSocket = createMockSocket();
     const mockAxios = createMockAxios();
 
@@ -44,7 +44,7 @@ describe("Entities Module - subscribe()", () => {
     });
 
     const callback = vi.fn();
-    const unsubscribe = await entities.Todo.subscribe(callback);
+    const unsubscribe = entities.Todo.subscribe(callback);
 
     expect(typeof unsubscribe).toBe("function");
     expect(mockSocket.subscribeToRoom).toHaveBeenCalledWith(
@@ -53,7 +53,7 @@ describe("Entities Module - subscribe()", () => {
     );
   });
 
-  test("subscribe() should call callback when update_model event is received", async () => {
+  test("subscribe() should call callback when update_model event is received", () => {
     const mockSocket = createMockSocket();
     const mockAxios = createMockAxios();
 
@@ -64,7 +64,7 @@ describe("Entities Module - subscribe()", () => {
     });
 
     const callback = vi.fn();
-    await entities.Todo.subscribe(callback);
+    entities.Todo.subscribe(callback);
 
     // Simulate an incoming message
     const messageData = JSON.stringify({
@@ -88,7 +88,7 @@ describe("Entities Module - subscribe()", () => {
     });
   });
 
-  test("subscribe() should handle update and delete events", async () => {
+  test("subscribe() should handle update and delete events", () => {
     const mockSocket = createMockSocket();
     const mockAxios = createMockAxios();
 
@@ -99,7 +99,7 @@ describe("Entities Module - subscribe()", () => {
     });
 
     const callback = vi.fn();
-    await entities.Todo.subscribe(callback);
+    entities.Todo.subscribe(callback);
 
     // Test update event
     mockSocket._simulateMessage(`entities:${appId}:Todo`, {
@@ -133,7 +133,7 @@ describe("Entities Module - subscribe()", () => {
     expect(callback).toHaveBeenCalledTimes(2);
   });
 
-  test("subscribe() unsubscribe function should stop receiving events", async () => {
+  test("subscribe() unsubscribe function should stop receiving events", () => {
     const mockSocket = createMockSocket();
     const mockAxios = createMockAxios();
 
@@ -144,7 +144,7 @@ describe("Entities Module - subscribe()", () => {
     });
 
     const callback = vi.fn();
-    const unsubscribe = await entities.Todo.subscribe(callback);
+    const unsubscribe = entities.Todo.subscribe(callback);
 
     // Simulate a message before unsubscribing
     mockSocket._simulateMessage(`entities:${appId}:Todo`, {
@@ -177,7 +177,7 @@ describe("Entities Module - subscribe()", () => {
     expect(callback).toHaveBeenCalledTimes(1);
   });
 
-  test("subscribe() should not call callback for invalid JSON messages", async () => {
+  test("subscribe() should not call callback for invalid JSON messages", () => {
     const mockSocket = createMockSocket();
     const mockAxios = createMockAxios();
 
@@ -190,7 +190,7 @@ describe("Entities Module - subscribe()", () => {
     const callback = vi.fn();
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    await entities.Todo.subscribe(callback);
+    entities.Todo.subscribe(callback);
 
     // Simulate an invalid JSON message
     mockSocket._simulateMessage(`entities:${appId}:Todo`, {
@@ -207,7 +207,7 @@ describe("Entities Module - subscribe()", () => {
     warnSpy.mockRestore();
   });
 
-  test("subscribe() should catch and log errors thrown by callback", async () => {
+  test("subscribe() should catch and log errors thrown by callback", () => {
     const mockSocket = createMockSocket();
     const mockAxios = createMockAxios();
 
@@ -224,7 +224,7 @@ describe("Entities Module - subscribe()", () => {
       throw new Error("Callback error!");
     });
 
-    await entities.Todo.subscribe(throwingCallback);
+    entities.Todo.subscribe(throwingCallback);
 
     // Simulate a message - this should NOT throw, but log the error
     expect(() => {
