@@ -66,13 +66,13 @@ export function createClient(config: CreateClientConfig): Base44Client {
     options,
     functionsVersion,
     headers: optionalHeaders,
-    useStagingDb: configUseStagingDb = false,
+    useStagingDb: configUseStagingDb,
   } = config;
 
-  // URL param is source of truth for staging DB in browser
+  // Config takes precedence, fallback to URL query param in browser
   const urlHasStagingDb = typeof window !== "undefined"
     && new URLSearchParams(window.location.search).get("use_staging_db") === "true";
-  const useStagingDb = urlHasStagingDb || configUseStagingDb;
+  const useStagingDb = configUseStagingDb ?? urlHasStagingDb;
 
   const socketConfig: RoomsSocketConfig = {
     serverUrl,
