@@ -6,11 +6,11 @@ export type RealtimeEventType = "create" | "update" | "delete";
 /**
  * Payload received when a realtime event occurs.
  */
-export interface RealtimeEvent<T = Record<string, any>> {
+export interface RealtimeEvent {
   /** The type of change that occurred */
   type: RealtimeEventType;
-  /** The entity data (new/updated for create/update, previous for delete) */
-  data: T;
+  /** The entity data */
+  data: any;
   /** The unique identifier of the affected entity */
   id: string;
   /** ISO 8601 timestamp of when the event occurred */
@@ -20,9 +20,7 @@ export interface RealtimeEvent<T = Record<string, any>> {
 /**
  * Callback function invoked when a realtime event occurs.
  */
-export type RealtimeCallback<T = Record<string, any>> = (
-  event: RealtimeEvent<T>
-) => void;
+export type RealtimeCallback = (event: RealtimeEvent) => void;
 
 /**
  * Function returned from subscribe, call it to unsubscribe.
