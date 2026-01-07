@@ -7,7 +7,7 @@ import {
   RealtimeEventType,
   Subscription,
 } from "./entities.types";
-import { RoomsSocket } from "../utils/socket-utils";
+import { RoomsSocket } from "../utils/socket-utils.js";
 
 /**
  * Configuration for the entities module.
