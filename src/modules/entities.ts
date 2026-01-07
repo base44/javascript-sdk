@@ -198,7 +198,7 @@ function createEntityHandler(
     },
 
     // Subscribe to realtime updates
-    subscribe(callback: RealtimeCallback): Subscription {
+    async subscribe(callback: RealtimeCallback): Promise<Subscription> {
       const room = `entities:${appId}:${entityName}`;
 
       // Get the socket and subscribe to the room
