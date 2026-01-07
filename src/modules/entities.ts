@@ -210,7 +210,11 @@ function createEntityHandler(
             return;
           }
 
-          callback(event);
+          try {
+            callback(event);
+          } catch (error) {
+            console.error("[Base44 SDK] Subscription callback error:", error);
+          }
         },
       });
 

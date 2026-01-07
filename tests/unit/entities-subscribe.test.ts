@@ -206,4 +206,48 @@ describe("Entities Module - subscribe()", () => {
 
     warnSpy.mockRestore();
   });
+
+  test("subscribe() should catch and log errors thrown by callback", async () => {
+    const mockSocket = createMockSocket();
+    const mockAxios = createMockAxios();
+
+    const entities = createEntitiesModule({
+      axios: mockAxios as any,
+      appId,
+      getSocket: () => mockSocket as any,
+    });
+
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    // Callback that throws an error
+    const throwingCallback = vi.fn(() => {
+      throw new Error("Callback error!");
+    });
+
+    await entities.Todo.subscribe(throwingCallback);
+
+    // Simulate a message - this should NOT throw, but log the error
+    expect(() => {
+      mockSocket._simulateMessage(`entities:${appId}:Todo`, {
+        room: `entities:${appId}:Todo`,
+        data: JSON.stringify({
+          type: "create",
+          data: { id: "123" },
+          id: "123",
+          timestamp: "2024-01-01T00:00:00.000Z",
+        }),
+      });
+    }).not.toThrow();
+
+    // The callback should have been called
+    expect(throwingCallback).toHaveBeenCalledTimes(1);
+
+    // The error should have been logged
+    expect(errorSpy).toHaveBeenCalledWith(
+      "[Base44 SDK] Subscription callback error:",
+      expect.any(Error)
+    );
+
+    errorSpy.mockRestore();
+  });
 });
