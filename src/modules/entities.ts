@@ -28,40 +28,7 @@ export interface EntitiesModuleConfig {
  */
 export function createEntitiesModule(
   config: EntitiesModuleConfig
-): EntitiesModule;
-
-/**
- * Creates the entities module for the Base44 SDK.
- *
- * @param axios - Axios instance
- * @param appId - Application ID
- * @returns Entities module with dynamic entity access
- * @internal
- * @deprecated Use the config object overload instead
- */
-export function createEntitiesModule(
-  axios: AxiosInstance,
-  appId: string
-): EntitiesModule;
-
-export function createEntitiesModule(
-  configOrAxios: EntitiesModuleConfig | AxiosInstance,
-  appIdArg?: string
 ): EntitiesModule {
-  // Handle both old and new signatures for backwards compatibility
-  const config: EntitiesModuleConfig =
-    "axios" in configOrAxios
-      ? configOrAxios
-      : {
-          axios: configOrAxios,
-          appId: appIdArg!,
-          getSocket: () => {
-            throw new Error(
-              "Realtime subscriptions are not available. Please update your client configuration."
-            );
-          },
-        };
-
   const { axios, appId, getSocket } = config;
   // Using Proxy to dynamically handle entity names
   return new Proxy(
