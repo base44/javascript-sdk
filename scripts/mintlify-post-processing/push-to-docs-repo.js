@@ -220,6 +220,9 @@ function main() {
       recursive: true,
     });
 
+    // Remove README.mdx - it's not used in the docs navigation
+    fs.rmSync(path.join(tempRepoDir, "sdk-docs", "README.mdx"), { force: true });
+
     // Scan the sdk-docs directory
     const sdkDocsDir = path.join(tempRepoDir, "sdk-docs");
     const sdkFiles = scanSdkDocs(sdkDocsDir);
