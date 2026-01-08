@@ -83,9 +83,17 @@ export function createAgentsModule({
 
           // Update local conversation state
           if (currentConversation) {
+            const messages = currentConversation.messages || [];
+            const existingIndex = messages.findIndex((m) => m.id === message.id);
+
+            const updatedMessages =
+              existingIndex !== -1
+                ? messages.map((m, i) => (i === existingIndex ? message : m))
+                : [...messages, message];
+
             currentConversation = {
               ...currentConversation,
-              messages: [...(currentConversation.messages || []), message],
+              messages: updatedMessages,
             };
             onUpdate?.(currentConversation);
           }
