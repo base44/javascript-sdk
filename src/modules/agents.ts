@@ -44,14 +44,8 @@ export function createAgentsModule({
     conversation: AgentConversation,
     message: AgentMessage
   ) => {
-    const room = `/agent-conversations/${conversation.id}`;
-    const socket = getSocket();
-    await socket.updateModel(room, {
-      ...conversation,
-      messages: [...(conversation.messages || []), message],
-    });
     return axios.post<any, AgentMessage>(
-      `${baseURL}/conversations/${conversation.id}/messages`,
+      `${baseURL}/conversations/${conversation.id}/messages?api_version=v2`,
       message
     );
   };
@@ -62,11 +56,41 @@ export function createAgentsModule({
   ) => {
     const room = `/agent-conversations/${conversationId}`;
     const socket = getSocket();
+
+    // Store the promise for initial conversation state
+    let currentConversation: AgentConversation | undefined;
+    const conversationPromise = getConversation(conversationId).then((conv) => {
+      currentConversation = conv;
+      return conv;
+    });
+
     return socket.subscribeToRoom(room, {
       connect: () => {},
-      update_model: ({ data: jsonStr }) => {
-        const conv = JSON.parse(jsonStr) as AgentConversation;
-        onUpdate?.(conv);
+      update_model: async ({ data: jsonStr }) => {
+        const data = JSON.parse(jsonStr);
+
+        if (data._message) {
+          // Wait for initial conversation to be loaded
+          await conversationPromise;
+          const message = data._message as AgentMessage;
+
+          // Update local conversation state
+          if (currentConversation) {
+            const messages = currentConversation.messages || [];
+            const existingIndex = messages.findIndex((m) => m.id === message.id);
+
+            const updatedMessages =
+              existingIndex !== -1
+                ? messages.map((m, i) => (i === existingIndex ? message : m))
+                : [...messages, message];
+
+            currentConversation = {
+              ...currentConversation,
+              messages: updatedMessages,
+            };
+            onUpdate?.(currentConversation);
+          }
+        }
       },
     });
   };
