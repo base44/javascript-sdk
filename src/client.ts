@@ -139,7 +139,11 @@ export function createClient(config: CreateClientConfig): Base44Client {
   );
 
   const userModules = {
-    entities: createEntitiesModule(axiosClient, appId),
+    entities: createEntitiesModule({
+      axios: axiosClient,
+      appId,
+      getSocket,
+    }),
     integrations: createIntegrationsModule(axiosClient, appId),
     auth: userAuthModule,
     functions: createFunctionsModule(functionsAxiosClient, appId),
@@ -167,7 +171,11 @@ export function createClient(config: CreateClientConfig): Base44Client {
   };
 
   const serviceRoleModules = {
-    entities: createEntitiesModule(serviceRoleAxiosClient, appId),
+    entities: createEntitiesModule({
+      axios: serviceRoleAxiosClient,
+      appId,
+      getSocket,
+    }),
     integrations: createIntegrationsModule(serviceRoleAxiosClient, appId),
     sso: createSsoModule(serviceRoleAxiosClient, appId, token),
     connectors: createConnectorsModule(serviceRoleAxiosClient, appId),
