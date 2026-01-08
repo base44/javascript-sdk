@@ -45,8 +45,8 @@ export function createAgentsModule({
     message: AgentMessage
   ) => {
     return axios.post<any, AgentMessage>(
-      `${baseURL}/conversations/${conversation.id}/messages`,
-      { ...message, api_version: "v2" }
+      `${baseURL}/conversations/${conversation.id}/messages?api_version=v2`,
+      message
     );
   };
 
