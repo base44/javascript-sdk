@@ -44,12 +44,6 @@ export function createAgentsModule({
     conversation: AgentConversation,
     message: AgentMessage
   ) => {
-    const room = `/agent-conversations/${conversation.id}`;
-    const socket = getSocket();
-    await socket.updateModel(room, {
-      ...conversation,
-      messages: [...(conversation.messages || []), message],
-    });
     return axios.post<any, AgentMessage>(
       `${baseURL}/conversations/${conversation.id}/messages`,
       { ...message, api_version: "v2" }
@@ -75,11 +69,10 @@ export function createAgentsModule({
       update_model: async ({ data: jsonStr }) => {
         const data = JSON.parse(jsonStr);
 
-        // Check if this is v2 format with _agent_message
-        if (data._agent_message) {
+        if (data._message) {
           // Wait for initial conversation to be loaded
           await conversationPromise;
-          const message = data._agent_message as AgentMessage;
+          const message = data._message as AgentMessage;
 
           // Update local conversation state
           if (currentConversation) {
@@ -97,11 +90,6 @@ export function createAgentsModule({
             };
             onUpdate?.(currentConversation);
           }
-        } else {
-          // Old format: full conversation object
-          const conv = data as AgentConversation;
-          currentConversation = conv;
-          onUpdate?.(conv);
         }
       },
     });
