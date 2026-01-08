@@ -1,6 +1,6 @@
 {
   "name": "@base44/sdk",
-  "version": "0.8.15",
+  "version": "0.8.16",
   "description": "JavaScript SDK for Base44 API",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
