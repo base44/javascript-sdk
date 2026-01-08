@@ -22,8 +22,8 @@ export const ANALYTICS_SESSION_ID_LOCAL_STORAGE_KEY =
   "base44_analytics_session_id";
 
 const defaultConfiguration: AnalyticsModuleOptions = {
-  // default to disabled //
-  enabled: false,
+  // default to enabled //
+  enabled: true,
   maxQueueSize: 1000,
   throttleTime: 1000,
   batchSize: 30,
