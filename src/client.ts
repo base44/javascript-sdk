@@ -8,36 +8,54 @@ import { getAccessToken } from "./utils/auth-utils.js";
 import { createFunctionsModule } from "./modules/functions.js";
 import { createAgentsModule } from "./modules/agents.js";
 import { createAppLogsModule } from "./modules/app-logs.js";
+import { createUsersModule } from "./modules/users.js";
 import { RoomsSocket, RoomsSocketConfig } from "./utils/socket-utils.js";
+import type {
+  Base44Client,
+  CreateClientConfig,
+  CreateClientOptions,
+} from "./client.types.js";
+import { createAnalyticsModule } from "./modules/analytics.js";
 
-export type CreateClientOptions = {
-  onError?: (error: Error) => void;
-};
-
-export type Base44Client = ReturnType<typeof createClient>;
+// Re-export client types
+export type { Base44Client, CreateClientConfig, CreateClientOptions };
 
 /**
- * Create a Base44 client instance
- * @param {Object} config - Client configuration
- * @param {string} [config.serverUrl='https://base44.app'] - API server URL
- * @param {string} [config.appBaseUrl] - Application base URL
- * @param {string|number} config.appId - Application ID
- * @param {string} [config.token] - Authentication token
- * @param {string} [config.serviceToken] - Service role authentication token
- * @param {boolean} [config.requiresAuth=false] - Whether the app requires authentication
- * @returns {Object} Base44 client instance
+ * Creates a Base44 client.
+ *
+ * This is the main entry point for the Base44 SDK. It creates a client that provides access to the SDK's modules, such as {@linkcode EntitiesModule | entities}, {@linkcode AuthModule | auth}, and {@linkcode FunctionsModule | functions}.
+ *
+ * Typically, you don't need to call this function because Base44 creates the client for you. You can then import and use the client to make API calls. The client takes care of managing authentication for you.
+ *
+ * The client supports three authentication modes:
+ * - **Anonymous**: Access modules anonymously without authentication using `base44.moduleName`. Operations are scoped to public data and permissions.
+ * - **User authentication**: Access modules with user-level permissions using `base44.moduleName`. Operations are scoped to the authenticated user's data and permissions.
+ * - **Service role authentication**: Access modules with elevated permissions using `base44.asServiceRole.moduleName`. Operations can access any data available to the app's admin. Can only be used in the backend. Typically, you create a client with service role authentication using the {@linkcode createClientFromRequest | createClientFromRequest()} function in your backend functions.
+ *
+ * For example, when using the {@linkcode EntitiesModule | entities} module:
+ * - **Anonymous**: Can only read public data.
+ * - **User authentication**: Can access the current user's data.
+ * - **Service role authentication**: Can access all data that admins can access.
+ *
+ * Most modules are available in all three modes, but with different permission levels. However, some modules are only available in specific authentication modes.
+ *
+ * @param config - Configuration object for the client.
+ * @returns A configured Base44 client instance with access to all SDK modules.
+ *
+ * @example
+ * ```typescript
+ * // Create a client for your app
+ * import { createClient } from '@base44/sdk';
+ *
+ * const base44 = createClient({
+ *   appId: 'my-app-id'
+ * });
+ *
+ * // Use the client to access your data
+ * const products = await base44.entities.Products.list();
+ * ```
  */
-export function createClient(config: {
-  serverUrl?: string;
-  appBaseUrl?: string;
-  appId: string;
-  token?: string;
-  serviceToken?: string;
-  requiresAuth?: boolean;
-  functionsVersion?: string;
-  headers?: Record<string, string>;
-  options?: CreateClientOptions;
-}) {
+export function createClient(config: CreateClientConfig): Base44Client {
   const {
     serverUrl = "https://base44.app",
     appId,
@@ -58,9 +76,16 @@ export function createClient(config: {
     token,
   };
 
-  const socket = RoomsSocket({
-    config: socketConfig,
-  });
+  let socket: ReturnType<typeof RoomsSocket> | null = null;
+
+  const getSocket = () => {
+    if (!socket) {
+      socket = RoomsSocket({
+        config: socketConfig,
+      });
+    }
+    return socket;
+  };
 
   const headers = {
     ...optionalHeaders,
@@ -103,43 +128,70 @@ export function createClient(config: {
     interceptResponses: false,
   });
 
-  const userModules = {
-    entities: createEntitiesModule(axiosClient, appId),
-    integrations: createIntegrationsModule(axiosClient, appId),
-    auth: createAuthModule(axiosClient, functionsAxiosClient, appId, {
+  const userAuthModule = createAuthModule(
+    axiosClient,
+    functionsAxiosClient,
+    appId,
+    {
       appBaseUrl,
       serverUrl,
+    }
+  );
+
+  const userModules = {
+    entities: createEntitiesModule({
+      axios: axiosClient,
+      appId,
+      getSocket,
     }),
+    integrations: createIntegrationsModule(axiosClient, appId),
+    auth: userAuthModule,
     functions: createFunctionsModule(functionsAxiosClient, appId),
     agents: createAgentsModule({
       axios: axiosClient,
-      socket,
+      getSocket,
       appId,
       serverUrl,
       token,
     }),
     appLogs: createAppLogsModule(axiosClient, appId),
+    users: createUsersModule(axiosClient, appId),
+    analytics: createAnalyticsModule({
+      axiosClient,
+      serverUrl,
+      appId,
+      userAuthModule,
+    }),
     cleanup: () => {
-      socket.disconnect();
+      userModules.analytics.cleanup();
+      if (socket) {
+        socket.disconnect();
+      }
     },
   };
 
   const serviceRoleModules = {
-    entities: createEntitiesModule(serviceRoleAxiosClient, appId),
+    entities: createEntitiesModule({
+      axios: serviceRoleAxiosClient,
+      appId,
+      getSocket,
+    }),
     integrations: createIntegrationsModule(serviceRoleAxiosClient, appId),
     sso: createSsoModule(serviceRoleAxiosClient, appId, token),
     connectors: createConnectorsModule(serviceRoleAxiosClient, appId),
     functions: createFunctionsModule(serviceRoleFunctionsAxiosClient, appId),
     agents: createAgentsModule({
       axios: serviceRoleAxiosClient,
-      socket,
+      getSocket,
       appId,
       serverUrl,
       token,
     }),
     appLogs: createAppLogsModule(serviceRoleAxiosClient, appId),
     cleanup: () => {
-      socket.disconnect();
+      if (socket) {
+        socket.disconnect();
+      }
     },
   };
 
@@ -173,19 +225,34 @@ export function createClient(config: {
     ...userModules,
 
     /**
-     * Set authentication token for all requests
-     * @param {string} newToken - New auth token
+     * Sets a new authentication token for all subsequent requests.
+     *
+     * @param newToken - The new authentication token
+     *
+     * @example
+     * ```typescript
+     * // Update token after login
+     * const { access_token } = await base44.auth.loginViaEmailPassword(
+     *   'user@example.com',
+     *   'password'
+     * );
+     * base44.setToken(access_token);
+     * ```
      */
     setToken(newToken: string) {
       userModules.auth.setToken(newToken);
-      socket.updateConfig({
-        token: newToken,
-      });
+      if (socket) {
+        socket.updateConfig({
+          token: newToken,
+        });
+      }
+      socketConfig.token = newToken;
     },
 
     /**
-     * Get current configuration
-     * @returns {Object} Current configuration
+     * Gets the current client configuration.
+     *
+     * @internal
      */
     getConfig() {
       return {
@@ -196,8 +263,22 @@ export function createClient(config: {
     },
 
     /**
-     * Access service role modules - throws error if no service token was provided
-     * @throws {Error} When accessed without a service token
+     * Provides access to service role modules.
+     *
+     * Service role authentication provides elevated permissions for server-side operations. Unlike user authentication, which is scoped to a specific user's permissions, service role authentication has access to the data and operations available to the app's admin.
+     *
+     * @throws {Error} When accessed without providing a serviceToken during client creation.
+     *
+     * @example
+     * ```typescript
+     * const base44 = createClient({
+     *   appId: 'my-app-id',
+     *   serviceToken: 'service-role-token'
+     * });
+     *
+     * // Also access a module with elevated permissions
+     * const allUsers = await base44.asServiceRole.entities.User.list();
+     * ```
      */
     get asServiceRole() {
       if (!serviceToken) {
@@ -212,7 +293,60 @@ export function createClient(config: {
   return client;
 }
 
-export function createClientFromRequest(request: Request) {
+/**
+ * Creates a Base44 client from an HTTP request.
+ *
+ * The client is created by automatically extracting authentication tokens from a request to a backend function. Base44 inserts the necessary headers when forwarding requests to backend functions.
+ *
+ * To learn more about the Base44 client, see {@linkcode createClient | createClient()}.
+ *
+ * @param request - The incoming HTTP request object containing Base44 authentication headers.
+ * @returns A configured Base44 client instance with authentication from the incoming request.
+ *
+ * @example
+ * ```typescript
+ * // User authentication in backend function
+ * import { createClientFromRequest } from 'npm:@base44/sdk';
+ *
+ * Deno.serve(async (req) => {
+ *   try {
+ *     const base44 = createClientFromRequest(req);
+ *     const user = await base44.auth.me();
+ *
+ *     if (!user) {
+ *       return Response.json({ error: 'Unauthorized' }, { status: 401 });
+ *     }
+ *
+ *     // Access user's data
+ *     const userOrders = await base44.entities.Orders.filter({ userId: user.id });
+ *     return Response.json({ orders: userOrders });
+ *   } catch (error) {
+ *     return Response.json({ error: error.message }, { status: 500 });
+ *   }
+ * });
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Service role authentication in backend function
+ * import { createClientFromRequest } from 'npm:@base44/sdk';
+ *
+ * Deno.serve(async (req) => {
+ *   try {
+ *     const base44 = createClientFromRequest(req);
+ *
+ *     // Access admin data with service role permissions
+ *     const recentOrders = await base44.asServiceRole.entities.Orders.list('-created_at', 50);
+ *
+ *     return Response.json({ orders: recentOrders });
+ *   } catch (error) {
+ *     return Response.json({ error: error.message }, { status: 500 });
+ *   }
+ * });
+ * ```
+ *
+ */
+export function createClientFromRequest(request: Request): Base44Client {
   const authHeader = request.headers.get("Authorization");
   const serviceRoleAuthHeader = request.headers.get(
     "Base44-Service-Authorization"
@@ -220,6 +354,7 @@ export function createClientFromRequest(request: Request) {
   const appId = request.headers.get("Base44-App-Id");
   const serverUrlHeader = request.headers.get("Base44-Api-Url");
   const functionsVersion = request.headers.get("Base44-Functions-Version");
+  const stateHeader = request.headers.get("Base44-State");
 
   if (!appId) {
     throw new Error(
@@ -257,11 +392,18 @@ export function createClientFromRequest(request: Request) {
     userToken = authHeader.split(" ")[1];
   }
 
+  // Prepare additional headers to propagate
+  const additionalHeaders: Record<string, string> = {};
+  if (stateHeader) {
+    additionalHeaders["Base44-State"] = stateHeader;
+  }
+
   return createClient({
     serverUrl: serverUrlHeader || "https://base44.app",
     appId,
     token: userToken,
     serviceToken: serviceRoleToken,
     functionsVersion: functionsVersion ?? undefined,
+    headers: additionalHeaders,
   });
 }

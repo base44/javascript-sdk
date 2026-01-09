@@ -24,10 +24,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Generate a token
+        id: generate-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.BASE44_GITHUB_ACTIONS_APP_ID }}
+          private-key: ${{ secrets.BASE44_GITHUB_ACTIONS_APP_PRIVATE_KEY }}
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ steps.generate-token.outputs.token }}
 
       - name: Enable corepack
         run: corepack enable
@@ -38,6 +46,9 @@ jobs:
           node-version: 20
           cache: "npm"
           registry-url: "https://registry.npmjs.org"
+
+      - name: Update npm
+        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: npm ci
@@ -79,8 +90,6 @@ jobs:
         if: github.event.inputs.dry_run == 'false'
         run: |
           npm publish --tag ${{ github.event.inputs.npm_tag }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Dry run publish
         if: github.event.inputs.dry_run == 'true'
@@ -125,3 +134,4 @@ jobs:
 permissions:
   contents: write
   packages: write
+  id-token: write

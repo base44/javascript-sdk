@@ -1,0 +1,37 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["./src/index.ts"],
+  "out": "docs/content",
+  "plugin": [
+    "typedoc-plugin-markdown",
+    "./scripts/mintlify-post-processing/typedoc-plugin/typedoc-mintlify-plugin.js"
+  ],
+  "fileExtension": ".mdx",
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "excludeInternal": true,
+  "excludeExternals": true,
+  "readme": "none",
+  "gitRevision": "main",
+  "sort": ["source-order"],
+  "kindSortOrder": [
+    "Project",
+    "Module",
+    "Namespace",
+    "Enum",
+    "Class",
+    "Interface",
+    "TypeAlias",
+    "Constructor",
+    "Property",
+    "Method",
+    "Function",
+    "Accessor",
+    "Variable"
+  ],
+  "entryFileName": "README.mdx",
+  "maxTypeConversionDepth": 2,
+  "hideBreadcrumbs": true,
+  "disableSources": true,
+  "hidePageTitle": true
+}
