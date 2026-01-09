@@ -57,6 +57,23 @@ export function createAuthModule(
       window.location.href = loginUrl;
     },
 
+    // Redirects the user to a provider's login page
+    loginWithProvider(provider: string, fromUrl: string = "/") {
+      // Build the full redirect URL
+      const redirectUrl = new URL(fromUrl, window.location.origin).toString();
+
+      // Build the provider login URL (google is the default, so no provider path needed)
+      const providerPath = provider === "google" ? "" : `/${provider}`;
+      const loginUrl = `${
+        options.serverUrl
+      }/api/apps/auth${providerPath}/login?app_id=${appId}&from_url=${encodeURIComponent(
+        redirectUrl
+      )}`;
+
+      // Redirect to the provider login page
+      window.location.href = loginUrl;
+    },
+
     // Logout the current user
     // Removes the token from localStorage and optionally redirects to a URL or reloads the page
     logout(redirectUrl?: string) {

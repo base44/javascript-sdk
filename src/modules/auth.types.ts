@@ -186,6 +186,28 @@ export interface AuthModule {
   redirectToLogin(nextUrl: string): void;
 
   /**
+   * Redirects the user to a third-party authentication provider's login page.
+   *
+   * Initiates OAuth/SSO login flow with providers like Google, Microsoft, etc. Requires a browser environment and can't be used in the backend.
+   *
+   * @param provider - Name of the supported authentication provider (e.g., 'google', 'microsoft').
+   * @param fromUrl - URL to redirect to after successful authentication. Defaults to '/'.
+   *
+   * @example
+   * ```typescript
+   * // Login with Google and return to current page
+   * base44.auth.loginWithProvider('google', window.location.pathname);
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Login with GitHub and redirect to dashboard
+   * base44.auth.loginWithProvider('microsoft', '/dashboard');
+   * ```
+   */
+  loginWithProvider(provider: string, fromUrl?: string): void;
+
+  /**
    * Logs out the current user.
    *
    * Removes the authentication token from local storage and Axios headers, then optionally redirects to a URL or reloads the page. Requires a browser environment and can't be used in the backend.
