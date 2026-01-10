@@ -29,7 +29,7 @@ export interface SendNotificationParams {
   /** Optional list of channels. If not specified, uses all channels (mobile_push + in_app) */
   channels?: NotificationChannel[];
   /** Optional custom metadata */
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**

@@ -190,6 +190,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
       token,
     }),
     appLogs: createAppLogsModule(serviceRoleAxiosClient, appId),
+    mobile: createMobileModule(serviceRoleAxiosClient, appId),
     cleanup: () => {
       if (socket) {
         socket.disconnect();
