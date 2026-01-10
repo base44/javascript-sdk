@@ -88,6 +88,14 @@ export type {
 
 export type { AppLogsModule } from "./modules/app-logs.types.js";
 
+export type {
+  MobileModule,
+  SendNotificationParams,
+  NotificationResult,
+  NotificationChannel,
+  ChannelResult,
+} from "./modules/mobile.types.js";
+
 export type { SsoModule, SsoAccessTokenResponse } from "./modules/sso.types.js";
 
 export type { ConnectorsModule } from "./modules/connectors.types.js";
