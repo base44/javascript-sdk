@@ -351,28 +351,22 @@ export interface CoreIntegrations {
 }
 
 /**
- * Integrations module for calling integration methods.
+ * Integrations module for calling integration endpoints.
  *
- * This module provides access to integration methods for interacting with external services. Unlike the connectors module that gives you raw OAuth tokens, integrations provide pre-built functions that Base44 executes on your behalf.
+ * This module provides access to integration endpoints for interacting with external
+ * services. Integrations are organized into packages. Base44 provides built-in integrations
+ * in the `Core` package.
  *
- * There are two types of integrations:
+ * Unlike the connectors module that gives you raw OAuth tokens, integrations provide
+ * pre-built functions that Base44 executes on your behalf.
  *
- * - **Built-in integrations** (`Core`): Pre-built functions provided by Base44 for common tasks such as AI-powered text generation, image creation, file uploads, and email. Access core integration methods using:
- *   ```
- *   base44.integrations.Core.FunctionName(params)
- *   ```
- *
- * - **Custom integrations** (`custom`): Pre-configured external APIs. Custom integration calls are proxied through Base44's backend, so credentials are never exposed to the frontend. Access custom integration methods using:
- *   ```
- *   base44.integrations.custom.call(slug, operationId, params)
- *   ```
- *
- *   <Info>To call a custom integration, it must be pre-configured by a workspace administrator who imports an OpenAPI specification.</Info>
+ * Integration endpoints are accessed dynamically using the pattern:
+ * `base44.integrations.PackageName.EndpointName(params)`
  *
  * This module is available to use with a client in all authentication modes:
  *
- * - **Anonymous or User authentication** (`base44.integrations`): Integration methods are invoked with the current user's permissions. Anonymous users invoke methods without authentication, while authenticated users invoke methods with their authentication context.
- * - **Service role authentication** (`base44.asServiceRole.integrations`): Integration methods are invoked with elevated admin-level permissions. The methods execute with admin authentication context.
+ * - **Anonymous or User authentication** (`base44.integrations`): Integration endpoints are invoked with the current user's permissions. Anonymous users invoke endpoints without authentication, while authenticated users invoke endpoints with their authentication context.
+ * - **Service role authentication** (`base44.asServiceRole.integrations`): Integration endpoints are invoked with elevated admin-level permissions. The endpoints execute with admin authentication context.
  */
 export type IntegrationsModule = {
   /**
@@ -381,7 +375,22 @@ export type IntegrationsModule = {
   Core: CoreIntegrations;
 
   /**
-   * Custom integrations module for calling pre-configured external APIs.
+   * Custom integrations module for calling workspace-level API integrations.
+   *
+   * Allows calling external APIs that workspace admins have configured
+   * by importing OpenAPI specifications.
+   *
+   * @example
+   * ```typescript
+   * const response = await base44.integrations.custom.call(
+   *   "github",        // integration slug
+   *   "listIssues",    // operation ID
+   *   {
+   *     pathParams: { owner: "myorg", repo: "myrepo" },
+   *     queryParams: { state: "open" }
+   *   }
+   * );
+   * ```
    */
   custom: CustomIntegrationsModule;
 } & {
