@@ -16,6 +16,7 @@ import type {
   CreateClientOptions,
 } from "./client.types.js";
 import { createAnalyticsModule } from "./modules/analytics.js";
+import { createRecordingModule } from "./modules/recording.js";
 
 // Re-export client types
 export type { Base44Client, CreateClientConfig, CreateClientOptions };
@@ -162,6 +163,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
       appId,
       userAuthModule,
     }),
+    recording: createRecordingModule(),
     cleanup: () => {
       userModules.analytics.cleanup();
       if (socket) {
