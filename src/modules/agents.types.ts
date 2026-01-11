@@ -78,7 +78,7 @@ export interface AgentMessageMetadata {
 export interface AgentConversation {
   /** Unique identifier for the conversation. */
   id: string;
-  /** Application ID. */
+  /** App ID. */
   app_id: string;
   /** Name of the agent in this conversation. */
   agent_name: string;
@@ -149,7 +149,7 @@ export interface AgentsModuleConfig {
   axios: AxiosInstance;
   /** Function to get WebSocket instance for realtime updates (lazy initialization) */
   getSocket: () => ReturnType<typeof RoomsSocket>;
-  /** Application ID */
+  /** App ID */
   appId: string;
   /** Server URL */
   serverUrl?: string;
