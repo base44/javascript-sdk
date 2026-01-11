@@ -90,20 +90,20 @@ export interface CustomIntegrationsModule {
   /**
    * Call a custom integration endpoint.
    *
-   * @param slug - The integration's unique identifier (slug), as defined by the workspace admin.
-   * @param endpoint - The endpoint in `method:path` format (e.g., `"get:/contacts"`, `"post:/users/{id}"`). The method is the HTTP verb (lowercase) and the path matches the OpenAPI specification.
+   * @param slug - The integration's unique identifier, as defined by the workspace admin.
+   * @param operationId - The endpoint in `method:path` format. For example, `"get:/contacts"`, or `"post:/users/{id}"`. The method is the HTTP verb in lowercase and the path matches the OpenAPI specification.
    * @param params - Optional parameters including payload, pathParams, and queryParams.
    * @returns Promise resolving to the integration call response.
    *
    * @throws {Error} If slug is not provided.
-   * @throws {Error} If endpoint is not provided.
-   * @throws {Base44Error} If the integration or endpoint is not found (404).
+   * @throws {Error} If operationId is not provided.
+   * @throws {Base44Error} If the integration or operation is not found (404).
    * @throws {Base44Error} If the external API call fails (502).
    * @throws {Base44Error} If the request times out (504).
    */
   call(
     slug: string,
-    endpoint: string,
+    operationId: string,
     params?: CustomIntegrationCallParams
   ): Promise<CustomIntegrationCallResponse>;
 }
