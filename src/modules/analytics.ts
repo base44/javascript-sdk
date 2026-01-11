@@ -13,14 +13,17 @@ import type { AuthModule } from "./auth.types";
 import { generateUuid } from "../utils/common.js";
 
 export const USER_HEARTBEAT_EVENT_NAME = "__user_heartbeat_event__";
+export const ANALYTICS_INITIALIZATION_EVENT_NAME = "__initialization_event__";
+export const ANALYTICS_SESSION_DURATION_EVENT_NAME =
+  "__session_duration_event__";
 export const ANALYTICS_CONFIG_ENABLE_URL_PARAM_KEY = "analytics-enable";
 
 export const ANALYTICS_SESSION_ID_LOCAL_STORAGE_KEY =
   "base44_analytics_session_id";
 
 const defaultConfiguration: AnalyticsModuleOptions = {
-  // default to disabled //
-  enabled: false,
+  // default to enabled //
+  enabled: true,
   maxQueueSize: 1000,
   throttleTime: 1000,
   batchSize: 30,
@@ -39,7 +42,9 @@ const analyticsSharedState = getSharedInstance(
     requestsQueue: [] as TrackEventData[],
     isProcessing: false,
     isHeartBeatProcessing: false,
+    wasInitializationTracked: false,
     sessionContext: null as SessionContext | null,
+    sessionStartTime: null as string | null,
     config: {
       ...defaultConfiguration,
       ...getAnalyticsConfigFromUrlParams(),
@@ -143,11 +148,14 @@ export const createAnalyticsModule = ({
       batchSize,
     });
     clearHeartBeatProcessor = startHeartBeatProcessor(track);
+    setSessionDurationTimerStart();
   };
 
   const onDocHidden = () => {
     stopAnalyticsProcessor();
     clearHeartBeatProcessor?.();
+    trackSessionDurationEvent(track);
+
     //  flush entire queue on visibility change and hope for the best //
     const eventsData = analyticsSharedState.requestsQueue.splice(0);
     flush(eventsData, { isBeacon: true });
@@ -174,6 +182,8 @@ export const createAnalyticsModule = ({
   startProcessing();
   // start the heart beat processor //
   clearHeartBeatProcessor = startHeartBeatProcessor(track);
+  // track the referrer event //
+  trackInitializationEvent(track);
   // start the visibility change listener //
   if (typeof window !== "undefined") {
     window.addEventListener("visibilitychange", onVisibilityChange);
@@ -231,6 +241,48 @@ function startHeartBeatProcessor(track: (params: TrackEventParams) => void) {
     clearInterval(interval);
     analyticsSharedState.isHeartBeatProcessing = false;
   };
+}
+
+function trackInitializationEvent(track: (params: TrackEventParams) => void) {
+  if (
+    typeof window === "undefined" ||
+    analyticsSharedState.wasInitializationTracked
+  ) {
+    return;
+  }
+
+  analyticsSharedState.wasInitializationTracked = true;
+  track({
+    eventName: ANALYTICS_INITIALIZATION_EVENT_NAME,
+    properties: {
+      referrer: document?.referrer,
+    },
+  });
+}
+
+function setSessionDurationTimerStart() {
+  if (
+    typeof window === "undefined" ||
+    analyticsSharedState.sessionStartTime !== null
+  ) {
+    return;
+  }
+  analyticsSharedState.sessionStartTime = new Date().toISOString();
+}
+function trackSessionDurationEvent(track: (params: TrackEventParams) => void) {
+  if (
+    typeof window === "undefined" ||
+    analyticsSharedState.sessionStartTime === null
+  )
+    return;
+  const sessionDuration =
+    new Date().getTime() -
+    new Date(analyticsSharedState.sessionStartTime).getTime();
+  analyticsSharedState.sessionStartTime = null;
+  track({
+    eventName: ANALYTICS_SESSION_DURATION_EVENT_NAME,
+    properties: { sessionDuration },
+  });
 }
 
 function getEventIntrinsicData(): TrackEventIntrinsicData {

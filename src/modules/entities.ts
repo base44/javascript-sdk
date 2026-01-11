@@ -1,18 +1,35 @@
 import { AxiosInstance } from "axios";
-import { EntitiesModule, EntityHandler } from "./entities.types";
+import {
+  EntitiesModule,
+  EntityHandler,
+  RealtimeCallback,
+  RealtimeEvent,
+  RealtimeEventType,
+  Subscription,
+} from "./entities.types";
+import { RoomsSocket } from "../utils/socket-utils.js";
+
+/**
+ * Configuration for the entities module.
+ * @internal
+ */
+export interface EntitiesModuleConfig {
+  axios: AxiosInstance;
+  appId: string;
+  getSocket: () => ReturnType<typeof RoomsSocket>;
+}
 
 /**
  * Creates the entities module for the Base44 SDK.
  *
- * @param axios - Axios instance
- * @param appId - Application ID
+ * @param config - Configuration object containing axios, appId, and getSocket
  * @returns Entities module with dynamic entity access
  * @internal
  */
 export function createEntitiesModule(
-  axios: AxiosInstance,
-  appId: string
+  config: EntitiesModuleConfig
 ): EntitiesModule {
+  const { axios, appId, getSocket } = config;
   // Using Proxy to dynamically handle entity names
   return new Proxy(
     {},
@@ -28,10 +45,29 @@ export function createEntitiesModule(
         }
 
         // Create entity handler
-        return createEntityHandler(axios, appId, entityName);
+        return createEntityHandler(axios, appId, entityName, getSocket);
       },
     }
   ) as EntitiesModule;
+}
+
+/**
+ * Parses the realtime message data and extracts event information.
+ * @internal
+ */
+function parseRealtimeMessage(dataStr: string): RealtimeEvent | null {
+  try {
+    const parsed = JSON.parse(dataStr);
+    return {
+      type: parsed.type as RealtimeEventType,
+      data: parsed.data,
+      id: parsed.id || parsed.data?.id,
+      timestamp: parsed.timestamp || new Date().toISOString(),
+    };
+  } catch (error) {
+    console.warn("[Base44 SDK] Failed to parse realtime message:", error);
+    return null;
+  }
 }
 
 /**
@@ -40,13 +76,15 @@ export function createEntitiesModule(
  * @param axios - Axios instance
  * @param appId - Application ID
  * @param entityName - Entity name
+ * @param getSocket - Function to get the socket instance
  * @returns Entity handler with CRUD methods
  * @internal
  */
 function createEntityHandler(
   axios: AxiosInstance,
   appId: string,
-  entityName: string
+  entityName: string,
+  getSocket: () => ReturnType<typeof RoomsSocket>
 ): EntityHandler {
   const baseURL = `/apps/${appId}/entities/${entityName}`;
 
@@ -124,6 +162,30 @@ function createEntityHandler(
           "Content-Type": "multipart/form-data",
         },
       });
+    },
+
+    // Subscribe to realtime updates
+    subscribe(callback: RealtimeCallback): Subscription {
+      const room = `entities:${appId}:${entityName}`;
+
+      // Get the socket and subscribe to the room
+      const socket = getSocket();
+      const unsubscribe = socket.subscribeToRoom(room, {
+        update_model: (msg) => {
+          const event = parseRealtimeMessage(msg.data);
+          if (!event) {
+            return;
+          }
+
+          try {
+            callback(event);
+          } catch (error) {
+            console.error("[Base44 SDK] Subscription callback error:", error);
+          }
+        },
+      });
+
+      return unsubscribe;
     },
   };
 }

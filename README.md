@@ -12,7 +12,7 @@ The SDK provides access to Base44's functionality through the following modules:
 - **[`connectors`](https://docs.base44.com/sdk-docs/interfaces/connectors)**: Manage OAuth connections and access tokens for third-party services.
 - **[`entities`](https://docs.base44.com/sdk-docs/interfaces/entities)**: Work with your app's data entities using CRUD operations.
 - **[`functions`](https://docs.base44.com/sdk-docs/interfaces/functions)**: Execute backend functions.
-- **[`integrations`](https://docs.base44.com/sdk-docs/type-aliases/integrations)**: Access third-party integrations.
+- **[`integrations`](https://docs.base44.com/sdk-docs/type-aliases/integrations)**: Pre-built server-side functions for external services.
 
 ## Example
 

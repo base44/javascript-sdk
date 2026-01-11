@@ -1,4 +1,33 @@
 /**
+ * Event types for realtime entity updates.
+ */
+export type RealtimeEventType = "create" | "update" | "delete";
+
+/**
+ * Payload received when a realtime event occurs.
+ */
+export interface RealtimeEvent {
+  /** The type of change that occurred */
+  type: RealtimeEventType;
+  /** The entity data */
+  data: any;
+  /** The unique identifier of the affected entity */
+  id: string;
+  /** ISO 8601 timestamp of when the event occurred */
+  timestamp: string;
+}
+
+/**
+ * Callback function invoked when a realtime event occurs.
+ */
+export type RealtimeCallback = (event: RealtimeEvent) => void;
+
+/**
+ * Function returned from subscribe, call it to unsubscribe.
+ */
+export type Subscription = () => void;
+
+/**
  * Entity handler providing CRUD operations for a specific entity type.
  *
  * Each entity in the app gets a handler with these methods for managing data.
@@ -261,6 +290,27 @@ export interface EntityHandler {
    * ```
    */
   importEntities(file: File): Promise<any>;
+
+  /**
+   * Subscribes to realtime updates for all records of this entity type.
+   *
+   * Receives notifications whenever any record is created, updated, or deleted.
+   *
+   * @param callback - Function called when an entity changes.
+   * @returns Unsubscribe function to stop listening.
+   *
+   * @example
+   * ```typescript
+   * // Subscribe to all Task changes
+   * const unsubscribe = base44.entities.Task.subscribe((event) => {
+   *   console.log(`Task ${event.id} was ${event.type}d:`, event.data);
+   * });
+   *
+   * // Later, unsubscribe
+   * unsubscribe();
+   * ```
+   */
+  subscribe(callback: RealtimeCallback): Subscription;
 }
 
 /**
