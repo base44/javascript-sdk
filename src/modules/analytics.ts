@@ -233,6 +233,7 @@ function startHeartBeatProcessor(track: (params: TrackEventParams) => void) {
   }
 
   analyticsSharedState.isHeartBeatProcessing = true;
+  track({ eventName: USER_HEARTBEAT_EVENT_NAME });
   const interval = setInterval(() => {
     track({ eventName: USER_HEARTBEAT_EVENT_NAME });
   }, analyticsSharedState.config.heartBeatInterval);
