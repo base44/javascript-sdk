@@ -5,7 +5,6 @@ import {
   RealtimeCallback,
   RealtimeEvent,
   RealtimeEventType,
-  Subscription,
 } from "./entities.types";
 import { RoomsSocket } from "../utils/socket-utils.js";
 
@@ -165,7 +164,7 @@ function createEntityHandler(
     },
 
     // Subscribe to realtime updates
-    subscribe(callback: RealtimeCallback): Subscription {
+    subscribe(callback: RealtimeCallback): () => void {
       const room = `entities:${appId}:${entityName}`;
 
       // Get the socket and subscribe to the room

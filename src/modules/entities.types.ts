@@ -23,11 +23,6 @@ export interface RealtimeEvent {
 export type RealtimeCallback = (event: RealtimeEvent) => void;
 
 /**
- * Function returned from subscribe, call it to unsubscribe.
- */
-export type Subscription = () => void;
-
-/**
  * Entity handler providing CRUD operations for a specific entity type.
  *
  * Each entity in the app gets a handler with these methods for managing data.
@@ -294,10 +289,16 @@ export interface EntityHandler {
   /**
    * Subscribes to realtime updates for all records of this entity type.
    *
-   * Receives notifications whenever any record is created, updated, or deleted.
+   * Establishes a WebSocket connection to receive instant updates when any
+   * record is created, updated, or deleted. Returns an unsubscribe function
+   * to clean up the connection.
    *
-   * @param callback - Function called when an entity changes.
-   * @returns Unsubscribe function to stop listening.
+   * @param callback - Callback function called when an entity changes. The callback receives an event object with the following properties:
+   * - `type`: The type of change that occurred - `'create'`, `'update'`, or `'delete'`.
+   * - `data`: The entity data after the change.
+   * - `id`: The unique identifier of the affected entity.
+   * - `timestamp`: ISO 8601 timestamp of when the event occurred.
+   * @returns Unsubscribe function to stop receiving updates.
    *
    * @example
    * ```typescript
@@ -306,11 +307,11 @@ export interface EntityHandler {
    *   console.log(`Task ${event.id} was ${event.type}d:`, event.data);
    * });
    *
-   * // Later, unsubscribe
+   * // Later, clean up the subscription
    * unsubscribe();
    * ```
    */
-  subscribe(callback: RealtimeCallback): Subscription;
+  subscribe(callback: RealtimeCallback): () => void;
 }
 
 /**
