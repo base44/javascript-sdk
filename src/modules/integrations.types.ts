@@ -391,6 +391,7 @@ export type IntegrationsModule = {
    *   }
    * );
    * ```
+   * @internal
    */
   custom: CustomIntegrationsModule;
 } & {

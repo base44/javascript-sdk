@@ -39,7 +39,6 @@ export type {
   RealtimeEventType,
   RealtimeEvent,
   RealtimeCallback,
-  Subscription,
 } from "./modules/entities.types.js";
 
 export type {

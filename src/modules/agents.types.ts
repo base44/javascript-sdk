@@ -78,7 +78,7 @@ export interface AgentMessageMetadata {
 export interface AgentConversation {
   /** Unique identifier for the conversation. */
   id: string;
-  /** Application ID. */
+  /** App ID. */
   app_id: string;
   /** Name of the agent in this conversation. */
   agent_name: string;
@@ -147,9 +147,9 @@ export interface CreateConversationParams {
 export interface AgentsModuleConfig {
   /** Axios instance for HTTP requests */
   axios: AxiosInstance;
-  /** Function to get WebSocket instance for real-time updates (lazy initialization) */
+  /** Function to get WebSocket instance for realtime updates (lazy initialization) */
   getSocket: () => ReturnType<typeof RoomsSocket>;
-  /** Application ID */
+  /** App ID */
   appId: string;
   /** Server URL */
   serverUrl?: string;
@@ -161,7 +161,7 @@ export interface AgentsModuleConfig {
  * Agents module for managing AI agent conversations.
  *
  * This module provides methods to create and manage conversations with AI agents,
- * send messages, and subscribe to real-time updates. Conversations can be used
+ * send messages, and subscribe to realtime updates. Conversations can be used
  * for chat interfaces, support systems, or any interactive AI app.
  *
  * The agents module enables you to:
@@ -169,7 +169,7 @@ export interface AgentsModuleConfig {
  * - **Create conversations** with agents defined in the app.
  * - **Send messages** from users to agents and receive AI-generated responses.
  * - **Retrieve conversations** individually or as filtered lists with sorting and pagination.
- * - **Subscribe to real-time updates** using WebSocket connections to receive instant notifications when new messages arrive.
+ * - **Subscribe to realtime updates** using WebSocket connections to receive instant notifications when new messages arrive.
  * - **Attach metadata** to conversations for tracking context, categories, priorities, or linking to external systems.
  * - **Generate WhatsApp connection URLs** for users to interact with agents through WhatsApp.
  *
@@ -295,7 +295,7 @@ export interface AgentsModule {
    * Adds a message to a conversation.
    *
    * Sends a message to the agent and updates the conversation. This method
-   * also updates the real-time socket to notify any subscribers.
+   * also updates the realtime socket to notify any subscribers.
    *
    * @param conversation - The conversation to add the message to.
    * @param message - The message to add.
@@ -317,19 +317,25 @@ export interface AgentsModule {
   ): Promise<AgentMessage>;
 
   /**
-   * Subscribes to real-time updates for a conversation.
+   * Subscribes to realtime updates for a conversation.
    *
    * Establishes a WebSocket connection to receive instant updates when new
    * messages are added to the conversation. Returns an unsubscribe function
    * to clean up the connection.
    *
    * @param conversationId - The conversation ID to subscribe to.
-   * @param onUpdate - Callback function called when the conversation is updated.
+   * @param onUpdate - Callback function called when the conversation is updated. The callback receives a conversation object with the following properties:
+   * - `id`: Unique identifier for the conversation.
+   * - `agent_name`: Name of the agent in this conversation.
+   * - `created_date`: ISO 8601 timestamp of when the conversation was created.
+   * - `updated_date`: ISO 8601 timestamp of when the conversation was last updated.
+   * - `messages`: Array of messages in the conversation. Each message includes `id`, `role` (`'user'`, `'assistant'`, or `'system'`), `content`, `created_date`, and optionally `tool_calls`, `reasoning`, `file_urls`, and `usage`.
+   * - `metadata`: Optional metadata associated with the conversation.
    * @returns Unsubscribe function to stop receiving updates.
    *
    * @example
    * ```typescript
-   * // Subscribe to real-time updates
+   * // Subscribe to realtime updates
    * const unsubscribe = base44.agents.subscribeToConversation(
    *   'conv-123',
    *   (updatedConversation) => {

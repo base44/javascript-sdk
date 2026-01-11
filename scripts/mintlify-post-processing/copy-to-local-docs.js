@@ -1,28 +1,74 @@
 #!/usr/bin/env node
 
+/**
+ * Local docs copy script - copies SDK docs to a local mintlify-docs repo.
+ * 
+ * Usage:
+ *   node copy-to-local-docs.js [--target <path-to-mintlify-docs>]
+ * 
+ * Options:
+ *   --target <path>  Path to the mintlify-docs repo. Defaults to ../mintlify-docs
+ *                    (assumes both repos are in the same parent folder)
+ * 
+ * Examples:
+ *   node copy-to-local-docs.js
+ *   node copy-to-local-docs.js --target ~/Projects/mintlify-docs
+ *   npm run copy-docs-local
+ *   npm run copy-docs-local -- --target ~/Projects/mintlify-docs
+ */
+
 import fs from "fs";
 import path from "path";
-import os from "os";
-import { execSync } from "child_process";
 
 console.debug = () => {}; // Disable debug logging. Comment this out to enable debug logging.
 
 const DOCS_SOURCE_PATH = path.join(import.meta.dirname, "../../docs/content");
-const TARGET_DOCS_REPO_URL = "git@github.com:base44-dev/mintlify-docs.git";
 const CATEGORY_MAP_PATH = path.join(import.meta.dirname, "./category-map.json");
+
+// Default: assume mintlify-docs is a sibling directory to javascript-sdk
+const SDK_ROOT = path.join(import.meta.dirname, "../..");
+const DEFAULT_TARGET = path.join(SDK_ROOT, "../mintlify-docs");
 
 function parseArgs() {
   const args = process.argv.slice(2);
-  let branch = null;
+  let target = DEFAULT_TARGET;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
 
-    if (arg === "--branch" && i + 1 < args.length) {
-      branch = args[++i];
+    if ((arg === "--target" || arg === "-t") && i + 1 < args.length) {
+      target = args[++i];
+      // Expand ~ to home directory
+      if (target.startsWith("~")) {
+        target = path.join(process.env.HOME, target.slice(1));
+      }
+      // Resolve to absolute path
+      target = path.resolve(target);
+    }
+
+    if (arg === "--help" || arg === "-h") {
+      console.log(`
+Local docs copy script - copies SDK docs to a local mintlify-docs repo.
+
+Usage:
+  node copy-to-local-docs.js [--target <path-to-mintlify-docs>]
+
+Options:
+  --target, -t <path>  Path to the mintlify-docs repo. 
+                       Defaults to ../mintlify-docs (sibling directory)
+  --help, -h           Show this help message
+
+Examples:
+  node copy-to-local-docs.js
+  node copy-to-local-docs.js --target ~/Projects/mintlify-docs
+  npm run copy-docs-local
+  npm run copy-docs-local -- --target ~/Projects/mintlify-docs
+`);
+      process.exit(0);
     }
   }
-  return { branch };
+
+  return { target };
 }
 
 function scanSdkDocs(sdkDocsDir) {
@@ -161,106 +207,59 @@ function updateDocsJson(repoDir, sdkFiles) {
 }
 
 function main() {
-  const { branch } = parseArgs();
-  if (!branch) {
-    console.error("Error: --branch <branch-name> is required");
-    process.exit(1);
-  }
+  const { target } = parseArgs();
 
-  if (!/^[a-zA-Z0-9\-_\/]+$/.test(branch)) {
-    console.error(
-      "Error: Invalid branch name. Branch name must contain only letters, numbers, hyphens, underscores, and forward slashes."
-    );
-    process.exit(1);
-  }
+  console.log(`Source: ${DOCS_SOURCE_PATH}`);
+  console.log(`Target: ${target}`);
 
-  console.log(`Branch: ${branch}`);
-
+  // Validate source exists
   if (
     !fs.existsSync(DOCS_SOURCE_PATH) ||
     !fs.statSync(DOCS_SOURCE_PATH).isDirectory()
   ) {
     console.error(`Error: docs directory does not exist: ${DOCS_SOURCE_PATH}`);
+    console.error("Have you run 'npm run create-docs' first?");
     process.exit(1);
   }
 
-  let tempRepoDir;
+  // Validate target exists and looks like a mintlify-docs repo
+  if (!fs.existsSync(target) || !fs.statSync(target).isDirectory()) {
+    console.error(`Error: target directory does not exist: ${target}`);
+    process.exit(1);
+  }
+
+  const docsJsonPath = path.join(target, "docs.json");
+  if (!fs.existsSync(docsJsonPath)) {
+    console.error(
+      `Error: docs.json not found in ${target}. Is this a mintlify-docs repo?`
+    );
+    process.exit(1);
+  }
+
   try {
-    // Create temporary directory
-    tempRepoDir = fs.mkdtempSync(path.join(os.tmpdir(), "mintlify-docs-"));
-    // Clone the repository
-    console.log(`Cloning repository to ${tempRepoDir}...`);
-    execSync(`git clone ${TARGET_DOCS_REPO_URL} ${tempRepoDir}`);
-
-    // Check if the specified branch already exists remotely
-    const branchExists =
-      execSync(`git ls-remote --heads origin ${branch}`, {
-        cwd: tempRepoDir,
-        encoding: "utf8",
-      }).trim().length > 0;
-
-    if (branchExists) {
-      console.log(`Branch ${branch} already exists. Checking it out...`);
-      execSync(`git checkout -b ${branch} origin/${branch}`, {
-        cwd: tempRepoDir,
-      });
-    } else {
-      console.log(`Branch ${branch} does not exist. Creating it...`);
-      execSync(`git checkout -b ${branch}`, { cwd: tempRepoDir });
+    // Remove the existing sdk-docs directory
+    const sdkDocsTarget = path.join(target, "sdk-docs");
+    if (fs.existsSync(sdkDocsTarget)) {
+      console.log(`Removing existing sdk-docs directory...`);
+      fs.rmSync(sdkDocsTarget, { recursive: true, force: true });
     }
 
-    // Remove the existing sdk-docs directory
-    fs.rmSync(path.join(tempRepoDir, "sdk-docs"), {
-      recursive: true,
-      force: true,
-    });
-
-    // Copy the docs directory to the temporary repository
-    fs.cpSync(DOCS_SOURCE_PATH, path.join(tempRepoDir, "sdk-docs"), {
-      recursive: true,
-    });
+    // Copy the docs directory to the target
+    console.log(`Copying docs to ${sdkDocsTarget}...`);
+    fs.cpSync(DOCS_SOURCE_PATH, sdkDocsTarget, { recursive: true });
 
     // Scan the sdk-docs directory
-    const sdkDocsDir = path.join(tempRepoDir, "sdk-docs");
-    const sdkFiles = scanSdkDocs(sdkDocsDir);
-
+    const sdkFiles = scanSdkDocs(sdkDocsTarget);
     console.debug(`SDK files: ${JSON.stringify(sdkFiles, null, 2)}`);
 
     // Update the docs.json file
-    updateDocsJson(tempRepoDir, sdkFiles);
+    updateDocsJson(target, sdkFiles);
 
-    // Commit the changes
-    execSync(`git add docs.json`, { cwd: tempRepoDir });
-    execSync(`git add sdk-docs`, { cwd: tempRepoDir });
-
-    const stagedOutput = execSync(`git diff --cached --name-only`, {
-      cwd: tempRepoDir,
-      encoding: "utf8",
-    });
-
-    const stagedChanges = stagedOutput.trim();
-
-    if (!stagedChanges.length) {
-      console.log(
-        "No staged changes detected (docs.json / sdk-docs). Skipping commit and push."
-      );
-      return;
-    }
-
-    console.log(`Changes staged for commit:\n${stagedChanges}`);
-
-    execSync(`git commit -m "Auto-updates to SDK Reference Docs"`, {
-      cwd: tempRepoDir,
-    });
-    execSync(`git push --set-upstream origin ${branch}`, { cwd: tempRepoDir });
-
-    console.log("Successfully committed and pushed the changes");
+    console.log("\n✅ Successfully copied SDK docs to local mintlify-docs repo");
+    console.log(`\nTo preview the docs, run 'mintlify dev' in ${target}`);
   } catch (e) {
-    console.error(`Error: Failed to commit and push changes: ${e}`);
+    console.error(`Error: Failed to copy docs: ${e}`);
     process.exit(1);
-  } finally {
-    // Remove the temporary directory
-    fs.rmSync(tempRepoDir, { recursive: true, force: true });
   }
 }
 

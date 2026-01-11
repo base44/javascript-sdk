@@ -46,6 +46,9 @@ export type AnalyticsModuleOptions = {
   heartBeatInterval?: number;
 };
 
+/**
+ * @internal
+ */
 export type AnalyticsModule = {
   track: (params: TrackEventParams) => void;
 };

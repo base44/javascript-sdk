@@ -1,5 +1,6 @@
 /**
  * Parameters for calling a custom integration endpoint.
+ * @internal
  */
 export interface CustomIntegrationCallParams {
   /**
@@ -26,6 +27,7 @@ export interface CustomIntegrationCallParams {
 
 /**
  * Response from a custom integration call.
+ * @internal
  */
 export interface CustomIntegrationCallResponse {
   /**
@@ -92,6 +94,7 @@ export interface CustomIntegrationCallResponse {
  *   }
  * );
  * ```
+ * @internal
  */
 export interface CustomIntegrationsModule {
   /**
