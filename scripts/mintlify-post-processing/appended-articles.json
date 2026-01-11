@@ -1,4 +1,7 @@
 {
   "interfaces/EntitiesModule": "interfaces/EntityHandler",
-  "type-aliases/integrations": "interfaces/CoreIntegrations"
+  "type-aliases/integrations": [
+    "interfaces/CoreIntegrations",
+    "interfaces/CustomIntegrationsModule"
+  ]
 }

@@ -3,6 +3,7 @@
   "AppLogsModule",
   "AuthModule",
   "ConnectorsModule",
+  "CustomIntegrationsModule",
   "EntitiesModule",
   "EntityHandler",
   "FunctionsModule",

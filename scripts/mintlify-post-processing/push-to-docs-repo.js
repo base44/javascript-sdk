@@ -58,23 +58,47 @@ function updateDocsJson(repoDir, sdkFiles) {
   const docsContent = fs.readFileSync(docsJsonPath, "utf8");
   const docs = JSON.parse(docsContent);
 
-  // Find the "SDK Reference" tab
-  const sdkTabIndex = docs.navigation.tabs.findIndex(
-    (tab) => tab.tab === "SDK Reference"
+  // Navigate to: Developers tab → SDK group → SDK Reference group
+  const developersTab = docs.navigation.tabs.find(
+    (tab) => tab.tab === "Developers"
   );
-  let sdkTab = docs.navigation.tabs[sdkTabIndex];
 
-  if (sdkTabIndex === -1) {
-    console.log(
-      "Could not find 'SDK Reference' tab in docs.json. Creating it..."
-    );
-    sdkTab = {
-      tab: "SDK Reference",
-      groups: [],
-    };
+  if (!developersTab) {
+    console.error("Could not find 'Developers' tab in docs.json");
+    process.exit(1);
   }
 
-  // Update the groups - merge categories that map to the same group name
+  const sdkGroup = developersTab.groups.find((group) => group.group === "SDK");
+
+  if (!sdkGroup) {
+    console.error("Could not find 'SDK' group in Developers tab");
+    process.exit(1);
+  }
+
+  // SDK group uses "pages" array which can contain nested groups
+  if (!Array.isArray(sdkGroup.pages)) {
+    console.error("SDK group does not have a pages array");
+    process.exit(1);
+  }
+
+  // Find the SDK Reference nested group inside SDK's pages
+  let sdkReferenceGroup = sdkGroup.pages.find(
+    (item) => typeof item === "object" && item.group === "SDK Reference"
+  );
+
+  if (!sdkReferenceGroup) {
+    console.log(
+      "Could not find 'SDK Reference' group inside SDK. Creating it..."
+    );
+    sdkReferenceGroup = {
+      group: "SDK Reference",
+      icon: "brackets-curly",
+      pages: [],
+    };
+    sdkGroup.pages.push(sdkReferenceGroup);
+  }
+
+  // Build the nested groups (Client, Modules, etc.) based on category map
   const groupMap = new Map(); // group name -> pages array
 
   const addToGroup = (groupName, pages) => {
@@ -113,41 +137,24 @@ function updateDocsJson(repoDir, sdkFiles) {
     );
   }
 
-  // Convert map to array of groups
-  const newGroups = Array.from(groupMap.entries()).map(
+  // Convert map to array of nested groups for SDK Reference
+  const newNestedGroups = Array.from(groupMap.entries()).map(
     ([groupName, pages]) => ({
       group: groupName,
       pages: pages.sort(), // Sort pages alphabetically within each group
     })
   );
 
-  const newGroupNames = new Set(newGroups.map((group) => group.group));
-  const preservedGroups = [];
-  let insertionIndex;
-
-  for (const existingGroup of sdkTab.groups ?? []) {
-    if (newGroupNames.has(existingGroup.group)) {
-      if (insertionIndex === undefined) {
-        insertionIndex = preservedGroups.length;
-      }
-      continue;
-    }
-    preservedGroups.push(existingGroup);
-  }
-
-  const finalGroups = [...preservedGroups];
-  const targetIndex = insertionIndex ?? finalGroups.length;
-  finalGroups.splice(targetIndex, 0, ...newGroups);
-  sdkTab.groups = finalGroups;
-
-  if (sdkTabIndex === -1) {
-    docs.navigation.tabs.push(sdkTab);
-  } else {
-    docs.navigation.tabs[sdkTabIndex] = sdkTab;
-  }
+  // Replace SDK Reference's pages with the new nested groups
+  // This preserves the SDK Reference group object but updates its contents
+  sdkReferenceGroup.pages = newNestedGroups;
 
   console.debug(
-    `New groups for docs.json: ${JSON.stringify(newGroups, null, 2)}`
+    `New nested groups for SDK Reference: ${JSON.stringify(
+      newNestedGroups,
+      null,
+      2
+    )}`
   );
 
   // Write updated docs.json
@@ -215,6 +222,11 @@ function main() {
     // Copy the docs directory to the temporary repository
     fs.cpSync(DOCS_SOURCE_PATH, path.join(tempRepoDir, "sdk-docs"), {
       recursive: true,
+    });
+
+    // Remove README.mdx - it's not used in the docs navigation
+    fs.rmSync(path.join(tempRepoDir, "sdk-docs", "README.mdx"), {
+      force: true,
     });
 
     // Scan the sdk-docs directory

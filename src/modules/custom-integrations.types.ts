@@ -16,12 +16,6 @@ export interface CustomIntegrationCallParams {
    * Query string parameters to append to the URL.
    */
   queryParams?: Record<string, any>;
-
-  /**
-   * Additional headers to send with this specific request.
-   * These are merged with the integration's configured headers.
-   */
-  headers?: Record<string, string>;
 }
 
 /**
@@ -59,18 +53,17 @@ export interface CustomIntegrationCallResponse {
  *
  * @example
  * ```typescript
- * // Call a custom GitHub integration
+ * // Call a custom CRM integration
  * const response = await base44.integrations.custom.call(
- *   "github",        // integration slug (defined by workspace admin)
- *   "listIssues",    // operation ID from the OpenAPI spec
+ *   "my-crm",         // integration slug (defined by workspace admin)
+ *   "get:/contacts",  // endpoint: method:path format
  *   {
- *     pathParams: { owner: "myorg", repo: "myrepo" },
- *     queryParams: { state: "open", per_page: 100 }
+ *     queryParams: { limit: 10 }
  *   }
  * );
  *
  * if (response.success) {
- *   console.log("Issues:", response.data);
+ *   console.log("Contacts:", response.data);
  * } else {
  *   console.error("API returned error:", response.status_code);
  * }
@@ -78,10 +71,10 @@ export interface CustomIntegrationCallResponse {
  *
  * @example
  * ```typescript
- * // Call with request body payload
+ * // Call with path params and request body payload
  * const response = await base44.integrations.custom.call(
  *   "github",
- *   "createIssue",
+ *   "post:/repos/{owner}/{repo}/issues",
  *   {
  *     pathParams: { owner: "myorg", repo: "myrepo" },
  *     payload: {
@@ -97,9 +90,9 @@ export interface CustomIntegrationsModule {
   /**
    * Call a custom integration endpoint.
    *
-   * @param slug - The integration's unique identifier (slug), as defined by the workspace admin.
-   * @param operationId - The operation ID from the OpenAPI spec (e.g., "listIssues", "getUser").
-   * @param params - Optional parameters including payload, pathParams, queryParams, and headers.
+   * @param slug - The integration's unique identifier, as defined by the workspace admin.
+   * @param operationId - The endpoint in `method:path` format. For example, `"get:/contacts"`, or `"post:/users/{id}"`. The method is the HTTP verb in lowercase and the path matches the OpenAPI specification.
+   * @param params - Optional parameters including payload, pathParams, and queryParams.
    * @returns Promise resolving to the integration call response.
    *
    * @throws {Error} If slug is not provided.
