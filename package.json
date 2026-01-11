@@ -24,7 +24,9 @@
     "create-docs:process": "node scripts/mintlify-post-processing/file-processing/file-processing.js"
   },
   "dependencies": {
+    "@rrweb/rrweb-plugin-console-record": "^2.0.0-alpha.18",
     "axios": "^1.6.2",
+    "rrweb": "^2.0.0-alpha.18",
     "socket.io-client": "^4.7.5",
     "uuid": "^13.0.0"
   },
