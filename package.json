@@ -19,6 +19,7 @@
     "docs": "typedoc",
     "prepublishOnly": "npm run build",
     "create-docs": "npm run create-docs:generate && npm run create-docs:process",
+    "create-docs-local": "npm run create-docs && npm run copy-docs-local",
     "push-docs": "node scripts/mintlify-post-processing/push-to-docs-repo.js",
     "copy-docs-local": "node scripts/mintlify-post-processing/copy-to-local-docs.js",
     "create-docs:generate": "typedoc",
