@@ -150,7 +150,11 @@ function updateDocsJson(repoDir, sdkFiles) {
   sdkReferenceGroup.pages = newNestedGroups;
 
   console.debug(
-    `New nested groups for SDK Reference: ${JSON.stringify(newNestedGroups, null, 2)}`
+    `New nested groups for SDK Reference: ${JSON.stringify(
+      newNestedGroups,
+      null,
+      2
+    )}`
   );
 
   // Write updated docs.json
@@ -221,7 +225,9 @@ function main() {
     });
 
     // Remove README.mdx - it's not used in the docs navigation
-    fs.rmSync(path.join(tempRepoDir, "sdk-docs", "README.mdx"), { force: true });
+    fs.rmSync(path.join(tempRepoDir, "sdk-docs", "README.mdx"), {
+      force: true,
+    });
 
     // Scan the sdk-docs directory
     const sdkDocsDir = path.join(tempRepoDir, "sdk-docs");
