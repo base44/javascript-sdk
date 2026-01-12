@@ -53,10 +53,21 @@ export function createAuthModule(
         ? new URL(nextUrl, window.location.origin).toString()
         : window.location.href;
 
+      // For preview URLs (preview--*), redirect to main app's login page
+      // but keep from_url pointing to the preview URL
+      let loginBaseUrl = options.appBaseUrl ?? "";
+      const hostname = window.location.hostname;
+      if (hostname.startsWith("preview--")) {
+        const mainHostname = hostname.replace(/^preview--/, "");
+        loginBaseUrl = `${window.location.protocol}//${mainHostname}${
+          window.location.port ? ":" + window.location.port : ""
+        }`;
+      }
+
       // Build the login URL
-      const loginUrl = `${
-        options.appBaseUrl ?? ""
-      }/login?from_url=${encodeURIComponent(redirectUrl)}`;
+      const loginUrl = `${loginBaseUrl}/login?from_url=${encodeURIComponent(
+        redirectUrl
+      )}`;
 
       // Redirect to the login page
       window.location.href = loginUrl;
