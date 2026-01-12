@@ -197,16 +197,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
   }
 
   // If authentication is required, verify token and redirect to login if needed
-  // Skip if already on login page to avoid redirect loop (but not on preview - preview should redirect to main)
-  const isPreview =
-    typeof window !== "undefined" &&
-    window.location.hostname.startsWith("preview--");
-  const isOnLoginPage =
-    typeof window !== "undefined" &&
-    window.location.pathname === "/login" &&
-    !isPreview;
-
-  if (requiresAuth && typeof window !== "undefined" && !isOnLoginPage) {
+  if (requiresAuth && typeof window !== "undefined") {
     // We perform this check asynchronously to not block client creation
     setTimeout(async () => {
       try {
