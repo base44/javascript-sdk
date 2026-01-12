@@ -43,6 +43,11 @@ export function createAuthModule(
         );
       }
 
+      // Skip redirect if already on login page to avoid redirect loop
+      if (window.location.pathname === "/login") {
+        return;
+      }
+
       // If nextUrl is not provided, use the current URL
       const redirectUrl = nextUrl
         ? new URL(nextUrl, window.location.origin).toString()
