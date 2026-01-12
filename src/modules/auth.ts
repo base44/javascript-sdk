@@ -43,8 +43,11 @@ export function createAuthModule(
         );
       }
 
-      // Skip redirect if already on login page to avoid redirect loop
-      if (window.location.pathname === "/login") {
+      const hostname = window.location.hostname;
+      const isPreview = hostname.startsWith("preview--");
+
+      // Skip redirect if already on login page (but not on preview - preview should redirect to main app)
+      if (window.location.pathname === "/login" && !isPreview) {
         return;
       }
 
@@ -56,8 +59,7 @@ export function createAuthModule(
       // For preview URLs (preview--*), redirect to main app's login page
       // but keep from_url pointing to the preview URL
       let loginBaseUrl = options.appBaseUrl ?? "";
-      const hostname = window.location.hostname;
-      if (hostname.startsWith("preview--")) {
+      if (isPreview) {
         const mainHostname = hostname.replace(/^preview--/, "");
         loginBaseUrl = `${window.location.protocol}//${mainHostname}${
           window.location.port ? ":" + window.location.port : ""
