@@ -7,6 +7,7 @@ import type { FunctionsModule } from "./modules/functions.types.js";
 import type { AgentsModule } from "./modules/agents.types.js";
 import type { AppLogsModule } from "./modules/app-logs.types.js";
 import type { AnalyticsModule } from "./modules/analytics.types.js";
+import type { RecordingModule } from "./modules/recording.types.js";
 
 /**
  * Options for creating a Base44 client.
@@ -94,6 +95,8 @@ export interface Base44Client {
    * @internal
    */
   analytics: AnalyticsModule;
+  /** {@link RecordingModule | Recording module} for capturing debug sessions. */
+  recording: RecordingModule;
   /** Cleanup function to disconnect WebSocket connections. Call when you're done with the client. */
   cleanup: () => void;
 
