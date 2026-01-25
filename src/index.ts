@@ -39,7 +39,19 @@ export type {
   RealtimeEventType,
   RealtimeEvent,
   RealtimeCallback,
+  WatchChangeType,
+  WatchEvent,
+  WatchOptions,
+  WatchCallback,
 } from "./modules/entities.types.js";
+
+// Watch list manager for client-side sorting optimization
+export {
+  WatchListManager,
+  createComparatorFromSort,
+  type WatchListManagerOptions,
+  type SortComparator,
+} from "./utils/watch-list-manager.js";
 
 export type {
   AuthModule,

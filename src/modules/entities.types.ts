@@ -4,6 +4,14 @@
 export type RealtimeEventType = "create" | "update" | "delete";
 
 /**
+ * Change types for live query (watch) subscriptions.
+ * - "added": Entity now matches the filter but didn't before (or was created matching)
+ * - "modified": Entity matched before and still matches
+ * - "removed": Entity matched before but no longer matches (or was deleted)
+ */
+export type WatchChangeType = "added" | "modified" | "removed";
+
+/**
  * Payload received when a realtime event occurs.
  */
 export interface RealtimeEvent {
@@ -16,6 +24,41 @@ export interface RealtimeEvent {
   /** ISO 8601 timestamp of when the event occurred */
   timestamp: string;
 }
+
+/**
+ * Payload received when a watch (live query) event occurs.
+ */
+export interface WatchEvent {
+  /** The type of change relative to the subscription filter */
+  changeType: WatchChangeType;
+  /** The CUD event type that triggered this change */
+  eventType: RealtimeEventType;
+  /** The entity data after the change */
+  data: any;
+  /** The unique identifier of the affected entity */
+  id: string;
+  /** ISO 8601 timestamp of when the event occurred */
+  timestamp: string;
+}
+
+/**
+ * Options for watch (live query) subscriptions.
+ */
+export interface WatchOptions {
+  /** MongoDB-style filter query */
+  filter?: Record<string, any>;
+  /** Sort field with optional '-' prefix for descending */
+  sort?: string;
+  /** Array of field names to include in the response */
+  fields?: string[];
+  /** Maximum number of results */
+  limit?: number;
+}
+
+/**
+ * Callback function invoked when a watch (live query) event occurs.
+ */
+export type WatchCallback = (event: WatchEvent) => void;
 
 /**
  * Callback function invoked when a realtime event occurs.
@@ -316,6 +359,64 @@ export interface EntityHandler {
    * ```
    */
   subscribe(callback: RealtimeCallback): () => void;
+
+  /**
+   * Watches for changes to a filtered subset of records (live query).
+   *
+   * Similar to `subscribe`, but allows you to specify filter, sort, fields,
+   * and limit options. The callback receives events with a `changeType` that
+   * indicates how the change affects the filtered result set:
+   * - `'added'`: A record now matches your filter (created or updated to match)
+   * - `'modified'`: A record still matches your filter but was updated
+   * - `'removed'`: A record no longer matches your filter (deleted or updated to not match)
+   *
+   * @param options - Options for the watch subscription:
+   * - `filter`: MongoDB-style filter query to match records
+   * - `sort`: Sort field with optional '-' prefix for descending order
+   * - `fields`: Array of field names to include in the response
+   * - `limit`: Maximum number of records to track
+   * @param callback - Callback function called when a matching entity changes. The callback receives an event object with:
+   * - `changeType`: How the change affects your filtered results - `'added'`, `'modified'`, or `'removed'`
+   * - `eventType`: The underlying CUD operation - `'create'`, `'update'`, or `'delete'`
+   * - `data`: The entity data after the change
+   * - `id`: The unique identifier of the affected entity
+   * - `timestamp`: ISO 8601 timestamp of when the event occurred
+   * @returns Unsubscribe function to stop receiving updates.
+   *
+   * @example
+   * ```typescript
+   * // Watch for changes to active high-priority tasks
+   * const unsubscribe = base44.entities.Task.watch(
+   *   {
+   *     filter: { status: 'active', priority: 'high' },
+   *     sort: '-created_date',
+   *     limit: 10
+   *   },
+   *   (event) => {
+   *     if (event.changeType === 'added') {
+   *       console.log('New high-priority task:', event.data);
+   *     } else if (event.changeType === 'removed') {
+   *       console.log('Task no longer high-priority:', event.id);
+   *     }
+   *   }
+   * );
+   *
+   * // Later, clean up the subscription
+   * unsubscribe();
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Watch for changes to current user's tasks
+   * const unsubscribe = base44.entities.Task.watch(
+   *   { filter: { assignee: currentUser.id } },
+   *   (event) => {
+   *     console.log(`My task ${event.id} was ${event.changeType}:`, event.data);
+   *   }
+   * );
+   * ```
+   */
+  watch(options: WatchOptions, callback: WatchCallback): () => void;
 }
 
 /**
