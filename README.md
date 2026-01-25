@@ -21,13 +21,13 @@ npm install @base44/sdk
 
 The SDK provides access to Base44's functionality through the following modules:
 
-- **[`agents`](https://docs.base44.com/sdk-docs/interfaces/agents)**: Interact with AI agents and manage conversations.
-- **[`app-logs`](https://docs.base44.com/sdk-docs/interfaces/app-logs)**: Access and query app logs.
-- **[`auth`](https://docs.base44.com/sdk-docs/interfaces/auth)**: Manage user authentication, registration, and session handling.
-- **[`connectors`](https://docs.base44.com/sdk-docs/interfaces/connectors)**: Manage OAuth connections and access tokens for third-party services.
-- **[`entities`](https://docs.base44.com/sdk-docs/interfaces/entities)**: Work with your app's data entities using CRUD operations.
-- **[`functions`](https://docs.base44.com/sdk-docs/interfaces/functions)**: Execute backend functions.
-- **[`integrations`](https://docs.base44.com/sdk-docs/type-aliases/integrations)**: Pre-built integrations for external services.
+- **[`agents`](https://docs.base44.com/developers/references/sdk/docs/interfaces/agents)**: Interact with AI agents and manage conversations.
+- **[`app-logs`](https://docs.base44.com/developers/references/sdk/docs/interfaces/app-logs)**: Access and query app logs.
+- **[`auth`](https://docs.base44.com/developers/references/sdk/docs/interfaces/auth)**: Manage user authentication, registration, and session handling.
+- **[`connectors`](https://docs.base44.com/developers/references/sdk/docs/interfaces/connectors)**: Manage OAuth connections and access tokens for third-party services.
+- **[`entities`](https://docs.base44.com/developers/references/sdk/docs/interfaces/entities)**: Work with your app's data entities using CRUD operations.
+- **[`functions`](https://docs.base44.com/developers/references/sdk/docs/interfaces/functions)**: Execute backend functions.
+- **[`integrations`](https://docs.base44.com/developers/references/sdk/docs/type-aliases/integrations)**: Pre-built integrations for external services.
 
 ## Quick starts
 
@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
 
 ## Learn more
 
-For complete documentation, guides, and API reference, visit the **[Base44 SDK Documentation](https://docs.base44.com/sdk-getting-started/overview)**.
+For complete documentation, guides, and API reference, visit the **[Base44 SDK Documentation](https://docs.base44.com/developers/landing)**.
 
 ## Development
 
