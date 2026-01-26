@@ -5,6 +5,10 @@ import {
   RealtimeCallback,
   RealtimeEvent,
   RealtimeEventType,
+  WatchCallback,
+  WatchChangeType,
+  WatchEvent,
+  WatchOptions,
 } from "./entities.types";
 import { RoomsSocket } from "../utils/socket-utils.js";
 
@@ -65,6 +69,26 @@ function parseRealtimeMessage(dataStr: string): RealtimeEvent | null {
     };
   } catch (error) {
     console.warn("[Base44 SDK] Failed to parse realtime message:", error);
+    return null;
+  }
+}
+
+/**
+ * Parses the watch (live query) message data and extracts event information.
+ * @internal
+ */
+function parseWatchMessage(dataStr: string): WatchEvent | null {
+  try {
+    const parsed = JSON.parse(dataStr);
+    return {
+      changeType: parsed.change_type as WatchChangeType,
+      eventType: parsed.type as RealtimeEventType,
+      data: parsed.data,
+      id: parsed.id || parsed.data?.id,
+      timestamp: parsed.timestamp || new Date().toISOString(),
+    };
+  } catch (error) {
+    console.warn("[Base44 SDK] Failed to parse watch message:", error);
     return null;
   }
 }
@@ -183,6 +207,39 @@ function createEntityHandler(
           }
         },
       });
+
+      return unsubscribe;
+    },
+
+    // Watch for changes to a filtered subset (live query)
+    watch(options: WatchOptions, callback: WatchCallback): () => void {
+      const socket = getSocket();
+
+      // Use subscribeQuery to send subscription options to the server
+      const unsubscribe = socket.subscribeQuery(
+        appId,
+        entityName,
+        {
+          filter: options.filter,
+          sort: options.sort,
+          fields: options.fields,
+          limit: options.limit,
+        },
+        {
+          update_model: (msg) => {
+            const event = parseWatchMessage(msg.data);
+            if (!event) {
+              return;
+            }
+
+            try {
+              callback(event);
+            } catch (error) {
+              console.error("[Base44 SDK] Watch callback error:", error);
+            }
+          },
+        }
+      );
 
       return unsubscribe;
     },

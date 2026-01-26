@@ -12,6 +12,16 @@ export interface RoomsSocketConfig {
 export type TSocketRoom = string;
 export type TJsonStr = string;
 
+/**
+ * Options for watch (live query) subscriptions.
+ */
+export interface WatchSubscriptionOptions {
+  filter?: Record<string, any>;
+  sort?: string;
+  fields?: string[];
+  limit?: number;
+}
+
 type RoomsSocketEventsMap = {
   listen: {
     connect: () => Promise<void> | void;
@@ -19,11 +29,29 @@ type RoomsSocketEventsMap = {
       room: string;
       data: TJsonStr;
     }) => Promise<void> | void;
+    subscribed: (msg: {
+      room: string;
+      entity_name: string;
+      options: WatchSubscriptionOptions;
+    }) => Promise<void> | void;
+    unsubscribed: (msg: {
+      room: string;
+      entity_name: string;
+    }) => Promise<void> | void;
     error: (error: Error) => Promise<void> | void;
   };
   emit: {
     join: (room: string) => void;
     leave: (room: string) => void;
+    subscribe_query: (data: {
+      app_id: string;
+      entity_name: string;
+      options: WatchSubscriptionOptions;
+    }) => void;
+    unsubscribe_query: (data: {
+      app_id: string;
+      entity_name: string;
+    }) => void;
   };
 };
 
@@ -51,6 +79,14 @@ function initializeSocket(
 
   socket.on("update_model", async (msg) => {
     return handlers.update_model?.(msg);
+  });
+
+  socket.on("subscribed", async (msg) => {
+    return handlers.subscribed?.(msg);
+  });
+
+  socket.on("unsubscribed", async (msg) => {
+    return handlers.unsubscribed?.(msg);
   });
 
   socket.on("error", async (error) => {
@@ -162,9 +198,53 @@ export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
     };
   };
 
+  /**
+   * Subscribe to a live query with filter, sort, fields, and limit options.
+   * This sends subscribe_query to the server and sets up listeners for updates.
+   */
+  const subscribeQuery = (
+    appId: string,
+    entityName: string,
+    options: WatchSubscriptionOptions,
+    handlers: Partial<{ [k in TEvent]: THandler<k> }>
+  ) => {
+    // The room name matches the backend format
+    const room = `entities:${appId}:${entityName}:watch`;
+
+    // Add handlers for this room
+    if (!roomsToListeners[room]) {
+      roomsToListeners[room] = [];
+    }
+    roomsToListeners[room].push(handlers);
+
+    // Send subscribe_query event to server
+    socket.emit("subscribe_query", {
+      app_id: appId,
+      entity_name: entityName,
+      options,
+    });
+
+    // Return unsubscribe function
+    return () => {
+      roomsToListeners[room] =
+        roomsToListeners[room]?.filter((listener) => listener !== handlers) ??
+        [];
+
+      if (roomsToListeners[room].length === 0) {
+        // Send unsubscribe_query event to server
+        socket.emit("unsubscribe_query", {
+          app_id: appId,
+          entity_name: entityName,
+        });
+        delete roomsToListeners[room];
+      }
+    };
+  };
+
   return {
     socket,
     subscribeToRoom,
+    subscribeQuery,
     updateConfig,
     updateModel,
     disconnect,
