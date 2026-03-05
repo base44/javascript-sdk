@@ -1,4 +1,8 @@
 {
+  "interfaces/ConnectorsModule": [
+    "type-aliases/ConnectorIntegrationType",
+    "interfaces/ConnectorIntegrationTypeRegistry"
+  ],
   "type-aliases/EntitiesModule": [
     "interfaces/EntityHandler",
     "type-aliases/EntityRecord",

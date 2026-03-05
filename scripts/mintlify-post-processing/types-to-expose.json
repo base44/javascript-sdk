@@ -5,6 +5,8 @@
   "AnalyticsModule",
   "AppLogsModule",
   "AuthModule",
+  "ConnectorIntegrationType",
+  "ConnectorIntegrationTypeRegistry",
   "ConnectorsModule",
   "CustomIntegrationsModule",
   "DeleteManyResult",

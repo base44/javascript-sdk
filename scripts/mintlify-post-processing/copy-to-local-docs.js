@@ -160,7 +160,8 @@ function updateDocsJson(repoDir, sdkFiles) {
     `SDK Reference pages: ${JSON.stringify(sdkReferencePages, null, 2)}`
   );
 
-  // Navigate to: Developers tab -> anchors -> SDK anchor -> groups -> SDK Reference
+  // Navigate to: Developers tab -> SDK section -> groups -> SDK Reference
+  // Supports both legacy "anchors" format and current "dropdowns" format.
   const developersTab = docs.navigation.tabs.find(
     (tab) => tab.tab === "Developers"
   );
@@ -170,13 +171,13 @@ function updateDocsJson(repoDir, sdkFiles) {
     process.exit(1);
   }
 
-  // Find the SDK anchor
-  const sdkAnchor = developersTab.anchors?.find(
-    (anchor) => anchor.anchor === "SDK"
-  );
+  // Find the SDK section (try dropdowns first, then fall back to anchors)
+  const sdkAnchor =
+    developersTab.dropdowns?.find((d) => d.dropdown === "SDK") ??
+    developersTab.anchors?.find((a) => a.anchor === "SDK");
 
   if (!sdkAnchor) {
-    console.error("Could not find 'SDK' anchor in Developers tab");
+    console.error("Could not find 'SDK' dropdown or anchor in Developers tab");
     process.exit(1);
   }
 
