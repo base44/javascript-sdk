@@ -54,9 +54,12 @@ export interface ConnectorConnectionResponse {
  *
  * | Service | Type identifier |
  * |---|---|
+ * | Box | `box` |
+ * | ClickUp | `clickup` |
  * | Discord | `discord` |
  * | GitHub | `github` |
  * | Gmail | `gmail` |
+ * | Google Analytics | `google_analytics` |
  * | Google BigQuery | `googlebigquery` |
  * | Google Calendar | `googlecalendar` |
  * | Google Docs | `googledocs` |
@@ -70,6 +73,7 @@ export interface ConnectorConnectionResponse {
  * | Slack User | `slack` |
  * | Slack Bot | `slackbot` |
  * | TikTok | `tiktok` |
+ * | Wrike | `wrike` |
  *
  * See the integration guides for more details:
  *
@@ -156,17 +160,15 @@ export interface ConnectorsModule {
   getAccessToken(integrationType: ConnectorIntegrationType): Promise<string>;
 
   /**
-   * Retrieves the OAuth access token and connection configuration for a specific external integration type.
+   * Retrieves the OAuth access token and connection configuration for a specific [external integration type](#available-connectors).
    *
-   * Returns both the OAuth token and any additional connection configuration
-   * that the connector provides. Some connectors require connection-specific
-   * parameters to build API requests. For example, a service might need a
-   * subdomain to construct the API URL (`{subdomain}.example.com`), which
-   * is available in `connectionConfig`. Most connectors only need the
-   * `accessToken`; `connectionConfig` will be `null` when there are no
-   * extra parameters.
+   * Some connectors require connection-specific parameters to build API calls.
+   * In such cases, the returned `connectionConfig` is an object with the additional parameters. If there are no extra parameters needed for the connection, the `connectionConfig` is `null`.
    *
-   * @param integrationType - The type of integration, such as `'googlecalendar'`, `'slack'`, or `'github'`.
+   * For example, a service might need a subdomain to construct the API URL in
+   * the form of `{subdomain}.example.com`. In such a case the subdomain will be available as a property of the `connectionConfig` object.
+   *
+   * @param integrationType - The type of integration, such as `'googlecalendar'`, `'slack'`, `'slackbot'`, `'github'`, or `'discord'`. See [Available connectors](#available-connectors) for the full list.
    * @returns Promise resolving to a {@link ConnectorConnectionResponse} with `accessToken` and `connectionConfig`.
    *
    * @example
