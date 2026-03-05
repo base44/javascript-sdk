@@ -23,8 +23,21 @@ export interface CreateClientOptions {
  */
 export interface CreateClientConfig {
   /**
-   * The Base44 server URL. Defaults to "https://base44.app".
-   * @internal
+   * The Base44 server URL.
+   *
+   * You don't need to set this for production use. The SDK defaults to `https://base44.app`.
+   *
+   * Set this when using the CLI's local development server ([`base44 dev`](https://docs.base44.com/developers/backend/overview/local-development)) to point SDK requests at your local machine instead of the hosted backend.
+   *
+   * @example
+   * ```typescript
+   * const base44 = createClient({
+   *   appId: "my-app-id",
+   *   serverUrl: process.env.NEXT_PUBLIC_BASE44_URL,
+   * });
+   * ```
+   *
+   * @defaultValue `"https://base44.app"`
    */
   serverUrl?: string;
   /**
