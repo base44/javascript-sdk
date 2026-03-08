@@ -53,46 +53,41 @@ export function createUserConnectorsModule(
 ): UserConnectorsModule {
   return {
     // @ts-expect-error Return type mismatch - implementation returns object, interface expects string
-    async getEndUserAccessToken(
-      integrationType: ConnectorIntegrationType
+    async getAppUserAccessToken(
+      connectorId: string
     ): Promise<ConnectorAccessTokenResponse> {
-      if (!integrationType || typeof integrationType !== "string") {
-        throw new Error("Integration type is required and must be a string");
+      if (!connectorId || typeof connectorId !== "string") {
+        throw new Error("Connector ID is required and must be a string");
       }
 
       const response = await axios.get<ConnectorAccessTokenResponse>(
-        `/apps/${appId}/end-user-auth/tokens/${integrationType}`
+        `/apps/${appId}/end-user-auth/connectors/${connectorId}/token`
       );
 
       // @ts-expect-error
       return response.access_token;
     },
 
-    async connectEndUser(
-      integrationType: ConnectorIntegrationType
-    ): Promise<string> {
-      if (!integrationType || typeof integrationType !== "string") {
-        throw new Error("Integration type is required and must be a string");
+    async connectAppUser(connectorId: string): Promise<string> {
+      if (!connectorId || typeof connectorId !== "string") {
+        throw new Error("Connector ID is required and must be a string");
       }
 
       const response = await axios.post<ConnectorInitiateResponse>(
-        `/apps/${appId}/end-user-auth/initiate`,
-        { integration_type: integrationType }
+        `/apps/${appId}/end-user-auth/connectors/${connectorId}/initiate`
       );
 
       // @ts-expect-error
       return response.redirect_url;
     },
 
-    async disconnectEndUser(
-      integrationType: ConnectorIntegrationType
-    ): Promise<void> {
-      if (!integrationType || typeof integrationType !== "string") {
-        throw new Error("Integration type is required and must be a string");
+    async disconnectAppUser(connectorId: string): Promise<void> {
+      if (!connectorId || typeof connectorId !== "string") {
+        throw new Error("Connector ID is required and must be a string");
       }
 
       await axios.delete(
-        `/apps/${appId}/end-user-auth/${integrationType}`
+        `/apps/${appId}/end-user-auth/connectors/${connectorId}`
       );
     },
   };

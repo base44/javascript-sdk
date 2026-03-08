@@ -101,70 +101,68 @@ export interface ConnectorsModule {
  * retrieving the end user's access token, and disconnecting the end user's connection.
  *
  * Unlike {@link ConnectorsModule | ConnectorsModule} which manages app-scoped tokens,
- * this module manages tokens scoped to individual end users.
+ * this module manages tokens scoped to individual end users. Methods are keyed on
+ * the connector ID (the OrgConnector's database ID) rather than the integration type.
  *
  * Available via `base44.connectors`.
- *
- * ## Dynamic Types
- *
- * If you're working in a TypeScript project, you can generate types from your app's connector configurations to get autocomplete on integration type names. See the [Dynamic Types](/developers/references/sdk/getting-started/dynamic-types) guide to get started.
  */
 export interface UserConnectorsModule {
   /**
-   * Retrieves an OAuth access token for an end user's connection to a specific external integration.
+   * Retrieves an OAuth access token for an end user's connection to a specific connector.
    *
    * Returns the OAuth token string that belongs to the currently authenticated end user
-   * for the specified external service.
+   * for the specified connector.
    *
-   * @param integrationType - The type of integration, such as `'googlecalendar'`, `'slack'`, or `'github'`.
+   * @param connectorId - The connector ID (OrgConnector database ID).
    * @returns Promise resolving to the access token string.
    *
    * @example
    * ```typescript
-   * // Get the end user's Google Calendar token
-   * const token = await base44.connectors.getEndUserAccessToken('googlecalendar');
+   * // Get the end user's access token for a connector
+   * const token = await base44.connectors.getAppUserAccessToken('abc123def');
    *
    * const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
    *   headers: { 'Authorization': `Bearer ${token}` }
    * });
    * ```
    */
-  getEndUserAccessToken(integrationType: ConnectorIntegrationType): Promise<string>;
+  getAppUserAccessToken(connectorId: string): Promise<string>;
 
   /**
-   * Initiates the end-user OAuth flow for a specific external integration type.
+   * Initiates the end-user OAuth flow for a specific connector.
    *
    * Returns a redirect URL that the end user should be navigated to in order to
-   * authenticate with the external service.
+   * authenticate with the external service. The scopes and integration type are
+   * derived from the connector configuration server-side.
    *
-   * @param integrationType - The type of integration, such as `'googlecalendar'`, `'slack'`, or `'github'`.
+   * @param connectorId - The connector ID (OrgConnector database ID).
    * @returns Promise resolving to the redirect URL string.
    *
    * @example
    * ```typescript
-   * // Start Google Calendar OAuth for the end user
-   * const redirectUrl = await base44.connectors.connectEndUser('googlecalendar');
+   * // Start OAuth for the end user
+   * const redirectUrl = await base44.connectors.connectAppUser('abc123def');
    *
    * // Redirect the user to the OAuth provider
    * window.location.href = redirectUrl;
    * ```
    */
-  connectEndUser(integrationType: ConnectorIntegrationType): Promise<string>;
+  connectAppUser(connectorId: string): Promise<string>;
 
   /**
-   * Disconnects an end user's OAuth connection for a specific external integration type.
+   * Disconnects an end user's OAuth connection for a specific connector.
    *
    * Removes the stored OAuth credentials for the currently authenticated end user's
-   * connection to the specified external service.
+   * connection to the specified connector.
    *
-   * @param integrationType - The type of integration to disconnect, such as `'googlecalendar'`, `'slack'`, or `'github'`.
+   * @param connectorId - The connector ID (OrgConnector database ID).
    * @returns Promise resolving when the connection has been removed.
    *
    * @example
    * ```typescript
-   * // Disconnect the end user's Google Calendar connection
-   * await base44.connectors.disconnectEndUser('googlecalendar');
+   * // Disconnect the end user's connection
+   * await base44.connectors.disconnectAppUser('abc123def');
    * ```
    */
-  disconnectEndUser(integrationType: ConnectorIntegrationType): Promise<void>;
+  disconnectAppUser(connectorId: string): Promise<void>;
 }
