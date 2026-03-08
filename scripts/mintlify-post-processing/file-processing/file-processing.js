@@ -1017,6 +1017,123 @@ function applySignatureCleanup(dir) {
   }
 }
 
+/**
+ * Transforms deprecated method sections:
+ * 1. Removes ~~strikethrough~~ and prepends a warning emoji to the heading
+ * 2. Extracts the #### Deprecated block, removes it, and re-inserts it as a
+ *    <Danger> callout between the heading and the signature blockquote
+ */
+function processDeprecatedMethods(content) {
+  const lines = content.split("\n");
+  let modified = false;
+  let inFence = false;
+
+  // First pass: find all deprecated sections and collect their info
+  const deprecatedSections = [];
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (trimmed.startsWith("```")) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+
+    if (trimmed === "#### Deprecated") {
+      const start = i;
+      let end = i + 1;
+      let message = "";
+      // The first non-empty line after "#### Deprecated" is the deprecation message.
+      // Any subsequent lines are description text that TypeDoc misplaced here.
+      while (end < lines.length) {
+        const t = lines[end].trim();
+        if (t.startsWith("#### ") || t.startsWith("### ") || t.startsWith("## ") || t === "***") break;
+        if (!message && t) {
+          message = t;
+        }
+        end++;
+      }
+      deprecatedSections.push({ start, end, message });
+    }
+  }
+
+  if (deprecatedSections.length === 0) {
+    return { content, modified: false };
+  }
+
+  // Remove deprecated sections bottom-up so indices stay valid
+  for (let s = deprecatedSections.length - 1; s >= 0; s--) {
+    const { start, end } = deprecatedSections[s];
+    lines.splice(start, end - start);
+    modified = true;
+  }
+
+  // Second pass: transform headings and insert Danger callouts
+  inFence = false;
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (trimmed.startsWith("```")) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+
+    // Match deprecated heading: ### ~~methodName()~~ (TypeDoc wraps deprecated names in ~~)
+    const headingMatch = trimmed.match(/^###\s+~~(.+?)~~\s*$/);
+    if (!headingMatch) continue;
+
+    // Remove strikethrough and prepend warning emoji
+    lines[i] = lines[i].replace(
+      /^(###\s+)~~(.+?)~~\s*$/,
+      "$1\u26A0\uFE0F $2"
+    );
+    modified = true;
+
+    // Find the matching deprecated message by method name
+    const methodName = headingMatch[1].replace(/\(\)$/, "");
+    const section = deprecatedSections.find((sec) =>
+      sec.message.toLowerCase().includes(methodName.toLowerCase()) ||
+      deprecatedSections.length === 1
+    ) || deprecatedSections.shift();
+
+    if (!section || !section.message) continue;
+
+    // Insert Danger callout right after the heading (before the signature)
+    const dangerBlock = [
+      "",
+      "<Danger>",
+      `**Deprecated:** ${section.message}`,
+      "</Danger>",
+      "",
+    ];
+    lines.splice(i + 1, 0, ...dangerBlock);
+  }
+
+  return { content: lines.join("\n"), modified };
+}
+
+function applyDeprecatedMethodProcessing(dir) {
+  if (!fs.existsSync(dir)) return;
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      applyDeprecatedMethodProcessing(entryPath);
+    } else if (
+      entry.isFile() &&
+      (entry.name.endsWith(".mdx") || entry.name.endsWith(".md"))
+    ) {
+      const content = fs.readFileSync(entryPath, "utf-8");
+      const { content: updated, modified } = processDeprecatedMethods(content);
+      if (modified) {
+        fs.writeFileSync(entryPath, updated, "utf-8");
+        console.log(
+          `Processed deprecated methods: ${path.relative(DOCS_DIR, entryPath)}`
+        );
+      }
+    }
+  }
+}
+
 function demoteNonCallableHeadings(content) {
   const lines = content.split("\n");
   let inFence = false;
@@ -1286,6 +1403,11 @@ function groupTypeDefinitions(content) {
   
   // Define type definition patterns for different modules
   const typeGroups = [
+    // Connectors module
+    {
+      types: ["ConnectorIntegrationType", "ConnectorIntegrationTypeRegistry"],
+      indicator: "ConnectorIntegrationType"
+    },
     // Entities module
     {
       types: ["EntityRecord", "EntityTypeRegistry", "SortField"],
@@ -1913,6 +2035,9 @@ function main() {
 
   // Clean up signatures: fix truncated generics, simplify keyof constraints, break long lines
   applySignatureCleanup(DOCS_DIR);
+
+  // Transform deprecated methods: add badge to heading, move deprecation notice to Warning callout
+  applyDeprecatedMethodProcessing(DOCS_DIR);
 
   applyHeadingDemotion(DOCS_DIR);
 
