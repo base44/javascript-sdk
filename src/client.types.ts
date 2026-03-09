@@ -23,8 +23,13 @@ export interface CreateClientOptions {
  */
 export interface CreateClientConfig {
   /**
-   * The Base44 server URL. Defaults to "https://base44.app".
-   * @internal
+   * The Base44 server URL.
+   *
+   * You don't need to set this for production use. The SDK defaults to `https://base44.app`.
+   *
+   * Set this when using a local development server to point SDK requests at your local machine instead of the hosted backend.
+   *
+   * @defaultValue `"https://base44.app"`
    */
   serverUrl?: string;
   /**
