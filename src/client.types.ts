@@ -91,7 +91,7 @@ export interface Base44Client {
   auth: AuthModule;
   /** The underlying Axios instance used for API requests. Useful for making custom API calls with the same authentication and configuration as the SDK. */
   axiosClient: AxiosInstance;
-  /** {@link UserConnectorsModule | Connectors module} for end-user OAuth flows. */
+  /** {@link UserConnectorsModule | Connectors module} for app-user OAuth flows. */
   connectors: UserConnectorsModule;
   /** {@link EntitiesModule | Entities module} for CRUD operations on your data models. */
   entities: EntitiesModule;

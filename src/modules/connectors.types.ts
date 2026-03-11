@@ -230,9 +230,9 @@ export interface ConnectorsModule {
 }
 
 /**
- * User-scoped connectors module for managing end-user OAuth connections.
+ * User-scoped connectors module for managing app-user OAuth connections.
  *
- * This module provides methods for end-user OAuth flows: initiating an OAuth connection,
+ * This module provides methods for app-user OAuth flows: initiating an OAuth connection,
  * retrieving the end user's access token, and disconnecting the end user's connection.
  *
  * Unlike {@link ConnectorsModule | ConnectorsModule} which manages app-scoped tokens,
@@ -264,7 +264,7 @@ export interface UserConnectorsModule {
   getAppUserAccessToken(connectorId: string): Promise<string>;
 
   /**
-   * Initiates the end-user OAuth flow for a specific connector.
+   * Initiates the app-user OAuth flow for a specific connector.
    *
    * Returns a redirect URL that the end user should be navigated to in order to
    * authenticate with the external service. The scopes and integration type are

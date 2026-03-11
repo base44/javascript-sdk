@@ -62,11 +62,11 @@ export function createConnectorsModule(
 }
 
 /**
- * Creates the user-scoped Connectors module (end-user OAuth flows).
+ * Creates the user-scoped Connectors module (app-user OAuth flows).
  *
  * @param axios - Axios instance (user-scoped client)
  * @param appId - Application ID
- * @returns User connectors module with end-user OAuth methods
+ * @returns User connectors module with app-user OAuth methods
  * @internal
  */
 export function createUserConnectorsModule(
@@ -83,7 +83,7 @@ export function createUserConnectorsModule(
       }
 
       const response = await axios.get<ConnectorAccessTokenResponse>(
-        `/apps/${appId}/end-user-auth/connectors/${connectorId}/token`
+        `/apps/${appId}/app-user-auth/connectors/${connectorId}/token`
       );
 
       // @ts-expect-error
@@ -96,7 +96,7 @@ export function createUserConnectorsModule(
       }
 
       const response = await axios.post<ConnectorInitiateResponse>(
-        `/apps/${appId}/end-user-auth/connectors/${connectorId}/initiate`
+        `/apps/${appId}/app-user-auth/connectors/${connectorId}/initiate`
       );
 
       // @ts-expect-error
@@ -109,7 +109,7 @@ export function createUserConnectorsModule(
       }
 
       await axios.delete(
-        `/apps/${appId}/end-user-auth/connectors/${connectorId}`
+        `/apps/${appId}/app-user-auth/connectors/${connectorId}`
       );
     },
   };
