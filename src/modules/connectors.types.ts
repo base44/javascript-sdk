@@ -54,30 +54,40 @@ export interface ConnectorConnectionResponse {
  *
  * | Service | Type identifier |
  * |---|---|
+ * | Airtable | `airtable` |
  * | Box | `box` |
  * | ClickUp | `clickup` |
  * | Discord | `discord` |
+ * | Dropbox | `dropbox` |
  * | GitHub | `github` |
  * | Gmail | `gmail` |
  * | Google Analytics | `google_analytics` |
  * | Google BigQuery | `googlebigquery` |
  * | Google Calendar | `googlecalendar` |
+ * | Google Classroom | `google_classroom` |
  * | Google Docs | `googledocs` |
  * | Google Drive | `googledrive` |
+ * | Google Search Console | `google_search_console` |
  * | Google Sheets | `googlesheets` |
  * | Google Slides | `googleslides` |
  * | HubSpot | `hubspot` |
+ * | Linear | `linear` |
  * | LinkedIn | `linkedin` |
+ * | Microsoft Teams | `microsoft_teams` |
  * | Notion | `notion` |
+ * | Outlook | `outlook` |
  * | Salesforce | `salesforce` |
+ * | SharePoint | `share_point` |
  * | Slack User | `slack` |
  * | Slack Bot | `slackbot` |
+ * | Splitwise | `splitwise` |
  * | TikTok | `tiktok` |
+ * | Wix | `wix` |
  * | Wrike | `wrike` |
  *
  * See the integration guides for more details:
  *
- * - **Scopes and permissions**: {@link https://docs.base44.com/Integrations/gmail-connector#gmail-scopes-and-permissions | Gmail}, {@link https://docs.base44.com/Integrations/linkedin-connector#linkedin-scopes-and-permissions | LinkedIn}, {@link https://docs.base44.com/Integrations/slack-connector#slack-scopes-and-permissions | Slack}
+ * - **Scopes and permissions**: {@link https://docs.base44.com/Integrations/gmail-connector#gmail-scopes-and-permissions | Gmail}, {@link https://docs.base44.com/Integrations/linkedin-connector#linkedin-scopes-and-permissions | LinkedIn}, {@link https://docs.base44.com/Integrations/slack-connector#slack-scopes-and-permissions | Slack}, {@link https://docs.base44.com/Integrations/github-connector#github-scopes-and-permissions | GitHub}
  * - **Slack connector types**: {@link https://docs.base44.com/Integrations/slack-connector#about-the-slack-connectors | About the Slack connectors} explains the difference between `slack` and `slackbot`
  *
  * ## Authentication Modes
