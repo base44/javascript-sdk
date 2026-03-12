@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from "vitest";
+import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import nock from "nock";
 import { createClient } from "../../src/index.ts";
 
@@ -14,6 +14,7 @@ declare module "../../src/modules/functions.types.ts" {
 describe("Functions Module", () => {
   let base44: ReturnType<typeof createClient>;
   let scope;
+  let fetchMock: ReturnType<typeof vi.fn>;
   const appId = "test-app-id";
   const serverUrl = "https://api.base44.com";
 
@@ -33,6 +34,9 @@ describe("Functions Module", () => {
       console.log(`Nock: No match for ${req.method} ${req.path}`);
       console.log("Headers:", req.getHeaders());
     });
+
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
   });
 
   afterEach(() => {
@@ -40,6 +44,8 @@ describe("Functions Module", () => {
     nock.cleanAll();
     nock.emitter.removeAllListeners("no match");
     nock.enableNetConnect();
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
   });
 
   test("should call a function with JSON data", async () => {
@@ -451,5 +457,64 @@ describe("Functions Module", () => {
 
     // Verify all mocks were called
     expect(scope.isDone()).toBe(true);
+  });
+
+  test("should fetch function endpoint directly for streaming", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200 }));
+
+    await base44.functions.fetch("/streaming_demo", {
+      method: "POST",
+      data: { mode: "sse" },
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${serverUrl}/api/functions/streaming_demo`,
+      expect.any(Object)
+    );
+
+    const requestInit = fetchMock.mock.calls[0][1];
+    const headers = new Headers(requestInit.headers);
+    expect(headers.get("Content-Type")).toBe("application/json");
+    expect(headers.get("X-App-Id")).toBe(appId);
+    expect(requestInit.body).toBe(JSON.stringify({ mode: "sse" }));
+  });
+
+  test("should fallback to app-scoped functions endpoint on 404", async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response("Not found", { status: 404 }))
+      .mockResolvedValueOnce(new Response("ok", { status: 200 }));
+
+    await base44.functions.fetch("/streaming_demo/deep/path", {
+      method: "POST",
+      data: { mode: "ndjson" },
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      `${serverUrl}/api/functions/streaming_demo/deep/path`
+    );
+    expect(fetchMock.mock.calls[1][0]).toBe(
+      `${serverUrl}/api/apps/${appId}/functions/streaming_demo/deep/path`
+    );
+  });
+
+  test("should include Authorization header when using functions.fetch", async () => {
+    const userToken = "user-streaming-token";
+    const authenticatedBase44 = createClient({
+      serverUrl,
+      appId,
+      token: userToken,
+    });
+    fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200 }));
+
+    await authenticatedBase44.functions.fetch("streaming_demo", {
+      method: "POST",
+      data: { mode: "text" },
+    });
+
+    const requestInit = fetchMock.mock.calls[0][1];
+    const headers = new Headers(requestInit.headers);
+    expect(headers.get("Authorization")).toBe(`Bearer ${userToken}`);
   });
 });
