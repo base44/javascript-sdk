@@ -18,14 +18,6 @@ export function createFunctionsModule(
     return `${String(base).replace(/\/$/, "")}${path}`;
   };
 
-  const isBodyInit = (value: unknown): boolean =>
-    value instanceof FormData ||
-    value instanceof Blob ||
-    value instanceof URLSearchParams ||
-    value instanceof ReadableStream ||
-    value instanceof ArrayBuffer ||
-    ArrayBuffer.isView(value);
-
   const toHeaders = (inputHeaders?: HeadersInit): Headers => {
     const headers = new Headers();
 
@@ -38,9 +30,8 @@ export function createFunctionsModule(
       });
     };
 
-    // Axios keeps defaults in method-specific buckets.
+    // Append common headers from axios defaults
     appendHeaders(axios.defaults.headers?.common as Record<string, unknown>);
-    appendHeaders(axios.defaults.headers?.post as Record<string, unknown>);
 
     if (inputHeaders) {
       new Headers(inputHeaders).forEach((value, key) => {
@@ -96,28 +87,12 @@ export function createFunctionsModule(
     async fetch(path: string, init: FunctionsFetchInit = {}) {
       const normalizedPath = path.startsWith("/") ? path : `/${path}`;
       const primaryPath = `/functions${normalizedPath}`;
-      const { data, ...fetchInit } = init;
 
-      const headers = toHeaders(fetchInit.headers);
-      let body: BodyInit | null | undefined = fetchInit.body;
-
-      if (body === undefined && data !== undefined) {
-        if (data === null) {
-          body = null;
-        } else if (
-          typeof data === "string" ||
-          isBodyInit(data)
-        ) {
-          body = data as BodyInit;
-        } else {
-          body = JSON.stringify(data);
-        }
-      }
+      const headers = toHeaders(init.headers);
 
       const requestInit: RequestInit = {
-        ...fetchInit,
+        ...init,
         headers,
-        body,
       };
 
       const response = await fetch(

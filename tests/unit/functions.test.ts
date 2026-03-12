@@ -464,7 +464,7 @@ describe("Functions Module", () => {
 
     await base44.functions.fetch("/streaming_demo", {
       method: "POST",
-      data: { mode: "sse" },
+      body: JSON.stringify({ mode: "sse" }),
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -483,7 +483,7 @@ describe("Functions Module", () => {
 
     const response = await base44.functions.fetch("/streaming_demo/deep/path", {
       method: "POST",
-      data: { mode: "ndjson" },
+      body: JSON.stringify({ mode: "ndjson" }),
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -504,7 +504,7 @@ describe("Functions Module", () => {
 
     await authenticatedBase44.functions.fetch("streaming_demo", {
       method: "POST",
-      data: { mode: "text" },
+      body: JSON.stringify({ mode: "text" }),
     });
 
     const requestInit = fetchMock.mock.calls[0][1];

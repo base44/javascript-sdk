@@ -20,13 +20,9 @@ export type FunctionName = keyof FunctionNameRegistry extends never
 /**
  * Options for {@linkcode FunctionsModule.fetch}.
  *
- * Extends native `fetch` options with a `data` convenience property that
- * is JSON-stringified when `body` is not provided.
+ * Uses native `fetch` options directly.
  */
-export type FunctionsFetchInit = RequestInit & {
-  /** Convenience payload for JSON requests when `body` is omitted. */
-  data?: unknown;
-};
+export type FunctionsFetchInit = RequestInit;
 
 /**
  * Functions module for invoking custom backend functions.
@@ -89,11 +85,10 @@ export interface FunctionsModule {
    * Use this when you need streaming behavior (SSE, chunked text, NDJSON),
    * because `invoke()` buffers the full response.
    *
-   * Requests are sent to `/api/functions/<path>`, with automatic fallback to
-   * `/api/apps/<appId>/functions/<path>` on `404` for compatibility.
+   * Requests are sent to `/api/functions/<path>`.
    *
    * @param path - Function path, e.g. `/streaming_demo` or `/streaming_demo/deep/path`
-   * @param init - Native fetch options, plus optional `data` for JSON payloads.
+   * @param init - Native fetch options.
    * @returns Promise resolving to a native fetch `Response`
    */
   fetch(path: string, init?: FunctionsFetchInit): Promise<Response>;
