@@ -96,13 +96,9 @@ export function createFunctionsModule(
     async fetch(path: string, init: FunctionsFetchInit = {}) {
       const normalizedPath = path.startsWith("/") ? path : `/${path}`;
       const primaryPath = `/functions${normalizedPath}`;
-      const fallbackPath = `/apps/${appId}/functions${normalizedPath}`;
       const { data, ...fetchInit } = init;
 
       const headers = toHeaders(fetchInit.headers);
-      if (!headers.has("X-App-Id")) {
-        headers.set("X-App-Id", appId);
-      }
       let body: BodyInit | null | undefined = fetchInit.body;
 
       if (body === undefined && data !== undefined) {
@@ -115,9 +111,6 @@ export function createFunctionsModule(
           body = data as BodyInit;
         } else {
           body = JSON.stringify(data);
-          if (!headers.has("Content-Type")) {
-            headers.set("Content-Type", "application/json");
-          }
         }
       }
 
@@ -127,17 +120,10 @@ export function createFunctionsModule(
         body,
       };
 
-      let response = await fetch(
+      const response = await fetch(
         joinBaseUrl(axios.defaults.baseURL, primaryPath),
         requestInit
       );
-
-      if (response.status === 404) {
-        response = await fetch(
-          joinBaseUrl(axios.defaults.baseURL, fallbackPath),
-          requestInit
-        );
-      }
 
       return response;
     },

@@ -474,29 +474,23 @@ describe("Functions Module", () => {
     );
 
     const requestInit = fetchMock.mock.calls[0][1];
-    const headers = new Headers(requestInit.headers);
-    expect(headers.get("Content-Type")).toBe("application/json");
-    expect(headers.get("X-App-Id")).toBe(appId);
     expect(requestInit.body).toBe(JSON.stringify({ mode: "sse" }));
   });
 
-  test("should fallback to app-scoped functions endpoint on 404", async () => {
+  test("should not fallback to app-scoped functions endpoint on 404", async () => {
     fetchMock
-      .mockResolvedValueOnce(new Response("Not found", { status: 404 }))
-      .mockResolvedValueOnce(new Response("ok", { status: 200 }));
+      .mockResolvedValueOnce(new Response("Not found", { status: 404 }));
 
-    await base44.functions.fetch("/streaming_demo/deep/path", {
+    const response = await base44.functions.fetch("/streaming_demo/deep/path", {
       method: "POST",
       data: { mode: "ndjson" },
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toBe(
       `${serverUrl}/api/functions/streaming_demo/deep/path`
     );
-    expect(fetchMock.mock.calls[1][0]).toBe(
-      `${serverUrl}/api/apps/${appId}/functions/streaming_demo/deep/path`
-    );
+    expect(response.status).toBe(404);
   });
 
   test("should include Authorization header when using functions.fetch", async () => {
