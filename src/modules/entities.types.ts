@@ -395,15 +395,18 @@ export interface EntityHandler<T = any> {
    * Updates multiple records matching a query using a MongoDB update operator.
    *
    * Applies the same update operation to all records matching the query.
-   * The `data` parameter must contain exactly one MongoDB update operator
-   * (e.g., `$set`, `$inc`, `$push`).
+   * The `data` parameter must contain one or more MongoDB update operators
+   * (e.g., `$set`, `$inc`, `$push`). Multiple operators can be combined in a
+   * single call, but each field may only appear in one operator.
    *
-   * Results are batched — when `has_more` is `true` in the response, call
-   * `updateMany` again with the same query to update the next batch.
+   * Results are batched in groups of up to 500 — when `has_more` is `true`
+   * in the response, call `updateMany` again with the same query to update
+   * the next batch.
    *
    * @param query - Query object to filter which records to update. Records matching all
    * specified criteria will be updated.
-   * @param data - Update operation object containing exactly one MongoDB update operator.
+   * @param data - Update operation object containing one or more MongoDB update operators.
+   * Each field may only appear in one operator per call.
    * Supported operators: `$set`, `$rename`, `$unset`, `$inc`, `$mul`, `$min`, `$max`,
    * `$currentDate`, `$addToSet`, `$push`, `$pull`.
    * @returns Promise resolving to the update result.
@@ -420,10 +423,10 @@ export interface EntityHandler<T = any> {
    *
    * @example
    * ```typescript
-   * // Increment a counter on all matching records
+   * // Combine multiple operators in a single call
    * const result = await base44.entities.MyEntity.updateMany(
    *   { category: 'sales' },
-   *   { $inc: { view_count: 1 } }
+   *   { $set: { status: 'done' }, $inc: { view_count: 1 } }
    * );
    * ```
    *
@@ -451,7 +454,9 @@ export interface EntityHandler<T = any> {
    * `bulkUpdate` allows different updates for each record. Each item in the
    * array must include an `id` field identifying which record to update.
    *
-   * @param data - Array of update objects. Each object must have an `id` field
+   * **Note:** Maximum 500 items per request.
+   *
+   * @param data - Array of update objects (max 500). Each object must have an `id` field
    * and any number of fields to update.
    * @returns Promise resolving to an array of updated records.
    *
