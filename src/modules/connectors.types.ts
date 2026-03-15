@@ -74,6 +74,7 @@ export interface ConnectorConnectionResponse {
  * | Linear | `linear` |
  * | LinkedIn | `linkedin` |
  * | Microsoft Teams | `microsoft_teams` |
+ * | Microsoft OneDrive | `one_drive` |
  * | Notion | `notion` |
  * | Outlook | `outlook` |
  * | Salesforce | `salesforce` |
@@ -82,6 +83,7 @@ export interface ConnectorConnectionResponse {
  * | Slack Bot | `slackbot` |
  * | Splitwise | `splitwise` |
  * | TikTok | `tiktok` |
+ * | Typeform | `typeform` |
  * | Wix | `wix` |
  * | Wrike | `wrike` |
  *
