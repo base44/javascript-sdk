@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from "vitest";
 import nock from "nock";
 import { createClient } from "../../src/index.ts";
-import type { DeleteResult } from "../../src/modules/entities.types.ts";
+import type { DeleteResult, UpdateManyResult } from "../../src/modules/entities.types.ts";
 
 /**
  * Todo entity type for testing.
@@ -196,6 +196,99 @@ describe("Entities Module", () => {
 
     // Verify the response matches DeleteResult type
     expect(result.success).toBe(true);
+
+    // Verify all mocks were called
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test("updateMany() should send query and data to correct endpoint", async () => {
+    const mockResult: UpdateManyResult = {
+      success: true,
+      updated: 3,
+      has_more: false,
+    };
+
+    // Mock the API response
+    scope
+      .patch(`/api/apps/${appId}/entities/Todo/update-many`, {
+        query: { completed: false },
+        data: { $set: { completed: true } },
+      })
+      .reply(200, mockResult);
+
+    // Call the API
+    const result = await base44.entities.Todo.updateMany(
+      { completed: false },
+      { $set: { completed: true } }
+    );
+
+    // Verify the response
+    expect(result.success).toBe(true);
+    expect(result.updated).toBe(3);
+    expect(result.has_more).toBe(false);
+
+    // Verify all mocks were called
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test("updateMany() should handle has_more response", async () => {
+    const mockResult: UpdateManyResult = {
+      success: true,
+      updated: 500,
+      has_more: true,
+    };
+
+    // Mock the API response
+    scope
+      .patch(`/api/apps/${appId}/entities/Todo/update-many`, {
+        query: {},
+        data: { $inc: { view_count: 1 } },
+      })
+      .reply(200, mockResult);
+
+    // Call the API
+    const result = await base44.entities.Todo.updateMany(
+      {},
+      { $inc: { view_count: 1 } }
+    );
+
+    // Verify the response
+    expect(result.success).toBe(true);
+    expect(result.updated).toBe(500);
+    expect(result.has_more).toBe(true);
+
+    // Verify all mocks were called
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test("bulkUpdate() should send array of updates to correct endpoint", async () => {
+    const updatePayload = [
+      { id: "1", title: "Updated Task 1", completed: true },
+      { id: "2", title: "Updated Task 2" },
+    ];
+    const mockResponse: Todo[] = [
+      { id: "1", title: "Updated Task 1", completed: true },
+      { id: "2", title: "Updated Task 2", completed: false },
+    ];
+
+    // Mock the API response
+    scope
+      .put(
+        `/api/apps/${appId}/entities/Todo/bulk`,
+        updatePayload as nock.RequestBodyMatcher
+      )
+      .reply(200, mockResponse);
+
+    // Call the API
+    const result = await base44.entities.Todo.bulkUpdate(updatePayload);
+
+    // Verify the response
+    expect(result).toHaveLength(2);
+    expect(result[0].id).toBe("1");
+    expect(result[0].title).toBe("Updated Task 1");
+    expect(result[0].completed).toBe(true);
+    expect(result[1].id).toBe("2");
+    expect(result[1].title).toBe("Updated Task 2");
 
     // Verify all mocks were called
     expect(scope.isDone()).toBe(true);
