@@ -1,17 +1,24 @@
 import { AxiosInstance } from "axios";
 import { FunctionsFetchInit, FunctionsModule } from "./functions.types";
 
+export interface FunctionsModuleConfig {
+  getAuthHeaders?: () => Record<string, string>;
+  baseURL?: string;
+}
+
 /**
  * Creates the functions module for the Base44 SDK.
  *
  * @param axios - Axios instance
  * @param appId - Application ID
+ * @param config - Optional configuration for fetch functionality
  * @returns Functions module with methods to invoke custom backend functions
  * @internal
  */
 export function createFunctionsModule(
   axios: AxiosInstance,
-  appId: string
+  appId: string,
+  config?: FunctionsModuleConfig
 ): FunctionsModule {
   const joinBaseUrl = (base: string | undefined, path: string) => {
     if (!base) return path;
@@ -21,17 +28,15 @@ export function createFunctionsModule(
   const toHeaders = (inputHeaders?: HeadersInit): Headers => {
     const headers = new Headers();
 
-    const appendHeaders = (source?: Record<string, unknown>) => {
-      if (!source) return;
-      Object.entries(source).forEach(([key, value]) => {
+    // Get auth headers from the getter function if provided
+    if (config?.getAuthHeaders) {
+      const authHeaders = config.getAuthHeaders();
+      Object.entries(authHeaders).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
           headers.set(key, String(value));
         }
       });
-    };
-
-    // Append common headers from axios defaults
-    appendHeaders(axios.defaults.headers?.common as Record<string, unknown>);
+    }
 
     if (inputHeaders) {
       new Headers(inputHeaders).forEach((value, key) => {
@@ -96,7 +101,7 @@ export function createFunctionsModule(
       };
 
       const response = await fetch(
-        joinBaseUrl(axios.defaults.baseURL, primaryPath),
+        joinBaseUrl(config?.baseURL, primaryPath),
         requestInit
       );
 

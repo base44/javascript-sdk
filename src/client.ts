@@ -151,7 +151,21 @@ export function createClient(config: CreateClientConfig): Base44Client {
     }),
     integrations: createIntegrationsModule(axiosClient, appId),
     auth: userAuthModule,
-    functions: createFunctionsModule(functionsAxiosClient, appId),
+    functions: createFunctionsModule(functionsAxiosClient, appId, {
+      getAuthHeaders: () => {
+        const headers: Record<string, string> = {};
+        const commonHeaders = functionsAxiosClient.defaults?.headers?.common as Record<string, unknown>;
+        if (commonHeaders) {
+          Object.entries(commonHeaders).forEach(([key, value]) => {
+            if (typeof value === 'string') {
+              headers[key] = value;
+            }
+          });
+        }
+        return headers;
+      },
+      baseURL: functionsAxiosClient.defaults?.baseURL,
+    }),
     agents: createAgentsModule({
       axios: axiosClient,
       getSocket,
@@ -184,7 +198,21 @@ export function createClient(config: CreateClientConfig): Base44Client {
     integrations: createIntegrationsModule(serviceRoleAxiosClient, appId),
     sso: createSsoModule(serviceRoleAxiosClient, appId, token),
     connectors: createConnectorsModule(serviceRoleAxiosClient, appId),
-    functions: createFunctionsModule(serviceRoleFunctionsAxiosClient, appId),
+    functions: createFunctionsModule(serviceRoleFunctionsAxiosClient, appId, {
+      getAuthHeaders: () => {
+        const headers: Record<string, string> = {};
+        const commonHeaders = serviceRoleFunctionsAxiosClient.defaults?.headers?.common as Record<string, unknown>;
+        if (commonHeaders) {
+          Object.entries(commonHeaders).forEach(([key, value]) => {
+            if (typeof value === 'string') {
+              headers[key] = value;
+            }
+          });
+        }
+        return headers;
+      },
+      baseURL: serviceRoleFunctionsAxiosClient.defaults?.baseURL,
+    }),
     agents: createAgentsModule({
       axios: serviceRoleAxiosClient,
       getSocket,
