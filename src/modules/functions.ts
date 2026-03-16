@@ -1,10 +1,5 @@
 import { AxiosInstance } from "axios";
-import { FunctionsFetchInit, FunctionsModule } from "./functions.types";
-
-export interface FunctionsModuleConfig {
-  getAuthHeaders?: () => Record<string, string>;
-  baseURL?: string;
-}
+import { FunctionsFetchInit, FunctionsModule, FunctionsModuleConfig } from "./functions.types";
 
 /**
  * Creates the functions module for the Base44 SDK.

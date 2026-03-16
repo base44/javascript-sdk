@@ -492,4 +492,40 @@ describe("Functions Module", () => {
     const headers = new Headers(requestInit.headers);
     expect(headers.get("Authorization")).toBe(`Bearer ${userToken}`);
   });
+
+  test("should normalize path with and without leading slash", async () => {
+    // Test with leading slash
+    fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200 }));
+    await base44.functions.fetch("/my_function");
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${serverUrl}/api/functions/my_function`,
+      expect.any(Object)
+    );
+
+    // Test without leading slash
+    fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200 }));
+    await base44.functions.fetch("my_function");
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${serverUrl}/api/functions/my_function`,
+      expect.any(Object)
+    );
+  });
+
+  test("should include service role Authorization header when using asServiceRole.functions.fetch", async () => {
+    const serviceToken = "service-role-token";
+    const serviceRoleBase44 = createClient({
+      serverUrl,
+      appId,
+      serviceToken,
+    });
+    fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200 }));
+
+    await serviceRoleBase44.asServiceRole.functions.fetch("/service_function", {
+      method: "GET",
+    });
+
+    const requestInit = fetchMock.mock.calls[0][1];
+    const headers = new Headers(requestInit.headers);
+    expect(headers.get("Authorization")).toBe(`Bearer ${serviceToken}`);
+  });
 });

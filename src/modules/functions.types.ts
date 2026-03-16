@@ -25,6 +25,15 @@ export type FunctionName = keyof FunctionNameRegistry extends never
 export type FunctionsFetchInit = RequestInit;
 
 /**
+ * Configuration for the functions module.
+ * @internal
+ */
+export interface FunctionsModuleConfig {
+  getAuthHeaders?: () => Record<string, string>;
+  baseURL?: string;
+}
+
+/**
  * Functions module for invoking custom backend functions.
  *
  * This module allows you to invoke the custom backend functions defined in the app.
