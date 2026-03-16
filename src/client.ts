@@ -155,7 +155,18 @@ export function createClient(config: CreateClientConfig): Base44Client {
     integrations: createIntegrationsModule(axiosClient, appId),
     connectors: createUserConnectorsModule(axiosClient, appId),
     auth: userAuthModule,
-    functions: createFunctionsModule(functionsAxiosClient, appId),
+    functions: createFunctionsModule(functionsAxiosClient, appId, {
+      getAuthHeaders: () => {
+        const headers: Record<string, string> = {};
+        // Get current token from storage or initial config
+        const currentToken = token || getAccessToken();
+        if (currentToken) {
+          headers["Authorization"] = `Bearer ${currentToken}`;
+        }
+        return headers;
+      },
+      baseURL: functionsAxiosClient.defaults?.baseURL,
+    }),
     agents: createAgentsModule({
       axios: axiosClient,
       getSocket,
@@ -188,7 +199,17 @@ export function createClient(config: CreateClientConfig): Base44Client {
     integrations: createIntegrationsModule(serviceRoleAxiosClient, appId),
     sso: createSsoModule(serviceRoleAxiosClient, appId, token),
     connectors: createConnectorsModule(serviceRoleAxiosClient, appId),
-    functions: createFunctionsModule(serviceRoleFunctionsAxiosClient, appId),
+    functions: createFunctionsModule(serviceRoleFunctionsAxiosClient, appId, {
+      getAuthHeaders: () => {
+        const headers: Record<string, string> = {};
+        // Use service token for authorization
+        if (serviceToken) {
+          headers["Authorization"] = `Bearer ${serviceToken}`;
+        }
+        return headers;
+      },
+      baseURL: serviceRoleFunctionsAxiosClient.defaults?.baseURL,
+    }),
     agents: createAgentsModule({
       axios: serviceRoleAxiosClient,
       getSocket,
