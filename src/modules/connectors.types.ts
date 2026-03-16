@@ -259,14 +259,14 @@ export interface UserConnectorsModule {
    * @example
    * ```typescript
    * // Get the end user's access token for a connector
-   * const token = await base44.connectors.getAppUserAccessToken('abc123def');
+   * const token = await base44.connectors.getCurrentAppUserAccessToken('abc123def');
    *
    * const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
    *   headers: { 'Authorization': `Bearer ${token}` }
    * });
    * ```
    */
-  getAppUserAccessToken(connectorId: string): Promise<string>;
+  getCurrentAppUserAccessToken(connectorId: string): Promise<string>;
 
   /**
    * Initiates the app-user OAuth flow for a specific connector.

@@ -73,7 +73,7 @@ export function createUserConnectorsModule(
   appId: string
 ): UserConnectorsModule {
   return {
-    async getAppUserAccessToken(
+    async getCurrentAppUserAccessToken(
       connectorId: string
     ): Promise<string> {
       if (!connectorId || typeof connectorId !== "string") {
