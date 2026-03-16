@@ -2,5 +2,6 @@
   "DeleteManyResult",
   "DeleteResult",
   "ImportResult",
-  "SortField"
+  "SortField",
+  "UpdateManyResult"
 ]

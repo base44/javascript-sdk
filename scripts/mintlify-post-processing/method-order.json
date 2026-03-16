@@ -1,0 +1,16 @@
+{
+  "entities": [
+    "get",
+    "list",
+    "filter",
+    "create",
+    "bulkCreate",
+    "importEntities",
+    "update",
+    "updateMany",
+    "bulkUpdate",
+    "delete",
+    "deleteMany",
+    "subscribe"
+  ]
+}
