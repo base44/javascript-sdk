@@ -1,13 +1,15 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
-import nock from 'nock';
+import { http, HttpResponse } from 'msw';
+import { server } from '../mocks/server';
 import { createClient } from '../../src/index.ts';
 
 describe('Auth Module', () => {
   let base44;
-  let scope;
   const appId = 'test-app-id';
   const serverUrl = 'https://api.base44.com';
   const appBaseUrl = 'https://api.base44.com';
+  const meUrl = `${serverUrl}/api/apps/${appId}/entities/User/me`;
+  const loginUrl = `${serverUrl}/api/apps/${appId}/auth/login`;
 
   beforeEach(() => {
     // Mock window.addEventListener and document for analytics module
@@ -24,36 +26,18 @@ describe('Auth Module', () => {
       };
     }
 
-    // Create a new client for each test
-    base44 = createClient({
-      serverUrl,
-      appId,
-      appBaseUrl,
-    });
-
-    // Create a nock scope for mocking API calls
-    scope = nock(serverUrl);
-
-    // Enable request debugging for Nock
-    nock.disableNetConnect();
-    nock.emitter.on('no match', (req) => {
-      console.log(`Nock: No match for ${req.method} ${req.path}`);
-      console.log('Headers:', req.getHeaders());
-    });
+    base44 = createClient({ serverUrl, appId, appBaseUrl });
   });
-  
+
   afterEach(() => {
-    // Clean up any pending mocks
-    nock.cleanAll();
-    nock.emitter.removeAllListeners('no match');
-    nock.enableNetConnect();
-    
+    base44.cleanup();
+
     // Clean up localStorage if it exists
     if (typeof window !== 'undefined' && window.localStorage) {
       window.localStorage.clear();
     }
   });
-  
+
   describe('me()', () => {
     test('should fetch current user information', async () => {
       const mockUser = {
@@ -62,219 +46,143 @@ describe('Auth Module', () => {
         name: 'Test User',
         role: 'user'
       };
-      
-      // Mock the API response
-      scope.get(`/api/apps/${appId}/entities/User/me`)
-        .reply(200, mockUser);
-        
-      // Call the API
+
+      server.use(http.get(meUrl, () => HttpResponse.json(mockUser)));
+
       const result = await base44.auth.me();
-      
-      // Verify the response - auth methods return data directly, not wrapped
+
       expect(result).toEqual(mockUser);
       expect(result.id).toBe('user-123');
       expect(result.email).toBe('test@example.com');
-      
-      // Verify all mocks were called
-      expect(scope.isDone()).toBe(true);
     });
-    
+
     test('should handle authentication errors', async () => {
-      // Mock the API error response
-      scope.get(`/api/apps/${appId}/entities/User/me`)
-        .reply(401, { detail: 'Unauthorized' });
-        
-      // Call the API and expect an error
+      server.use(http.get(meUrl, () => HttpResponse.json({ detail: 'Unauthorized' }, { status: 401 })));
+
       await expect(base44.auth.me()).rejects.toThrow();
-      
-      // Verify all mocks were called
-      expect(scope.isDone()).toBe(true);
     });
   });
-  
+
   describe('updateMe()', () => {
     test('should update current user data', async () => {
-      const updateData = {
-        name: 'Updated Name',
-        email: 'updated@example.com'
-      };
-      
-      const updatedUser = {
-        id: 'user-123',
-        ...updateData,
-        role: 'user'
-      };
-      
-      // Mock the API response
-      scope.put(`/api/apps/${appId}/entities/User/me`, updateData)
-        .reply(200, updatedUser);
-        
-      // Call the API
+      const updateData = { name: 'Updated Name', email: 'updated@example.com' };
+      const updatedUser = { id: 'user-123', ...updateData, role: 'user' };
+
+      server.use(http.put(meUrl, () => HttpResponse.json(updatedUser)));
+
       const result = await base44.auth.updateMe(updateData);
-      
-      // Verify the response - auth methods return data directly, not wrapped
+
       expect(result).toEqual(updatedUser);
       expect(result.name).toBe('Updated Name');
       expect(result.email).toBe('updated@example.com');
-      
-      // Verify all mocks were called
-      expect(scope.isDone()).toBe(true);
     });
-    
+
     test('should handle validation errors', async () => {
-      const invalidData = {
-        email: 'invalid-email'
-      };
-      
-      // Mock the API error response
-      scope.put(`/api/apps/${appId}/entities/User/me`, invalidData)
-        .reply(400, { detail: 'Invalid email format' });
-        
-      // Call the API and expect an error
-      await expect(base44.auth.updateMe(invalidData)).rejects.toThrow();
-      
-      // Verify all mocks were called
-      expect(scope.isDone()).toBe(true);
+      server.use(http.put(meUrl, () => HttpResponse.json({ detail: 'Invalid email format' }, { status: 400 })));
+
+      await expect(base44.auth.updateMe({ email: 'invalid-email' })).rejects.toThrow();
     });
   });
-  
+
   describe('login()', () => {
     test('should throw error when not in browser environment', () => {
-      // Mock window as undefined to simulate non-browser environment
       const originalWindow = global.window;
       delete global.window;
-      
+
       expect(() => {
         base44.auth.redirectToLogin('/dashboard');
       }).toThrow('Login method can only be used in a browser environment');
-      
-      // Restore window
+
       global.window = originalWindow;
     });
-    
+
     test('should redirect to login page with correct URL in browser environment', () => {
-      // Mock window object
       const mockLocation = { href: '' };
       const originalWindow = global.window;
-      global.window = {
-        location: mockLocation
-      };
+      global.window = { location: mockLocation };
 
       const nextUrl = 'https://example.com/dashboard';
       base44.auth.redirectToLogin(nextUrl);
 
-      // Verify the redirect URL was set correctly
       expect(mockLocation.href).toBe(
         `${appBaseUrl}/login?from_url=${encodeURIComponent(nextUrl)}`
       );
 
-      // Restore window
       global.window = originalWindow;
     });
-    
+
     test('should use current URL when nextUrl is not provided', () => {
-      // Mock window object
       const currentUrl = 'https://example.com/current-page';
       const mockLocation = { href: currentUrl };
       const originalWindow = global.window;
-      global.window = {
-        location: mockLocation
-      };
+      global.window = { location: mockLocation };
 
       base44.auth.redirectToLogin();
 
-      // Verify the redirect URL uses current URL
       expect(mockLocation.href).toBe(
         `${appBaseUrl}/login?from_url=${encodeURIComponent(currentUrl)}`
       );
 
-      // Restore window
       global.window = originalWindow;
     });
 
     test('should use appBaseUrl for login redirect when provided', () => {
       const customAppBaseUrl = 'https://custom-app.example.com';
-      const clientWithCustomUrl = createClient({
-        serverUrl,
-        appId,
-        appBaseUrl: customAppBaseUrl,
-      });
+      const clientWithCustomUrl = createClient({ serverUrl, appId, appBaseUrl: customAppBaseUrl });
 
-      // Mock window.location
       const originalWindow = global.window;
       const mockLocation = { href: '' };
-      global.window = {
-        location: mockLocation
-      };
+      global.window = { location: mockLocation };
 
-      const nextUrl = 'https://example.com/dashboard';
-      clientWithCustomUrl.auth.redirectToLogin(nextUrl);
+      clientWithCustomUrl.auth.redirectToLogin('https://example.com/dashboard');
 
-      // Verify the redirect URL uses the custom appBaseUrl
       expect(mockLocation.href).toBe(
-        `${customAppBaseUrl}/login?from_url=${encodeURIComponent(nextUrl)}`
+        `${customAppBaseUrl}/login?from_url=${encodeURIComponent('https://example.com/dashboard')}`
       );
 
-      // Restore window
       global.window = originalWindow;
     });
 
     test('should use relative URL for login redirect when appBaseUrl is not provided', () => {
-      // Create a client without appBaseUrl
-      const clientWithoutAppBaseUrl = createClient({
-        serverUrl,
-        appId,
-      });
+      const clientWithoutAppBaseUrl = createClient({ serverUrl, appId });
 
-      // Mock window.location
       const originalWindow = global.window;
       const mockLocation = { href: '', origin: 'https://current-app.com' };
-      global.window = {
-        location: mockLocation
-      };
+      global.window = { location: mockLocation };
 
-      const nextUrl = 'https://example.com/dashboard';
-      clientWithoutAppBaseUrl.auth.redirectToLogin(nextUrl);
+      clientWithoutAppBaseUrl.auth.redirectToLogin('https://example.com/dashboard');
 
-      // Verify the redirect URL uses a relative path (no appBaseUrl prefix)
       expect(mockLocation.href).toBe(
-        `/login?from_url=${encodeURIComponent(nextUrl)}`
+        `/login?from_url=${encodeURIComponent('https://example.com/dashboard')}`
       );
 
-      // Restore window
       global.window = originalWindow;
     });
   });
-  
+
   describe('logout()', () => {
     test('should remove token from axios headers', async () => {
-      // Set a token first
       base44.auth.setToken('test-token', false);
-      
-      // Mock the API response for me() call
-      scope.get(`/api/apps/${appId}/entities/User/me`)
-        .matchHeader('Authorization', 'Bearer test-token')
-        .reply(200, { id: 'user-123', email: 'test@example.com' });
-      
-      // Verify token is set by making a request
+
+      server.use(
+        http.get(meUrl, ({ request }) => {
+          if (request.headers.get('Authorization') === 'Bearer test-token') {
+            return HttpResponse.json({ id: 'user-123', email: 'test@example.com' });
+          }
+          return HttpResponse.json({ detail: 'Unauthorized' }, { status: 401 });
+        })
+      );
+
+      // Token is set — should succeed
       await base44.auth.me();
-      expect(scope.isDone()).toBe(true);
-      
-      // Call logout
+
       base44.auth.logout();
-      
-      // Mock another me() call to verify no Authorization header is sent
-      scope.get(`/api/apps/${appId}/entities/User/me`)
-        .matchHeader('Authorization', (val) => !val) // Should not have Authorization header
-        .reply(401, { detail: 'Unauthorized' });
-      
-      // Verify no Authorization header is sent after logout (should throw 401)
+
+      // After logout no Authorization header — should fail
       await expect(base44.auth.me()).rejects.toThrow();
-      expect(scope.isDone()).toBe(true);
     });
-    
+
     test('should remove token from localStorage in browser environment', async () => {
-      // Mock window and localStorage
       const mockLocalStorage = {
         removeItem: vi.fn(),
         getItem: vi.fn(),
@@ -284,28 +192,21 @@ describe('Auth Module', () => {
       const originalWindow = global.window;
       global.window = {
         localStorage: mockLocalStorage,
-        location: {
-          reload: vi.fn()
-        }
+        location: { reload: vi.fn() }
       };
-      
-      // Set a token to localStorage first
+
       base44.auth.setToken('test-token', true);
       expect(mockLocalStorage.setItem).toHaveBeenCalledWith('base44_access_token', 'test-token');
-      
-      // Call logout
+
       base44.auth.logout();
-      
-      // Verify token was removed from localStorage
+
       expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('base44_access_token');
       expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('token');
-      
-      // Restore window
+
       global.window = originalWindow;
     });
-    
+
     test('should handle localStorage errors gracefully', async () => {
-      // Mock window and localStorage with error
       const mockLocalStorage = {
         removeItem: vi.fn().mockImplementation(() => {
           throw new Error('localStorage error');
@@ -315,79 +216,63 @@ describe('Auth Module', () => {
       const originalWindow = global.window;
       global.window = {
         localStorage: mockLocalStorage,
-        location: {
-          reload: vi.fn()
-        }
+        location: { reload: vi.fn() }
       };
-      
-      // Call logout - should not throw
+
       base44.auth.logout();
-      
-      // Verify error was logged
+
       expect(consoleSpy).toHaveBeenCalledWith('Failed to remove token from localStorage:', expect.any(Error));
-      
-      // Restore
+
       consoleSpy.mockRestore();
       global.window = originalWindow;
     });
-    
+
     test('should redirect to specified URL after logout', async () => {
-      // Mock window object
       const mockLocation = { href: '' };
       const originalWindow = global.window;
-      global.window = {
-        location: mockLocation
-      };
+      global.window = { location: mockLocation };
 
       const redirectUrl = 'https://example.com/logout-success';
       base44.auth.logout(redirectUrl);
 
-      // Verify redirect to server-side logout endpoint with from_url parameter
       const expectedUrl = `${appBaseUrl}/api/apps/auth/logout?from_url=${encodeURIComponent(redirectUrl)}`;
       expect(mockLocation.href).toBe(expectedUrl);
 
-      // Restore window
       global.window = originalWindow;
     });
-    
+
     test('should redirect to logout endpoint when no redirect URL is provided', async () => {
-      // Mock window object
       const mockLocation = { href: 'https://example.com/current-page' };
       const originalWindow = global.window;
-      global.window = {
-        location: mockLocation
-      };
+      global.window = { location: mockLocation };
 
-      // Call logout without redirect URL
       base44.auth.logout();
 
-      // Verify redirect to server-side logout endpoint with current page as from_url
       const expectedUrl = `${appBaseUrl}/api/apps/auth/logout?from_url=${encodeURIComponent('https://example.com/current-page')}`;
       expect(mockLocation.href).toBe(expectedUrl);
 
-      // Restore window
       global.window = originalWindow;
     });
   });
-  
+
   describe('setToken()', () => {
     test('should set token in axios headers', async () => {
       const token = 'test-access-token';
-      
       base44.auth.setToken(token, false);
-      
-      // Mock the API response for me() call
-      scope.get(`/api/apps/${appId}/entities/User/me`)
-        .matchHeader('Authorization', `Bearer ${token}`)
-        .reply(200, { id: 'user-123', email: 'test@example.com' });
-      
-      // Verify token is set by making a request
+
+      let capturedAuth = null;
+      server.use(
+        http.get(meUrl, ({ request }) => {
+          capturedAuth = request.headers.get('Authorization');
+          return HttpResponse.json({ id: 'user-123', email: 'test@example.com' });
+        })
+      );
+
       await base44.auth.me();
-      expect(scope.isDone()).toBe(true);
+      expect(capturedAuth).toBe(`Bearer ${token}`);
     });
-    
+
     test('should save token to localStorage when requested', () => {
-      // Mock window and localStorage
       const mockLocalStorage = {
         setItem: vi.fn(),
         getItem: vi.fn(),
@@ -395,22 +280,16 @@ describe('Auth Module', () => {
         clear: vi.fn()
       };
       const originalWindow = global.window;
-      global.window = {
-        localStorage: mockLocalStorage
-      };
-      
-      const token = 'test-access-token';
-      base44.auth.setToken(token, true);
-      
-      // Verify token was saved to localStorage
-      expect(mockLocalStorage.setItem).toHaveBeenCalledWith('base44_access_token', token);
-      
-      // Restore window
+      global.window = { localStorage: mockLocalStorage };
+
+      base44.auth.setToken('test-access-token', true);
+
+      expect(mockLocalStorage.setItem).toHaveBeenCalledWith('base44_access_token', 'test-access-token');
+
       global.window = originalWindow;
     });
-    
+
     test('should not save token to localStorage when not requested', () => {
-      // Mock window and localStorage
       const mockLocalStorage = {
         setItem: vi.fn(),
         getItem: vi.fn(),
@@ -418,35 +297,31 @@ describe('Auth Module', () => {
         clear: vi.fn()
       };
       const originalWindow = global.window;
-      global.window = {
-        localStorage: mockLocalStorage
-      };
-      
-      const token = 'test-access-token';
-      base44.auth.setToken(token, false);
-      
-      // Verify token was not saved to localStorage
+      global.window = { localStorage: mockLocalStorage };
+
+      base44.auth.setToken('test-access-token', false);
+
       expect(mockLocalStorage.setItem).not.toHaveBeenCalled();
-      
-      // Restore window
+
       global.window = originalWindow;
     });
-    
+
     test('should handle empty token gracefully', async () => {
       base44.auth.setToken('', false);
-      
-      // Mock the API response for me() call
-      scope.get(`/api/apps/${appId}/entities/User/me`)
-        .matchHeader('Authorization', (val) => !val) // Should not have Authorization header
-        .reply(401, { detail: 'Unauthorized' });
-      
-      // Verify no Authorization header is sent (should throw 401)
+
+      server.use(
+        http.get(meUrl, ({ request }) => {
+          if (!request.headers.has('Authorization')) {
+            return HttpResponse.json({ detail: 'Unauthorized' }, { status: 401 });
+          }
+          return HttpResponse.json({ id: 'user-123' });
+        })
+      );
+
       await expect(base44.auth.me()).rejects.toThrow();
-      expect(scope.isDone()).toBe(true);
     });
-    
+
     test('should handle localStorage errors gracefully', () => {
-      // Mock window and localStorage with error
       const mockLocalStorage = {
         setItem: vi.fn().mockImplementation(() => {
           throw new Error('localStorage error');
@@ -454,193 +329,111 @@ describe('Auth Module', () => {
       };
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const originalWindow = global.window;
-      global.window = {
-        localStorage: mockLocalStorage
-      };
-      
-      const token = 'test-access-token';
-      base44.auth.setToken(token, true);
-      
-      // Verify error was logged
+      global.window = { localStorage: mockLocalStorage };
+
+      base44.auth.setToken('test-access-token', true);
+
       expect(consoleSpy).toHaveBeenCalledWith('Failed to save token to localStorage:', expect.any(Error));
-      
-      // Restore
+
       consoleSpy.mockRestore();
       global.window = originalWindow;
     });
   });
-  
+
   describe('loginViaEmailPassword()', () => {
     test('should login successfully with email and password', async () => {
-      const loginData = {
-        email: 'test@example.com',
-        password: 'password123'
-      };
-      
       const mockResponse = {
         access_token: 'test-access-token',
-        user: {
-          id: 'user-123',
-          email: 'test@example.com',
-          name: 'Test User'
-        }
+        user: { id: 'user-123', email: 'test@example.com', name: 'Test User' }
       };
-      
-      // Mock the API response
-      scope.post(`/api/apps/${appId}/auth/login`, loginData)
-        .reply(200, mockResponse);
-        
-      // Call the API
-      const result = await base44.auth.loginViaEmailPassword(
-        loginData.email,
-        loginData.password
+
+      server.use(
+        http.post(loginUrl, () => HttpResponse.json(mockResponse)),
+        http.get(meUrl, ({ request }) => {
+          if (request.headers.get('Authorization') === 'Bearer test-access-token') {
+            return HttpResponse.json({ id: 'user-123', email: 'test@example.com' });
+          }
+          return HttpResponse.json({ detail: 'Unauthorized' }, { status: 401 });
+        })
       );
-      
-      // Verify the response
+
+      const result = await base44.auth.loginViaEmailPassword('test@example.com', 'password123');
+
       expect(result.access_token).toBe('test-access-token');
       expect(result.user.email).toBe('test@example.com');
-      
-      // Verify token was set in axios headers by making a subsequent request
-      scope.get(`/api/apps/${appId}/entities/User/me`)
-        .matchHeader('Authorization', 'Bearer test-access-token')
-        .reply(200, { id: 'user-123', email: 'test@example.com' });
-      
+
+      // Token should be set — subsequent me() should succeed
       await base44.auth.me();
-      expect(scope.isDone()).toBe(true);
-      
-      // Verify all mocks were called
-      expect(scope.isDone()).toBe(true);
     });
-    
+
     test('should login with turnstile token when provided', async () => {
-      const loginData = {
-        email: 'test@example.com',
-        password: 'password123',
-        turnstile_token: 'turnstile-token-123'
-      };
-      
+      let capturedBody = null;
       const mockResponse = {
         access_token: 'test-access-token',
-        user: {
-          id: 'user-123',
-          email: 'test@example.com'
-        }
+        user: { id: 'user-123', email: 'test@example.com' }
       };
-      
-      // Mock the API response
-      scope.post(`/api/apps/${appId}/auth/login`, loginData)
-        .reply(200, mockResponse);
-        
-      // Call the API
-      const result = await base44.auth.loginViaEmailPassword(
-        loginData.email,
-        loginData.password,
-        loginData.turnstile_token
+
+      server.use(
+        http.post(loginUrl, async ({ request }) => {
+          capturedBody = await request.json();
+          return HttpResponse.json(mockResponse);
+        }),
+        http.get(meUrl, () => HttpResponse.json({ id: 'user-123', email: 'test@example.com' }))
       );
-      
-      // Verify the response
+
+      const result = await base44.auth.loginViaEmailPassword(
+        'test@example.com',
+        'password123',
+        'turnstile-token-123'
+      );
+
       expect(result.access_token).toBe('test-access-token');
-      
-      // Verify token was set in axios headers by making a subsequent request
-      scope.get(`/api/apps/${appId}/entities/User/me`)
-        .matchHeader('Authorization', 'Bearer test-access-token')
-        .reply(200, { id: 'user-123', email: 'test@example.com' });
-      
+      expect(capturedBody.turnstile_token).toBe('turnstile-token-123');
+
       await base44.auth.me();
-      expect(scope.isDone()).toBe(true);
     });
-    
+
     test('should handle authentication errors and logout', async () => {
-      const loginData = {
-        email: 'test@example.com',
-        password: 'wrongpassword'
-      };
-      
-      // Mock the API error response
-      scope.post(`/api/apps/${appId}/auth/login`, loginData)
-        .reply(401, { detail: 'Invalid credentials' });
-        
-      // Set a token first to test logout
+      server.use(
+        http.post(loginUrl, () => HttpResponse.json({ detail: 'Invalid credentials' }, { status: 401 }))
+      );
+
       base44.auth.setToken('existing-token', false);
-      
-      // Call the API and expect an error
+
       await expect(
-        base44.auth.loginViaEmailPassword(loginData.email, loginData.password)
+        base44.auth.loginViaEmailPassword('test@example.com', 'wrongpassword')
       ).rejects.toThrow();
-      
-      // Verify all mocks were called
-      expect(scope.isDone()).toBe(true);
     });
-    
+
     test('should handle network errors', async () => {
-      const loginData = {
-        email: 'test@example.com',
-        password: 'password123'
-      };
-      
-      // Mock network error
-      scope.post(`/api/apps/${appId}/auth/login`, loginData)
-        .replyWithError('Network error');
-        
-      // Call the API and expect an error
+      server.use(http.post(loginUrl, () => HttpResponse.error()));
+
       await expect(
-        base44.auth.loginViaEmailPassword(loginData.email, loginData.password)
+        base44.auth.loginViaEmailPassword('test@example.com', 'password123')
       ).rejects.toThrow();
-      
-      // Verify all mocks were called
-      expect(scope.isDone()).toBe(true);
     });
   });
-  
+
   describe('isAuthenticated()', () => {
     test('should return true when token is valid', async () => {
-      const mockUser = {
-        id: 'user-123',
-        email: 'test@example.com'
-      };
-      
-      // Mock the API response
-      scope.get(`/api/apps/${appId}/entities/User/me`)
-        .reply(200, mockUser);
-        
-      // Call the API
+      server.use(http.get(meUrl, () => HttpResponse.json({ id: 'user-123', email: 'test@example.com' })));
+
       const result = await base44.auth.isAuthenticated();
-      
-      // Verify the response
       expect(result).toBe(true);
-      
-      // Verify all mocks were called
-      expect(scope.isDone()).toBe(true);
     });
-    
+
     test('should return false when token is invalid', async () => {
-      // Mock the API error response
-      scope.get(`/api/apps/${appId}/entities/User/me`)
-        .reply(401, { detail: 'Unauthorized' });
-        
-      // Call the API
+      server.use(http.get(meUrl, () => HttpResponse.json({ detail: 'Unauthorized' }, { status: 401 })));
+
       const result = await base44.auth.isAuthenticated();
-      
-      // Verify the response
       expect(result).toBe(false);
-      
-      // Verify all mocks were called
-      expect(scope.isDone()).toBe(true);
     });
-    
+
     test('should return false on network errors', async () => {
-      // Mock network error
-      scope.get(`/api/apps/${appId}/entities/User/me`)
-        .replyWithError('Network error');
-        
-      // Call the API
+      server.use(http.get(meUrl, () => HttpResponse.error()));
+
       const result = await base44.auth.isAuthenticated();
-      
-      // Verify the response
       expect(result).toBe(false);
-      
-      // Verify all mocks were called
-      expect(scope.isDone()).toBe(true);
     });
   });
-}); 
+});

@@ -1,28 +1,28 @@
 import { createClient, createClientFromRequest } from '../../src/index.ts';
-import { describe, test, expect, beforeEach, afterEach } from 'vitest';
-import nock from 'nock';
+import { describe, test, expect, afterEach } from 'vitest';
+import { http, HttpResponse } from 'msw';
+import { server } from '../mocks/server';
 
 describe('Client Creation', () => {
   test('should create a client with default options', () => {
-    const client = createClient({
-      appId: 'test-app-id',
-    });
-    
+    const client = createClient({ appId: 'test-app-id' });
+
     expect(client).toBeDefined();
     expect(client.entities).toBeDefined();
     expect(client.integrations).toBeDefined();
     expect(client.auth).toBeDefined();
     expect(client.analytics).toBeDefined();
-    
+
     const config = client.getConfig();
     expect(config.appId).toBe('test-app-id');
     expect(config.serverUrl).toBe('https://base44.app');
     expect(config.requiresAuth).toBe(false);
-    
-    // Should throw error when accessing asServiceRole without service token
+
     expect(() => client.asServiceRole).toThrow('Service token is required to use asServiceRole. Please provide a serviceToken when creating the client.');
+
+    client.cleanup();
   });
-  
+
   test('should create a client with custom options', () => {
     const client = createClient({
       appId: 'test-app-id',
@@ -30,21 +30,20 @@ describe('Client Creation', () => {
       requiresAuth: true,
       token: 'test-token',
     });
-    
+
     expect(client).toBeDefined();
-    
+
     const config = client.getConfig();
     expect(config.appId).toBe('test-app-id');
     expect(config.serverUrl).toBe('https://custom-server.com');
     expect(config.requiresAuth).toBe(true);
+
+    client.cleanup();
   });
 
   test('should create a client with service token', () => {
-    const client = createClient({
-      appId: 'test-app-id',
-      serviceToken: 'service-token-123',
-    });
-    
+    const client = createClient({ appId: 'test-app-id', serviceToken: 'service-token-123' });
+
     expect(client).toBeDefined();
     expect(client.entities).toBeDefined();
     expect(client.integrations).toBeDefined();
@@ -53,8 +52,9 @@ describe('Client Creation', () => {
     expect(client.asServiceRole.entities).toBeDefined();
     expect(client.asServiceRole.integrations).toBeDefined();
     expect(client.asServiceRole.functions).toBeDefined();
-    // Service role should not have auth module
     expect(client.asServiceRole.auth).toBeUndefined();
+
+    client.cleanup();
   });
 
   test('should create a client with both user token and service token', () => {
@@ -74,60 +74,45 @@ describe('Client Creation', () => {
     expect(client.asServiceRole.integrations).toBeDefined();
     expect(client.asServiceRole.functions).toBeDefined();
     expect(client.asServiceRole.auth).toBeUndefined();
-  });
 
+    client.cleanup();
+  });
 });
 
 describe('appBaseUrl Normalization', () => {
   test('should use appBaseUrl when provided as a string', () => {
     const customAppBaseUrl = 'https://custom-app.example.com';
-    const client = createClient({
-      appId: 'test-app-id',
-      appBaseUrl: customAppBaseUrl,
-    });
+    const client = createClient({ appId: 'test-app-id', appBaseUrl: customAppBaseUrl });
 
-    // Mock window.location
     const originalWindow = global.window;
     const mockLocation = { href: '', origin: 'https://current-app.com' };
-    global.window = {
-      location: mockLocation
-    };
+    global.window = { location: mockLocation };
 
-    const nextUrl = 'https://example.com/dashboard';
-    client.auth.redirectToLogin(nextUrl);
+    client.auth.redirectToLogin('https://example.com/dashboard');
 
-    // Verify the redirect URL uses the custom appBaseUrl
     expect(mockLocation.href).toBe(
-      `${customAppBaseUrl}/login?from_url=${encodeURIComponent(nextUrl)}`
+      `${customAppBaseUrl}/login?from_url=${encodeURIComponent('https://example.com/dashboard')}`
     );
 
-    // Restore window
     global.window = originalWindow;
+    client.cleanup();
   });
 
   test('should normalize appBaseUrl to empty string when not provided', () => {
-    const client = createClient({
-      appId: 'test-app-id',
-      // appBaseUrl not provided
-    });
+    const client = createClient({ appId: 'test-app-id' });
 
-    // Mock window.location
     const originalWindow = global.window;
     const mockLocation = { href: '', origin: 'https://current-app.com' };
-    global.window = {
-      location: mockLocation
-    };
+    global.window = { location: mockLocation };
 
-    const nextUrl = 'https://example.com/dashboard';
-    client.auth.redirectToLogin(nextUrl);
+    client.auth.redirectToLogin('https://example.com/dashboard');
 
-    // Verify the redirect URL uses empty string (relative path)
     expect(mockLocation.href).toBe(
-      `/login?from_url=${encodeURIComponent(nextUrl)}`
+      `/login?from_url=${encodeURIComponent('https://example.com/dashboard')}`
     );
 
-    // Restore window
     global.window = originalWindow;
+    client.cleanup();
   });
 });
 
@@ -148,57 +133,57 @@ describe('createClientFromRequest', () => {
     };
 
     const client = createClientFromRequest(mockRequest);
-    
+
     expect(client).toBeDefined();
     expect(client.entities).toBeDefined();
     expect(client.integrations).toBeDefined();
     expect(client.auth).toBeDefined();
     expect(client.asServiceRole).toBeDefined();
-    
+
     const config = client.getConfig();
     expect(config.appId).toBe('test-app-id');
     expect(config.serverUrl).toBe('https://custom-server.com');
+
+    client.cleanup();
   });
 
   test('should create client from request with minimal headers', () => {
     const mockRequest = {
       headers: {
         get: (name) => {
-          const headers = {
-            'Base44-App-Id': 'minimal-app-id'
-          };
+          const headers = { 'Base44-App-Id': 'minimal-app-id' };
           return headers[name] || null;
         }
       }
     };
 
     const client = createClientFromRequest(mockRequest);
-    
+
     expect(client).toBeDefined();
     const config = client.getConfig();
     expect(config.appId).toBe('minimal-app-id');
-    expect(config.serverUrl).toBe('https://base44.app'); // Default value
+    expect(config.serverUrl).toBe('https://base44.app');
+
+    client.cleanup();
   });
 
   test('should create client with only user token', () => {
     const mockRequest = {
       headers: {
         get: (name) => {
-          const headers = {
-            'Authorization': 'Bearer user-only-token',
-            'Base44-App-Id': 'user-app-id'
-          };
+          const headers = { 'Authorization': 'Bearer user-only-token', 'Base44-App-Id': 'user-app-id' };
           return headers[name] || null;
         }
       }
     };
 
     const client = createClientFromRequest(mockRequest);
-    
+
     expect(client).toBeDefined();
     expect(client.auth).toBeDefined();
-    // Should throw error when accessing asServiceRole without service token
     expect(() => client.asServiceRole).toThrow('Service token is required to use asServiceRole. Please provide a serviceToken when creating the client.');
+
+    client.cleanup();
   });
 
   test('should create client with only service token', () => {
@@ -215,19 +200,19 @@ describe('createClientFromRequest', () => {
     };
 
     const client = createClientFromRequest(mockRequest);
-    
+
     expect(client).toBeDefined();
     expect(client.auth).toBeDefined();
     expect(client.asServiceRole).toBeDefined();
+
+    client.cleanup();
   });
 
   test('should throw error when Base44-App-Id header is missing', () => {
     const mockRequest = {
       headers: {
         get: (name) => {
-          const headers = {
-            'Authorization': 'Bearer some-token'
-          };
+          const headers = { 'Authorization': 'Bearer some-token' };
           return headers[name] || null;
         }
       }
@@ -252,7 +237,6 @@ describe('createClientFromRequest', () => {
       }
     };
 
-    // Should throw error for malformed headers instead of continuing silently
     expect(() => createClientFromRequest(mockRequest)).toThrow('Invalid authorization header format. Expected "Bearer <token>"');
   });
 
@@ -270,7 +254,6 @@ describe('createClientFromRequest', () => {
       }
     };
 
-    // Should throw error for empty headers instead of continuing silently
     expect(() => createClientFromRequest(mockRequest)).toThrow('Invalid authorization header format. Expected "Bearer <token>"');
   });
 
@@ -278,199 +261,160 @@ describe('createClientFromRequest', () => {
     const mockRequest = {
       headers: {
         get: (name) => {
-          const headers = {
-            'Base44-App-Id': 'test-app-id',
-            'Base44-State': '192.168.1.100'
-          };
+          const headers = { 'Base44-App-Id': 'test-app-id', 'Base44-State': '192.168.1.100' };
           return headers[name] || null;
         }
       }
     };
 
     const client = createClientFromRequest(mockRequest);
-    
+
     expect(client).toBeDefined();
     const config = client.getConfig();
     expect(config.appId).toBe('test-app-id');
+
+    client.cleanup();
   });
 
   test('should work without Base44-State header', () => {
     const mockRequest = {
       headers: {
         get: (name) => {
-          const headers = {
-            'Base44-App-Id': 'test-app-id'
-          };
+          const headers = { 'Base44-App-Id': 'test-app-id' };
           return headers[name] || null;
         }
       }
     };
 
     const client = createClientFromRequest(mockRequest);
-    
+
     expect(client).toBeDefined();
     const config = client.getConfig();
     expect(config.appId).toBe('test-app-id');
+
+    client.cleanup();
   });
 });
 
 
 describe('Service Role Authorization Headers', () => {
-  
-  let scope;
   const appId = 'test-app-id';
   const serverUrl = 'https://api.base44.com';
-  
-  beforeEach(() => {
-    // Create a nock scope for mocking API calls
-    scope = nock(serverUrl);
-    
-    // Enable request debugging for Nock
-    nock.disableNetConnect();
-    nock.emitter.on('no match', (req) => {
-      console.log(`Nock: No match for ${req.method} ${req.path}`);
-      console.log('Headers:', req.getHeaders());
-    });
-  });
-  
-  afterEach(() => {
-    // Clean up any pending mocks
-    nock.cleanAll();
-    nock.emitter.removeAllListeners('no match');
-    nock.enableNetConnect();
-  });
+  const entitiesBase = `${serverUrl}/api/apps/${appId}/entities`;
+  const intBase = `${serverUrl}/api/apps/${appId}/integration-endpoints`;
+  const functionsBase = `${serverUrl}/api/apps/${appId}/functions`;
 
   test('should use user token for regular client operations and service token for service role operations', async () => {
     const userToken = 'user-token-123';
     const serviceToken = 'service-token-456';
-    
-    const client = createClient({
-      serverUrl,
-      appId,
-      token: userToken,
-      serviceToken: serviceToken,
-    });
+    const client = createClient({ serverUrl, appId, token: userToken, serviceToken });
 
-    // Mock user entities request (should use user token)
-    scope.get(`/api/apps/${appId}/entities/Todo`)
-      .matchHeader('Authorization', `Bearer ${userToken}`)
-      .reply(200, { items: [], total: 0 });
+    const userCalls = [];
+    const serviceCalls = [];
 
-    // Mock service role entities request (should use service token)
-    scope.get(`/api/apps/${appId}/entities/Todo`)
-      .matchHeader('Authorization', `Bearer ${serviceToken}`)
-      .reply(200, { items: [], total: 0 });
+    server.use(
+      http.get(`${entitiesBase}/Todo`, ({ request }) => {
+        const auth = request.headers.get('Authorization');
+        if (auth === `Bearer ${userToken}`) userCalls.push('user');
+        if (auth === `Bearer ${serviceToken}`) serviceCalls.push('service');
+        return HttpResponse.json({ items: [], total: 0 });
+      })
+    );
 
-    // Make requests
     await client.entities.Todo.list();
     await client.asServiceRole.entities.Todo.list();
 
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    expect(userCalls).toHaveLength(1);
+    expect(serviceCalls).toHaveLength(1);
+
+    client.cleanup();
   });
 
   test('should use service token for service role entities operations', async () => {
     const serviceToken = 'service-token-only-123';
-    
-    const client = createClient({
-      serverUrl,
-      appId,
-      serviceToken: serviceToken,
-    });
+    const client = createClient({ serverUrl, appId, serviceToken });
 
-    // Mock service role entities request
-    scope.get(`/api/apps/${appId}/entities/User/123`)
-      .matchHeader('Authorization', `Bearer ${serviceToken}`)
-      .reply(200, { id: '123', name: 'Test User' });
+    let capturedAuth = null;
+    server.use(
+      http.get(`${entitiesBase}/User/123`, ({ request }) => {
+        capturedAuth = request.headers.get('Authorization');
+        return HttpResponse.json({ id: '123', name: 'Test User' });
+      })
+    );
 
-    // Make request
     const result = await client.asServiceRole.entities.User.get('123');
 
-    // Verify response
     expect(result.id).toBe('123');
     expect(result.name).toBe('Test User');
+    expect(capturedAuth).toBe(`Bearer ${serviceToken}`);
 
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    client.cleanup();
   });
 
   test('should use service token for service role integrations operations', async () => {
     const serviceToken = 'service-token-integration-456';
-    
-    const client = createClient({
-      serverUrl,
-      appId,
-      serviceToken: serviceToken,
-    });
+    const client = createClient({ serverUrl, appId, serviceToken });
 
-    // Mock service role integrations request
-    scope.post(`/api/apps/${appId}/integration-endpoints/Core/SendEmail`)
-      .matchHeader('Authorization', `Bearer ${serviceToken}`)
-      .reply(200, { success: true, messageId: '123' });
+    let capturedAuth = null;
+    server.use(
+      http.post(`${intBase}/Core/SendEmail`, ({ request }) => {
+        capturedAuth = request.headers.get('Authorization');
+        return HttpResponse.json({ success: true, messageId: '123' });
+      })
+    );
 
-    // Make request
-    const result = await client.asServiceRole.integrations.Core.SendEmail({ 
+    const result = await client.asServiceRole.integrations.Core.SendEmail({
       to: 'test@example.com',
       subject: 'Test',
       body: 'Test message'
     });
 
-    // Verify response
     expect(result.success).toBe(true);
     expect(result.messageId).toBe('123');
+    expect(capturedAuth).toBe(`Bearer ${serviceToken}`);
 
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    client.cleanup();
   });
 
   test('should use service token for service role functions operations', async () => {
     const serviceToken = 'service-token-functions-789';
-    
-    const client = createClient({
-      serverUrl,
-      appId,
-      serviceToken: serviceToken,
-    });
+    const client = createClient({ serverUrl, appId, serviceToken });
 
-    // Mock service role functions request
-    scope.post(`/api/apps/${appId}/functions/testFunction`, { param: 'test' })
-      .matchHeader('Authorization', `Bearer ${serviceToken}`)
-      .reply(200, { result: 'function executed' });
+    let capturedAuth = null;
+    server.use(
+      http.post(`${functionsBase}/testFunction`, ({ request }) => {
+        capturedAuth = request.headers.get('Authorization');
+        return HttpResponse.json({ result: 'function executed' });
+      })
+    );
 
-    // Make request
-    const result = await client.asServiceRole.functions.invoke('testFunction', { 
-      param: 'test' 
-    });
+    const result = await client.asServiceRole.functions.invoke('testFunction', { param: 'test' });
 
-    // Verify response
     expect(result.data.result).toBe('function executed');
+    expect(capturedAuth).toBe(`Bearer ${serviceToken}`);
 
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    client.cleanup();
   });
 
   test('should use user token for regular operations when both tokens are present', async () => {
     const userToken = 'user-token-regular-123';
     const serviceToken = 'service-token-regular-456';
-    
-    const client = createClient({
-      serverUrl,
-      appId,
-      token: userToken,
-      serviceToken: serviceToken,
-    });
+    const client = createClient({ serverUrl, appId, token: userToken, serviceToken });
 
-    // Mock regular user entities request (should use user token)
-    scope.get(`/api/apps/${appId}/entities/Task`)
-      .matchHeader('Authorization', `Bearer ${userToken}`)
-      .reply(200, { items: [{ id: 'task1', title: 'User Task' }], total: 1 });
+    let taskAuth = null;
+    let emailAuth = null;
 
-    // Mock regular integrations request (should use user token)
-    scope.post(`/api/apps/${appId}/integration-endpoints/Core/SendEmail`)
-      .matchHeader('Authorization', `Bearer ${userToken}`)
-      .reply(200, { success: true, messageId: 'email123' });
+    server.use(
+      http.get(`${entitiesBase}/Task`, ({ request }) => {
+        taskAuth = request.headers.get('Authorization');
+        return HttpResponse.json({ items: [{ id: 'task1', title: 'User Task' }], total: 1 });
+      }),
+      http.post(`${intBase}/Core/SendEmail`, ({ request }) => {
+        emailAuth = request.headers.get('Authorization');
+        return HttpResponse.json({ success: true, messageId: 'email123' });
+      })
+    );
 
-    // Make requests using regular client (not service role)
     const taskResult = await client.entities.Task.list();
     const emailResult = await client.integrations.Core.SendEmail({
       to: 'user@example.com',
@@ -478,39 +422,36 @@ describe('Service Role Authorization Headers', () => {
       body: 'User message'
     });
 
-    // Verify responses
     expect(taskResult.items[0].title).toBe('User Task');
     expect(emailResult.success).toBe(true);
     expect(emailResult.messageId).toBe('email123');
+    expect(taskAuth).toBe(`Bearer ${userToken}`);
+    expect(emailAuth).toBe(`Bearer ${userToken}`);
 
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    client.cleanup();
   });
 
   test('should work without authorization header when no tokens are provided', async () => {
-    const client = createClient({
-      serverUrl,
-      appId,
-    });
+    const client = createClient({ serverUrl, appId });
 
-    // Mock request without authorization header
-    scope.get(`/api/apps/${appId}/entities/PublicData`)
-      .matchHeader('Authorization', (val) => !val) // Should not have Authorization header
-      .reply(200, { items: [{ id: 'public1', data: 'public' }], total: 1 });
+    let capturedAuth = null;
+    server.use(
+      http.get(`${entitiesBase}/PublicData`, ({ request }) => {
+        capturedAuth = request.headers.get('Authorization');
+        return HttpResponse.json({ items: [{ id: 'public1', data: 'public' }], total: 1 });
+      })
+    );
 
-    // Make request
     const result = await client.entities.PublicData.list();
 
-    // Verify response
     expect(result.items[0].data).toBe('public');
+    expect(capturedAuth).toBeNull();
 
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    client.cleanup();
   });
 
   test('should propagate Base44-State header in API requests when created from request', async () => {
     const clientIp = '192.168.1.100';
-    
     const mockRequest = {
       headers: {
         get: (name) => {
@@ -527,17 +468,22 @@ describe('Service Role Authorization Headers', () => {
 
     const client = createClientFromRequest(mockRequest);
 
-    // Mock entities request and verify Base44-State header is present
-    scope.get(`/api/apps/${appId}/entities/Todo`)
-      .matchHeader('Base44-State', clientIp)
-      .matchHeader('Authorization', 'Bearer user-token-123')
-      .reply(200, { items: [], total: 0 });
+    let capturedState = null;
+    let capturedAuth = null;
+    server.use(
+      http.get(`${entitiesBase}/Todo`, ({ request }) => {
+        capturedState = request.headers.get('Base44-State');
+        capturedAuth = request.headers.get('Authorization');
+        return HttpResponse.json({ items: [], total: 0 });
+      })
+    );
 
-    // Make request
     await client.entities.Todo.list();
 
-    // Verify all mocks were called (including header match)
-    expect(scope.isDone()).toBe(true);
+    expect(capturedState).toBe(clientIp);
+    expect(capturedAuth).toBe('Bearer user-token-123');
+
+    client.cleanup();
   });
 
   test('should not include Base44-State header when not present in original request', async () => {
@@ -556,22 +502,23 @@ describe('Service Role Authorization Headers', () => {
 
     const client = createClientFromRequest(mockRequest);
 
-    // Mock entities request and verify Base44-State header is NOT present
-    scope.get(`/api/apps/${appId}/entities/Todo`)
-      .matchHeader('Base44-State', (val) => !val) // Should not have this header
-      .matchHeader('Authorization', 'Bearer user-token-123')
-      .reply(200, { items: [], total: 0 });
+    let capturedState = null;
+    server.use(
+      http.get(`${entitiesBase}/Todo`, ({ request }) => {
+        capturedState = request.headers.get('Base44-State');
+        return HttpResponse.json({ items: [], total: 0 });
+      })
+    );
 
-    // Make request
     await client.entities.Todo.list();
 
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    expect(capturedState).toBeNull();
+
+    client.cleanup();
   });
 
   test('should propagate Base44-State header in service role API requests', async () => {
     const clientIp = '10.0.0.50';
-    
     const mockRequest = {
       headers: {
         get: (name) => {
@@ -588,20 +535,22 @@ describe('Service Role Authorization Headers', () => {
 
     const client = createClientFromRequest(mockRequest);
 
-    // Mock service role entities request and verify Base44-State header is present
-    scope.get(`/api/apps/${appId}/entities/User/123`)
-      .matchHeader('Base44-State', clientIp)
-      .matchHeader('Authorization', 'Bearer service-token-123')
-      .reply(200, { id: '123', name: 'Test User' });
+    let capturedState = null;
+    let capturedAuth = null;
+    server.use(
+      http.get(`${entitiesBase}/User/123`, ({ request }) => {
+        capturedState = request.headers.get('Base44-State');
+        capturedAuth = request.headers.get('Authorization');
+        return HttpResponse.json({ id: '123', name: 'Test User' });
+      })
+    );
 
-    // Make request using service role
     const result = await client.asServiceRole.entities.User.get('123');
 
-    // Verify response
     expect(result.id).toBe('123');
+    expect(capturedState).toBe(clientIp);
+    expect(capturedAuth).toBe('Bearer service-token-123');
 
-    // Verify all mocks were called (including header match)
-    expect(scope.isDone()).toBe(true);
+    client.cleanup();
   });
-
-}); 
+});
