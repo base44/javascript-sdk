@@ -39,7 +39,7 @@ export interface ConnectorConnectionResponse {
 }
 
 /**
- * Connectors module for managing OAuth tokens for external services.
+ * Connectors module for managing app-scoped OAuth tokens for external services.
  *
  * This module allows you to retrieve OAuth access tokens for external services that the app has connected to. Connectors are app-scoped. When an app builder connects an integration like Google Calendar, Slack, or GitHub, all users of the app share that same connection.
  *
@@ -232,4 +232,77 @@ export interface ConnectorsModule {
   getConnection(
     integrationType: ConnectorIntegrationType,
   ): Promise<ConnectorConnectionResponse>;
+}
+
+/**
+ * User-scoped connectors module for managing app-user OAuth connections.
+ *
+ * This module provides methods for app-user OAuth flows: initiating an OAuth connection,
+ * retrieving the end user's access token, and disconnecting the end user's connection.
+ *
+ * Unlike {@link ConnectorsModule | ConnectorsModule} which manages app-scoped tokens,
+ * this module manages tokens scoped to individual end users. Methods are keyed on
+ * the connector ID (the OrgConnector's database ID) rather than the integration type.
+ *
+ * Available via `base44.connectors`.
+ */
+export interface UserConnectorsModule {
+  /**
+   * Retrieves an OAuth access token for an end user's connection to a specific connector.
+   *
+   * Returns the OAuth token string that belongs to the currently authenticated end user
+   * for the specified connector.
+   *
+   * @param connectorId - The connector ID (OrgConnector database ID).
+   * @returns Promise resolving to the access token string.
+   *
+   * @example
+   * ```typescript
+   * // Get the end user's access token for a connector
+   * const token = await base44.connectors.getCurrentAppUserAccessToken('abc123def');
+   *
+   * const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+   *   headers: { 'Authorization': `Bearer ${token}` }
+   * });
+   * ```
+   */
+  getCurrentAppUserAccessToken(connectorId: string): Promise<string>;
+
+  /**
+   * Initiates the app-user OAuth flow for a specific connector.
+   *
+   * Returns a redirect URL that the end user should be navigated to in order to
+   * authenticate with the external service. The scopes and integration type are
+   * derived from the connector configuration server-side.
+   *
+   * @param connectorId - The connector ID (OrgConnector database ID).
+   * @returns Promise resolving to the redirect URL string.
+   *
+   * @example
+   * ```typescript
+   * // Start OAuth for the end user
+   * const redirectUrl = await base44.connectors.connectAppUser('abc123def');
+   *
+   * // Redirect the user to the OAuth provider
+   * window.location.href = redirectUrl;
+   * ```
+   */
+  connectAppUser(connectorId: string): Promise<string>;
+
+  /**
+   * Disconnects an end user's OAuth connection for a specific connector.
+   *
+   * Removes the stored OAuth credentials for the currently authenticated end user's
+   * connection to the specified connector.
+   *
+   * @param connectorId - The connector ID (OrgConnector database ID).
+   * @returns Promise resolving when the connection has been removed.
+   *
+   * @example
+   * ```typescript
+   * // Disconnect the end user's connection
+   * await base44.connectors.disconnectAppUser('abc123def');
+   * ```
+   */
+  disconnectAppUser(connectorId: string): Promise<void>;
 }

@@ -4,6 +4,7 @@ import {
   ConnectorAccessTokenResponse,
   ConnectorConnectionResponse,
   ConnectorsModule,
+  UserConnectorsModule,
 } from "./connectors.types.js";
 
 /**
@@ -55,6 +56,59 @@ export function createConnectorsModule(
         accessToken: data.access_token,
         connectionConfig: data.connection_config ?? null,
       };
+    },
+  };
+}
+
+/**
+ * Creates the user-scoped Connectors module (app-user OAuth flows).
+ *
+ * @param axios - Axios instance (user-scoped client)
+ * @param appId - Application ID
+ * @returns User connectors module with app-user OAuth methods
+ * @internal
+ */
+export function createUserConnectorsModule(
+  axios: AxiosInstance,
+  appId: string
+): UserConnectorsModule {
+  return {
+    async getCurrentAppUserAccessToken(
+      connectorId: string
+    ): Promise<string> {
+      if (!connectorId || typeof connectorId !== "string") {
+        throw new Error("Connector ID is required and must be a string");
+      }
+
+      const response = await axios.get(
+        `/apps/${appId}/app-user-auth/connectors/${connectorId}/token`
+      );
+
+      const data = response as unknown as { access_token: string };
+      return data.access_token;
+    },
+
+    async connectAppUser(connectorId: string): Promise<string> {
+      if (!connectorId || typeof connectorId !== "string") {
+        throw new Error("Connector ID is required and must be a string");
+      }
+
+      const response = await axios.post(
+        `/apps/${appId}/app-user-auth/connectors/${connectorId}/initiate`
+      );
+
+      const data = response as unknown as { redirect_url: string };
+      return data.redirect_url;
+    },
+
+    async disconnectAppUser(connectorId: string): Promise<void> {
+      if (!connectorId || typeof connectorId !== "string") {
+        throw new Error("Connector ID is required and must be a string");
+      }
+
+      await axios.delete(
+        `/apps/${appId}/app-user-auth/connectors/${connectorId}`
+      );
     },
   };
 }
