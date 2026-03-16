@@ -154,13 +154,10 @@ export function createClient(config: CreateClientConfig): Base44Client {
     functions: createFunctionsModule(functionsAxiosClient, appId, {
       getAuthHeaders: () => {
         const headers: Record<string, string> = {};
-        const commonHeaders = functionsAxiosClient.defaults?.headers?.common as Record<string, unknown>;
-        if (commonHeaders) {
-          Object.entries(commonHeaders).forEach(([key, value]) => {
-            if (typeof value === 'string') {
-              headers[key] = value;
-            }
-          });
+        // Get current token from storage or initial config
+        const currentToken = token || getAccessToken();
+        if (currentToken) {
+          headers["Authorization"] = `Bearer ${currentToken}`;
         }
         return headers;
       },
@@ -201,13 +198,9 @@ export function createClient(config: CreateClientConfig): Base44Client {
     functions: createFunctionsModule(serviceRoleFunctionsAxiosClient, appId, {
       getAuthHeaders: () => {
         const headers: Record<string, string> = {};
-        const commonHeaders = serviceRoleFunctionsAxiosClient.defaults?.headers?.common as Record<string, unknown>;
-        if (commonHeaders) {
-          Object.entries(commonHeaders).forEach(([key, value]) => {
-            if (typeof value === 'string') {
-              headers[key] = value;
-            }
-          });
+        // Use service token for authorization
+        if (serviceToken) {
+          headers["Authorization"] = `Bearer ${serviceToken}`;
         }
         return headers;
       },
