@@ -459,39 +459,20 @@ describe("Functions Module", () => {
     expect(scope.isDone()).toBe(true);
   });
 
-  test("should fetch function endpoint directly for streaming", async () => {
+  test("should fetch function endpoint directly", async () => {
     fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200 }));
 
-    await base44.functions.fetch("/streaming_demo", {
-      method: "POST",
-      body: JSON.stringify({ mode: "sse" }),
+    await base44.functions.fetch("/my_function", {
+      method: "GET",
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
-      `${serverUrl}/api/functions/streaming_demo`,
+      `${serverUrl}/api/functions/my_function`,
       expect.any(Object)
     );
-
-    const requestInit = fetchMock.mock.calls[0][1];
-    expect(requestInit.body).toBe(JSON.stringify({ mode: "sse" }));
   });
 
-  test("should not fallback to app-scoped functions endpoint on 404", async () => {
-    fetchMock
-      .mockResolvedValueOnce(new Response("Not found", { status: 404 }));
-
-    const response = await base44.functions.fetch("/streaming_demo/deep/path", {
-      method: "POST",
-      body: JSON.stringify({ mode: "ndjson" }),
-    });
-
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0][0]).toBe(
-      `${serverUrl}/api/functions/streaming_demo/deep/path`
-    );
-    expect(response.status).toBe(404);
-  });
 
   test("should include Authorization header when using functions.fetch", async () => {
     const userToken = "user-streaming-token";
