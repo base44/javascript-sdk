@@ -91,7 +91,7 @@ export function createFunctionsModule(
     // Fetch a backend function endpoint directly (supports streaming).
     async fetch(path: string, init: FunctionsFetchInit = {}) {
       const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-      const primaryPath = `/functions${normalizedPath}`;
+      const primaryPath = `/api/functions${normalizedPath}`;
 
       const headers = toHeaders(init.headers);
 
