@@ -39,13 +39,6 @@ export interface ConnectorConnectionResponse {
 }
 
 /**
- * Response from the connectors initiate endpoint.
- */
-export interface ConnectorInitiateResponse {
-  redirect_url: string;
-}
-
-/**
  * Connectors module for managing app-scoped OAuth tokens for external services.
  *
  * This module allows you to retrieve OAuth access tokens for external services that the app has connected to. Connectors are app-scoped. When an app builder connects an integration like Google Calendar, Slack, or GitHub, all users of the app share that same connection.

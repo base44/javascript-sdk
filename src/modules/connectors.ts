@@ -2,7 +2,6 @@ import { AxiosInstance } from "axios";
 import {
   ConnectorIntegrationType,
   ConnectorAccessTokenResponse,
-  ConnectorInitiateResponse,
   ConnectorConnectionResponse,
   ConnectorsModule,
   UserConnectorsModule,
@@ -74,20 +73,19 @@ export function createUserConnectorsModule(
   appId: string
 ): UserConnectorsModule {
   return {
-    // @ts-expect-error Return type mismatch - implementation returns object, interface expects string
     async getAppUserAccessToken(
       connectorId: string
-    ): Promise<ConnectorAccessTokenResponse> {
+    ): Promise<string> {
       if (!connectorId || typeof connectorId !== "string") {
         throw new Error("Connector ID is required and must be a string");
       }
 
-      const response = await axios.get<ConnectorAccessTokenResponse>(
+      const response = await axios.get(
         `/apps/${appId}/app-user-auth/connectors/${connectorId}/token`
       );
 
-      // @ts-expect-error
-      return response.access_token;
+      const data = response as unknown as { access_token: string };
+      return data.access_token;
     },
 
     async connectAppUser(connectorId: string): Promise<string> {
@@ -95,12 +93,12 @@ export function createUserConnectorsModule(
         throw new Error("Connector ID is required and must be a string");
       }
 
-      const response = await axios.post<ConnectorInitiateResponse>(
+      const response = await axios.post(
         `/apps/${appId}/app-user-auth/connectors/${connectorId}/initiate`
       );
 
-      // @ts-expect-error
-      return response.redirect_url;
+      const data = response as unknown as { redirect_url: string };
+      return data.redirect_url;
     },
 
     async disconnectAppUser(connectorId: string): Promise<void> {
