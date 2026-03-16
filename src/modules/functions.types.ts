@@ -82,8 +82,13 @@ export interface FunctionsModule {
   /**
    * Performs a direct HTTP request to a backend function path and returns the native `Response`.
    *
-   * Use this when you need streaming behavior (SSE, chunked text, NDJSON),
-   * because `invoke()` buffers the full response.
+   * Use this method when you need low-level control over the request/response that the higher-level
+   * `invoke()` abstraction doesn't provide, such as:
+   * - Streaming responses (SSE, chunked text, NDJSON)
+   * - Custom HTTP methods (PUT, PATCH, DELETE, etc.)
+   * - Custom headers or request configuration
+   * - Access to raw response metadata (status, headers)
+   * - Direct control over request/response bodies
    *
    * Requests are sent to `/api/functions/<path>`.
    *
