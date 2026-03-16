@@ -45,6 +45,18 @@ export interface DeleteManyResult {
 }
 
 /**
+ * Result returned when updating multiple entities via a query.
+ */
+export interface UpdateManyResult {
+  /** Whether the operation was successful. */
+  success: boolean;
+  /** Number of entities that were updated. */
+  updated: number;
+  /** Whether there are more entities matching the query that were not updated in this batch. When `true`, call `updateMany` again with the same query to update the next batch. */
+  has_more: boolean;
+}
+
+/**
  * Result returned when importing entities from a file.
  *
  * @typeParam T - The entity type for imported records. Defaults to `any`.
@@ -378,6 +390,87 @@ export interface EntityHandler<T = any> {
    * ```
    */
   bulkCreate(data: Partial<T>[]): Promise<T[]>;
+
+  /**
+   * Updates multiple records matching a query using a MongoDB update operator.
+   *
+   * Applies the same update operation to all records matching the query.
+   * The `data` parameter must contain one or more MongoDB update operators
+   * (e.g., `$set`, `$inc`, `$push`). Multiple operators can be combined in a
+   * single call, but each field may only appear in one operator.
+   *
+   * Results are batched in groups of up to 500 — when `has_more` is `true`
+   * in the response, call `updateMany` again with the same query to update
+   * the next batch.
+   *
+   * @param query - Query object to filter which records to update. Records matching all
+   * specified criteria will be updated.
+   * @param data - Update operation object containing one or more MongoDB update operators.
+   * Each field may only appear in one operator per call.
+   * Supported operators: `$set`, `$rename`, `$unset`, `$inc`, `$mul`, `$min`, `$max`,
+   * `$currentDate`, `$addToSet`, `$push`, `$pull`.
+   * @returns Promise resolving to the update result.
+   *
+   * @example
+   * ```typescript
+   * // Set status to 'archived' for all completed records
+   * const result = await base44.entities.MyEntity.updateMany(
+   *   { status: 'completed' },
+   *   { $set: { status: 'archived' } }
+   * );
+   * console.log(`Updated ${result.updated} records`);
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Combine multiple operators in a single call
+   * const result = await base44.entities.MyEntity.updateMany(
+   *   { category: 'sales' },
+   *   { $set: { status: 'done' }, $inc: { view_count: 1 } }
+   * );
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Handle batched updates for large datasets
+   * let hasMore = true;
+   * let totalUpdated = 0;
+   * while (hasMore) {
+   *   const result = await base44.entities.MyEntity.updateMany(
+   *     { status: 'pending' },
+   *     { $set: { status: 'processed' } }
+   *   );
+   *   totalUpdated += result.updated;
+   *   hasMore = result.has_more;
+   * }
+   * ```
+   */
+  updateMany(query: Partial<T>, data: Record<string, Record<string, any>>): Promise<UpdateManyResult>;
+
+  /**
+   * Updates multiple records in a single request, each with its own update data.
+   *
+   * Unlike `updateMany` which applies the same update to all matching records,
+   * `bulkUpdate` allows different updates for each record. Each item in the
+   * array must include an `id` field identifying which record to update.
+   *
+   * **Note:** Maximum 500 items per request.
+   *
+   * @param data - Array of update objects (max 500). Each object must have an `id` field
+   * and any number of fields to update.
+   * @returns Promise resolving to an array of updated records.
+   *
+   * @example
+   * ```typescript
+   * // Update multiple records with different data
+   * const updated = await base44.entities.MyEntity.bulkUpdate([
+   *   { id: 'entity-1', status: 'paid', amount: 999 },
+   *   { id: 'entity-2', status: 'cancelled' },
+   *   { id: 'entity-3', name: 'Renamed Item' }
+   * ]);
+   * ```
+   */
+  bulkUpdate(data: (Partial<T> & { id: string })[]): Promise<T[]>;
 
   /**
    * Imports records from a file.
