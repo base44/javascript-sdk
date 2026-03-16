@@ -1,4 +1,3 @@
-import type { AxiosInstance } from "axios";
 import type { EntitiesModule } from "./modules/entities.types.js";
 import type { IntegrationsModule } from "./modules/integrations.types.js";
 import type { AuthModule } from "./modules/auth.types.js";
@@ -94,8 +93,6 @@ export interface Base44Client {
   appLogs: AppLogsModule;
   /** {@link AuthModule | Auth module} for user authentication and management. */
   auth: AuthModule;
-  /** The underlying Axios instance used for API requests. Useful for making custom API calls with the same authentication and configuration as the SDK. */
-  axiosClient: AxiosInstance;
   /** {@link UserConnectorsModule | Connectors module} for app-user OAuth flows. */
   connectors: UserConnectorsModule;
   /** {@link EntitiesModule | Entities module} for CRUD operations on your data models. */
@@ -132,8 +129,6 @@ export interface Base44Client {
   readonly asServiceRole: {
     /** {@link AgentsModule | Agents module} with elevated permissions. */
     agents: AgentsModule;
-    /** The underlying Axios instance used for service role API requests. Useful for making custom API calls with service role authentication. */
-    axiosClient: AxiosInstance;
     /** {@link AppLogsModule | App logs module} with elevated permissions. */
     appLogs: AppLogsModule;
     /** {@link ConnectorsModule | Connectors module} for OAuth token retrieval. */
