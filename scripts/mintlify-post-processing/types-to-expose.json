@@ -22,5 +22,6 @@
   "IntegrationsModule",
   "CoreIntegrations",
   "SortField",
-  "SsoModule"
+  "SsoModule",
+  "UpdateManyResult"
 ]

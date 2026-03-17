@@ -45,7 +45,7 @@ export interface DeleteManyResult {
 }
 
 /**
- * Result returned when updating multiple entities via a query.
+ * Result returned when updating multiple entities using a query.
  */
 export interface UpdateManyResult {
   /** Whether the operation was successful. */
@@ -307,6 +307,11 @@ export interface EntityHandler<T = any> {
    * Updates a record by ID with the provided data. Only the fields
    * included in the data object will be updated.
    *
+   * To update a single record by ID, use this method. To apply the same
+   * update to many records matching a query, use {@linkcode updateMany | updateMany()}.
+   * To update multiple specific records with different data each, use
+   * {@linkcode bulkUpdate | bulkUpdate()}.
+   *
    * @param id - The unique identifier of the record to update.
    * @param data - Object containing the fields to update.
    * @returns Promise resolving to the updated record.
@@ -392,29 +397,39 @@ export interface EntityHandler<T = any> {
   bulkCreate(data: Partial<T>[]): Promise<T[]>;
 
   /**
-   * Updates multiple records matching a query using a MongoDB update operator.
+   * Applies the same update to all records that match a query.
    *
-   * Applies the same update operation to all records matching the query.
-   * The `data` parameter must contain one or more MongoDB update operators
-   * (e.g., `$set`, `$inc`, `$push`). Multiple operators can be combined in a
-   * single call, but each field may only appear in one operator.
+   * Use this when you need to make the same change across all records that
+   * match specific criteria. For example, you could set every completed order
+   * to "archived", or increment a counter on all active users.
    *
-   * Results are batched in groups of up to 500 — when `has_more` is `true`
+   * Results are batched in groups of up to 500. When `has_more` is `true`
    * in the response, call `updateMany` again with the same query to update
-   * the next batch.
+   * the next batch. Make sure the query excludes already-updated records
+   * so you don't re-process the same entities on each iteration. For
+   * example, filter by `status: 'pending'` when setting status to `'processed'`.
    *
-   * @param query - Query object to filter which records to update. Records matching all
-   * specified criteria will be updated.
-   * @param data - Update operation object containing one or more MongoDB update operators.
+   * To update a single record by ID, use {@linkcode update | update()} instead. To update
+   * multiple specific records with different data each, use {@linkcode bulkUpdate | bulkUpdate()}.
+   *
+   * @param query - Query object to filter which records to update. Use field-value
+   * pairs for exact matches, or
+   * [MongoDB query operators](https://www.mongodb.com/docs/manual/reference/operator/query/)
+   * for advanced filtering. Supported query operators include `$eq`, `$ne`, `$gt`,
+   * `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$and`, `$or`, `$not`, `$nor`,
+   * `$exists`, `$regex`, `$all`, `$elemMatch`, and `$size`.
+   * @param data - Update operation object containing one or more
+   * [MongoDB update operators](https://www.mongodb.com/docs/manual/reference/operator/update/).
    * Each field may only appear in one operator per call.
-   * Supported operators: `$set`, `$rename`, `$unset`, `$inc`, `$mul`, `$min`, `$max`,
-   * `$currentDate`, `$addToSet`, `$push`, `$pull`.
+   * Supported update operators include `$set`, `$rename`, `$unset`, `$inc`, `$mul`, `$min`, `$max`,
+   * `$currentDate`, `$addToSet`, `$push`, and `$pull`.
    * @returns Promise resolving to the update result.
    *
    * @example
    * ```typescript
-   * // Set status to 'archived' for all completed records
-   * const result = await base44.entities.MyEntity.updateMany(
+   * // Basic usage
+   * // Archive all completed orders
+   * const result = await base44.entities.Order.updateMany(
    *   { status: 'completed' },
    *   { $set: { status: 'archived' } }
    * );
@@ -423,8 +438,19 @@ export interface EntityHandler<T = any> {
    *
    * @example
    * ```typescript
-   * // Combine multiple operators in a single call
-   * const result = await base44.entities.MyEntity.updateMany(
+   * // Multiple query operators
+   * // Flag urgent items that haven't been handled yet
+   * const result = await base44.entities.Task.updateMany(
+   *   { priority: { $in: ['high', 'critical'] }, status: { $ne: 'done' } },
+   *   { $set: { flagged: true } }
+   * );
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Multiple update operators
+   * // Close out sales records and bump the view count
+   * const result = await base44.entities.Deal.updateMany(
    *   { category: 'sales' },
    *   { $set: { status: 'done' }, $inc: { view_count: 1 } }
    * );
@@ -432,11 +458,14 @@ export interface EntityHandler<T = any> {
    *
    * @example
    * ```typescript
-   * // Handle batched updates for large datasets
+   * // Batched updates
+   * // Process all pending items in batches of 500.
+   * // The query filters by 'pending', so updated records (now 'processed')
+   * // are automatically excluded from the next batch.
    * let hasMore = true;
    * let totalUpdated = 0;
    * while (hasMore) {
-   *   const result = await base44.entities.MyEntity.updateMany(
+   *   const result = await base44.entities.Job.updateMany(
    *     { status: 'pending' },
    *     { $set: { status: 'processed' } }
    *   );
@@ -445,29 +474,47 @@ export interface EntityHandler<T = any> {
    * }
    * ```
    */
-  updateMany(query: Partial<T>, data: Record<string, Record<string, any>>): Promise<UpdateManyResult>;
+  updateMany(
+    query: Partial<T>,
+    data: Record<string, Record<string, any>>,
+  ): Promise<UpdateManyResult>;
 
   /**
-   * Updates multiple records in a single request, each with its own update data.
+   * Updates the specified records in a single request, each with its own data.
    *
-   * Unlike `updateMany` which applies the same update to all matching records,
-   * `bulkUpdate` allows different updates for each record. Each item in the
-   * array must include an `id` field identifying which record to update.
+   * Use this when you already know which records to update and each one needs
+   * different field values. For example, you could update the status and amount
+   * on three separate invoices in one call.
    *
-   * **Note:** Maximum 500 items per request.
+   * You can update up to 500 records per request.
    *
-   * @param data - Array of update objects (max 500). Each object must have an `id` field
-   * and any number of fields to update.
-   * @returns Promise resolving to an array of updated records.
+   * To apply the same update to all records matching a query, use
+   * {@linkcode updateMany | updateMany()}. To update a single record by ID, use
+   * {@linkcode update | update()}.
+   *
+   * @param data - Array of objects to update. Each object must contain an `id` field identifying which record to update and any fields to change.
+   * @returns Promise resolving to an array of the updated records.
    *
    * @example
    * ```typescript
-   * // Update multiple records with different data
-   * const updated = await base44.entities.MyEntity.bulkUpdate([
-   *   { id: 'entity-1', status: 'paid', amount: 999 },
-   *   { id: 'entity-2', status: 'cancelled' },
-   *   { id: 'entity-3', name: 'Renamed Item' }
+   * // Basic usage
+   * // Update three invoices with different statuses and amounts
+   * const updated = await base44.entities.Invoice.bulkUpdate([
+   *   { id: 'inv-1', status: 'paid', amount: 999 },
+   *   { id: 'inv-2', status: 'cancelled' },
+   *   { id: 'inv-3', amount: 450 }
    * ]);
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // More than 500 items
+   * // Reassign each task to a different owner in batches
+   * const allUpdates = reassignments.map(r => ({ id: r.taskId, owner: r.newOwner }));
+   * for (let i = 0; i < allUpdates.length; i += 500) {
+   *   const batch = allUpdates.slice(i, i + 500);
+   *   await base44.entities.Task.bulkUpdate(batch);
+   * }
    * ```
    */
   bulkUpdate(data: (Partial<T> & { id: string })[]): Promise<T[]>;
