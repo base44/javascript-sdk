@@ -12,5 +12,9 @@
     "delete",
     "deleteMany",
     "subscribe"
+  ],
+  "functions": [
+    "invoke",
+    "fetch"
   ]
 }

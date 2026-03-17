@@ -1835,6 +1835,11 @@ function removeNonExposedTypeLinks(content, exposedTypeNames) {
   const updatedContent = content.replace(
     linkRegex,
     (match, backtick, typeName, linkPath) => {
+      // Preserve external links (e.g. MDN docs) — only strip internal type refs
+      if (/^https?:\/\//.test(linkPath)) {
+        return match;
+      }
+
       // Check if this looks like a type doc link (path ends with the type name)
       const pathEnd = linkPath
         .split("/")
