@@ -405,7 +405,9 @@ export interface EntityHandler<T = any> {
    *
    * Results are batched in groups of up to 500. When `has_more` is `true`
    * in the response, call `updateMany` again with the same query to update
-   * the next batch.
+   * the next batch. Make sure the query excludes already-updated records
+   * so you don't re-process the same entities on each iteration. For
+   * example, filter by `status: 'pending'` when setting status to `'processed'`.
    *
    * To update a single record by ID, use {@linkcode update | update()} instead. To update
    * multiple specific records with different data each, use {@linkcode bulkUpdate | bulkUpdate()}.
@@ -457,7 +459,9 @@ export interface EntityHandler<T = any> {
    * @example
    * ```typescript
    * // Batched updates
-   * // Process all pending items in batches of 500
+   * // Process all pending items in batches of 500.
+   * // The query filters by 'pending', so updated records (now 'processed')
+   * // are automatically excluded from the next batch.
    * let hasMore = true;
    * let totalUpdated = 0;
    * while (hasMore) {
