@@ -468,7 +468,7 @@ describe("Functions Module", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
-      `${serverUrl}/api/functions/my_function`,
+      `${serverUrl}/api/apps/${appId}/functions/my_function`,
       expect.any(Object)
     );
   });
@@ -498,7 +498,7 @@ describe("Functions Module", () => {
     fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200 }));
     await base44.functions.fetch("/my_function");
     expect(fetchMock).toHaveBeenCalledWith(
-      `${serverUrl}/api/functions/my_function`,
+      `${serverUrl}/api/apps/${appId}/functions/my_function`,
       expect.any(Object)
     );
 
@@ -506,7 +506,7 @@ describe("Functions Module", () => {
     fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200 }));
     await base44.functions.fetch("my_function");
     expect(fetchMock).toHaveBeenCalledWith(
-      `${serverUrl}/api/functions/my_function`,
+      `${serverUrl}/api/apps/${appId}/functions/my_function`,
       expect.any(Object)
     );
   });
