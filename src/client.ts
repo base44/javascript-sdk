@@ -97,7 +97,6 @@ export function createClient(config: CreateClientConfig): Base44Client {
 
   const headers = {
     ...optionalHeaders,
-    "X-App-Id": String(appId),
   };
 
   const functionHeaders = functionsVersion
