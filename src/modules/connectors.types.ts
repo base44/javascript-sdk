@@ -232,6 +232,27 @@ export interface ConnectorsModule {
   getConnection(
     integrationType: ConnectorIntegrationType,
   ): Promise<ConnectorConnectionResponse>;
+
+  /**
+   * Retrieves an OAuth access token for an end user's connection to a specific connector.
+   *
+   * Returns the OAuth token string that belongs to the currently authenticated end user
+   * for the specified connector.
+   *
+   * @param connectorId - The connector ID (OrgConnector database ID).
+   * @returns Promise resolving to the access token string.
+   *
+   * @example
+   * ```typescript
+   * // Get the end user's access token for a connector
+   * const token = await base44.asServiceRole.connectors.getCurrentAppUserAccessToken('abc123def');
+   *
+   * const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+   *   headers: { 'Authorization': `Bearer ${token}` }
+   * });
+   * ```
+   */
+  getCurrentAppUserAccessToken(connectorId: string): Promise<string>;
 }
 
 /**
@@ -247,27 +268,6 @@ export interface ConnectorsModule {
  * Available via `base44.connectors`.
  */
 export interface UserConnectorsModule {
-  /**
-   * Retrieves an OAuth access token for an end user's connection to a specific connector.
-   *
-   * Returns the OAuth token string that belongs to the currently authenticated end user
-   * for the specified connector.
-   *
-   * @param connectorId - The connector ID (OrgConnector database ID).
-   * @returns Promise resolving to the access token string.
-   *
-   * @example
-   * ```typescript
-   * // Get the end user's access token for a connector
-   * const token = await base44.connectors.getCurrentAppUserAccessToken('abc123def');
-   *
-   * const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
-   *   headers: { 'Authorization': `Bearer ${token}` }
-   * });
-   * ```
-   */
-  getCurrentAppUserAccessToken(connectorId: string): Promise<string>;
-
   /**
    * Initiates the app-user OAuth flow for a specific connector.
    *
