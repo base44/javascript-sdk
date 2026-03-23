@@ -17,7 +17,8 @@ import {
  */
 export function createConnectorsModule(
   axios: AxiosInstance,
-  appId: string
+  appId: string,
+  userToken?: string
 ): ConnectorsModule {
   return {
     /**
@@ -65,8 +66,14 @@ export function createConnectorsModule(
         throw new Error("Connector ID is required and must be a string");
       }
 
+      const headers: Record<string, string> = {};
+      if (userToken) {
+        headers["on-behalf-of"] = `Bearer ${userToken}`;
+      }
+
       const response = await axios.get(
-        `/apps/${appId}/app-user-auth/connectors/${connectorId}/token`
+        `/apps/${appId}/app-user-auth/connectors/${connectorId}/token`,
+        { headers }
       );
 
       const data = response as unknown as { access_token: string };

@@ -198,7 +198,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     }),
     integrations: createIntegrationsModule(serviceRoleAxiosClient, appId),
     sso: createSsoModule(serviceRoleAxiosClient, appId, token),
-    connectors: createConnectorsModule(serviceRoleAxiosClient, appId),
+    connectors: createConnectorsModule(serviceRoleAxiosClient, appId, token),
     functions: createFunctionsModule(serviceRoleFunctionsAxiosClient, appId, {
       getAuthHeaders: () => {
         const headers: Record<string, string> = {};
