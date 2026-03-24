@@ -1,10 +1,10 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import nock from 'nock';
-import { createClient } from '../../src/index.ts';
+import { createClient, Base44Client } from '../../src/index.ts';
 
 describe('Auth Module', () => {
-  let base44;
-  let scope;
+  let base44: Base44Client;
+  let scope: nock.Scope;
   const appId = 'test-app-id';
   const serverUrl = 'https://api.base44.com';
   const appBaseUrl = 'https://api.base44.com';
@@ -13,15 +13,15 @@ describe('Auth Module', () => {
     // Mock window.addEventListener and document for analytics module
     if (typeof window !== 'undefined') {
       if (!window.addEventListener) {
-        window.addEventListener = vi.fn();
-        window.removeEventListener = vi.fn();
+        window.addEventListener = vi.fn() as unknown as typeof window.addEventListener;
+        window.removeEventListener = vi.fn() as unknown as typeof window.removeEventListener;
       }
     }
     if (typeof document === 'undefined') {
       global.document = {
         referrer: '',
         visibilityState: 'visible'
-      };
+      } as Document;
     }
 
     // Create a new client for each test
@@ -36,7 +36,7 @@ describe('Auth Module', () => {
 
     // Enable request debugging for Nock
     nock.disableNetConnect();
-    nock.emitter.on('no match', (req) => {
+    nock.emitter.on('no match', (req: nock.Req) => {
       console.log(`Nock: No match for ${req.method} ${req.path}`);
       console.log('Headers:', req.getHeaders());
     });
@@ -142,6 +142,7 @@ describe('Auth Module', () => {
     test('should throw error when not in browser environment', () => {
       // Mock window as undefined to simulate non-browser environment
       const originalWindow = global.window;
+      // @ts-expect-error - Intentionally deleting window for test
       delete global.window;
       
       expect(() => {
@@ -158,7 +159,7 @@ describe('Auth Module', () => {
       const originalWindow = global.window;
       global.window = {
         location: mockLocation
-      };
+      } as unknown as Window & typeof globalThis;
 
       const nextUrl = 'https://example.com/dashboard';
       base44.auth.redirectToLogin(nextUrl);
@@ -179,7 +180,7 @@ describe('Auth Module', () => {
       const originalWindow = global.window;
       global.window = {
         location: mockLocation
-      };
+      } as unknown as Window & typeof globalThis;
 
       base44.auth.redirectToLogin();
 
@@ -205,7 +206,7 @@ describe('Auth Module', () => {
       const mockLocation = { href: '' };
       global.window = {
         location: mockLocation
-      };
+      } as unknown as Window & typeof globalThis;
 
       const nextUrl = 'https://example.com/dashboard';
       clientWithCustomUrl.auth.redirectToLogin(nextUrl);
@@ -231,7 +232,7 @@ describe('Auth Module', () => {
       const mockLocation = { href: '', origin: 'https://current-app.com' };
       global.window = {
         location: mockLocation
-      };
+      } as unknown as Window & typeof globalThis;
 
       const nextUrl = 'https://example.com/dashboard';
       clientWithoutAppBaseUrl.auth.redirectToLogin(nextUrl);
@@ -265,7 +266,7 @@ describe('Auth Module', () => {
       
       // Mock another me() call to verify no Authorization header is sent
       scope.get(`/api/apps/${appId}/entities/User/me`)
-        .matchHeader('Authorization', (val) => !val) // Should not have Authorization header
+        .matchHeader('Authorization', (val: string | undefined) => !val) // Should not have Authorization header
         .reply(401, { detail: 'Unauthorized' });
       
       // Verify no Authorization header is sent after logout (should throw 401)
@@ -287,7 +288,7 @@ describe('Auth Module', () => {
         location: {
           reload: vi.fn()
         }
-      };
+      } as unknown as Window & typeof globalThis;
       
       // Set a token to localStorage first
       base44.auth.setToken('test-token', true);
@@ -318,7 +319,7 @@ describe('Auth Module', () => {
         location: {
           reload: vi.fn()
         }
-      };
+      } as unknown as Window & typeof globalThis;
       
       // Call logout - should not throw
       base44.auth.logout();
@@ -337,7 +338,7 @@ describe('Auth Module', () => {
       const originalWindow = global.window;
       global.window = {
         location: mockLocation
-      };
+      } as unknown as Window & typeof globalThis;
 
       const redirectUrl = 'https://example.com/logout-success';
       base44.auth.logout(redirectUrl);
@@ -356,7 +357,7 @@ describe('Auth Module', () => {
       const originalWindow = global.window;
       global.window = {
         location: mockLocation
-      };
+      } as unknown as Window & typeof globalThis;
 
       // Call logout without redirect URL
       base44.auth.logout();
@@ -397,7 +398,7 @@ describe('Auth Module', () => {
       const originalWindow = global.window;
       global.window = {
         localStorage: mockLocalStorage
-      };
+      } as unknown as Window & typeof globalThis;
       
       const token = 'test-access-token';
       base44.auth.setToken(token, true);
@@ -420,7 +421,7 @@ describe('Auth Module', () => {
       const originalWindow = global.window;
       global.window = {
         localStorage: mockLocalStorage
-      };
+      } as unknown as Window & typeof globalThis;
       
       const token = 'test-access-token';
       base44.auth.setToken(token, false);
@@ -437,7 +438,7 @@ describe('Auth Module', () => {
       
       // Mock the API response for me() call
       scope.get(`/api/apps/${appId}/entities/User/me`)
-        .matchHeader('Authorization', (val) => !val) // Should not have Authorization header
+        .matchHeader('Authorization', (val: string | undefined) => !val) // Should not have Authorization header
         .reply(401, { detail: 'Unauthorized' });
       
       // Verify no Authorization header is sent (should throw 401)
@@ -456,7 +457,7 @@ describe('Auth Module', () => {
       const originalWindow = global.window;
       global.window = {
         localStorage: mockLocalStorage
-      };
+      } as unknown as Window & typeof globalThis;
       
       const token = 'test-access-token';
       base44.auth.setToken(token, true);
@@ -643,4 +644,4 @@ describe('Auth Module', () => {
       expect(scope.isDone()).toBe(true);
     });
   });
-}); 
+});
