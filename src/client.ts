@@ -122,9 +122,14 @@ export function createClient(config: CreateClientConfig): Base44Client {
     onError: options?.onError,
   });
 
+  const serviceRoleHeaders = {
+    ...headers,
+    ...(token ? { "on-behalf-of": `Bearer ${token}` } : {}),
+  };
+
   const serviceRoleAxiosClient = createAxiosClient({
     baseURL: `${serverUrl}/api`,
-    headers,
+    headers: serviceRoleHeaders,
     token: serviceToken,
     onError: options?.onError,
   });
@@ -197,7 +202,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
       getSocket,
     }),
     integrations: createIntegrationsModule(serviceRoleAxiosClient, appId),
-    sso: createSsoModule(serviceRoleAxiosClient, appId, token),
+    sso: createSsoModule(serviceRoleAxiosClient, appId),
     connectors: createConnectorsModule(serviceRoleAxiosClient, appId),
     functions: createFunctionsModule(serviceRoleFunctionsAxiosClient, appId, {
       getAuthHeaders: () => {
