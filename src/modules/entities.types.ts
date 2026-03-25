@@ -45,6 +45,18 @@ export interface DeleteManyResult {
 }
 
 /**
+ * Result returned when updating multiple entities using a query.
+ */
+export interface UpdateManyResult {
+  /** Whether the operation was successful. */
+  success: boolean;
+  /** Number of entities that were updated. */
+  updated: number;
+  /** Whether there are more entities matching the query that were not updated in this batch. When `true`, call `updateMany` again with the same query to update the next batch. */
+  has_more: boolean;
+}
+
+/**
  * Result returned when importing entities from a file.
  *
  * @typeParam T - The entity type for imported records. Defaults to `any`.
@@ -295,6 +307,11 @@ export interface EntityHandler<T = any> {
    * Updates a record by ID with the provided data. Only the fields
    * included in the data object will be updated.
    *
+   * To update a single record by ID, use this method. To apply the same
+   * update to many records matching a query, use {@linkcode updateMany | updateMany()}.
+   * To update multiple specific records with different data each, use
+   * {@linkcode bulkUpdate | bulkUpdate()}.
+   *
    * @param id - The unique identifier of the record to update.
    * @param data - Object containing the fields to update.
    * @returns Promise resolving to the updated record.
@@ -378,6 +395,129 @@ export interface EntityHandler<T = any> {
    * ```
    */
   bulkCreate(data: Partial<T>[]): Promise<T[]>;
+
+  /**
+   * Applies the same update to all records that match a query.
+   *
+   * Use this when you need to make the same change across all records that
+   * match specific criteria. For example, you could set every completed order
+   * to "archived", or increment a counter on all active users.
+   *
+   * Results are batched in groups of up to 500. When `has_more` is `true`
+   * in the response, call `updateMany` again with the same query to update
+   * the next batch. Make sure the query excludes already-updated records
+   * so you don't re-process the same entities on each iteration. For
+   * example, filter by `status: 'pending'` when setting status to `'processed'`.
+   *
+   * To update a single record by ID, use {@linkcode update | update()} instead. To update
+   * multiple specific records with different data each, use {@linkcode bulkUpdate | bulkUpdate()}.
+   *
+   * @param query - Query object to filter which records to update. Use field-value
+   * pairs for exact matches, or
+   * [MongoDB query operators](https://www.mongodb.com/docs/manual/reference/operator/query/)
+   * for advanced filtering. Supported query operators include `$eq`, `$ne`, `$gt`,
+   * `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$and`, `$or`, `$not`, `$nor`,
+   * `$exists`, `$regex`, `$all`, `$elemMatch`, and `$size`.
+   * @param data - Update operation object containing one or more
+   * [MongoDB update operators](https://www.mongodb.com/docs/manual/reference/operator/update/).
+   * Each field may only appear in one operator per call.
+   * Supported update operators include `$set`, `$rename`, `$unset`, `$inc`, `$mul`, `$min`, `$max`,
+   * `$currentDate`, `$addToSet`, `$push`, and `$pull`.
+   * @returns Promise resolving to the update result.
+   *
+   * @example
+   * ```typescript
+   * // Basic usage
+   * // Archive all completed orders
+   * const result = await base44.entities.Order.updateMany(
+   *   { status: 'completed' },
+   *   { $set: { status: 'archived' } }
+   * );
+   * console.log(`Updated ${result.updated} records`);
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Multiple query operators
+   * // Flag urgent items that haven't been handled yet
+   * const result = await base44.entities.Task.updateMany(
+   *   { priority: { $in: ['high', 'critical'] }, status: { $ne: 'done' } },
+   *   { $set: { flagged: true } }
+   * );
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Multiple update operators
+   * // Close out sales records and bump the view count
+   * const result = await base44.entities.Deal.updateMany(
+   *   { category: 'sales' },
+   *   { $set: { status: 'done' }, $inc: { view_count: 1 } }
+   * );
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Batched updates
+   * // Process all pending items in batches of 500.
+   * // The query filters by 'pending', so updated records (now 'processed')
+   * // are automatically excluded from the next batch.
+   * let hasMore = true;
+   * let totalUpdated = 0;
+   * while (hasMore) {
+   *   const result = await base44.entities.Job.updateMany(
+   *     { status: 'pending' },
+   *     { $set: { status: 'processed' } }
+   *   );
+   *   totalUpdated += result.updated;
+   *   hasMore = result.has_more;
+   * }
+   * ```
+   */
+  updateMany(
+    query: Partial<T>,
+    data: Record<string, Record<string, any>>,
+  ): Promise<UpdateManyResult>;
+
+  /**
+   * Updates the specified records in a single request, each with its own data.
+   *
+   * Use this when you already know which records to update and each one needs
+   * different field values. For example, you could update the status and amount
+   * on three separate invoices in one call.
+   *
+   * You can update up to 500 records per request.
+   *
+   * To apply the same update to all records matching a query, use
+   * {@linkcode updateMany | updateMany()}. To update a single record by ID, use
+   * {@linkcode update | update()}.
+   *
+   * @param data - Array of objects to update. Each object must contain an `id` field identifying which record to update and any fields to change.
+   * @returns Promise resolving to an array of the updated records.
+   *
+   * @example
+   * ```typescript
+   * // Basic usage
+   * // Update three invoices with different statuses and amounts
+   * const updated = await base44.entities.Invoice.bulkUpdate([
+   *   { id: 'inv-1', status: 'paid', amount: 999 },
+   *   { id: 'inv-2', status: 'cancelled' },
+   *   { id: 'inv-3', amount: 450 }
+   * ]);
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // More than 500 items
+   * // Reassign each task to a different owner in batches
+   * const allUpdates = reassignments.map(r => ({ id: r.taskId, owner: r.newOwner }));
+   * for (let i = 0; i < allUpdates.length; i += 500) {
+   *   const batch = allUpdates.slice(i, i + 500);
+   *   await base44.entities.Task.bulkUpdate(batch);
+   * }
+   * ```
+   */
+  bulkUpdate(data: (Partial<T> & { id: string })[]): Promise<T[]>;
 
   /**
    * Imports records from a file.

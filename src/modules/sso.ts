@@ -12,22 +12,13 @@ import { SsoModule } from "./sso.types";
  */
 export function createSsoModule(
   axios: AxiosInstance,
-  appId: string,
-  userToken?: string
+  appId: string
 ): SsoModule {
   return {
     // Get SSO access token for a specific user
     async getAccessToken(userid: string) {
       const url = `/apps/${appId}/auth/sso/accesstoken/${userid}`;
-
-      // Prepare headers with both tokens if available
-      const headers: Record<string, string> = {};
-
-      if (userToken) {
-        headers["on-behalf-of"] = `Bearer ${userToken}`;
-      }
-
-      return axios.get(url, { headers });
+      return axios.get(url);
     },
   };
 }

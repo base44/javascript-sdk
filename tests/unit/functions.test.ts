@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from "vitest";
+import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import nock from "nock";
 import { createClient } from "../../src/index.ts";
 
@@ -14,6 +14,7 @@ declare module "../../src/modules/functions.types.ts" {
 describe("Functions Module", () => {
   let base44: ReturnType<typeof createClient>;
   let scope;
+  let fetchMock: ReturnType<typeof vi.fn>;
   const appId = "test-app-id";
   const serverUrl = "https://api.base44.com";
 
@@ -33,6 +34,9 @@ describe("Functions Module", () => {
       console.log(`Nock: No match for ${req.method} ${req.path}`);
       console.log("Headers:", req.getHeaders());
     });
+
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
   });
 
   afterEach(() => {
@@ -40,6 +44,8 @@ describe("Functions Module", () => {
     nock.cleanAll();
     nock.emitter.removeAllListeners("no match");
     nock.enableNetConnect();
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
   });
 
   test("should call a function with JSON data", async () => {
@@ -451,5 +457,75 @@ describe("Functions Module", () => {
 
     // Verify all mocks were called
     expect(scope.isDone()).toBe(true);
+  });
+
+  test("should fetch function endpoint directly", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200 }));
+
+    await base44.functions.fetch("/my_function", {
+      method: "GET",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${serverUrl}/api/functions/my_function`,
+      expect.any(Object)
+    );
+  });
+
+
+  test("should include Authorization header when using functions.fetch", async () => {
+    const userToken = "user-streaming-token";
+    const authenticatedBase44 = createClient({
+      serverUrl,
+      appId,
+      token: userToken,
+    });
+    fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200 }));
+
+    await authenticatedBase44.functions.fetch("streaming_demo", {
+      method: "POST",
+      body: JSON.stringify({ mode: "text" }),
+    });
+
+    const requestInit = fetchMock.mock.calls[0][1];
+    const headers = new Headers(requestInit.headers);
+    expect(headers.get("Authorization")).toBe(`Bearer ${userToken}`);
+  });
+
+  test("should normalize path with and without leading slash", async () => {
+    // Test with leading slash
+    fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200 }));
+    await base44.functions.fetch("/my_function");
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${serverUrl}/api/functions/my_function`,
+      expect.any(Object)
+    );
+
+    // Test without leading slash
+    fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200 }));
+    await base44.functions.fetch("my_function");
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${serverUrl}/api/functions/my_function`,
+      expect.any(Object)
+    );
+  });
+
+  test("should include service role Authorization header when using asServiceRole.functions.fetch", async () => {
+    const serviceToken = "service-role-token";
+    const serviceRoleBase44 = createClient({
+      serverUrl,
+      appId,
+      serviceToken,
+    });
+    fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200 }));
+
+    await serviceRoleBase44.asServiceRole.functions.fetch("/service_function", {
+      method: "GET",
+    });
+
+    const requestInit = fetchMock.mock.calls[0][1];
+    const headers = new Headers(requestInit.headers);
+    expect(headers.get("Authorization")).toBe(`Bearer ${serviceToken}`);
   });
 });

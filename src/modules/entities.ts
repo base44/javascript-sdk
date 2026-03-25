@@ -9,6 +9,7 @@ import {
   RealtimeEvent,
   RealtimeEventType,
   SortField,
+  UpdateManyResult,
 } from "./entities.types";
 import { RoomsSocket } from "../utils/socket-utils.js";
 
@@ -158,6 +159,16 @@ function createEntityHandler<T = any>(
     // Create multiple entities in a single request
     async bulkCreate(data: Partial<T>[]): Promise<T[]> {
       return axios.post(`${baseURL}/bulk`, data);
+    },
+
+    // Update multiple entities matching a query using a MongoDB update operator
+    async updateMany(query: Partial<T>, data: Record<string, Record<string, any>>): Promise<UpdateManyResult> {
+      return axios.patch(`${baseURL}/update-many`, { query, data });
+    },
+
+    // Update multiple entities by ID, each with its own update data
+    async bulkUpdate(data: (Partial<T> & { id: string })[]): Promise<T[]> {
+      return axios.put(`${baseURL}/bulk`, data);
     },
 
     // Import entities from a file

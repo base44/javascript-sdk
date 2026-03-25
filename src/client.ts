@@ -3,7 +3,10 @@ import { createEntitiesModule } from "./modules/entities.js";
 import { createIntegrationsModule } from "./modules/integrations.js";
 import { createAuthModule } from "./modules/auth.js";
 import { createSsoModule } from "./modules/sso.js";
-import { createConnectorsModule } from "./modules/connectors.js";
+import {
+  createConnectorsModule,
+  createUserConnectorsModule,
+} from "./modules/connectors.js";
 import { getAccessToken } from "./utils/auth-utils.js";
 import { createFunctionsModule } from "./modules/functions.js";
 import { createAgentsModule } from "./modules/agents.js";
@@ -119,9 +122,14 @@ export function createClient(config: CreateClientConfig): Base44Client {
     onError: options?.onError,
   });
 
+  const serviceRoleHeaders = {
+    ...headers,
+    ...(token ? { "on-behalf-of": `Bearer ${token}` } : {}),
+  };
+
   const serviceRoleAxiosClient = createAxiosClient({
     baseURL: `${serverUrl}/api`,
-    headers,
+    headers: serviceRoleHeaders,
     token: serviceToken,
     onError: options?.onError,
   });
@@ -150,8 +158,20 @@ export function createClient(config: CreateClientConfig): Base44Client {
       getSocket,
     }),
     integrations: createIntegrationsModule(axiosClient, appId),
+    connectors: createUserConnectorsModule(axiosClient, appId),
     auth: userAuthModule,
-    functions: createFunctionsModule(functionsAxiosClient, appId),
+    functions: createFunctionsModule(functionsAxiosClient, appId, {
+      getAuthHeaders: () => {
+        const headers: Record<string, string> = {};
+        // Get current token from storage or initial config
+        const currentToken = token || getAccessToken();
+        if (currentToken) {
+          headers["Authorization"] = `Bearer ${currentToken}`;
+        }
+        return headers;
+      },
+      baseURL: functionsAxiosClient.defaults?.baseURL,
+    }),
     agents: createAgentsModule({
       axios: axiosClient,
       getSocket,
@@ -182,9 +202,19 @@ export function createClient(config: CreateClientConfig): Base44Client {
       getSocket,
     }),
     integrations: createIntegrationsModule(serviceRoleAxiosClient, appId),
-    sso: createSsoModule(serviceRoleAxiosClient, appId, token),
+    sso: createSsoModule(serviceRoleAxiosClient, appId),
     connectors: createConnectorsModule(serviceRoleAxiosClient, appId),
-    functions: createFunctionsModule(serviceRoleFunctionsAxiosClient, appId),
+    functions: createFunctionsModule(serviceRoleFunctionsAxiosClient, appId, {
+      getAuthHeaders: () => {
+        const headers: Record<string, string> = {};
+        // Use service token for authorization
+        if (serviceToken) {
+          headers["Authorization"] = `Bearer ${serviceToken}`;
+        }
+        return headers;
+      },
+      baseURL: serviceRoleFunctionsAxiosClient.defaults?.baseURL,
+    }),
     agents: createAgentsModule({
       axios: serviceRoleAxiosClient,
       getSocket,

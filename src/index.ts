@@ -45,6 +45,7 @@ export type {
   RealtimeEvent,
   RealtimeCallback,
   SortField,
+  UpdateManyResult,
 } from "./modules/entities.types.js";
 
 export type {
@@ -100,7 +101,10 @@ export type { AppLogsModule } from "./modules/app-logs.types.js";
 
 export type { SsoModule, SsoAccessTokenResponse } from "./modules/sso.types.js";
 
-export type { ConnectorsModule } from "./modules/connectors.types.js";
+export type {
+  ConnectorsModule,
+  UserConnectorsModule,
+} from "./modules/connectors.types.js";
 
 export type {
   CustomIntegrationsModule,

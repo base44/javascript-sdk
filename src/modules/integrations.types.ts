@@ -23,7 +23,7 @@ export type IntegrationEndpointFunction = (
  * ```typescript
  * await base44.integrations.Core.InvokeLLM({
  *   prompt: 'Explain quantum computing',
- *   model: 'gpt-4'
+ *   model: 'gpt_5'
  * });
  * ```
  *
@@ -46,6 +46,11 @@ export type IntegrationPackage = {
 export interface InvokeLLMParams {
   /** The prompt text to send to the model */
   prompt: string;
+  /** Optionally specify a model to override the app-level model setting for this specific call.
+   *
+   * Options: `"gpt_5_mini"`, `"gemini_3_flash"`, `"gpt_5"`, `"gemini_3_pro"`, `"claude_sonnet_4_6"`, `"claude_opus_4_6"`
+   */
+  model?: 'gpt_5_mini' | 'gemini_3_flash' | 'gpt_5' | 'gemini_3_pro' | 'claude_sonnet_4_6' | 'claude_opus_4_6';
   /** If set to `true`, the LLM will use Google Search, Maps, and News to gather real-time context before answering.
    * @default false
    */
@@ -393,7 +398,7 @@ export type IntegrationsModule = {
    * ```typescript
    * const response = await base44.integrations.Core.InvokeLLM({
    *   prompt: 'Explain quantum computing',
-   *   model: 'gpt-4'
+   *   model: 'gpt_5'
    * });
    * ```
    */
@@ -423,7 +428,7 @@ export type IntegrationsModule = {
    * ```typescript
    * const response = await base44.integrations.Core.InvokeLLM({
    *   prompt: 'Explain quantum computing',
-   *   model: 'gpt-4'
+   *   model: 'gpt_5'
    * });
    * ```
    *

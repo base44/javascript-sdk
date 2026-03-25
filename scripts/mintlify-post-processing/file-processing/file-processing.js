@@ -30,6 +30,7 @@ const APPENDED_ARTICLES_PATH = path.join(
   __dirname,
   "../appended-articles.json"
 );
+const METHOD_ORDER_PATH = path.join(__dirname, "..", "method-order.json");
 
 // Controlled via env var so we can re-enable Panel injection when needed.
 const PANELS_ENABLED = process.env.MINTLIFY_INCLUDE_PANELS === "true";
@@ -1017,6 +1018,123 @@ function applySignatureCleanup(dir) {
   }
 }
 
+/**
+ * Transforms deprecated method sections:
+ * 1. Removes ~~strikethrough~~ and prepends a warning emoji to the heading
+ * 2. Extracts the #### Deprecated block, removes it, and re-inserts it as a
+ *    <Danger> callout between the heading and the signature blockquote
+ */
+function processDeprecatedMethods(content) {
+  const lines = content.split("\n");
+  let modified = false;
+  let inFence = false;
+
+  // First pass: find all deprecated sections and collect their info
+  const deprecatedSections = [];
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (trimmed.startsWith("```")) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+
+    if (trimmed === "#### Deprecated") {
+      const start = i;
+      let end = i + 1;
+      let message = "";
+      // The first non-empty line after "#### Deprecated" is the deprecation message.
+      // Any subsequent lines are description text that TypeDoc misplaced here.
+      while (end < lines.length) {
+        const t = lines[end].trim();
+        if (t.startsWith("#### ") || t.startsWith("### ") || t.startsWith("## ") || t === "***") break;
+        if (!message && t) {
+          message = t;
+        }
+        end++;
+      }
+      deprecatedSections.push({ start, end, message });
+    }
+  }
+
+  if (deprecatedSections.length === 0) {
+    return { content, modified: false };
+  }
+
+  // Remove deprecated sections bottom-up so indices stay valid
+  for (let s = deprecatedSections.length - 1; s >= 0; s--) {
+    const { start, end } = deprecatedSections[s];
+    lines.splice(start, end - start);
+    modified = true;
+  }
+
+  // Second pass: transform headings and insert Danger callouts
+  inFence = false;
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (trimmed.startsWith("```")) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+
+    // Match deprecated heading: ### ~~methodName()~~ (TypeDoc wraps deprecated names in ~~)
+    const headingMatch = trimmed.match(/^###\s+~~(.+?)~~\s*$/);
+    if (!headingMatch) continue;
+
+    // Remove strikethrough and prepend warning emoji
+    lines[i] = lines[i].replace(
+      /^(###\s+)~~(.+?)~~\s*$/,
+      "$1\u26A0\uFE0F $2"
+    );
+    modified = true;
+
+    // Find the matching deprecated message by method name
+    const methodName = headingMatch[1].replace(/\(\)$/, "");
+    const section = deprecatedSections.find((sec) =>
+      sec.message.toLowerCase().includes(methodName.toLowerCase()) ||
+      deprecatedSections.length === 1
+    ) || deprecatedSections.shift();
+
+    if (!section || !section.message) continue;
+
+    // Insert Danger callout right after the heading (before the signature)
+    const dangerBlock = [
+      "",
+      "<Danger>",
+      `**Deprecated:** ${section.message}`,
+      "</Danger>",
+      "",
+    ];
+    lines.splice(i + 1, 0, ...dangerBlock);
+  }
+
+  return { content: lines.join("\n"), modified };
+}
+
+function applyDeprecatedMethodProcessing(dir) {
+  if (!fs.existsSync(dir)) return;
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      applyDeprecatedMethodProcessing(entryPath);
+    } else if (
+      entry.isFile() &&
+      (entry.name.endsWith(".mdx") || entry.name.endsWith(".md"))
+    ) {
+      const content = fs.readFileSync(entryPath, "utf-8");
+      const { content: updated, modified } = processDeprecatedMethods(content);
+      if (modified) {
+        fs.writeFileSync(entryPath, updated, "utf-8");
+        console.log(
+          `Processed deprecated methods: ${path.relative(DOCS_DIR, entryPath)}`
+        );
+      }
+    }
+  }
+}
+
 function demoteNonCallableHeadings(content) {
   const lines = content.split("\n");
   let inFence = false;
@@ -1286,6 +1404,11 @@ function groupTypeDefinitions(content) {
   
   // Define type definition patterns for different modules
   const typeGroups = [
+    // Connectors module
+    {
+      types: ["ConnectorIntegrationType", "ConnectorIntegrationTypeRegistry"],
+      indicator: "ConnectorIntegrationType"
+    },
     // Entities module
     {
       types: ["EntityRecord", "EntityTypeRegistry", "SortField"],
@@ -1712,6 +1835,11 @@ function removeNonExposedTypeLinks(content, exposedTypeNames) {
   const updatedContent = content.replace(
     linkRegex,
     (match, backtick, typeName, linkPath) => {
+      // Preserve external links (e.g. MDN docs) — only strip internal type refs
+      if (/^https?:\/\//.test(linkPath)) {
+        return match;
+      }
+
       // Check if this looks like a type doc link (path ends with the type name)
       const pathEnd = linkPath
         .split("/")
@@ -1838,6 +1966,40 @@ function cleanupSortFieldSignature(dir) {
 }
 
 /**
+ * Fix truncated intersection types in ParamField type attributes.
+ * TypeDoc renders (Partial<T> & { id: string })[] as "Partial<...> & object[]".
+ */
+function cleanupTruncatedParamTypes(dir) {
+  if (!fs.existsSync(dir)) return;
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      cleanupTruncatedParamTypes(entryPath);
+    } else if (
+      entry.isFile() &&
+      (entry.name.endsWith(".mdx") || entry.name.endsWith(".md"))
+    ) {
+      let content = fs.readFileSync(entryPath, "utf-8");
+      let modified = false;
+
+      if (content.includes('type="Partial<...> & object[]"')) {
+        content = content.replace(
+          /type="Partial<\.\.\.> & object\[\]"/g,
+          'type="(Partial<T> & { id: string })[]"'
+        );
+        modified = true;
+      }
+
+      if (modified) {
+        fs.writeFileSync(entryPath, content, "utf-8");
+        console.log(`Cleaned truncated param type: ${path.relative(DOCS_DIR, entryPath)}`);
+      }
+    }
+  }
+}
+
+/**
  * Main function
  */
 /**
@@ -1882,6 +2044,127 @@ function deleteTypesAfterProcessing(docsDir) {
   }
 }
 
+/**
+ * Load method-order.json config.
+ * Keys are MDX base filenames (e.g. "entities"), values are ordered method name arrays.
+ */
+function loadMethodOrderConfig() {
+  if (!fs.existsSync(METHOD_ORDER_PATH)) return {};
+  return JSON.parse(fs.readFileSync(METHOD_ORDER_PATH, "utf-8"));
+}
+
+/**
+ * Reorder method blocks inside an MDX file according to a given ordered list.
+ *
+ * The file is split on `***` horizontal-rule separators into sections. Sections
+ * whose first `### name()` heading matches an entry in `orderedNames` are
+ * reordered accordingly; unlisted method sections keep their relative order
+ * and appear after explicitly ordered ones.
+ *
+ * Type-definition sections that are displaced between the `## ... Methods`
+ * heading and the first method are relocated to after the footer (where
+ * `## Type Definitions` lives), so they appear under the correct TOC group.
+ */
+function reorderMethods(content, orderedNames) {
+  const sections = content.split(/\n*\*{3}\n*/);
+  const HR = "\n\n***\n\n";
+
+  const methodRe = /^### (\w+)\(\)/m;
+  const methodsHeadingRe = /^## .+ Methods$/m;
+
+  const tagged = sections.map((text) => ({
+    text,
+    methodName: (text.match(methodRe) || [])[1] || null,
+    hasMethodsHeading: methodsHeadingRe.test(text),
+  }));
+
+  const firstMethodIdx = tagged.findIndex((t) => t.methodName);
+  if (firstMethodIdx === -1) return { content, modified: false };
+
+  let lastMethodIdx = -1;
+  for (let i = tagged.length - 1; i >= 0; i--) {
+    if (tagged[i].methodName) {
+      lastMethodIdx = i;
+      break;
+    }
+  }
+
+  const headingIdx = tagged.findIndex((t) => t.hasMethodsHeading);
+  const displacedStart = headingIdx !== -1 ? headingIdx + 1 : firstMethodIdx;
+
+  const header = tagged.slice(0, displacedStart);
+  const displaced = tagged.slice(displacedStart, firstMethodIdx);
+  const middle = tagged.slice(firstMethodIdx, lastMethodIdx + 1);
+  const footer = tagged.slice(lastMethodIdx + 1);
+
+  const methods = middle.filter((t) => t.methodName);
+  const stray = middle.filter((t) => !t.methodName);
+
+  const orderMap = new Map(orderedNames.map((n, i) => [n, i]));
+  const origOrder = methods.map((m) => m.methodName).join(",");
+
+  methods.sort((a, b) => {
+    const ai = orderMap.has(a.methodName)
+      ? orderMap.get(a.methodName)
+      : orderedNames.length + methods.indexOf(a);
+    const bi = orderMap.has(b.methodName)
+      ? orderMap.get(b.methodName)
+      : orderedNames.length + methods.indexOf(b);
+    return ai - bi;
+  });
+
+  const newOrder = methods.map((m) => m.methodName).join(",");
+  if (origOrder === newOrder && displaced.length === 0 && stray.length === 0) {
+    return { content, modified: false };
+  }
+
+  const ordered = [
+    ...header,
+    ...methods,
+    ...footer,
+    ...displaced,
+    ...stray,
+  ];
+
+  return { content: ordered.map((t) => t.text).join(HR), modified: true };
+}
+
+/**
+ * Apply method ordering to MDX files whose base name matches a key in method-order.json.
+ */
+function applyMethodOrdering(dir) {
+  const config = loadMethodOrderConfig();
+  if (Object.keys(config).length === 0) return;
+
+  if (!fs.existsSync(dir)) return;
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      applyMethodOrdering(entryPath);
+    } else if (
+      entry.isFile() &&
+      (entry.name.endsWith(".mdx") || entry.name.endsWith(".md"))
+    ) {
+      const baseName = path.basename(entry.name, path.extname(entry.name));
+      const orderedNames = config[baseName];
+      if (!orderedNames) continue;
+
+      const content = fs.readFileSync(entryPath, "utf-8");
+      const { content: updated, modified } = reorderMethods(
+        content,
+        orderedNames
+      );
+      if (modified) {
+        fs.writeFileSync(entryPath, updated, "utf-8");
+        console.log(
+          `Reordered methods: ${path.relative(DOCS_DIR, entryPath)}`
+        );
+      }
+    }
+  }
+}
+
 function main() {
   console.log("Processing TypeDoc MDX files for Mintlify...\n");
 
@@ -1911,8 +2194,14 @@ function main() {
   // Clean up SortField signature specifically (before general signature cleanup)
   cleanupSortFieldSignature(DOCS_DIR);
 
+  // Fix truncated intersection types in ParamField type attributes
+  cleanupTruncatedParamTypes(DOCS_DIR);
+
   // Clean up signatures: fix truncated generics, simplify keyof constraints, break long lines
   applySignatureCleanup(DOCS_DIR);
+
+  // Transform deprecated methods: add badge to heading, move deprecation notice to Warning callout
+  applyDeprecatedMethodProcessing(DOCS_DIR);
 
   applyHeadingDemotion(DOCS_DIR);
 
@@ -1924,6 +2213,9 @@ function main() {
 
   // Group type definitions under a parent heading
   applyTypeDefinitionGrouping(DOCS_DIR);
+
+  // Reorder methods according to method-order.json
+  applyMethodOrdering(DOCS_DIR);
 
   // Link type names in Type Declarations sections to their corresponding headings
   applyTypeDeclarationLinking(DOCS_DIR);

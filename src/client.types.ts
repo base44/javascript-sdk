@@ -2,7 +2,10 @@ import type { EntitiesModule } from "./modules/entities.types.js";
 import type { IntegrationsModule } from "./modules/integrations.types.js";
 import type { AuthModule } from "./modules/auth.types.js";
 import type { SsoModule } from "./modules/sso.types.js";
-import type { ConnectorsModule } from "./modules/connectors.types.js";
+import type {
+  ConnectorsModule,
+  UserConnectorsModule,
+} from "./modules/connectors.types.js";
 import type { FunctionsModule } from "./modules/functions.types.js";
 import type { AgentsModule } from "./modules/agents.types.js";
 import type { AppLogsModule } from "./modules/app-logs.types.js";
@@ -23,8 +26,13 @@ export interface CreateClientOptions {
  */
 export interface CreateClientConfig {
   /**
-   * The Base44 server URL. Defaults to "https://base44.app".
-   * @internal
+   * The Base44 server URL.
+   *
+   * You don't need to set this for production use. The SDK defaults to `https://base44.app`.
+   *
+   * Set this when using a local development server to point SDK requests at your local machine instead of the hosted backend.
+   *
+   * @defaultValue `"https://base44.app"`
    */
   serverUrl?: string;
   /**
@@ -85,6 +93,8 @@ export interface Base44Client {
   appLogs: AppLogsModule;
   /** {@link AuthModule | Auth module} for user authentication and management. */
   auth: AuthModule;
+  /** {@link UserConnectorsModule | Connectors module} for app-user OAuth flows. */
+  connectors: UserConnectorsModule;
   /** {@link EntitiesModule | Entities module} for CRUD operations on your data models. */
   entities: EntitiesModule;
   /** {@link FunctionsModule | Functions module} for invoking custom backend functions. */
