@@ -7,12 +7,9 @@ import {
   ResetPasswordParams,
 } from "./auth.types";
 
-const POPUP_AUTH_DOMAIN_REGEX =
-  /^(preview-sandbox--|preview--|checkpoint--)[^.]+\./;
-
-function isPopupAuthDomain(): boolean {
+function isInsideIframe(): boolean {
   if (typeof window === "undefined") return false;
-  return POPUP_AUTH_DOMAIN_REGEX.test(window.location.hostname);
+  return window !== window.parent;
 }
 
 /**
@@ -147,9 +144,9 @@ export function createAuthModule(
 
       const loginUrl = `${options.appBaseUrl}/api${authPath}?${queryParams}`;
 
-      // On preview/sandbox/checkpoint domains the app runs inside an iframe —
-      // use a popup to avoid OAuth providers blocking iframe navigation.
-      if (isPopupAuthDomain()) {
+      // When running inside an iframe, use a popup to avoid OAuth providers
+      // blocking iframe navigation.
+      if (isInsideIframe()) {
         const popupLoginUrl = `${loginUrl}&popup_origin=${encodeURIComponent(window.location.origin)}`;
         return loginViaPopup(popupLoginUrl, redirectUrl, window.location.origin);
       }
