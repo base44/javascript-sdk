@@ -107,7 +107,7 @@ function createEntityHandler<T = any>(
       if (fields)
         params.fields = Array.isArray(fields) ? fields.join(",") : fields;
 
-      return axios.get(baseURL, { params });
+      return axios.get(baseURL, { params, headers: { 'Accept-Encoding': 'identity' } });
     },
 
     // Filter entities based on query
@@ -128,7 +128,7 @@ function createEntityHandler<T = any>(
       if (fields)
         params.fields = Array.isArray(fields) ? fields.join(",") : fields;
 
-      return axios.get(baseURL, { params });
+      return axios.get(baseURL, { params, headers: { 'Accept-Encoding': 'identity' } });
     },
 
     // Get entity by ID
