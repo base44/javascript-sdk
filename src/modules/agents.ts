@@ -121,6 +121,7 @@ export function createAgentsModule({
     if (accessToken) {
       return `${baseUrl}?token=${accessToken}`;
     } else {
+      // No token - URL will redirect to login automatically
       return baseUrl;
     }
   };
