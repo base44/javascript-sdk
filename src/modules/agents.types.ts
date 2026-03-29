@@ -405,4 +405,25 @@ export interface AgentsModule {
    * ```
    */
   getWhatsAppConnectURL(agentName: AgentName): string;
+
+  /**
+   * Gets Telegram connection URL for an agent.
+   *
+   * Generates a URL that users can use to connect with the agent through Telegram.
+   * The URL includes authentication if a token is available. When the user opens
+   * this URL, they are redirected to the agent's Telegram bot with an activation
+   * code that securely links their account.
+   *
+   * @param agentName - The name of the agent.
+   * @returns Telegram connection URL.
+   *
+   * @example
+   * ```typescript
+   * // Get Telegram connection URL
+   * const telegramUrl = base44.agents.getTelegramConnectURL('support-agent');
+   * console.log(`Connect through Telegram: ${telegramUrl}`);
+   * // User can open this URL to start a Telegram conversation
+   * ```
+   */
+  getTelegramConnectURL(agentName: AgentName): string;
 }
