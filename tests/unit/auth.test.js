@@ -632,15 +632,99 @@ describe('Auth Module', () => {
       // Mock network error
       scope.get(`/api/apps/${appId}/entities/User/me`)
         .replyWithError('Network error');
-        
+
       // Call the API
       const result = await base44.auth.isAuthenticated();
-      
+
       // Verify the response
       expect(result).toBe(false);
-      
+
       // Verify all mocks were called
       expect(scope.isDone()).toBe(true);
+    });
+  });
+
+  describe('onAuthStateChange()', () => {
+    test('should fire SIGNED_IN when setToken is called for the first time', () => {
+      const callback = vi.fn();
+      base44.auth.onAuthStateChange(callback);
+
+      base44.auth.setToken('token-1', false);
+
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(callback).toHaveBeenCalledWith('SIGNED_IN', { access_token: 'token-1' });
+    });
+
+    test('should fire TOKEN_REFRESHED when setToken is called again', () => {
+      const callback = vi.fn();
+      base44.auth.onAuthStateChange(callback);
+
+      base44.auth.setToken('token-1', false);
+      base44.auth.setToken('token-2', false);
+
+      expect(callback).toHaveBeenCalledTimes(2);
+      expect(callback).toHaveBeenCalledWith('TOKEN_REFRESHED', { access_token: 'token-2' });
+    });
+
+    test('should fire SIGNED_OUT on logout', () => {
+      const callback = vi.fn();
+      base44.auth.onAuthStateChange(callback);
+
+      base44.auth.logout();
+
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(callback).toHaveBeenCalledWith('SIGNED_OUT', {});
+    });
+
+    test('should fire SIGNED_IN on loginViaEmailPassword', async () => {
+      const callback = vi.fn();
+      base44.auth.onAuthStateChange(callback);
+
+      scope.post(`/api/apps/${appId}/auth/login`)
+        .reply(200, { access_token: 'login-token', user: { id: 'u1', email: 'a@b.com' } });
+
+      await base44.auth.loginViaEmailPassword('a@b.com', 'pass');
+
+      expect(callback).toHaveBeenCalledWith('SIGNED_IN', { access_token: 'login-token' });
+    });
+
+    test('should stop firing after unsubscribe', () => {
+      const callback = vi.fn();
+      const unsubscribe = base44.auth.onAuthStateChange(callback);
+
+      base44.auth.setToken('token-1', false);
+      expect(callback).toHaveBeenCalledTimes(1);
+
+      unsubscribe();
+
+      base44.auth.setToken('token-2', false);
+      expect(callback).toHaveBeenCalledTimes(1); // no additional call
+    });
+
+    test('should support multiple listeners', () => {
+      const cb1 = vi.fn();
+      const cb2 = vi.fn();
+      base44.auth.onAuthStateChange(cb1);
+      base44.auth.onAuthStateChange(cb2);
+
+      base44.auth.setToken('token-1', false);
+
+      expect(cb1).toHaveBeenCalledTimes(1);
+      expect(cb2).toHaveBeenCalledTimes(1);
+    });
+
+    test('should fire SIGNED_IN again after logout and new setToken', () => {
+      const callback = vi.fn();
+      base44.auth.onAuthStateChange(callback);
+
+      base44.auth.setToken('token-1', false);
+      expect(callback).toHaveBeenCalledWith('SIGNED_IN', { access_token: 'token-1' });
+
+      base44.auth.logout();
+      expect(callback).toHaveBeenCalledWith('SIGNED_OUT', {});
+
+      base44.auth.setToken('token-2', false);
+      expect(callback).toHaveBeenCalledWith('SIGNED_IN', { access_token: 'token-2' });
     });
   });
 }); 

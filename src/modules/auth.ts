@@ -2,6 +2,9 @@ import { AxiosInstance } from "axios";
 import {
   AuthModule,
   AuthModuleOptions,
+  AuthEvent,
+  AuthEventData,
+  AuthStateChangeCallback,
   VerifyOtpParams,
   ChangePasswordParams,
   ResetPasswordParams,
@@ -14,18 +17,17 @@ function isInsideIframe(): boolean {
 
 /**
  * Opens a URL in a centered popup and waits for the backend to postMessage
- * the auth result back. On success, redirects the current window to
- * redirectUrl with the token params appended, preserving the same behaviour
- * as a normal full-page redirect flow.
+ * the auth result back. On success, calls onToken so the SDK can set the
+ * token and fire auth state change events — no page redirect needed.
  *
  * @param url - The login URL to open in the popup (should include popup_origin).
- * @param redirectUrl - Where to redirect after auth (the original fromUrl).
  * @param expectedOrigin - The origin we expect the postMessage to come from.
+ * @param onToken - Callback invoked with the access_token when auth completes.
  */
 function loginViaPopup(
   url: string,
-  redirectUrl: string,
-  expectedOrigin: string
+  expectedOrigin: string,
+  onToken: (accessToken: string) => void
 ): void {
   const width = 500;
   const height = 600;
@@ -54,19 +56,7 @@ function loginViaPopup(
     if (!event.data?.access_token) return;
 
     cleanup();
-
-    // Append the token params to redirectUrl so the app processes them
-    // exactly as it would from a normal OAuth callback redirect.
-    const callbackUrl = new URL(redirectUrl);
-    const { access_token, is_new_user } = event.data;
-
-    callbackUrl.searchParams.set("access_token", access_token);
-
-    if (is_new_user != null) {
-      callbackUrl.searchParams.set("is_new_user", String(is_new_user));
-    }
-
-    window.location.href = callbackUrl.toString();
+    onToken(event.data.access_token);
   };
 
   // Only used to detect the user closing the popup before auth completes
@@ -93,6 +83,13 @@ export function createAuthModule(
   appId: string,
   options: AuthModuleOptions
 ): AuthModule {
+  const listeners = new Set<AuthStateChangeCallback>();
+  let hasToken = false;
+
+  function notify(event: AuthEvent, data: AuthEventData = {}) {
+    listeners.forEach((cb) => cb(event, data));
+  }
+
   return {
     // Get current user information
     async me() {
@@ -148,7 +145,9 @@ export function createAuthModule(
       // blocking iframe navigation.
       if (isInsideIframe()) {
         const popupLoginUrl = `${loginUrl}&popup_origin=${encodeURIComponent(window.location.origin)}`;
-        return loginViaPopup(popupLoginUrl, redirectUrl, window.location.origin);
+        return loginViaPopup(popupLoginUrl, window.location.origin, (token) => {
+          this.setToken(token);
+        });
       }
 
       // Default: full-page redirect
@@ -159,6 +158,8 @@ export function createAuthModule(
     logout(redirectUrl?: string) {
       // Remove token from axios headers (always do this)
       delete axios.defaults.headers.common["Authorization"];
+      hasToken = false;
+      notify("SIGNED_OUT");
 
       // Only do the rest if in a browser environment
       if (typeof window !== "undefined") {
@@ -186,6 +187,8 @@ export function createAuthModule(
     setToken(token: string, saveToStorage = true) {
       if (!token) return;
 
+      const event: AuthEvent = hasToken ? "TOKEN_REFRESHED" : "SIGNED_IN";
+
       // handle token change for axios clients
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
       functionsAxiosClient.defaults.headers.common[
@@ -206,6 +209,9 @@ export function createAuthModule(
           console.error("Failed to save token to localStorage:", e);
         }
       }
+
+      hasToken = true;
+      notify(event, { access_token: token });
     },
 
     // Login using username and password
@@ -310,6 +316,14 @@ export function createAuthModule(
         current_password: currentPassword,
         new_password: newPassword,
       });
+    },
+
+    // Subscribe to auth state changes
+    onAuthStateChange(callback: AuthStateChangeCallback) {
+      listeners.add(callback);
+      return () => {
+        listeners.delete(callback);
+      };
     },
   };
 }

@@ -50,6 +50,9 @@ export type {
 
 export type {
   AuthModule,
+  AuthEvent,
+  AuthEventData,
+  AuthStateChangeCallback,
   LoginResponse,
   RegisterParams,
   VerifyOtpParams,
