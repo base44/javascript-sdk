@@ -17,17 +17,18 @@ function isInsideIframe(): boolean {
 
 /**
  * Opens a URL in a centered popup and waits for the backend to postMessage
- * the auth result back. On success, calls onToken so the SDK can set the
- * token and fire auth state change events — no page redirect needed.
+ * the auth result back. On success, redirects the current window to
+ * redirectUrl with the token params appended, preserving the same behaviour
+ * as a normal full-page redirect flow.
  *
  * @param url - The login URL to open in the popup (should include popup_origin).
+ * @param redirectUrl - Where to redirect after auth (the original fromUrl).
  * @param expectedOrigin - The origin we expect the postMessage to come from.
- * @param onToken - Callback invoked with the access_token when auth completes.
  */
 function loginViaPopup(
   url: string,
-  expectedOrigin: string,
-  onToken: (accessToken: string) => void
+  redirectUrl: string,
+  expectedOrigin: string
 ): void {
   const width = 500;
   const height = 600;
@@ -56,7 +57,17 @@ function loginViaPopup(
     if (!event.data?.access_token) return;
 
     cleanup();
-    onToken(event.data.access_token);
+
+    const callbackUrl = new URL(redirectUrl);
+    const { access_token, is_new_user } = event.data;
+
+    callbackUrl.searchParams.set("access_token", access_token);
+
+    if (is_new_user != null) {
+      callbackUrl.searchParams.set("is_new_user", String(is_new_user));
+    }
+
+    window.location.href = callbackUrl.toString();
   };
 
   // Only used to detect the user closing the popup before auth completes
@@ -144,10 +155,7 @@ export function createAuthModule(
       // blocking iframe navigation.
       if (isInsideIframe()) {
         const popupLoginUrl = `${loginUrl}&popup_origin=${encodeURIComponent(window.location.origin)}`;
-        return loginViaPopup(popupLoginUrl, window.location.origin, (token) => {
-          this.setToken(token);
-          notify("SIGNED_IN", { access_token: token });
-        });
+        return loginViaPopup(popupLoginUrl, redirectUrl, window.location.origin);
       }
 
       // Default: full-page redirect
