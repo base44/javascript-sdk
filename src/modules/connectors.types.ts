@@ -236,6 +236,8 @@ export interface ConnectorsModule {
   /**
    * Retrieves an OAuth access token for an end user's connection to a specific connector.
    *
+   * @deprecated Use {@link getCurrentAppUserConnection} instead.
+   *
    * Returns the OAuth token string that belongs to the currently authenticated end user
    * for the specified connector.
    *
@@ -253,6 +255,28 @@ export interface ConnectorsModule {
    * ```
    */
   getCurrentAppUserAccessToken(connectorId: string): Promise<string>;
+
+  /**
+   * Retrieves the OAuth access token and connection configuration for an end user's
+   * connection to a specific connector.
+   *
+   * Returns both the OAuth token and any connection-specific configuration that
+   * belongs to the currently authenticated end user for the specified connector.
+   *
+   * @param connectorId - The connector ID (OrgConnector database ID).
+   * @returns Promise resolving to a {@link ConnectorConnectionResponse} with `accessToken` and `connectionConfig`.
+   *
+   * @example
+   * ```typescript
+   * // Get the end user's connection details for a connector
+   * const { accessToken, connectionConfig } = await base44.asServiceRole.connectors.getCurrentAppUserConnection('abc123def');
+   *
+   * const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+   *   headers: { 'Authorization': `Bearer ${accessToken}` }
+   * });
+   * ```
+   */
+  getCurrentAppUserConnection(connectorId: string): Promise<ConnectorConnectionResponse>;
 }
 
 /**
