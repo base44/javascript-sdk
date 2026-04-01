@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from "vitest";
 import nock from "nock";
 import { createClient } from "../../src/index.ts";
+import type { AppUserConnectorConnectionResponse } from "../../src/modules/connectors.types.ts";
 
 describe("Connectors module – getConnection", () => {
   const appId = "test-app-id";
@@ -130,7 +131,7 @@ describe("Connectors module – getCurrentAppUserConnection", () => {
       .get(`/api/apps/${appId}/app-user-auth/connectors/connector-1/token`)
       .reply(200, apiResponse);
 
-    const connection =
+    const connection: AppUserConnectorConnectionResponse =
       await base44.asServiceRole.connectors.getCurrentAppUserConnection(
         "connector-1"
       );
@@ -153,7 +154,7 @@ describe("Connectors module – getCurrentAppUserConnection", () => {
       .get(`/api/apps/${appId}/app-user-auth/connectors/connector-2/token`)
       .reply(200, apiResponse);
 
-    const connection =
+    const connection: AppUserConnectorConnectionResponse =
       await base44.asServiceRole.connectors.getCurrentAppUserConnection(
         "connector-2"
       );
@@ -174,7 +175,7 @@ describe("Connectors module – getCurrentAppUserConnection", () => {
       .get(`/api/apps/${appId}/app-user-auth/connectors/connector-3/token`)
       .reply(200, apiResponse);
 
-    const connection =
+    const connection: AppUserConnectorConnectionResponse =
       await base44.asServiceRole.connectors.getCurrentAppUserConnection(
         "connector-3"
       );

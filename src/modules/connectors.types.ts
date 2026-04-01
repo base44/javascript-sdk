@@ -39,6 +39,16 @@ export interface ConnectorConnectionResponse {
 }
 
 /**
+ * Connection details for an app-user connector.
+ */
+export interface AppUserConnectorConnectionResponse {
+  /** The OAuth access token for the end user's connection. */
+  accessToken: string;
+  /** Key-value configuration for the connection, or `null` if the connector does not provide one. */
+  connectionConfig: Record<string, string> | null;
+}
+
+/**
  * Connectors module for managing app-scoped OAuth tokens for external services.
  *
  * This module allows you to retrieve OAuth access tokens for external services that the app has connected to. Connectors are app-scoped. When an app builder connects an integration like Google Calendar, Slack, or GitHub, all users of the app share that same connection.
@@ -264,7 +274,7 @@ export interface ConnectorsModule {
    * belongs to the currently authenticated end user for the specified connector.
    *
    * @param connectorId - The connector ID (OrgConnector database ID).
-   * @returns Promise resolving to a {@link ConnectorConnectionResponse} with `accessToken` and `connectionConfig`.
+   * @returns Promise resolving to an {@link AppUserConnectorConnectionResponse} with `accessToken` and `connectionConfig`.
    *
    * @example
    * ```typescript
@@ -276,7 +286,7 @@ export interface ConnectorsModule {
    * });
    * ```
    */
-  getCurrentAppUserConnection(connectorId: string): Promise<ConnectorConnectionResponse>;
+  getCurrentAppUserConnection(connectorId: string): Promise<AppUserConnectorConnectionResponse>;
 }
 
 /**

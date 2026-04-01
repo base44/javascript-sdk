@@ -3,6 +3,7 @@ import {
   ConnectorIntegrationType,
   ConnectorAccessTokenResponse,
   ConnectorConnectionResponse,
+  AppUserConnectorConnectionResponse,
   ConnectorsModule,
   UserConnectorsModule,
 } from "./connectors.types.js";
@@ -78,7 +79,7 @@ export function createConnectorsModule(
 
     async getCurrentAppUserConnection(
       connectorId: string
-    ): Promise<ConnectorConnectionResponse> {
+    ): Promise<AppUserConnectorConnectionResponse> {
       if (!connectorId || typeof connectorId !== "string") {
         throw new Error("Connector ID is required and must be a string");
       }
