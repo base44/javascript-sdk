@@ -84,7 +84,6 @@ export function createAuthModule(
   options: AuthModuleOptions
 ): AuthModule {
   const listeners = new Set<AuthStateChangeCallback>();
-  let hasToken = false;
 
   function notify(event: AuthEvent, data: AuthEventData = {}) {
     listeners.forEach((cb) => cb(event, data));
@@ -147,6 +146,7 @@ export function createAuthModule(
         const popupLoginUrl = `${loginUrl}&popup_origin=${encodeURIComponent(window.location.origin)}`;
         return loginViaPopup(popupLoginUrl, window.location.origin, (token) => {
           this.setToken(token);
+          notify("SIGNED_IN", { access_token: token });
         });
       }
 
@@ -158,7 +158,6 @@ export function createAuthModule(
     logout(redirectUrl?: string) {
       // Remove token from axios headers (always do this)
       delete axios.defaults.headers.common["Authorization"];
-      hasToken = false;
       notify("SIGNED_OUT");
 
       // Only do the rest if in a browser environment
@@ -187,7 +186,6 @@ export function createAuthModule(
     setToken(token: string, saveToStorage = true) {
       if (!token) return;
 
-      const event: AuthEvent = hasToken ? "TOKEN_REFRESHED" : "SIGNED_IN";
 
       // handle token change for axios clients
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
@@ -210,8 +208,6 @@ export function createAuthModule(
         }
       }
 
-      hasToken = true;
-      notify(event, { access_token: token });
     },
 
     // Login using username and password
@@ -234,6 +230,7 @@ export function createAuthModule(
 
         if (access_token) {
           this.setToken(access_token);
+          notify("SIGNED_IN", { access_token });
         }
 
         return {

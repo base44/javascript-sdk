@@ -105,7 +105,7 @@ export interface AuthModuleOptions {
 /**
  * Auth state change event types.
  */
-export type AuthEvent = "SIGNED_IN" | "SIGNED_OUT" | "TOKEN_REFRESHED";
+export type AuthEvent = "SIGNED_IN" | "SIGNED_OUT";
 
 /**
  * Data passed to auth state change callbacks.
@@ -535,7 +535,6 @@ export interface AuthModule {
    * Events:
    * - `SIGNED_IN` — fired after a successful login (email/password, OAuth, or popup).
    * - `SIGNED_OUT` — fired after logout.
-   * - `TOKEN_REFRESHED` — fired when `setToken` is called while already authenticated.
    *
    * Returns an unsubscribe function. Call it to stop receiving events.
    *
