@@ -113,8 +113,6 @@ export type AuthEvent = "SIGNED_IN" | "SIGNED_OUT" | "TOKEN_REFRESHED";
 export interface AuthEventData {
   /** JWT access token, present on SIGNED_IN and TOKEN_REFRESHED events. */
   access_token?: string;
-  /** User data, present on SIGNED_IN when available. */
-  user?: User;
 }
 
 /**
@@ -548,9 +546,10 @@ export interface AuthModule {
    * ```typescript
    * // In a React AuthContext provider
    * useEffect(() => {
-   *   const unsubscribe = base44.auth.onAuthStateChange((event, data) => {
+   *   const unsubscribe = base44.auth.onAuthStateChange(async (event, data) => {
    *     if (event === 'SIGNED_IN') {
-   *       setUser(data.user);
+   *       const user = await base44.auth.me();
+   *       setUser(user);
    *     } else if (event === 'SIGNED_OUT') {
    *       setUser(null);
    *     }
