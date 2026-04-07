@@ -1,7 +1,8 @@
 // Load environment variables from .env file
 import dotenv from 'dotenv';
 import './utils/circular-json-handler.js';
-import { beforeAll, afterAll, test } from 'vitest';
+import { beforeAll, afterAll, afterEach } from 'vitest';
+import { server } from './mocks/server.ts';
 
 try {
   dotenv.config({ path: './tests/.env' });
@@ -16,13 +17,18 @@ try {
   console.warn('Failed to load circular JSON handler:', err.message);
 }
 
-// Global beforeAll and afterAll hooks
+// MSW server lifecycle
 beforeAll(() => {
+  server.listen({ onUnhandledRequest: 'warn' });
   console.log('Starting Base44 SDK tests...');
-  // Add any global setup here
+});
+
+afterEach(() => {
+  // Remove per-test handlers registered via server.use()
+  server.resetHandlers();
 });
 
 afterAll(() => {
+  server.close();
   console.log('Completed Base44 SDK tests');
-  // Add any global teardown here
-}); 
+});

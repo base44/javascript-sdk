@@ -40,7 +40,7 @@
     "dotenv": "^16.3.1",
     "eslint": "^9.39.2",
     "eslint-plugin-import": "^2.32.0",
-    "nock": "^13.4.0",
+    "msw": "^2.12.11",
     "typedoc": "^0.28.14",
     "typedoc-plugin-markdown": "^4.9.0",
     "typescript": "^5.3.2",

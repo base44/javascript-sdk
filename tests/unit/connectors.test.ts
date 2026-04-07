@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from "vitest";
-import nock from "nock";
+import { http, HttpResponse } from "msw";
+import { server } from "../mocks/server";
 import { createClient } from "../../src/index.ts";
 
 describe("Connectors module – getConnection", () => {
@@ -7,81 +8,62 @@ describe("Connectors module – getConnection", () => {
   const serverUrl = "https://base44.app";
   const serviceToken = "service-token-123";
   let base44: ReturnType<typeof createClient>;
-  let scope: nock.Scope;
+  const tokensBase = `${serverUrl}/api/apps/${appId}/external-auth/tokens`;
 
   beforeEach(() => {
-    base44 = createClient({
-      serverUrl,
-      appId,
-      serviceToken,
-    });
-    scope = nock(serverUrl);
+    base44 = createClient({ serverUrl, appId, serviceToken });
   });
 
   afterEach(() => {
-    nock.cleanAll();
+    base44.cleanup();
   });
 
   test("extracts accessToken and connectionConfig from API response", async () => {
-    const apiResponse = {
-      access_token: "oauth-token-abc123",
-      integration_type: "jira",
-      connection_config: { subdomain: "my-company" },
-    };
-
-    scope
-      .get(`/api/apps/${appId}/external-auth/tokens/jira`)
-      .reply(200, apiResponse);
-
-    const connection = await base44.asServiceRole.connectors.getConnection(
-      "jira"
+    server.use(
+      http.get(`${tokensBase}/jira`, () =>
+        HttpResponse.json({
+          access_token: "oauth-token-abc123",
+          integration_type: "jira",
+          connection_config: { subdomain: "my-company" },
+        })
+      )
     );
+
+    const connection = await base44.asServiceRole.connectors.getConnection("jira");
 
     expect(connection).toBeDefined();
     expect(connection.accessToken).toBe("oauth-token-abc123");
-    expect(connection.connectionConfig).toEqual({
-      subdomain: "my-company",
-    });
-    expect(scope.isDone()).toBe(true);
+    expect(connection.connectionConfig).toEqual({ subdomain: "my-company" });
   });
 
   test("returns connectionConfig as null when API omits connection_config", async () => {
-    const apiResponse = {
-      access_token: "token-only",
-      integration_type: "slack",
-    };
-
-    scope
-      .get(`/api/apps/${appId}/external-auth/tokens/slack`)
-      .reply(200, apiResponse);
-
-    const connection = await base44.asServiceRole.connectors.getConnection(
-      "slack"
+    server.use(
+      http.get(`${tokensBase}/slack`, () =>
+        HttpResponse.json({ access_token: "token-only", integration_type: "slack" })
+      )
     );
+
+    const connection = await base44.asServiceRole.connectors.getConnection("slack");
 
     expect(connection.accessToken).toBe("token-only");
     expect(connection.connectionConfig).toBeNull();
-    expect(scope.isDone()).toBe(true);
   });
 
   test("returns connectionConfig as null when API sends null connection_config", async () => {
-    const apiResponse = {
-      access_token: "token-only",
-      integration_type: "github",
-      connection_config: null,
-    };
-
-    scope
-      .get(`/api/apps/${appId}/external-auth/tokens/github`)
-      .reply(200, apiResponse);
-
-    const connection = await base44.asServiceRole.connectors.getConnection(
-      "github"
+    server.use(
+      http.get(`${tokensBase}/github`, () =>
+        HttpResponse.json({
+          access_token: "token-only",
+          integration_type: "github",
+          connection_config: null,
+        })
+      )
     );
+
+    const connection = await base44.asServiceRole.connectors.getConnection("github");
 
     expect(connection.accessToken).toBe("token-only");
     expect(connection.connectionConfig).toBeNull();
-    expect(scope.isDone()).toBe(true);
   });
 
   test("throws when integrationType is empty string", async () => {
@@ -92,9 +74,7 @@ describe("Connectors module – getConnection", () => {
 
   test("throws when integrationType is not a string", async () => {
     await expect(
-      base44.asServiceRole.connectors.getConnection(
-        null as unknown as string
-      )
+      base44.asServiceRole.connectors.getConnection(null as unknown as string)
     ).rejects.toThrow("Integration type is required and must be a string");
   });
 });
