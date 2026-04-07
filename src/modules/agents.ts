@@ -5,6 +5,8 @@ import {
   AgentMessage,
   AgentsModule,
   AgentsModuleConfig,
+  ClientToolHandler,
+  ClientToolResult,
   CreateConversationParams,
 } from "./agents.types.js";
 
@@ -19,6 +21,9 @@ export function createAgentsModule({
 
   // Track active conversations
   const currentConversations: Record<string, AgentConversation | undefined> = {};
+
+  // Stores client tool handlers keyed by conversation ID
+  const clientToolHandlers: Record<string, Record<string, ClientToolHandler>> = {};
 
   const getConversations = () => {
     return axios.get<any, AgentConversation[]>(`${baseURL}/conversations`);
@@ -51,6 +56,75 @@ export function createAgentsModule({
       `${baseURL}/conversations/v2/${conversation.id}/messages`,
       message
     );
+  };
+
+  const registerClientToolHandlers = (
+    conversationId: string,
+    handlers: Record<string, ClientToolHandler>
+  ) => {
+    clientToolHandlers[conversationId] = {
+      ...(clientToolHandlers[conversationId] || {}),
+      ...handlers,
+    };
+  };
+
+  const submitToolResults = (
+    conversationId: string,
+    results: ClientToolResult[]
+  ) => {
+    return axios.post(`${baseURL}/conversations/${conversationId}/client-tool-results`, { results });
+  };
+
+  const handlePendingClientTools = async (
+    conversationId: string,
+    message: AgentMessage
+  ): Promise<boolean> => {
+    if (!message?.tool_calls) return false;
+
+    const pendingCalls = message.tool_calls.filter(
+      (tc) => tc.status === "pending_client_execution"
+    );
+
+    if (pendingCalls.length === 0) return false;
+
+    const handlers = clientToolHandlers[conversationId];
+    if (!handlers) return false;
+
+    const results: ClientToolResult[] = [];
+    for (const tc of pendingCalls) {
+      const handler = handlers[tc.name];
+      if (!handler) {
+        results.push({
+          tool_call_id: tc.id,
+          result: `Error: No handler registered for client tool '${tc.name}'`,
+        });
+        continue;
+      }
+
+      try {
+        const args = JSON.parse(tc.arguments_string);
+        const context = {
+          appId,
+          conversationId,
+          toolCallId: tc.id,
+          toolName: tc.name,
+          messages: currentConversations[conversationId]?.messages || [],
+        };
+        const result = await handler(args, context);
+        results.push({
+          tool_call_id: tc.id,
+          result: typeof result === "string" ? result : JSON.stringify(result),
+        });
+      } catch (error: any) {
+        results.push({
+          tool_call_id: tc.id,
+          result: `Error executing client tool '${tc.name}': ${error.message}`,
+        });
+      }
+    }
+
+    await submitToolResults(conversationId, results);
+    return true;
   };
 
   const subscribeToConversation = (
@@ -92,6 +166,9 @@ export function createAgentsModule({
               messages: updatedMessages,
             };
             onUpdate?.(currentConversations[conversationId]!);
+
+            // Automatically handle pending client tool calls
+            await handlePendingClientTools(conversationId, message);
           }
         }
       },
@@ -132,6 +209,9 @@ export function createAgentsModule({
     listConversations,
     createConversation,
     addMessage,
+    registerClientToolHandlers,
+    submitToolResults,
+    handlePendingClientTools,
     subscribeToConversation,
     getWhatsAppConnectURL,
     getTelegramConnectURL,

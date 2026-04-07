@@ -48,7 +48,7 @@ export interface AgentMessageToolCall {
   /** Arguments passed to the tool as JSON string. */
   arguments_string: string;
   /** Status of the tool call. */
-  status: "running" | "success" | "error" | "stopped";
+  status: "running" | "success" | "error" | "stopped" | "pending_client_execution";
   /** Results from the tool call. */
   results?: string;
 }
@@ -157,6 +157,43 @@ export interface CreateConversationParams {
   agent_name: AgentName;
   /** Optional metadata to attach to the conversation. */
   metadata?: Record<string, any>;
+}
+
+/**
+ * Context passed to client tool handlers during execution.
+ */
+export interface ClientToolContext {
+  /** The app ID. */
+  appId: string;
+  /** The conversation ID. */
+  conversationId: string;
+  /** The unique tool call ID. */
+  toolCallId: string;
+  /** The tool name. */
+  toolName: string;
+  /** The conversation messages so far. */
+  messages: AgentMessage[];
+}
+
+/**
+ * A client tool handler function.
+ *
+ * Receives parsed arguments and execution context, returns a string result
+ * (or an object that will be JSON.stringified).
+ */
+export type ClientToolHandler = (
+  args: Record<string, any>,
+  context: ClientToolContext
+) => Promise<string | Record<string, any>> | string | Record<string, any>;
+
+/**
+ * Result of a client tool execution, to be submitted back to the server.
+ */
+export interface ClientToolResult {
+  /** The tool call ID this result corresponds to. */
+  tool_call_id: string;
+  /** The result string. */
+  result: string;
 }
 
 /**
@@ -347,12 +384,92 @@ export interface AgentsModule {
   ): Promise<AgentMessage>;
 
   /**
+   * Registers handler functions for client-side tools defined in the agent configuration.
+   *
+   * Client tools are tools that execute in the browser rather than on the server.
+   * They are defined by the app builder in the agent configuration (name, description,
+   * parameters). The SDK caller provides the handler functions that run locally when
+   * the agent invokes these tools.
+   *
+   * When subscribed to the conversation via {@linkcode subscribeToConversation | subscribeToConversation()},
+   * client tool calls are handled automatically — the SDK detects pending client tool calls,
+   * executes the registered handlers, and submits results back to the server.
+   *
+   * For user info inside a handler, call `base44.auth.me()` from the handler body.
+   *
+   * @param conversationId - The conversation ID to register handlers for.
+   * @param handlers - Map of tool name to handler function. Each handler receives
+   *   `(args, context)` where `args` are the parsed tool arguments and `context`
+   *   includes `appId`, `conversationId`, `toolCallId`, `toolName`, and `messages`.
+   *
+   * @example
+   * ```typescript
+   * base44.agents.registerClientToolHandlers(conversation.id, {
+   *   get_current_location: async ({ accuracy }, { conversationId, messages }) => {
+   *     const pos = await new Promise((resolve, reject) =>
+   *       navigator.geolocation.getCurrentPosition(resolve, reject, {
+   *         enableHighAccuracy: accuracy === 'high'
+   *       })
+   *     );
+   *     return JSON.stringify({
+   *       lat: pos.coords.latitude,
+   *       lng: pos.coords.longitude
+   *     });
+   *   },
+   *   get_clipboard_text: async () => {
+   *     return await navigator.clipboard.readText();
+   *   }
+   * });
+   * ```
+   */
+  registerClientToolHandlers(
+    conversationId: string,
+    handlers: Record<string, ClientToolHandler>
+  ): void;
+
+  /**
+   * Submits results for client-side tool calls.
+   *
+   * This is called automatically when using {@linkcode subscribeToConversation | subscribeToConversation()}
+   * with registered handlers. You only need to call this directly if you are
+   * implementing custom tool call handling logic outside of the subscription flow.
+   *
+   * @param conversationId - The conversation ID.
+   * @param results - Array of tool call results.
+   */
+  submitToolResults(
+    conversationId: string,
+    results: ClientToolResult[]
+  ): Promise<any>;
+
+  /**
+   * Processes pending client-side tool calls from a message.
+   *
+   * Finds tool calls with `pending_client_execution` status, executes their
+   * registered handlers, and submits the results back to the server.
+   *
+   * This is called automatically by {@linkcode subscribeToConversation | subscribeToConversation()}.
+   * You only need to call this directly for custom handling flows.
+   *
+   * @param conversationId - The conversation ID.
+   * @param message - The message containing tool calls.
+   * @returns `true` if client tool calls were processed, `false` otherwise.
+   */
+  handlePendingClientTools(
+    conversationId: string,
+    message: AgentMessage
+  ): Promise<boolean>;
+
+  /**
    * Subscribes to realtime updates for a conversation.
    *
    * Establishes a WebSocket connection to receive instant updates when new
    * messages are added to the conversation. Returns an unsubscribe function
    * to clean up the connection.
-   * 
+   *
+   * Client tool handlers registered via {@linkcode registerClientToolHandlers | registerClientToolHandlers()}
+   * are automatically executed when tool calls with `pending_client_execution` status arrive.
+   *
    * <Note>
    * When receiving messages through this function, tool call data is truncated for efficiency. The `arguments_string` is limited to 500 characters and `results` to 50 characters. The complete tool call data is always saved in storage and can be retrieved by calling {@linkcode getConversation | getConversation()} after the message completes.
    * </Note>
