@@ -112,6 +112,20 @@ export function createAgentsModule({
     }
   };
 
+  const getTelegramConnectURL = (agentName: string) => {
+    const baseUrl = `${serverUrl}/api/apps/${appId}/agents/${encodeURIComponent(
+      agentName
+    )}/telegram`;
+    const accessToken = token ?? getAccessToken();
+
+    if (accessToken) {
+      return `${baseUrl}?token=${accessToken}`;
+    } else {
+      // No token - URL will redirect to login automatically
+      return baseUrl;
+    }
+  };
+
   return {
     getConversations,
     getConversation,
@@ -120,5 +134,6 @@ export function createAgentsModule({
     addMessage,
     subscribeToConversation,
     getWhatsAppConnectURL,
+    getTelegramConnectURL,
   };
 }

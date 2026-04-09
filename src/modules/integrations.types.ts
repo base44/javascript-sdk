@@ -194,8 +194,13 @@ export interface CoreIntegrations {
   /**
    * Create AI-generated images from text prompts.
    *
+   * Images are generated as PNG files at approximately 1024px on the shorter side. The
+   * exact dimensions vary by aspect ratio. 
+   * 
+   * Prompts that violate the AI provider's content policy will be refused.
+   *
    * @param params - Parameters for image generation
-   * @returns Promise resolving to the generated image URL.
+   * @returns Promise resolving to an object containing the URL of the generated PNG image.
    *
    * @example
    * ```typescript
