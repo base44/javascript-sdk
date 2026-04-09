@@ -8,6 +8,20 @@ cd docs
 mint dev
 ```
 
+## Running in a git worktree
+
+Git worktrees don't have their own `node_modules`. Before running `npm run create-docs` from a worktree, symlink in the main repo's `node_modules`:
+
+```bash
+# If a partial node_modules exists (e.g. from a failed npm install), remove it first
+rm -rf /path/to/worktree/javascript-sdk/node_modules
+
+ln -s /Users/samm/Projects/base44-workspace/javascript-sdk/node_modules \
+  /path/to/worktree/javascript-sdk/node_modules
+```
+
+Then `npm run create-docs` works normally from the worktree.
+
 ## Pipeline configuration files
 
 | File | Purpose |
