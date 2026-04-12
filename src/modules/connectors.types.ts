@@ -39,6 +39,16 @@ export interface ConnectorConnectionResponse {
 }
 
 /**
+ * Connection details for an app-user connector.
+ */
+export interface AppUserConnectorConnectionResponse {
+  /** The OAuth access token for the end user's connection. */
+  accessToken: string;
+  /** Key-value configuration for the connection, or `null` if the connector does not provide one. */
+  connectionConfig: Record<string, string> | null;
+}
+
+/**
  * Connectors module for managing app-scoped OAuth tokens for external services.
  *
  * This module allows you to retrieve OAuth access tokens for external services that the app has connected to. Connectors are app-scoped. When an app builder connects an integration like Google Calendar, Slack, or GitHub, all users of the app share that same connection.
@@ -236,6 +246,8 @@ export interface ConnectorsModule {
   /**
    * Retrieves an OAuth access token for an end user's connection to a specific connector.
    *
+   * @deprecated Use {@link getCurrentAppUserConnection} instead.
+   *
    * Returns the OAuth token string that belongs to the currently authenticated end user
    * for the specified connector.
    *
@@ -253,6 +265,28 @@ export interface ConnectorsModule {
    * ```
    */
   getCurrentAppUserAccessToken(connectorId: string): Promise<string>;
+
+  /**
+   * Retrieves the OAuth access token and connection configuration for an end user's
+   * connection to a specific connector.
+   *
+   * Returns both the OAuth token and any connection-specific configuration that
+   * belongs to the currently authenticated end user for the specified connector.
+   *
+   * @param connectorId - The connector ID (OrgConnector database ID).
+   * @returns Promise resolving to an {@link AppUserConnectorConnectionResponse} with `accessToken` and `connectionConfig`.
+   *
+   * @example
+   * ```typescript
+   * // Get the end user's connection details for a connector
+   * const { accessToken, connectionConfig } = await base44.asServiceRole.connectors.getCurrentAppUserConnection('abc123def');
+   *
+   * const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+   *   headers: { 'Authorization': `Bearer ${accessToken}` }
+   * });
+   * ```
+   */
+  getCurrentAppUserConnection(connectorId: string): Promise<AppUserConnectorConnectionResponse>;
 }
 
 /**

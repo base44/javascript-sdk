@@ -3,6 +3,7 @@ import {
   ConnectorIntegrationType,
   ConnectorAccessTokenResponse,
   ConnectorConnectionResponse,
+  AppUserConnectorConnectionResponse,
   ConnectorsModule,
   UserConnectorsModule,
 } from "./connectors.types.js";
@@ -58,6 +59,9 @@ export function createConnectorsModule(
       };
     },
 
+    /**
+     * @deprecated Use getCurrentAppUserConnection(connectorId) and use the returned accessToken (and connectionConfig when needed) instead.
+     */
     async getCurrentAppUserAccessToken(
       connectorId: string
     ): Promise<string> {
@@ -71,6 +75,24 @@ export function createConnectorsModule(
 
       const data = response as unknown as { access_token: string };
       return data.access_token;
+    },
+
+    async getCurrentAppUserConnection(
+      connectorId: string
+    ): Promise<AppUserConnectorConnectionResponse> {
+      if (!connectorId || typeof connectorId !== "string") {
+        throw new Error("Connector ID is required and must be a string");
+      }
+
+      const response = await axios.get(
+        `/apps/${appId}/app-user-auth/connectors/${connectorId}/token`
+      );
+
+      const data = response as unknown as ConnectorAccessTokenResponse;
+      return {
+        accessToken: data.access_token,
+        connectionConfig: data.connection_config ?? null,
+      };
     },
   };
 }
