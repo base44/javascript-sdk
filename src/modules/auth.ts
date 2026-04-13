@@ -2,9 +2,6 @@ import { AxiosInstance } from "axios";
 import {
   AuthModule,
   AuthModuleOptions,
-  AuthEvent,
-  AuthEventData,
-  AuthStateChangeCallback,
   VerifyOtpParams,
   ChangePasswordParams,
   ResetPasswordParams,
@@ -94,12 +91,6 @@ export function createAuthModule(
   appId: string,
   options: AuthModuleOptions
 ): AuthModule {
-  const listeners = new Set<AuthStateChangeCallback>();
-
-  function notify(event: AuthEvent, data: AuthEventData = {}) {
-    listeners.forEach((cb) => cb(event, data));
-  }
-
   return {
     // Get current user information
     async me() {
@@ -166,7 +157,6 @@ export function createAuthModule(
     logout(redirectUrl?: string) {
       // Remove token from axios headers (always do this)
       delete axios.defaults.headers.common["Authorization"];
-      notify("SIGNED_OUT");
 
       // Only do the rest if in a browser environment
       if (typeof window !== "undefined") {
@@ -194,7 +184,6 @@ export function createAuthModule(
     setToken(token: string, saveToStorage = true) {
       if (!token) return;
 
-
       // handle token change for axios clients
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
       functionsAxiosClient.defaults.headers.common[
@@ -215,7 +204,6 @@ export function createAuthModule(
           console.error("Failed to save token to localStorage:", e);
         }
       }
-
     },
 
     // Login using username and password
@@ -238,7 +226,6 @@ export function createAuthModule(
 
         if (access_token) {
           this.setToken(access_token);
-          notify("SIGNED_IN", { access_token });
         }
 
         return {
@@ -323,12 +310,5 @@ export function createAuthModule(
       });
     },
 
-    // Subscribe to auth state changes
-    onAuthStateChange(callback: AuthStateChangeCallback) {
-      listeners.add(callback);
-      return () => {
-        listeners.delete(callback);
-      };
-    },
   };
 }

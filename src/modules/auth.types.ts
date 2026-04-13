@@ -103,27 +103,6 @@ export interface AuthModuleOptions {
 }
 
 /**
- * Auth state change event types.
- */
-export type AuthEvent = "SIGNED_IN" | "SIGNED_OUT";
-
-/**
- * Data passed to auth state change callbacks.
- */
-export interface AuthEventData {
-  /** JWT access token, present on SIGNED_IN and TOKEN_REFRESHED events. */
-  access_token?: string;
-}
-
-/**
- * Callback for auth state changes.
- */
-export type AuthStateChangeCallback = (
-  event: AuthEvent,
-  data: AuthEventData
-) => void;
-
-/**
  * Authentication module for managing user authentication and authorization. The module automatically stores tokens in local storage when available and manages authorization headers for API requests.
  *
  * ## Features
@@ -528,34 +507,4 @@ export interface AuthModule {
    * ```
    */
   changePassword(params: ChangePasswordParams): Promise<any>;
-
-  /**
-   * Registers a callback that fires whenever the authentication state changes.
-   *
-   * Events:
-   * - `SIGNED_IN` — fired after a successful login (email/password, OAuth, or popup).
-   * - `SIGNED_OUT` — fired after logout.
-   *
-   * Returns an unsubscribe function. Call it to stop receiving events.
-   *
-   * @param callback - Function called with the event type and associated data.
-   * @returns Unsubscribe function.
-   *
-   * @example
-   * ```typescript
-   * // In a React AuthContext provider
-   * useEffect(() => {
-   *   const unsubscribe = base44.auth.onAuthStateChange(async (event, data) => {
-   *     if (event === 'SIGNED_IN') {
-   *       const user = await base44.auth.me();
-   *       setUser(user);
-   *     } else if (event === 'SIGNED_OUT') {
-   *       setUser(null);
-   *     }
-   *   });
-   *   return unsubscribe;
-   * }, []);
-   * ```
-   */
-  onAuthStateChange(callback: AuthStateChangeCallback): () => void;
 }
