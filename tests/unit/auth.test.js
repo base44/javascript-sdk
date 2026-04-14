@@ -632,15 +632,244 @@ describe('Auth Module', () => {
       // Mock network error
       scope.get(`/api/apps/${appId}/entities/User/me`)
         .replyWithError('Network error');
-        
+
       // Call the API
       const result = await base44.auth.isAuthenticated();
-      
+
       // Verify the response
       expect(result).toBe(false);
-      
+
       // Verify all mocks were called
       expect(scope.isDone()).toBe(true);
+    });
+  });
+
+  describe('loginWithProvider()', () => {
+    test('should redirect to google login URL by default', () => {
+      const originalWindow = global.window;
+      const mockLocation = { href: '', origin: 'https://myapp.com' };
+      const win = { location: mockLocation };
+      win.parent = win; // not in iframe
+      global.window = win;
+
+      base44.auth.loginWithProvider('google', '/dashboard');
+
+      expect(mockLocation.href).toContain(`${appBaseUrl}/api/apps/auth/login?`);
+      expect(mockLocation.href).toContain(`app_id=${appId}`);
+      expect(mockLocation.href).toContain('from_url=');
+
+      global.window = originalWindow;
+    });
+
+    test('should include provider path for non-google providers', () => {
+      const originalWindow = global.window;
+      const mockLocation = { href: '', origin: 'https://myapp.com' };
+      const win = { location: mockLocation };
+      win.parent = win;
+      global.window = win;
+
+      base44.auth.loginWithProvider('microsoft', '/dashboard');
+
+      expect(mockLocation.href).toContain('/api/apps/auth/microsoft/login?');
+
+      global.window = originalWindow;
+    });
+
+    test('should use SSO URL structure for sso provider', () => {
+      const originalWindow = global.window;
+      const mockLocation = { href: '', origin: 'https://myapp.com' };
+      const win = { location: mockLocation };
+      win.parent = win;
+      global.window = win;
+
+      base44.auth.loginWithProvider('sso', '/dashboard');
+
+      expect(mockLocation.href).toContain(`/api/apps/${appId}/auth/sso/login?`);
+
+      global.window = originalWindow;
+    });
+
+    test('should use popup when inside an iframe', () => {
+      const originalWindow = global.window;
+      const mockPopup = { closed: false, close: vi.fn() };
+      const mockLocation = { href: '', origin: 'https://myapp.com' };
+      // Simulate iframe: window.parent !== window
+      const parentWindow = {};
+      global.window = {
+        location: mockLocation,
+        parent: parentWindow,
+        screenX: 0,
+        screenY: 0,
+        outerWidth: 1024,
+        outerHeight: 768,
+        open: vi.fn().mockReturnValue(mockPopup),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      };
+
+      base44.auth.loginWithProvider('google', '/dashboard');
+
+      // Should NOT have redirected
+      expect(mockLocation.href).toBe('');
+      // Should have opened a popup
+      expect(global.window.open).toHaveBeenCalledTimes(1);
+      const openCall = global.window.open.mock.calls[0];
+      expect(openCall[0]).toContain('popup_origin=');
+      expect(openCall[1]).toBe('base44_auth');
+
+      global.window = originalWindow;
+    });
+
+    test('should not use popup when not inside an iframe', () => {
+      const originalWindow = global.window;
+      const mockLocation = { href: '', origin: 'https://myapp.com' };
+      // window.parent === window (not in iframe)
+      const win = { location: mockLocation, open: vi.fn() };
+      win.parent = win;
+      global.window = win;
+
+      base44.auth.loginWithProvider('google', '/dashboard');
+
+      // Should have redirected directly
+      expect(mockLocation.href).toContain(`${appBaseUrl}/api/apps/auth/login?`);
+      // Should NOT have opened a popup
+      expect(global.window.open).not.toHaveBeenCalled();
+
+      global.window = originalWindow;
+    });
+
+    test('should handle popup being blocked by browser', () => {
+      const originalWindow = global.window;
+      const mockLocation = { href: '', origin: 'https://myapp.com' };
+      const parentWindow = {};
+      global.window = {
+        location: mockLocation,
+        parent: parentWindow,
+        screenX: 0,
+        screenY: 0,
+        outerWidth: 1024,
+        outerHeight: 768,
+        open: vi.fn().mockReturnValue(null), // popup blocked
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      };
+
+      // Should not throw
+      expect(() => {
+        base44.auth.loginWithProvider('google', '/dashboard');
+      }).not.toThrow();
+
+      global.window = originalWindow;
+    });
+
+    test('should redirect on postMessage with valid token from popup', () => {
+      const originalWindow = global.window;
+      const mockPopup = { closed: false, close: vi.fn() };
+      const mockLocation = { href: '', origin: 'https://myapp.com' };
+      const parentWindow = {};
+      let messageHandler;
+      global.window = {
+        location: mockLocation,
+        parent: parentWindow,
+        screenX: 0,
+        screenY: 0,
+        outerWidth: 1024,
+        outerHeight: 768,
+        open: vi.fn().mockReturnValue(mockPopup),
+        addEventListener: vi.fn((event, handler) => {
+          if (event === 'message') messageHandler = handler;
+        }),
+        removeEventListener: vi.fn(),
+      };
+
+      base44.auth.loginWithProvider('google', '/callback');
+
+      // Simulate postMessage from popup
+      messageHandler({
+        origin: 'https://myapp.com',
+        source: mockPopup,
+        data: { access_token: 'test-token-123', is_new_user: true },
+      });
+
+      // Should redirect with token params
+      expect(mockLocation.href).toContain('access_token=test-token-123');
+      expect(mockLocation.href).toContain('is_new_user=true');
+      // Popup should be closed
+      expect(mockPopup.close).toHaveBeenCalled();
+
+      global.window = originalWindow;
+    });
+
+    test('should ignore postMessage from wrong origin', () => {
+      const originalWindow = global.window;
+      const mockPopup = { closed: false, close: vi.fn() };
+      const mockLocation = { href: '', origin: 'https://myapp.com' };
+      const parentWindow = {};
+      let messageHandler;
+      global.window = {
+        location: mockLocation,
+        parent: parentWindow,
+        screenX: 0,
+        screenY: 0,
+        outerWidth: 1024,
+        outerHeight: 768,
+        open: vi.fn().mockReturnValue(mockPopup),
+        addEventListener: vi.fn((event, handler) => {
+          if (event === 'message') messageHandler = handler;
+        }),
+        removeEventListener: vi.fn(),
+      };
+
+      base44.auth.loginWithProvider('google', '/callback');
+
+      // Simulate postMessage from wrong origin
+      messageHandler({
+        origin: 'https://evil.com',
+        source: mockPopup,
+        data: { access_token: 'stolen-token' },
+      });
+
+      // Should NOT have redirected
+      expect(mockLocation.href).toBe('');
+      expect(mockPopup.close).not.toHaveBeenCalled();
+
+      global.window = originalWindow;
+    });
+
+    test('should ignore postMessage from wrong source', () => {
+      const originalWindow = global.window;
+      const mockPopup = { closed: false, close: vi.fn() };
+      const mockLocation = { href: '', origin: 'https://myapp.com' };
+      const parentWindow = {};
+      let messageHandler;
+      global.window = {
+        location: mockLocation,
+        parent: parentWindow,
+        screenX: 0,
+        screenY: 0,
+        outerWidth: 1024,
+        outerHeight: 768,
+        open: vi.fn().mockReturnValue(mockPopup),
+        addEventListener: vi.fn((event, handler) => {
+          if (event === 'message') messageHandler = handler;
+        }),
+        removeEventListener: vi.fn(),
+      };
+
+      base44.auth.loginWithProvider('google', '/callback');
+
+      // Simulate postMessage from correct origin but different source
+      messageHandler({
+        origin: 'https://myapp.com',
+        source: {}, // not the popup
+        data: { access_token: 'stolen-token' },
+      });
+
+      // Should NOT have redirected
+      expect(mockLocation.href).toBe('');
+      expect(mockPopup.close).not.toHaveBeenCalled();
+
+      global.window = originalWindow;
     });
   });
 }); 

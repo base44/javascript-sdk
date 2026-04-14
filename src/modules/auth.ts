@@ -7,6 +7,74 @@ import {
   ResetPasswordParams,
 } from "./auth.types";
 
+function isInsideIframe(): boolean {
+  if (typeof window === "undefined") return false;
+  return window !== window.parent;
+}
+
+/**
+ * Opens a URL in a centered popup and waits for the backend to postMessage
+ * the auth result back. On success, redirects the current window to
+ * redirectUrl with the token params appended, preserving the same behaviour
+ * as a normal full-page redirect flow.
+ *
+ * @param url - The login URL to open in the popup (should include popup_origin).
+ * @param redirectUrl - Where to redirect after auth (the original fromUrl).
+ * @param expectedOrigin - The origin we expect the postMessage to come from.
+ */
+function loginViaPopup(
+  url: string,
+  redirectUrl: string,
+  expectedOrigin: string
+): void {
+  const width = 500;
+  const height = 600;
+  const left = Math.round(window.screenX + (window.outerWidth - width) / 2);
+  const top = Math.round(window.screenY + (window.outerHeight - height) / 2);
+
+  const popup = window.open(
+    url,
+    "base44_auth",
+    `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+  );
+
+  if (!popup) {
+    return;
+  }
+
+  const cleanup = () => {
+    window.removeEventListener("message", onMessage);
+    clearInterval(pollTimer);
+    if (!popup.closed) popup.close();
+  };
+
+  const onMessage = (event: MessageEvent) => {
+    if (event.origin !== expectedOrigin) return;
+    if (event.source !== popup) return;
+    if (!event.data?.access_token) return;
+
+    cleanup();
+
+    const callbackUrl = new URL(redirectUrl);
+    const { access_token, is_new_user } = event.data;
+
+    callbackUrl.searchParams.set("access_token", access_token);
+
+    if (is_new_user != null) {
+      callbackUrl.searchParams.set("is_new_user", String(is_new_user));
+    }
+
+    window.location.href = callbackUrl.toString();
+  };
+
+  // Only used to detect the user closing the popup before auth completes
+  const pollTimer = setInterval(() => {
+    if (popup.closed) cleanup();
+  }, 500);
+
+  window.addEventListener("message", onMessage);
+}
+
 /**
  * Creates the auth module for the Base44 SDK.
  *
@@ -74,7 +142,14 @@ export function createAuthModule(
 
       const loginUrl = `${options.appBaseUrl}/api${authPath}?${queryParams}`;
 
-      // Redirect to the provider login page
+      // When running inside an iframe, use a popup to avoid OAuth providers
+      // blocking iframe navigation.
+      if (isInsideIframe()) {
+        const popupLoginUrl = `${loginUrl}&popup_origin=${encodeURIComponent(window.location.origin)}`;
+        return loginViaPopup(popupLoginUrl, redirectUrl, window.location.origin);
+      }
+
+      // Default: full-page redirect
       window.location.href = loginUrl;
     },
 
@@ -234,5 +309,6 @@ export function createAuthModule(
         new_password: newPassword,
       });
     },
+
   };
 }
