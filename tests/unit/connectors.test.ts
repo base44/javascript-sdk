@@ -100,6 +100,74 @@ describe("Connectors module – getConnection", () => {
   });
 });
 
+describe("Connectors module – getConnection({ connectorId })", () => {
+  const appId = "test-app-id";
+  const serverUrl = "https://base44.app";
+  const serviceToken = "service-token-123";
+  let base44: ReturnType<typeof createClient>;
+  let scope: nock.Scope;
+
+  beforeEach(() => {
+    base44 = createClient({
+      serverUrl,
+      appId,
+      serviceToken,
+    });
+    scope = nock(serverUrl);
+  });
+
+  afterEach(() => {
+    nock.cleanAll();
+  });
+
+  test("extracts accessToken and connectionConfig from by-connector endpoint", async () => {
+    const apiResponse = {
+      access_token: "builder-oauth-token-xyz789",
+      integration_type: "snowflake",
+      connection_config: { subdomain: "xy12345.us-east-1" },
+    };
+
+    scope
+      .get(`/api/apps/${appId}/external-auth/tokens/by-connector/connector-abc`)
+      .reply(200, apiResponse);
+
+    const connection = await base44.asServiceRole.connectors.getConnection({
+      connectorId: "connector-abc",
+    });
+
+    expect(connection.accessToken).toBe("builder-oauth-token-xyz789");
+    expect(connection.connectionConfig).toEqual({
+      subdomain: "xy12345.us-east-1",
+    });
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test("returns connectionConfig as null when API omits connection_config", async () => {
+    const apiResponse = {
+      access_token: "token-only",
+      integration_type: "databricks",
+    };
+
+    scope
+      .get(`/api/apps/${appId}/external-auth/tokens/by-connector/conn-2`)
+      .reply(200, apiResponse);
+
+    const connection = await base44.asServiceRole.connectors.getConnection({
+      connectorId: "conn-2",
+    });
+
+    expect(connection.accessToken).toBe("token-only");
+    expect(connection.connectionConfig).toBeNull();
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test("throws when connectorId is empty string", async () => {
+    await expect(
+      base44.asServiceRole.connectors.getConnection({ connectorId: "" })
+    ).rejects.toThrow("Connector ID is required and must be a string");
+  });
+});
+
 describe("Connectors module – getCurrentAppUserConnection", () => {
   const appId = "test-app-id";
   const serverUrl = "https://base44.app";

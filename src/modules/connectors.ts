@@ -42,15 +42,24 @@ export function createConnectorsModule(
     },
 
     async getConnection(
-      integrationType: ConnectorIntegrationType
+      arg: ConnectorIntegrationType | { connectorId: string }
     ): Promise<ConnectorConnectionResponse> {
-      if (!integrationType || typeof integrationType !== "string") {
+      let url: string;
+      if (typeof arg === "string") {
+        if (!arg) {
+          throw new Error("Integration type is required and must be a string");
+        }
+        url = `/apps/${appId}/external-auth/tokens/${arg}`;
+      } else if (arg && typeof arg === "object" && typeof arg.connectorId === "string") {
+        if (!arg.connectorId) {
+          throw new Error("Connector ID is required and must be a string");
+        }
+        url = `/apps/${appId}/external-auth/tokens/by-connector/${arg.connectorId}`;
+      } else {
         throw new Error("Integration type is required and must be a string");
       }
 
-      const response = await axios.get<ConnectorAccessTokenResponse>(
-        `/apps/${appId}/external-auth/tokens/${integrationType}`
-      );
+      const response = await axios.get<ConnectorAccessTokenResponse>(url);
 
       const data = response as unknown as ConnectorAccessTokenResponse;
       return {
