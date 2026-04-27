@@ -48,7 +48,7 @@ export interface AgentMessageToolCall {
   /** Arguments passed to the tool as JSON string. */
   arguments_string: string;
   /** Status of the tool call. */
-  status: "running" | "success" | "error" | "stopped";
+  status: "running" | "success" | "error" | "stopped" | "waiting_for_user_input";
   /** Results from the tool call. */
   results?: string;
 }
