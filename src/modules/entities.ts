@@ -74,6 +74,42 @@ function parseRealtimeMessage<T = any>(dataStr: string): RealtimeEvent<T> | null
   }
 }
 
+// In-flight HTTP refetches for truncated realtime events. Lets multiple
+// subscribers in the same browser (e.g. several React components subscribed
+// to the same entity) share one HTTP call when they all receive the same
+// truncated event. Keyed by `${entityName}:${id}:${timestamp}` so distinct
+// updates are not collapsed.
+const inflightRefetches = new Map<string, Promise<any>>();
+
+/**
+ * Refetches a record over HTTP after the server signaled it had to slim the
+ * realtime broadcast (`_truncated: true`). Reuses an in-flight promise if
+ * one exists for the same (entityName, id, timestamp) so concurrent
+ * subscribers in the same browser fan out to a single HTTP call.
+ * @internal
+ */
+function refetchTruncated<T>(
+  axios: AxiosInstance,
+  baseURL: string,
+  entityName: string,
+  id: string,
+  timestamp: string
+): Promise<T> {
+  const key = `${entityName}:${id}:${timestamp}`;
+  let promise = inflightRefetches.get(key) as Promise<T> | undefined;
+  if (!promise) {
+    promise = axios.get(`${baseURL}/${id}`) as Promise<T>;
+    inflightRefetches.set(key, promise);
+    // Clear the cache entry after the promise settles plus a short grace
+    // window so late subscribers can still piggy-back on the result. Use
+    // .then(success, failure) instead of .finally to avoid creating an
+    // unhandled rejection tail when the underlying axios call rejects.
+    const cleanup = () => setTimeout(() => inflightRefetches.delete(key), 5_000);
+    promise.then(cleanup, cleanup);
+  }
+  return promise;
+}
+
 /**
  * Creates a handler for a specific entity.
  *
@@ -190,10 +226,33 @@ function createEntityHandler<T = any>(
       // Get the socket and subscribe to the room
       const socket = getSocket();
       const unsubscribe = socket.subscribeToRoom(room, {
-        update_model: (msg) => {
+        update_model: async (msg) => {
           const event = parseRealtimeMessage<T>(msg.data);
           if (!event) {
             return;
+          }
+
+          // Server signals oversize broadcasts with `_truncated: true` on
+          // `data`. The wire payload is bounded for transport; we transparently
+          // refetch the full record over HTTP so callers always see complete
+          // data. Skip on delete events — the record no longer exists.
+          if (event.type !== "delete" && (event.data as any)?._truncated) {
+            try {
+              event.data = await refetchTruncated<T>(
+                axios,
+                baseURL,
+                entityName,
+                event.id,
+                event.timestamp
+              );
+            } catch (error) {
+              console.warn(
+                "[Base44 SDK] Failed to refetch truncated entity, falling through with partial data:",
+                error
+              );
+              // event.data stays as the truncated payload; user code receives
+              // partial data — same UX as today's drop-and-stale.
+            }
           }
 
           try {
