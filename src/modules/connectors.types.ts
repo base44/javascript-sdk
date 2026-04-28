@@ -65,11 +65,15 @@ export interface AppUserConnectorConnectionResponse {
  * | Service | Type identifier |
  * |---|---|
  * | Airtable | `airtable` |
+ * | BambooHR | `bamboohr` |
  * | Box | `box` |
+ * | Calendly | `calendly` |
  * | ClickUp | `clickup` |
+ * | Contentful | `contentful` |
  * | Discord | `discord` |
  * | Dropbox | `dropbox` |
  * | GitHub | `github` |
+ * | GitLab | `gitlab` |
  * | Gmail | `gmail` |
  * | Google Analytics | `google_analytics` |
  * | Google BigQuery | `googlebigquery` |
@@ -77,10 +81,14 @@ export interface AppUserConnectorConnectionResponse {
  * | Google Classroom | `google_classroom` |
  * | Google Docs | `googledocs` |
  * | Google Drive | `googledrive` |
+ * | Google Meet | `googlemeet` |
  * | Google Search Console | `google_search_console` |
  * | Google Sheets | `googlesheets` |
  * | Google Slides | `googleslides` |
+ * | Google Tasks | `googletasks` |
  * | HubSpot | `hubspot` |
+ * | Hugging Face | `hugging_face` |
+ * | Instagram | `instagram` |
  * | Linear | `linear` |
  * | LinkedIn | `linkedin` |
  * | Microsoft Teams | `microsoft_teams` |
@@ -92,6 +100,7 @@ export interface AppUserConnectorConnectionResponse {
  * | Slack User | `slack` |
  * | Slack Bot | `slackbot` |
  * | Splitwise | `splitwise` |
+ * | Supabase | `supabase` |
  * | TikTok | `tiktok` |
  * | Typeform | `typeform` |
  * | Wix | `wix` |
