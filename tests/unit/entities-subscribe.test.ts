@@ -207,8 +207,8 @@ describe("Entities Module - subscribe()", () => {
     warnSpy.mockRestore();
   });
 
-  describe("auto-refetch on _truncated events", () => {
-    test("refetches full record over HTTP when data._truncated is true", async () => {
+  describe("auto-refetch on _oversize events", () => {
+    test("refetches full record over HTTP when data._oversize is true", async () => {
       const mockSocket = createMockSocket();
       const mockAxios = createMockAxios();
       mockAxios.get.mockResolvedValueOnce({
@@ -230,7 +230,7 @@ describe("Entities Module - subscribe()", () => {
         room: `entities:${appId}:Todo`,
         data: JSON.stringify({
           type: "update",
-          data: { id: "123", _truncated: true },
+          data: { id: "123", _oversize: true },
           id: "123",
           timestamp: "2024-01-01T00:00:00.000Z",
         }),
@@ -249,7 +249,7 @@ describe("Entities Module - subscribe()", () => {
       );
     });
 
-    test("does NOT refetch on delete events even if _truncated is set", async () => {
+    test("does NOT refetch on delete events even if _oversize is set", async () => {
       const mockSocket = createMockSocket();
       const mockAxios = createMockAxios();
 
@@ -266,7 +266,7 @@ describe("Entities Module - subscribe()", () => {
         room: `entities:${appId}:Todo`,
         data: JSON.stringify({
           type: "delete",
-          data: { id: "123", _truncated: true },
+          data: { id: "123", _oversize: true },
           id: "123",
           timestamp: "2024-01-01T00:00:00.000Z",
         }),
@@ -281,7 +281,7 @@ describe("Entities Module - subscribe()", () => {
       );
     });
 
-    test("does NOT refetch when data has no _truncated flag", async () => {
+    test("does NOT refetch when data has no _oversize flag", async () => {
       const mockSocket = createMockSocket();
       const mockAxios = createMockAxios();
 
@@ -306,7 +306,7 @@ describe("Entities Module - subscribe()", () => {
 
       await vi.waitFor(() => expect(callback).toHaveBeenCalledTimes(1));
 
-      // Untruncated payload — no refetch
+      // No oversize flag — no refetch
       expect(mockAxios.get).not.toHaveBeenCalled();
       expect(callback).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -335,7 +335,7 @@ describe("Entities Module - subscribe()", () => {
         room: `entities:${appId}:Todo`,
         data: JSON.stringify({
           type: "update",
-          data: { id: "456", _truncated: true },
+          data: { id: "456", _oversize: true },
           id: "456",
           timestamp: "2024-01-01T00:00:00.000Z",
         }),
@@ -347,11 +347,11 @@ describe("Entities Module - subscribe()", () => {
       expect(callback).toHaveBeenCalledWith(
         expect.objectContaining({
           type: "update",
-          data: { id: "456", _truncated: true },
+          data: { id: "456", _oversize: true },
         })
       );
       expect(warnSpy).toHaveBeenCalledWith(
-        "[Base44 SDK] Failed to refetch truncated entity, falling through with partial data:",
+        "[Base44 SDK] Failed to refetch oversize entity, falling through with stub payload:",
         expect.any(Error)
       );
 
@@ -361,7 +361,7 @@ describe("Entities Module - subscribe()", () => {
     test("debounces concurrent refetches for the same (entity, id, timestamp)", async () => {
       // The debounce map is keyed by `${entityName}:${id}:${timestamp}`, so two
       // events arriving back-to-back with the same key should fan out to a
-      // single HTTP refetch. We simulate that by sending the same truncated
+      // single HTTP refetch. We simulate that by sending the same oversize
       // message twice in quick succession (before the first refetch resolves)
       // and asserting only one HTTP call fires.
       const mockSocket = createMockSocket();
@@ -382,19 +382,19 @@ describe("Entities Module - subscribe()", () => {
       const callback = vi.fn();
       entities.Todo.subscribe(callback);
 
-      const truncatedMsg = {
+      const oversizeMsg = {
         room: `entities:${appId}:Todo`,
         data: JSON.stringify({
           type: "update",
-          data: { id: "789", _truncated: true },
+          data: { id: "789", _oversize: true },
           id: "789",
           timestamp: "2024-01-01T00:00:00.000Z",
         }),
       };
 
       // Same key arrives twice while the first refetch is still in-flight.
-      mockSocket._simulateMessage(`entities:${appId}:Todo`, truncatedMsg);
-      mockSocket._simulateMessage(`entities:${appId}:Todo`, truncatedMsg);
+      mockSocket._simulateMessage(`entities:${appId}:Todo`, oversizeMsg);
+      mockSocket._simulateMessage(`entities:${appId}:Todo`, oversizeMsg);
 
       // Both handlers piggy-back on a single HTTP call.
       await Promise.resolve();
@@ -404,7 +404,7 @@ describe("Entities Module - subscribe()", () => {
       resolveRecord({ id: "789", title: "Full" });
       await vi.waitFor(() => expect(callback).toHaveBeenCalledTimes(2));
       expect(mockAxios.get).toHaveBeenCalledTimes(1);
-      // Both invocations carry the freshly fetched record, not the truncated stub.
+      // Both invocations carry the freshly fetched record, not the oversize stub.
       expect(callback).toHaveBeenNthCalledWith(
         1,
         expect.objectContaining({ data: { id: "789", title: "Full" } })

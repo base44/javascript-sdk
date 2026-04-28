@@ -74,16 +74,16 @@ function parseRealtimeMessage<T = any>(dataStr: string): RealtimeEvent<T> | null
   }
 }
 
-// In-flight HTTP refetches for truncated realtime events. Lets multiple
+// In-flight HTTP refetches for oversize realtime events. Lets multiple
 // subscribers in the same browser (e.g. several React components subscribed
 // to the same entity) share one HTTP call when they all receive the same
-// truncated event. Keyed by `${entityName}:${id}:${timestamp}` so distinct
+// oversize event. Keyed by `${entityName}:${id}:${timestamp}` so distinct
 // updates are not collapsed.
 const inflightRefetches = new Map<string, Promise<any>>();
 
 /**
  * Refetches a record over HTTP after the server signaled it had to slim the
- * realtime broadcast (`_truncated: true`). Reuses an in-flight promise if
+ * realtime broadcast (`_oversize: true`). Reuses an in-flight promise if
  * one exists for the same (entityName, id, timestamp) so concurrent
  * subscribers in the same browser fan out to a single HTTP call.
  * @internal
@@ -232,11 +232,11 @@ function createEntityHandler<T = any>(
             return;
           }
 
-          // Server signals oversize broadcasts with `_truncated: true` on
+          // Server signals oversize broadcasts with `_oversize: true` on
           // `data`. The wire payload is bounded for transport; we transparently
           // refetch the full record over HTTP so callers always see complete
           // data. Skip on delete events — the record no longer exists.
-          if (event.type !== "delete" && (event.data as any)?._truncated) {
+          if (event.type !== "delete" && (event.data as any)?._oversize) {
             try {
               event.data = await refetchTruncated<T>(
                 axios,
@@ -247,11 +247,11 @@ function createEntityHandler<T = any>(
               );
             } catch (error) {
               console.warn(
-                "[Base44 SDK] Failed to refetch truncated entity, falling through with partial data:",
+                "[Base44 SDK] Failed to refetch oversize entity, falling through with stub payload:",
                 error
               );
-              // event.data stays as the truncated payload; user code receives
-              // partial data — same UX as today's drop-and-stale.
+              // event.data stays as the `{id, _oversize: true}` stub; user
+              // code receives partial data — same UX as today's drop-and-stale.
             }
           }
 
