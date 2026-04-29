@@ -49,9 +49,16 @@ export interface AppUserConnectorConnectionResponse {
 }
 
 /**
- * Connectors module for managing app-scoped OAuth tokens for external services.
+ * Connectors module for managing OAuth tokens for external services.
  *
- * This module allows you to retrieve OAuth access tokens for external services that the app has connected to. Connectors are app-scoped. When an app builder connects an integration like Google Calendar, Slack, or GitHub, all users of the app share that same connection.
+ * Use this module in **service role** mode (`base44.asServiceRole.connectors`) from server-side code.
+ *
+ * There are two ways to obtain tokens:
+ *
+ * - **App-scoped connections** — The app builder connects an integration once; every user of the app shares that OAuth token. Call {@link getConnection} with an [integration type](#available-connectors) string (for example `'googlecalendar'` or `'slack'`).
+ * - **End-user (app-user) connections** — Each signed-in end user has their own OAuth token for connectors that support per-user auth. Call {@link getCurrentAppUserConnection} with the **connector ID** (the org connector's database ID), not the integration type. The API returns tokens for the user your request acts on behalf of: when the client is created with both a service token and the end user's JWT (for example via {@link createClientFromRequest | createClientFromRequest()} in a Base44 backend function), requests include the `on-behalf-of` header so the correct user's connection is resolved.
+ *
+ * End users start or revoke OAuth from the browser using {@link UserConnectorsModule | `base44.connectors`} (`connectAppUser` / `disconnectAppUser`).
  *
  * Unlike the integrations module that provides pre-built functions, connectors give you
  * raw OAuth tokens so you can call external service APIs directly with full control over
@@ -60,7 +67,7 @@ export interface AppUserConnectorConnectionResponse {
  *
  * ## Available connectors
  *
- * All connectors work through [`getConnection()`](#getconnection). Pass the integration type string and use the returned OAuth token to call the external service's API directly.
+ * For **app-scoped** tokens, pass the integration type string to {@link getConnection}. Use the returned `accessToken` (and `connectionConfig` when the connector provides extra parameters) to call the external service's API directly.
  *
  * | Service | Type identifier |
  * |---|---|
@@ -108,7 +115,7 @@ export interface AppUserConnectorConnectionResponse {
  *
  * ## Dynamic Types
  *
- * If you're working in a TypeScript project, you can generate types from your app's connector configurations to get autocomplete on integration type names when calling `getConnection()`. See the [Dynamic Types](/developers/references/sdk/getting-started/dynamic-types) guide to get started.
+ * If you're working in a TypeScript project, you can generate types from your app's connector configurations to get autocomplete on integration type names when calling {@link getConnection}. See the [Dynamic Types](/developers/references/sdk/getting-started/dynamic-types) guide to get started.
  */
 export interface ConnectorsModule {
   /**
@@ -267,13 +274,13 @@ export interface ConnectorsModule {
   getCurrentAppUserAccessToken(connectorId: string): Promise<string>;
 
   /**
-   * Retrieves the OAuth access token and connection configuration for an end user's
-   * connection to a specific connector.
+   * Retrieves the OAuth access token and connection configuration for an end user's connection to a specific connector.
    *
-   * Returns both the OAuth token and any connection-specific configuration that
-   * belongs to the currently authenticated end user for the specified connector.
+   * Use this instead of {@link getCurrentAppUserAccessToken} when you need `connectionConfig` (for example a subdomain or other parameters the integration requires for API URLs).
    *
-   * @param connectorId - The connector ID (OrgConnector database ID).
+   * The token belongs to the **end user the request acts on behalf of**. In practice, call from server-side code where the client was created with a service token **and** the end user's JWT so the runtime forwards an `on-behalf-of` header (for example {@link createClientFromRequest | createClientFromRequest()} in a Base44 backend function).
+   *
+   * @param connectorId - The connector ID (OrgConnector database ID), not the integration type string.
    * @returns Promise resolving to an {@link AppUserConnectorConnectionResponse} with `accessToken` and `connectionConfig`.
    *
    * @example
@@ -282,8 +289,20 @@ export interface ConnectorsModule {
    * const { accessToken, connectionConfig } = await base44.asServiceRole.connectors.getCurrentAppUserConnection('abc123def');
    *
    * const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
-   *   headers: { 'Authorization': `Bearer ${accessToken}` }
+   *   headers: { Authorization: `Bearer ${accessToken}` }
    * });
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Using connectionConfig for APIs that need extra connection parameters
+   * const { accessToken, connectionConfig } = await base44.asServiceRole.connectors.getCurrentAppUserConnection('abc123def');
+   *
+   * const subdomain = connectionConfig?.subdomain;
+   * const data = await fetch(
+   *   `https://${subdomain}.example.com/api/v1/resources`,
+   *   { headers: { Authorization: `Bearer ${accessToken}` } }
+   * ).then((r) => r.json());
    * ```
    */
   getCurrentAppUserConnection(connectorId: string): Promise<AppUserConnectorConnectionResponse>;
