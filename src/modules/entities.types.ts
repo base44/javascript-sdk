@@ -96,6 +96,94 @@ export type SortField<T> =
   | `-${keyof T & string}`;
 
 /**
+ * Entity filter query type system.
+ *
+ * `EntityFilterQuery<T>` keeps field names tied to the entity schema while
+ * allowing Base44's documented filtering syntax. Each field can use an exact
+ * value, `null`, an array shorthand for matching any listed value, or a
+ * field-level operator object. Root-level `$and`, `$or`, and `$nor` combine
+ * nested filter queries.
+ *
+ * Operator values are typed from the field they filter where possible. For
+ * example, numeric fields accept numeric comparison values, string fields
+ * accept `$regex`, and array fields accept `$all` and `$size`.
+ */
+
+/**
+ * Value accepted when filtering an entity field.
+ *
+ * Supports exact matches, `null`, array shorthand for matching any of the
+ * provided values, and documented MongoDB-style query operators.
+ *
+ * @typeParam T - Field value type.
+ */
+export type EntityFilterValue<T> =
+  | EntityFilterComparable<T>
+  | EntityFilterComparable<T>[]
+  | EntityFilterOperators<T>;
+
+/**
+ * MongoDB-style query operators accepted for a single entity field.
+ *
+ * @typeParam T - Field value type.
+ */
+export type EntityFilterOperators<T> = EntityFilterCommonOperators<T> & {
+  /** Negates another field-level filter expression. */
+  $not?: EntityFilterCommonOperators<T>;
+};
+
+type EntityFilterComparable<T> = Exclude<T, undefined> | null;
+
+type EntityFilterCommonOperators<T> = {
+  $eq?: EntityFilterComparable<T>;
+  $ne?: EntityFilterComparable<T>;
+  $gt?: EntityFilterComparable<T>;
+  $gte?: EntityFilterComparable<T>;
+  $lt?: EntityFilterComparable<T>;
+  $lte?: EntityFilterComparable<T>;
+  $in?: EntityFilterComparable<T>[];
+  $nin?: EntityFilterComparable<T>[];
+  $exists?: boolean;
+} & EntityFilterStringOperators<T> &
+  EntityFilterArrayOperators<T>;
+
+type EntityFilterStringOperators<T> = Extract<
+  Exclude<T, undefined | null>,
+  string
+> extends never
+  ? {}
+  : {
+      $regex?: string;
+    };
+
+type EntityFilterArrayElement<T> = T extends readonly (infer U)[] ? U : never;
+
+type EntityFilterArrayOperators<T> = [
+  EntityFilterArrayElement<Exclude<T, undefined | null>>,
+] extends [never]
+  ? {}
+  : {
+      $all?: EntityFilterArrayElement<Exclude<T, undefined | null>>[];
+      $size?: number;
+    };
+
+/**
+ * Query object accepted by entity filtering methods.
+ *
+ * Field keys are typed from the entity schema. `$and`, `$or`, and `$nor`
+ * combine nested filter queries at the root level.
+ *
+ * @typeParam T - Entity record type.
+ */
+export type EntityFilterQuery<T> = {
+  [K in keyof T]?: EntityFilterValue<T[K]>;
+} & {
+  $and?: EntityFilterQuery<T>[];
+  $or?: EntityFilterQuery<T>[];
+  $nor?: EntityFilterQuery<T>[];
+};
+
+/**
  * Fields added by the server to every entity record, such as `id`, `created_date`, `updated_date`, and `created_by`.
  */
 interface ServerEntityFields {
@@ -208,7 +296,9 @@ export interface EntityHandler<T = any> {
    * @typeParam K - The fields to include in the response. Defaults to all fields.
    * @param query - Query object with field-value pairs. Each key should be a field name
    * from your entity schema, and each value is the criteria to match. Records matching all
-   * specified criteria are returned. Field names are case-sensitive.
+   * specified criteria are returned. Field names are case-sensitive. Use field-value pairs
+   * for exact matches, `null` for null values, arrays as shorthand for matching any of the
+   * provided values, or documented MongoDB query operators for advanced filtering.
    * @param sort - Sort parameter, such as `'-created_date'` for descending. Defaults to `'-created_date'`.
    * @param limit - Maximum number of results to return. Defaults to `50`.
    * @param skip - Number of results to skip for pagination. Defaults to `0`.
@@ -229,6 +319,42 @@ export interface EntityHandler<T = any> {
    * const filteredRecords = await base44.entities.MyEntity.filter({
    *   priority: 'high',
    *   status: 'active'
+   * });
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Filter by any matching value
+   * const records = await base44.entities.MyEntity.filter({
+   *   external_id: ['item-1', 'item-2']
+   * });
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Filter with query operators
+   * const popularRecords = await base44.entities.MyEntity.filter({
+   *   count: { $gte: 100 },
+   *   external_id: { $in: ['item-1', 'item-2'] }
+   * });
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Filter with logical operators
+   * const records = await base44.entities.MyEntity.filter({
+   *   $or: [
+   *     { name: 'Example item' },
+   *     { slug: 'example-item' }
+   *   ]
+   * });
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Filter null values
+   * const recordsWithoutDescription = await base44.entities.MyEntity.filter({
+   *   description: null
    * });
    * ```
    *
@@ -256,7 +382,7 @@ export interface EntityHandler<T = any> {
    * ```
    */
   filter<K extends keyof T = keyof T>(
-    query: Partial<T>,
+    query: EntityFilterQuery<T>,
     sort?: SortField<T>,
     limit?: number,
     skip?: number,
