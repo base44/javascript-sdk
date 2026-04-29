@@ -3,6 +3,7 @@ import {
   DeleteManyResult,
   DeleteResult,
   EntitiesModule,
+  EntityFilterQuery,
   EntityHandler,
   ImportResult,
   RealtimeCallback,
@@ -112,7 +113,7 @@ function createEntityHandler<T = any>(
 
     // Filter entities based on query
     async filter<K extends keyof T = keyof T>(
-      query: Partial<T>,
+      query: EntityFilterQuery<T>,
       sort?: SortField<T>,
       limit?: number,
       skip?: number,

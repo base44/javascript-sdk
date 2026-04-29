@@ -10,6 +10,7 @@ interface Todo {
   id: string;
   title: string;
   completed: boolean;
+  description?: string;
 }
 
 // Module augmentation: register Todo type in EntityTypeRegistry
@@ -98,6 +99,34 @@ describe("Entities Module", () => {
     expect(result[0].completed).toBe(true);
 
     // Verify all mocks were called
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test("filter() should support typed advanced query syntax", async () => {
+    const mockTodos: Todo[] = [{ id: "2", title: "Task 2", completed: true }];
+
+    scope
+      .get(`/api/apps/${appId}/entities/Todo`)
+      .query((query) => {
+        const parsedQ = JSON.parse(query.q as string);
+
+        return (
+          parsedQ.title.$in[0] === "Task 1" &&
+          parsedQ.title.$in[1] === "Task 2" &&
+          parsedQ.description === null &&
+          parsedQ.$or[0].title === "Task 2" &&
+          parsedQ.$or[1].completed === true
+        );
+      })
+      .reply(200, mockTodos);
+
+    const result = await base44.entities.Todo.filter({
+      title: { $in: ["Task 1", "Task 2"] },
+      description: null,
+      $or: [{ title: "Task 2" }, { completed: true }],
+    });
+
+    expect(result).toHaveLength(1);
     expect(scope.isDone()).toBe(true);
   });
 
