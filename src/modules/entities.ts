@@ -197,6 +197,22 @@ function createEntityHandler<T = any>(
             return;
           }
 
+          // Server signals oversize broadcasts with `_oversize: true` on
+          // `data`. The wire payload was slimmed to fit under the realtime
+          // transport cap, so big string fields arrive as empty strings (or
+          // the whole record collapses to a stub). Surface this to the
+          // developer console so they know to fetch the full record on
+          // demand (e.g. a follow-up entities.X.get(id) call) instead of
+          // rendering the slimmed payload directly. Skip on delete events
+          // — the record no longer exists.
+          if (event.type !== "delete" && (event.data as any)?._oversize) {
+            console.error(
+              `[Base44 SDK] Realtime broadcast for ${entityName}#${event.id} was oversize and got slimmed for transport. ` +
+                `Fields >10 KB are empty and the rest of the record may be a stub. ` +
+                `Call \`entities.${entityName}.get("${event.id}")\` to fetch the full record.`
+            );
+          }
+
           try {
             callback(event);
           } catch (error) {

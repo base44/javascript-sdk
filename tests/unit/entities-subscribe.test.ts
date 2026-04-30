@@ -207,6 +207,116 @@ describe("Entities Module - subscribe()", () => {
     warnSpy.mockRestore();
   });
 
+  describe("oversize broadcast handling", () => {
+    test("logs a console.error and passes the stub through when data._oversize is true", () => {
+      const mockSocket = createMockSocket();
+      const mockAxios = createMockAxios();
+      const entities = createEntitiesModule({
+        axios: mockAxios as any,
+        appId,
+        getSocket: () => mockSocket as any,
+      });
+
+      const callback = vi.fn();
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      entities.Todo.subscribe(callback);
+
+      mockSocket._simulateMessage(`entities:${appId}:Todo`, {
+        room: `entities:${appId}:Todo`,
+        data: JSON.stringify({
+          type: "update",
+          data: { id: "123", _oversize: true },
+          id: "123",
+          timestamp: "2024-01-01T00:00:00.000Z",
+        }),
+      });
+
+      // No HTTP call — the SDK never auto-refetches.
+      expect(mockAxios.get).not.toHaveBeenCalled();
+      // Developer is notified via console.error.
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[Base44 SDK] Realtime broadcast for Todo#123 was oversize")
+      );
+      // Callback still fires with the slimmed payload — caller decides what to do.
+      expect(callback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "update",
+          id: "123",
+          data: { id: "123", _oversize: true },
+        })
+      );
+
+      errorSpy.mockRestore();
+    });
+
+    test("does NOT log on delete events even if _oversize is set", () => {
+      const mockSocket = createMockSocket();
+      const mockAxios = createMockAxios();
+      const entities = createEntitiesModule({
+        axios: mockAxios as any,
+        appId,
+        getSocket: () => mockSocket as any,
+      });
+
+      const callback = vi.fn();
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      entities.Todo.subscribe(callback);
+
+      mockSocket._simulateMessage(`entities:${appId}:Todo`, {
+        room: `entities:${appId}:Todo`,
+        data: JSON.stringify({
+          type: "delete",
+          data: { id: "123", _oversize: true },
+          id: "123",
+          timestamp: "2024-01-01T00:00:00.000Z",
+        }),
+      });
+
+      expect(errorSpy).not.toHaveBeenCalled();
+      expect(callback).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "delete", id: "123" })
+      );
+
+      errorSpy.mockRestore();
+    });
+
+    test("does NOT log when data has no _oversize flag", () => {
+      const mockSocket = createMockSocket();
+      const mockAxios = createMockAxios();
+      const entities = createEntitiesModule({
+        axios: mockAxios as any,
+        appId,
+        getSocket: () => mockSocket as any,
+      });
+
+      const callback = vi.fn();
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      entities.Todo.subscribe(callback);
+
+      mockSocket._simulateMessage(`entities:${appId}:Todo`, {
+        room: `entities:${appId}:Todo`,
+        data: JSON.stringify({
+          type: "update",
+          data: { id: "123", title: "Normal Todo" },
+          id: "123",
+          timestamp: "2024-01-01T00:00:00.000Z",
+        }),
+      });
+
+      expect(errorSpy).not.toHaveBeenCalled();
+      expect(callback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { id: "123", title: "Normal Todo" },
+        })
+      );
+
+      errorSpy.mockRestore();
+    });
+  });
+
   test("subscribe() should catch and log errors thrown by callback", () => {
     const mockSocket = createMockSocket();
     const mockAxios = createMockAxios();
