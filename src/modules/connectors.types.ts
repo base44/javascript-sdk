@@ -70,7 +70,7 @@ export interface AppUserConnectorConnectionResponse {
  *
  * Each signed-in app user has their own OAuth token. Use this when each user needs to act as themselves. For example, sending emails from their Gmail account or posting to their personal LinkedIn. To use an app user connector:
  *
- * 1. Register OAuth credentials for the service in Workspace Settings to get a **connector ID**.
+ * 1. Register OAuth credentials for the service in Workspace Settings to get a **connector ID**. This requires workspace admin access.
  * 2. From the frontend, call [connectAppUser()](#connectappuser) with the connector ID to get an authorization URL, then redirect the app user to that URL to complete the OAuth flow.
  * 3. In a backend function, call {@linkcode getCurrentAppUserConnection | getCurrentAppUserConnection()} using the service role client (`base44.asServiceRole.connectors`) with the connector ID to retrieve the app user's token.
  * 4. Use the returned `accessToken` to call the external service's API directly.
