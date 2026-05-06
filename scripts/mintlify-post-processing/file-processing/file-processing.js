@@ -1475,6 +1475,7 @@ function mergeSectionWithMethods(content, filePath) {
   const lines = content.split("\n");
   let modified = false;
   const isIntegrations = filePath && filePath.includes("integrations.mdx");
+  const isConnectors = filePath && filePath.includes("connectors.mdx");
   let firstMethodsFound = false;
   
   // Storage for extracted content
@@ -1482,7 +1483,42 @@ function mergeSectionWithMethods(content, filePath) {
   let customDescription = null;
   let indexableContent = [];
   let customIntegrationsModuleDescription = [];
-  
+
+  // For connectors.mdx: remove the appended user-connectors intro section and
+  // fold connectAppUser/disconnectAppUser into the existing ## Methods section.
+  if (isConnectors) {
+    let userConnectorsStart = -1;
+    let appendedMethodsStart = -1;
+
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].trim() === "## user-connectors") {
+        userConnectorsStart = i;
+      } else if (userConnectorsStart !== -1 && lines[i].trim() === "## Methods") {
+        appendedMethodsStart = i;
+        break;
+      }
+    }
+
+    if (userConnectorsStart !== -1 && appendedMethodsStart !== -1) {
+      // Extract the method lines (everything after the appended ## Methods heading)
+      const methodLines = lines.splice(appendedMethodsStart + 1);
+      // Remove the appended ## user-connectors section (intro + ## Methods heading)
+      lines.splice(userConnectorsStart, lines.length - userConnectorsStart);
+
+      // ## Type Definitions doesn't exist yet at this stage — groupTypeDefinitions
+      // creates it later from ## ConnectorIntegrationType. Insert before that heading
+      // so the methods land in ## Methods and the types remain in ## Type Definitions.
+      let insertBefore = lines.findIndex((l) => l.trim() === "## ConnectorIntegrationType");
+      if (insertBefore === -1) {
+        // Fallback: append to end
+        lines.push(...methodLines);
+      } else {
+        lines.splice(insertBefore, 0, ...methodLines);
+      }
+      modified = true;
+    }
+  }
+
   // First pass: extract type descriptions and remove sections in integrations
   if (isIntegrations) {
     for (let i = 0; i < lines.length; i++) {

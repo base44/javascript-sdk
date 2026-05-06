@@ -3,5 +3,6 @@
   "DeleteResult",
   "ImportResult",
   "SortField",
-  "UpdateManyResult"
+  "UpdateManyResult",
+  "user-connectors"
 ]
