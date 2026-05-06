@@ -64,7 +64,7 @@ export interface AppUserConnectorConnectionResponse {
  *
  * 1. Connect the external service account in the app's Integration settings or using the [`connectors push`](/developers/references/cli/commands/connectors-push) CLI command.
  * 2. In a backend function, call {@linkcode getConnection | getConnection()} using the service role client (`base44.asServiceRole.connectors`) with an [integration type](#available-connectors) string to retrieve the shared OAuth token.
- * 3. Use the returned `accessToken` to call the external service's API directly.
+ * 3. Use the returned `accessToken` to call the external service's API directly. Some connectors also return a `connectionConfig` with additional values such as a subdomain for building the API URL.
  *
  * ## App user connectors
  *
@@ -73,7 +73,7 @@ export interface AppUserConnectorConnectionResponse {
  * 1. Register OAuth credentials for the service in Workspace Settings to get a **connector ID**. This requires workspace admin access.
  * 2. From the frontend, call [connectAppUser()](#connectappuser) with the connector ID to get an authorization URL, then redirect the app user to that URL to complete the OAuth flow.
  * 3. In a backend function, call {@linkcode getCurrentAppUserConnection | getCurrentAppUserConnection()} using the service role client (`base44.asServiceRole.connectors`) with the connector ID to retrieve the app user's token.
- * 4. Use the returned `accessToken` to call the external service's API directly.
+ * 4. Use the returned `accessToken` to call the external service's API directly. Some connectors also return a `connectionConfig` with additional values such as a subdomain for building the API URL.
  *
  * ## Available connectors
  *
@@ -105,7 +105,7 @@ export interface AppUserConnectorConnectionResponse {
  * | Google Tasks | `googletasks` |
  * | Hugging Face | `hugging_face` |
  * | HubSpot | `hubspot` |
- * | Instagram | `instagram` |
+ * | Instagram Business | `instagram` |
  * | Linear | `linear` |
  * | LinkedIn | `linkedin` |
  * | Microsoft Teams | `microsoft_teams` |
