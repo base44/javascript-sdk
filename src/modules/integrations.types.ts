@@ -48,9 +48,9 @@ export interface InvokeLLMParams {
   prompt: string;
   /** Optionally specify a model to override the app-level model setting for this specific call.
    *
-   * Options: `"gpt_5_mini"`, `"gemini_3_flash"`, `"gpt_5"`, `"gpt_5_4"`, `"gemini_3_1_pro"`, `"claude_sonnet_4_6"`, `"claude_opus_4_6"`
+   * Options: `"gpt_5_mini"`, `"gemini_3_flash"`, `"gpt_5"`, `"gpt_5_4"`, `"gpt_5_5"`, `"gemini_3_1_pro"`, `"claude_sonnet_4_6"`, `"claude_opus_4_6"`, `"claude_opus_4_7"`
    */
-  model?: 'gpt_5_mini' | 'gemini_3_flash' | 'gpt_5' | 'gpt_5_4' | 'gemini_3_1_pro' | 'claude_sonnet_4_6' | 'claude_opus_4_6';
+  model?: 'gpt_5_mini' | 'gemini_3_flash' | 'gpt_5' | 'gpt_5_4' | 'gpt_5_5' | 'gemini_3_1_pro' | 'claude_sonnet_4_6' | 'claude_opus_4_6' | 'claude_opus_4_7';
   /** If set to `true`, the LLM will use Google Search, Maps, and News to gather real-time context before answering.
    * @default false
    */

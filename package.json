@@ -1,6 +1,6 @@
 {
   "name": "@base44/sdk",
-  "version": "0.8.26",
+  "version": "0.8.27",
   "description": "JavaScript SDK for Base44 API",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -11,7 +11,8 @@
   "scripts": {
     "build": "tsc",
     "lint": "eslint src",
-    "test": "vitest run",
+    "test": "npm run test:types && vitest run",
+    "test:types": "tsc --noEmit -p tsconfig.type-tests.json",
     "test:unit": "vitest run tests/unit",
     "test:e2e": "vitest run tests/e2e",
     "test:watch": "vitest",

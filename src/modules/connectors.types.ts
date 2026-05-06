@@ -103,8 +103,8 @@ export interface AppUserConnectorConnectionResponse {
  * | Google Sheets | `googlesheets` |
  * | Google Slides | `googleslides` |
  * | Google Tasks | `googletasks` |
- * | Hugging Face | `hugging_face` |
  * | HubSpot | `hubspot` |
+ * | Hugging Face | `hugging_face` |
  * | Instagram Business | `instagram` |
  * | Linear | `linear` |
  * | LinkedIn | `linkedin` |
