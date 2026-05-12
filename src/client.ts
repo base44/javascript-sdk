@@ -151,6 +151,17 @@ export function createClient(config: CreateClientConfig): Base44Client {
     }
   );
 
+  // Apply the access token before any module that may issue authenticated
+  // requests during construction (notably analytics, which fires an init
+  // event whose flush calls auth.me()). Without this, the first User/me
+  // request is built before setToken runs and goes out unauthenticated.
+  if (typeof window !== "undefined") {
+    const accessToken = token || getAccessToken();
+    if (accessToken) {
+      userAuthModule.setToken(accessToken);
+    }
+  }
+
   const userModules = {
     entities: createEntitiesModule({
       axios: axiosClient,
@@ -229,15 +240,6 @@ export function createClient(config: CreateClientConfig): Base44Client {
       }
     },
   };
-
-  // Always try to get token from localStorage or URL parameters
-  if (typeof window !== "undefined") {
-    // Get token from URL or localStorage
-    const accessToken = token || getAccessToken();
-    if (accessToken) {
-      userModules.auth.setToken(accessToken);
-    }
-  }
 
   // If authentication is required, verify token and redirect to login if needed
   if (requiresAuth && typeof window !== "undefined") {
