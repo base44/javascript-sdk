@@ -42,6 +42,7 @@ export type {
   EntityFilterValue,
   EntityHandler,
   EntityRecord,
+  EntitySubscriptionOptions,
   EntityTypeRegistry,
   ImportResult,
   RealtimeEventType,
