@@ -136,22 +136,15 @@ export interface AuthModule {
   me(): Promise<User>;
 
   /**
-   * Updates the current authenticated user's information.
+   * Updates the current authenticated user's custom profile fields.
    *
-   * Only the fields included in the data object will be updated.
-   * Commonly updated fields include `full_name` and custom profile fields.
+   * Only custom fields defined in your User entity schema can be updated.
+   * Platform-managed fields (`id`, `email`, `full_name`, `created_date`,
+   * `updated_date`, `app_id`, `is_verified`, `is_service`, `disabled`, and `role`)
+   * are read-only and cannot be changed with this method.
    *
-   * @param data - Object containing the fields to update.
+   * @param data - Object containing the custom fields to update.
    * @returns Promise resolving to the updated user data.
-   *
-   * @example
-   * ```typescript
-   * // Update specific fields
-   * const updatedUser = await base44.auth.updateMe({
-   *   full_name: 'John Doe'
-   * });
-   * console.log(`Updated user: ${updatedUser.full_name}`);
-   * ```
    *
    * @example
    * ```typescript
@@ -164,7 +157,7 @@ export interface AuthModule {
    * ```
    */
   updateMe(
-    data: Partial<Omit<User, "id" | "created_date" | "updated_date">>
+    data: Record<string, any>
   ): Promise<User>;
 
   /**
