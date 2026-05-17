@@ -140,7 +140,7 @@ export interface AuthModule {
    *
    * You can update `role` and any [custom fields](/developers/backend/resources/entities/user-schema#custom-fields) defined in your
    * User entity schema.
-   * The `role` value must match one of the defined options.
+   * The `role` value must be either `'user'` or `'admin'`.
    * <Note>
    * The following fields are read-only and can't be changed with this method:
    * `id`, `email`, `full_name`, `created_date`, `updated_date`, and `created_by`.
