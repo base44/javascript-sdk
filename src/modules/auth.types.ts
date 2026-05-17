@@ -136,7 +136,7 @@ export interface AuthModule {
   me(): Promise<User>;
 
   /**
-   * Updates fields on the current authenticated user's profile.
+   * Updates the current authenticated user's information.
    *
    * You can update `role` and any custom fields defined in your
    * [User entity schema](https://docs.base44.com/developers/backend/resources/entities/user-schema).
