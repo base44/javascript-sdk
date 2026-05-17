@@ -136,22 +136,22 @@ export interface AuthModule {
   me(): Promise<User>;
 
   /**
-   * Updates the current authenticated user's custom profile fields.
+   * Updates fields on the current authenticated user's profile.
    *
-   * Only custom fields defined in your [User entity schema](https://docs.base44.com/developers/backend/resources/entities/user-schema) can be updated.
-   * The following platform-managed fields are read-only and cannot be changed
-   * with this method: `id`, `email`, `full_name`, `created_date`, `updated_date`,
-   * `app_id`, `is_verified`, `is_service`, `disabled`, and `role`.
+   * You can update `role` and any custom fields defined in your
+   * [User entity schema](https://docs.base44.com/developers/backend/resources/entities/user-schema).
+   * The following fields are read-only and cannot be changed with this method:
+   * `id`, `email`, `full_name`, `created_date`, `updated_date`, and `created_by`.
    *
-   * @param data - Object containing the custom fields to update.
+   * @param data - Object containing the fields to update.
    * @returns Promise resolving to the updated user data.
    *
    * @example
    * ```typescript
-   * // Update custom fields defined in your User entity
+   * // Update role and custom fields defined in your User entity
    * await base44.auth.updateMe({
+   *   role: 'admin',
    *   bio: 'Software developer',
-   *   phone: '+1234567890',
    *   preferences: { theme: 'dark' }
    * });
    * ```
