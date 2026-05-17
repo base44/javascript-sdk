@@ -139,9 +139,9 @@ export interface AuthModule {
    * Updates the current authenticated user's custom profile fields.
    *
    * Only custom fields defined in your User entity schema can be updated.
-   * Platform-managed fields (`id`, `email`, `full_name`, `created_date`,
-   * `updated_date`, `app_id`, `is_verified`, `is_service`, `disabled`, and `role`)
-   * are read-only and cannot be changed with this method.
+   * The following platform-managed fields are read-only and cannot be changed
+   * with this method: `id`, `email`, `full_name`, `created_date`, `updated_date`,
+   * `app_id`, `is_verified`, `is_service`, `disabled`, and `role`.
    *
    * @param data - Object containing the custom fields to update.
    * @returns Promise resolving to the updated user data.
