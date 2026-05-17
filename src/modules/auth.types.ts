@@ -138,7 +138,7 @@ export interface AuthModule {
   /**
    * Updates the current authenticated user's information.
    *
-   * You can update `role` and any custom fields defined in your
+   * You can update `role` and any [custom fields](/developers/backend/resources/entities/user-schema#custom-fields) defined in your
    * User entity schema.
    * The `role` value must match one of the defined options.
    * <Note>
