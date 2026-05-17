@@ -139,7 +139,7 @@ export interface AuthModule {
    * Updates the current authenticated user's information.
    *
    * You can update `role` and any custom fields defined in your
-   * [User entity schema](https://docs.base44.com/developers/backend/resources/entities/user-schema).
+   * User entity schema.
    * The `role` value must match one of the defined options.
    * <Note>
    * The following fields are read-only and can't be changed with this method:
