@@ -138,33 +138,29 @@ export interface AuthModule {
   /**
    * Updates the current authenticated user's information.
    *
-   * Only the fields included in the data object will be updated.
-   * Commonly updated fields include `full_name` and custom profile fields.
+   * You can update `role` and any [custom fields](/developers/backend/resources/entities/user-schema#custom-fields) defined in your
+   * User entity schema.
+   * The `role` value must be either `'user'` or `'admin'`.
+   * <Note>
+   * The following fields are read-only and can't be changed with this method:
+   * `id`, `email`, `full_name`, `created_date`, `updated_date`, and `created_by`.
+   * </Note>
    *
    * @param data - Object containing the fields to update.
    * @returns Promise resolving to the updated user data.
    *
    * @example
    * ```typescript
-   * // Update specific fields
-   * const updatedUser = await base44.auth.updateMe({
-   *   full_name: 'John Doe'
-   * });
-   * console.log(`Updated user: ${updatedUser.full_name}`);
-   * ```
-   *
-   * @example
-   * ```typescript
-   * // Update custom fields defined in your User entity
+   * // Update role and custom fields defined in your User entity
    * await base44.auth.updateMe({
+   *   role: 'admin',
    *   bio: 'Software developer',
-   *   phone: '+1234567890',
    *   preferences: { theme: 'dark' }
    * });
    * ```
    */
   updateMe(
-    data: Partial<Omit<User, "id" | "created_date" | "updated_date">>
+    data: Record<string, any>
   ): Promise<User>;
 
   /**
