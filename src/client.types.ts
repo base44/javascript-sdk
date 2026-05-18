@@ -1,7 +1,4 @@
-import type {
-  EntitiesModule,
-  EntitySubscriptionOptions,
-} from "./modules/entities.types.js";
+import type { EntitiesModule } from "./modules/entities.types.js";
 import type { IntegrationsModule } from "./modules/integrations.types.js";
 import type { AuthModule } from "./modules/auth.types.js";
 import type { SsoModule } from "./modules/sso.types.js";
@@ -22,10 +19,6 @@ export interface CreateClientOptions {
    * Optional error handler that will be called whenever an API error occurs.
    */
   onError?: (error: Error) => void;
-  /**
-   * Client-side controls for realtime entity subscriptions.
-   */
-  entitySubscriptions?: EntitySubscriptionOptions;
 }
 
 /**

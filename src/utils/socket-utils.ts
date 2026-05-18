@@ -151,8 +151,14 @@ export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
     }
 
     roomsToListeners[room].push(handlers);
+    let unsubscribed = false;
 
     return () => {
+      if (unsubscribed) {
+        return;
+      }
+
+      unsubscribed = true;
       roomsToListeners[room] =
         roomsToListeners[room]?.filter((listener) => listener !== handlers) ??
         [];

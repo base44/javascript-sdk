@@ -162,20 +162,11 @@ export function createClient(config: CreateClientConfig): Base44Client {
     }
   }
 
-  const userAnalyticsModule = createAnalyticsModule({
-    axiosClient,
-    serverUrl,
-    appId,
-    userAuthModule,
-  });
-
   const userModules = {
     entities: createEntitiesModule({
       axios: axiosClient,
       appId,
       getSocket,
-      subscriptionOptions: options?.entitySubscriptions,
-      trackSubscriptionEvent: userAnalyticsModule.track,
     }),
     integrations: createIntegrationsModule(axiosClient, appId),
     connectors: createUserConnectorsModule(axiosClient, appId),
@@ -201,7 +192,12 @@ export function createClient(config: CreateClientConfig): Base44Client {
     }),
     appLogs: createAppLogsModule(axiosClient, appId),
     users: createUsersModule(axiosClient, appId),
-    analytics: userAnalyticsModule,
+    analytics: createAnalyticsModule({
+      axiosClient,
+      serverUrl,
+      appId,
+      userAuthModule,
+    }),
     cleanup: () => {
       userModules.analytics.cleanup();
       if (socket) {
@@ -215,7 +211,6 @@ export function createClient(config: CreateClientConfig): Base44Client {
       axios: serviceRoleAxiosClient,
       appId,
       getSocket,
-      subscriptionOptions: options?.entitySubscriptions,
     }),
     integrations: createIntegrationsModule(serviceRoleAxiosClient, appId),
     sso: createSsoModule(serviceRoleAxiosClient, appId),

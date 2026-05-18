@@ -68,4 +68,16 @@ describe("RoomsSocket", () => {
     expect(socketMock.emit).toHaveBeenNthCalledWith(2, "leave", "room-a");
     expect(socketMock.emit).toHaveBeenNthCalledWith(3, "join", "room-a");
   });
+
+  test("unsubscribe is idempotent after the room is left", () => {
+    const socket = createRoomsSocket();
+    const unsubscribe = socket.subscribeToRoom("room-a", {});
+
+    unsubscribe();
+    unsubscribe();
+
+    expect(socketMock.emit).toHaveBeenCalledTimes(2);
+    expect(socketMock.emit).toHaveBeenNthCalledWith(1, "join", "room-a");
+    expect(socketMock.emit).toHaveBeenNthCalledWith(2, "leave", "room-a");
+  });
 });

@@ -27,43 +27,6 @@ export interface RealtimeEvent<T = any> {
 export type RealtimeCallback<T = any> = (event: RealtimeEvent<T>) => void;
 
 /**
- * Client-side controls for realtime entity subscriptions.
- */
-export interface EntitySubscriptionOptions {
-  /**
-   * Maximum number of distinct active entity realtime subscriptions allowed
-   * for one SDK client instance. Repeated subscriptions to the same entity
-   * share one active entity subscription and do not count again.
-   *
-   * @defaultValue `100`
-   */
-  maxActiveSubscriptions?: number;
-  /**
-   * Number of subscribe/unsubscribe operations for the same entity within
-   * `churnWindowMs` before the SDK logs a warning and emits diagnostic
-   * telemetry.
-   *
-   * @defaultValue `20`
-   */
-  churnWarningThreshold?: number;
-  /**
-   * Time window, in milliseconds, used to detect repeated subscribe/unsubscribe
-   * churn for one entity.
-   *
-   * @defaultValue `60000`
-   */
-  churnWindowMs?: number;
-  /**
-   * Grace period, in milliseconds, before the SDK leaves an entity realtime
-   * room after its last local callback unsubscribes. A new subscription to
-   * the same entity during this window reuses the existing room membership.
-   *
-   * @defaultValue `1000`
-   */
-  emptyRoomGraceMs?: number;
-}
-
-/**
  * Result returned when deleting a single entity.
  */
 export interface DeleteResult {
