@@ -138,7 +138,7 @@ export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
   }
 
   function getListeners(room: string) {
-    return roomsToListeners[room];
+    return roomsToListeners[room] ?? [];
   }
 
   const subscribeToRoom = (
@@ -151,13 +151,20 @@ export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
     }
 
     roomsToListeners[room].push(handlers);
+    let unsubscribed = false;
 
     return () => {
+      if (unsubscribed) {
+        return;
+      }
+
+      unsubscribed = true;
       roomsToListeners[room] =
         roomsToListeners[room]?.filter((listener) => listener !== handlers) ??
         [];
       if (roomsToListeners[room].length === 0) {
         leaveRoom(room);
+        delete roomsToListeners[room];
       }
     };
   };
