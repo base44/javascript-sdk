@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { RoomsSocket } from "../../src/utils/socket-utils.ts";
 
 const socketMock = vi.hoisted(() => ({
@@ -27,6 +27,10 @@ describe("RoomsSocket", () => {
     socketMock.listeners = {};
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   function createRoomsSocket() {
     return RoomsSocket({
       config: {
@@ -40,6 +44,7 @@ describe("RoomsSocket", () => {
   }
 
   test("shares one room join across multiple listeners until the last unsubscribe", () => {
+    vi.useFakeTimers();
     const socket = createRoomsSocket();
     const firstUnsubscribe = socket.subscribeToRoom("room-a", {});
     const secondUnsubscribe = socket.subscribeToRoom("room-a", {});
@@ -53,15 +58,21 @@ describe("RoomsSocket", () => {
 
     secondUnsubscribe();
 
+    expect(socketMock.emit).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(250);
+
     expect(socketMock.emit).toHaveBeenCalledTimes(2);
     expect(socketMock.emit).toHaveBeenLastCalledWith("leave", "room-a");
   });
 
-  test("rejoins a room after its last listener unsubscribes", () => {
+  test("rejoins a room after its last listener unsubscribe grace elapses", () => {
+    vi.useFakeTimers();
     const socket = createRoomsSocket();
     const firstUnsubscribe = socket.subscribeToRoom("room-a", {});
 
     firstUnsubscribe();
+    vi.advanceTimersByTime(250);
     socket.subscribeToRoom("room-a", {});
 
     expect(socketMock.emit).toHaveBeenNthCalledWith(1, "join", "room-a");
@@ -70,14 +81,40 @@ describe("RoomsSocket", () => {
   });
 
   test("unsubscribe is idempotent after the room is left", () => {
+    vi.useFakeTimers();
     const socket = createRoomsSocket();
     const unsubscribe = socket.subscribeToRoom("room-a", {});
 
     unsubscribe();
     unsubscribe();
 
+    vi.advanceTimersByTime(250);
+
     expect(socketMock.emit).toHaveBeenCalledTimes(2);
     expect(socketMock.emit).toHaveBeenNthCalledWith(1, "join", "room-a");
     expect(socketMock.emit).toHaveBeenNthCalledWith(2, "leave", "room-a");
+  });
+
+  test("does not leave and rejoin during brief unsubscribe-resubscribe churn", () => {
+    vi.useFakeTimers();
+    const socket = createRoomsSocket();
+    const firstUnsubscribe = socket.subscribeToRoom("room-a", {});
+
+    firstUnsubscribe();
+
+    expect(socketMock.emit).toHaveBeenCalledTimes(1);
+
+    const secondUnsubscribe = socket.subscribeToRoom("room-a", {});
+
+    vi.advanceTimersByTime(250);
+
+    expect(socketMock.emit).toHaveBeenCalledTimes(1);
+    expect(socketMock.emit).toHaveBeenCalledWith("join", "room-a");
+
+    secondUnsubscribe();
+    vi.advanceTimersByTime(250);
+
+    expect(socketMock.emit).toHaveBeenCalledTimes(2);
+    expect(socketMock.emit).toHaveBeenLastCalledWith("leave", "room-a");
   });
 });

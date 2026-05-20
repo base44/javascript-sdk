@@ -31,6 +31,8 @@ type TEvent = keyof RoomsSocketEventsMap["listen"];
 
 type THandler<E extends TEvent> = RoomsSocketEventsMap["listen"][E];
 
+const ROOM_LEAVE_GRACE_MS = 250;
+
 function initializeSocket(
   config: RoomsSocketConfig,
   handlers: Partial<RoomsSocketEventsMap["listen"]>
@@ -73,14 +75,20 @@ export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
     TSocketRoom,
     Partial<RoomsSocketEventsMap["listen"]>[]
   > = {};
+  const pendingRoomLeaves: Record<TSocketRoom, ReturnType<typeof setTimeout>> =
+    {};
 
   const handlers: RoomsSocketEventsMap["listen"] = {
     connect: async () => {
       const promises: Promise<void>[] = [];
       Object.keys(roomsToListeners).forEach((room) => {
-        joinRoom(room);
         const listeners = getListeners(room);
-        listeners?.forEach(({ connect }) => {
+        if (listeners.length === 0) {
+          return;
+        }
+
+        joinRoom(room);
+        listeners.forEach(({ connect }) => {
           const promise = async () => connect?.();
           promises.push(promise());
         });
@@ -141,11 +149,37 @@ export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
     return roomsToListeners[room] ?? [];
   }
 
+  function cancelPendingRoomLeave(room: TSocketRoom) {
+    const pendingLeave = pendingRoomLeaves[room];
+    if (!pendingLeave) {
+      return;
+    }
+
+    clearTimeout(pendingLeave);
+    delete pendingRoomLeaves[room];
+  }
+
+  function scheduleRoomLeave(room: TSocketRoom) {
+    cancelPendingRoomLeave(room);
+    pendingRoomLeaves[room] = setTimeout(() => {
+      delete pendingRoomLeaves[room];
+
+      if ((roomsToListeners[room]?.length ?? 0) > 0) {
+        return;
+      }
+
+      leaveRoom(room);
+      delete roomsToListeners[room];
+    }, ROOM_LEAVE_GRACE_MS);
+  }
+
   const subscribeToRoom = (
     room: TSocketRoom,
     handlers: Partial<{ [k in TEvent]: THandler<k> }>
   ) => {
-    if (!roomsToListeners[room]) {
+    if (roomsToListeners[room]) {
+      cancelPendingRoomLeave(room);
+    } else {
       joinRoom(room);
       roomsToListeners[room] = [];
     }
@@ -163,8 +197,7 @@ export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
         roomsToListeners[room]?.filter((listener) => listener !== handlers) ??
         [];
       if (roomsToListeners[room].length === 0) {
-        leaveRoom(room);
-        delete roomsToListeners[room];
+        scheduleRoomLeave(room);
       }
     };
   };
