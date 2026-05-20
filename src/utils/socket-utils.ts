@@ -118,6 +118,8 @@ export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
   }
 
   function disconnect() {
+    clearPendingRoomLeaves();
+
     if (socket) {
       socket.disconnect();
     }
@@ -157,6 +159,17 @@ export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
 
     clearTimeout(pendingLeave);
     delete pendingRoomLeaves[room];
+  }
+
+  function clearPendingRoomLeaves() {
+    Object.keys(pendingRoomLeaves).forEach((room) => {
+      clearTimeout(pendingRoomLeaves[room]);
+      delete pendingRoomLeaves[room];
+
+      if ((roomsToListeners[room]?.length ?? 0) === 0) {
+        delete roomsToListeners[room];
+      }
+    });
   }
 
   function scheduleRoomLeave(room: TSocketRoom) {

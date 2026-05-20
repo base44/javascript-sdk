@@ -117,4 +117,20 @@ describe("RoomsSocket", () => {
     expect(socketMock.emit).toHaveBeenCalledTimes(2);
     expect(socketMock.emit).toHaveBeenLastCalledWith("leave", "room-a");
   });
+
+  test("clears pending room leaves when the socket is replaced", () => {
+    vi.useFakeTimers();
+    const socket = createRoomsSocket();
+    const unsubscribe = socket.subscribeToRoom("room-a", {});
+
+    unsubscribe();
+    socket.updateConfig({ token: "next-token" });
+    socket.subscribeToRoom("room-a", {});
+
+    vi.advanceTimersByTime(250);
+
+    expect(socketMock.emit).toHaveBeenCalledTimes(2);
+    expect(socketMock.emit).toHaveBeenNthCalledWith(1, "join", "room-a");
+    expect(socketMock.emit).toHaveBeenNthCalledWith(2, "join", "room-a");
+  });
 });
