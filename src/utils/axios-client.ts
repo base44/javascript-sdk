@@ -1,6 +1,5 @@
 import axios from "axios";
 import { isInIFrame } from "./common.js";
-import { v4 as uuidv4 } from "uuid";
 import type { Base44ErrorJSON } from "./axios-client.types.js";
 
 /**
@@ -177,7 +176,7 @@ export function createAxiosClient({
     if (typeof window !== "undefined") {
       config.headers.set("X-Origin-URL", window.location.href);
     }
-    const requestId = uuidv4();
+    const requestId = crypto.randomUUID();
     (config as any).requestId = requestId;
     if (isInIFrame) {
       try {
