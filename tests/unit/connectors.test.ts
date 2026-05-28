@@ -96,13 +96,11 @@ describe("Connectors module – getConnection", () => {
       base44.asServiceRole.connectors.getConnection(
         null as unknown as string
       )
-    ).rejects.toThrow(
-      "getConnection requires either an integration type string or an object with a connectorId string"
-    );
+    ).rejects.toThrow("Integration type is required and must be a string");
   });
 });
 
-describe("Connectors module – getConnection({ connectorId })", () => {
+describe("Connectors module – getWorkspaceConnection", () => {
   const appId = "test-app-id";
   const serverUrl = "https://base44.app";
   const serviceToken = "service-token-123";
@@ -133,9 +131,10 @@ describe("Connectors module – getConnection({ connectorId })", () => {
       .get(`/api/apps/${appId}/external-auth/tokens/by-connector/connector-abc`)
       .reply(200, apiResponse);
 
-    const connection = await base44.asServiceRole.connectors.getConnection({
-      connectorId: "connector-abc",
-    });
+    const connection =
+      await base44.asServiceRole.connectors.getWorkspaceConnection(
+        "connector-abc"
+      );
 
     expect(connection.accessToken).toBe("builder-oauth-token-xyz789");
     expect(connection.connectionConfig).toEqual({
@@ -154,9 +153,8 @@ describe("Connectors module – getConnection({ connectorId })", () => {
       .get(`/api/apps/${appId}/external-auth/tokens/by-connector/conn-2`)
       .reply(200, apiResponse);
 
-    const connection = await base44.asServiceRole.connectors.getConnection({
-      connectorId: "conn-2",
-    });
+    const connection =
+      await base44.asServiceRole.connectors.getWorkspaceConnection("conn-2");
 
     expect(connection.accessToken).toBe("token-only");
     expect(connection.connectionConfig).toBeNull();
@@ -165,7 +163,15 @@ describe("Connectors module – getConnection({ connectorId })", () => {
 
   test("throws when connectorId is empty string", async () => {
     await expect(
-      base44.asServiceRole.connectors.getConnection({ connectorId: "" })
+      base44.asServiceRole.connectors.getWorkspaceConnection("")
+    ).rejects.toThrow("Connector ID is required and must be a string");
+  });
+
+  test("throws when connectorId is not a string", async () => {
+    await expect(
+      base44.asServiceRole.connectors.getWorkspaceConnection(
+        null as unknown as string
+      )
     ).rejects.toThrow("Connector ID is required and must be a string");
   });
 });
