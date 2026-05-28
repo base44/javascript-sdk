@@ -56,7 +56,9 @@ export function createConnectorsModule(
         }
         url = `/apps/${appId}/external-auth/tokens/by-connector/${arg.connectorId}`;
       } else {
-        throw new Error("Integration type is required and must be a string");
+        throw new Error(
+          "getConnection requires either an integration type string or an object with a connectorId string"
+        );
       }
 
       const response = await axios.get<ConnectorAccessTokenResponse>(url);

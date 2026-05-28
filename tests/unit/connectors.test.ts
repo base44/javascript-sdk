@@ -96,7 +96,9 @@ describe("Connectors module – getConnection", () => {
       base44.asServiceRole.connectors.getConnection(
         null as unknown as string
       )
-    ).rejects.toThrow("Integration type is required and must be a string");
+    ).rejects.toThrow(
+      "getConnection requires either an integration type string or an object with a connectorId string"
+    );
   });
 });
 
