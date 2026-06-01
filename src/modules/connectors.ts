@@ -67,7 +67,7 @@ export function createConnectorsModule(
       }
 
       const response = await axios.get<ConnectorAccessTokenResponse>(
-        `/apps/${appId}/external-auth/tokens/by-connector/${connectorId}`
+        `/apps/${appId}/external-auth/tokens/connectors/${connectorId}`
       );
 
       const data = response as unknown as ConnectorAccessTokenResponse;

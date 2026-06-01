@@ -120,7 +120,7 @@ describe("Connectors module – getWorkspaceConnection", () => {
     nock.cleanAll();
   });
 
-  test("extracts accessToken and connectionConfig from by-connector endpoint", async () => {
+  test("extracts accessToken and connectionConfig from connectors endpoint", async () => {
     const apiResponse = {
       access_token: "builder-oauth-token-xyz789",
       integration_type: "snowflake",
@@ -128,7 +128,7 @@ describe("Connectors module – getWorkspaceConnection", () => {
     };
 
     scope
-      .get(`/api/apps/${appId}/external-auth/tokens/by-connector/connector-abc`)
+      .get(`/api/apps/${appId}/external-auth/tokens/connectors/connector-abc`)
       .reply(200, apiResponse);
 
     const connection =
@@ -150,7 +150,7 @@ describe("Connectors module – getWorkspaceConnection", () => {
     };
 
     scope
-      .get(`/api/apps/${appId}/external-auth/tokens/by-connector/conn-2`)
+      .get(`/api/apps/${appId}/external-auth/tokens/connectors/conn-2`)
       .reply(200, apiResponse);
 
     const connection =
