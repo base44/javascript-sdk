@@ -1,0 +1,124 @@
+/**
+ * Types for the {@link AccountsModule | accounts} module (multi-tenancy).
+ *
+ * An Account groups the app's end-users into an isolated tenant (a company,
+ * team, or organization). Users join accounts via membership and act inside one
+ * active account at a time. Account-scoped entities are transparently isolated
+ * to the active account (carried by the `X-Active-Account-Id` header, derived
+ * from the `/<account_id>/...` URL path).
+ */
+
+/** Account-management role. Distinct from the app's business roles. */
+export type AccountRole = "owner" | "admin" | "member";
+
+/** Assignable (non-owner) role used for invites/role changes. */
+export type AssignableAccountRole = "admin" | "member";
+
+export type AccountStatus = "active" | "suspended";
+export type AccountMembershipStatus = "pending" | "active";
+
+/** An account (tenant) within the app. */
+export interface Account {
+  id: string;
+  app_id: string;
+  name: string;
+  status: AccountStatus;
+  plan_id?: string | null;
+  billing_status?: string;
+  /** The current user's role in this account (present on `listMine()` results). */
+  my_role?: AccountRole;
+  /** Builder-defined custom fields. */
+  data?: Record<string, unknown>;
+  created_date?: string;
+}
+
+/** The accounts the current user belongs to, plus the active one. */
+export interface MyAccountsResponse {
+  accounts: Account[];
+  active_account_id: string | null;
+}
+
+/** A user's membership in an account. */
+export interface AccountMembership {
+  id: string;
+  account_id: string;
+  email: string;
+  role: AccountRole;
+  status: AccountMembershipStatus;
+}
+
+/** A subscription plan/tier offered to accounts. */
+export interface AccountPlan {
+  id: string;
+  name: string;
+  description?: string | null;
+  price_amount: number;
+  currency: string;
+  interval: "month" | "year";
+  is_active: boolean;
+}
+
+/** A provider checkout session. */
+export interface CheckoutSession {
+  url: string;
+  session_id: string;
+}
+
+/**
+ * The accounts module — manage multi-tenancy ("Accounts") from inside the app.
+ *
+ * Access via `base44.accounts`. Available when the app has multi-tenancy enabled.
+ */
+export interface AccountsModule {
+  /** The active account id, read from the current URL path (or `undefined`). */
+  getActiveAccountId(): string | undefined;
+  /**
+   * Switch the active account by navigating to its folder (`/<accountId>/...`).
+   * A full navigation re-roots the app so all data follows the new account.
+   * @param accountId - The account to switch to.
+   * @param subPath - Optional in-account route to land on (defaults to the root).
+   */
+  switchAccount(accountId: string, subPath?: string): void;
+  /** List the accounts the current user belongs to, plus the active one. */
+  listMine(): Promise<MyAccountsResponse>;
+  /** Create a new account; the current user becomes its owner. */
+  create(params: { name: string; data?: Record<string, unknown> }): Promise<Account>;
+  /** Rename and/or update an account's custom fields (managers only). */
+  update(
+    accountId: string,
+    params: { name?: string; data?: Record<string, unknown> }
+  ): Promise<Account>;
+  /** List an account's members (any active member). */
+  listMembers(accountId: string): Promise<AccountMembership[]>;
+  /** Invite a user by email to an account (managers only). */
+  invite(
+    accountId: string,
+    email: string,
+    role?: AssignableAccountRole
+  ): Promise<AccountMembership>;
+  /** Accept a pending invite to an account for the current user. */
+  acceptInvite(accountId: string): Promise<AccountMembership>;
+  /** Change a member's role (managers only; not for the owner). */
+  changeMemberRole(
+    accountId: string,
+    email: string,
+    role: AssignableAccountRole
+  ): Promise<AccountMembership>;
+  /** Remove a member from an account (managers only; not the owner). */
+  removeMember(accountId: string, email: string): Promise<{ removed: boolean }>;
+  /** Transfer ownership to another active member (owner only). */
+  transferOwnership(
+    accountId: string,
+    email: string
+  ): Promise<{ transferred: boolean }>;
+  /** Per-account billing. */
+  billing: {
+    /** List the active plans available to this account. */
+    listPlans(accountId: string): Promise<AccountPlan[]>;
+    /** Start a subscription checkout session for a plan. */
+    startCheckout(
+      accountId: string,
+      params: { plan_id: string; success_url: string; cancel_url: string }
+    ): Promise<CheckoutSession>;
+  };
+}

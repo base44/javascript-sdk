@@ -12,6 +12,7 @@ import { createFunctionsModule } from "./modules/functions.js";
 import { createAgentsModule } from "./modules/agents.js";
 import { createAppLogsModule } from "./modules/app-logs.js";
 import { createUsersModule } from "./modules/users.js";
+import { createAccountsModule } from "./modules/accounts.js";
 import { RoomsSocket, RoomsSocketConfig } from "./utils/socket-utils.js";
 import type {
   Base44Client,
@@ -192,6 +193,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     }),
     appLogs: createAppLogsModule(axiosClient, appId),
     users: createUsersModule(axiosClient, appId),
+    accounts: createAccountsModule(axiosClient, appId),
     analytics: createAnalyticsModule({
       axiosClient,
       serverUrl,

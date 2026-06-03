@@ -1,5 +1,5 @@
 import axios from "axios";
-import { isInIFrame } from "./common.js";
+import { getActiveAccountIdFromPath, isInIFrame } from "./common.js";
 import { v4 as uuidv4 } from "uuid";
 import type { Base44ErrorJSON } from "./axios-client.types.js";
 
@@ -176,6 +176,15 @@ export function createAxiosClient({
   client.interceptors.request.use((config) => {
     if (typeof window !== "undefined") {
       config.headers.set("X-Origin-URL", window.location.href);
+      // Multi-tenancy: forward the active account (from the URL path) per request
+      // so account-scoped reads/writes stay isolated to the current tenant even
+      // after a client-side account switch. The path is the canonical source, so
+      // it overrides any stale default header (e.g. one frozen at module load);
+      // no-op for single-tenant apps (no account segment in the path).
+      const activeAccountId = getActiveAccountIdFromPath();
+      if (activeAccountId) {
+        config.headers.set("X-Active-Account-Id", activeAccountId);
+      }
     }
     const requestId = uuidv4();
     (config as any).requestId = requestId;

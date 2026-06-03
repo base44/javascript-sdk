@@ -102,6 +102,19 @@ export type {
 
 export type { AppLogsModule } from "./modules/app-logs.types.js";
 
+export type {
+  AccountsModule,
+  Account,
+  AccountMembership,
+  AccountPlan,
+  AccountRole,
+  AssignableAccountRole,
+  AccountStatus,
+  AccountMembershipStatus,
+  MyAccountsResponse,
+  CheckoutSession,
+} from "./modules/accounts.types.js";
+
 export type { SsoModule, SsoAccessTokenResponse } from "./modules/sso.types.js";
 
 export type {
