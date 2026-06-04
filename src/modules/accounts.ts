@@ -9,7 +9,9 @@ import type {
   AccountMembership,
   AccountPlan,
   AccountsModule,
+  AccountSubscription,
   AssignableAccountRole,
+  CheckoutParams,
   CheckoutSession,
   MyAccountsResponse,
 } from "./accounts.types.js";
@@ -28,6 +30,22 @@ export function createAccountsModule(
 ): AccountsModule {
   const base = `/apps/${appId}/accounts`;
   const enc = encodeURIComponent;
+
+  // Resolve the account id to operate on: an explicit id wins, then the
+  // explicitly-stored client selection, then the server-resolved default
+  // (the sole-account case). Throws a clear error when none can be found so
+  // callers never silently send `/accounts/undefined/...` (which 404s as
+  // "Account not found").
+  const resolveAccountId = async (provided?: string | null): Promise<string> => {
+    if (provided) return provided;
+    const stored = getStoredActiveAccountId(appId);
+    if (stored) return stored;
+    const mine: MyAccountsResponse = await axios.get(`${base}/me`);
+    if (mine.active_account_id) return mine.active_account_id;
+    throw new Error(
+      "No active account: pass an accountId, or have the user select or create an account first."
+    );
+  };
 
   return {
     getActiveAccountId(): string | undefined {
@@ -62,8 +80,9 @@ export function createAccountsModule(
       return axios.patch(`${base}/${accountId}`, params);
     },
 
-    async listMembers(accountId: string): Promise<AccountMembership[]> {
-      return axios.get(`${base}/${accountId}/members`);
+    async listMembers(accountId?: string): Promise<AccountMembership[]> {
+      const id = await resolveAccountId(accountId);
+      return axios.get(`${base}/${id}/members`);
     },
 
     async invite(
@@ -103,15 +122,48 @@ export function createAccountsModule(
     },
 
     billing: {
-      async listPlans(accountId: string): Promise<AccountPlan[]> {
-        return axios.get(`${base}/${accountId}/billing/plans`);
+      async listPlans(accountId?: string): Promise<AccountPlan[]> {
+        const id = await resolveAccountId(accountId);
+        return axios.get(`${base}/${id}/billing/plans`);
+      },
+
+      async getSubscription(accountId?: string): Promise<AccountSubscription> {
+        // /me is needed for the account's plan_id/billing_status, and also
+        // resolves the active account id — fetch it once and reuse it.
+        const mine: MyAccountsResponse = await axios.get(`${base}/me`);
+        const id =
+          accountId ??
+          getStoredActiveAccountId(appId) ??
+          mine.active_account_id ??
+          undefined;
+        if (!id) {
+          throw new Error(
+            "No active account: pass an accountId, or have the user select or create an account first."
+          );
+        }
+        const plans: AccountPlan[] = await axios.get(`${base}/${id}/billing/plans`);
+        const account = mine.accounts.find((a) => a.id === id) ?? null;
+        const planId = account?.plan_id ?? null;
+        return {
+          account_id: id,
+          plan_id: planId,
+          billing_status: account?.billing_status ?? "none",
+          plan: planId ? plans.find((p) => p.id === planId) ?? null : null,
+        };
       },
 
       async startCheckout(
-        accountId: string,
-        params: { plan_id: string; success_url: string; cancel_url: string }
+        accountIdOrParams: string | CheckoutParams,
+        maybeParams?: CheckoutParams
       ): Promise<CheckoutSession> {
-        return axios.post(`${base}/${accountId}/billing/checkout`, params);
+        const explicitId =
+          typeof accountIdOrParams === "string" ? accountIdOrParams : undefined;
+        const params =
+          typeof accountIdOrParams === "string"
+            ? maybeParams
+            : accountIdOrParams;
+        const id = await resolveAccountId(explicitId);
+        return axios.post(`${base}/${id}/billing/checkout`, params);
       },
     },
   };

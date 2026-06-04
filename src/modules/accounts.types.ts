@@ -64,6 +64,24 @@ export interface CheckoutSession {
   session_id: string;
 }
 
+/** Parameters for starting a subscription checkout. */
+export interface CheckoutParams {
+  plan_id: string;
+  success_url: string;
+  cancel_url: string;
+}
+
+/** The current subscription state of an account. */
+export interface AccountSubscription {
+  account_id: string;
+  /** The active plan id, or `null` when the account has no subscription. */
+  plan_id: string | null;
+  /** Lifecycle status: "none" | "active" | "past_due" | "canceled". */
+  billing_status: string;
+  /** The resolved plan (matched from the account's available plans), or `null`. */
+  plan: AccountPlan | null;
+}
+
 /**
  * The accounts module — manage multi-tenancy ("Accounts") from inside the app.
  *
@@ -89,8 +107,11 @@ export interface AccountsModule {
     accountId: string,
     params: { name?: string; data?: Record<string, unknown> }
   ): Promise<Account>;
-  /** List an account's members (any active member). */
-  listMembers(accountId: string): Promise<AccountMembership[]>;
+  /**
+   * List an account's members (any active member).
+   * @param accountId - Defaults to the active account when omitted.
+   */
+  listMembers(accountId?: string): Promise<AccountMembership[]>;
   /** Invite a user by email to an account (managers only). */
   invite(
     accountId: string,
@@ -114,12 +135,24 @@ export interface AccountsModule {
   ): Promise<{ transferred: boolean }>;
   /** Per-account billing. */
   billing: {
-    /** List the active plans available to this account. */
-    listPlans(accountId: string): Promise<AccountPlan[]>;
-    /** Start a subscription checkout session for a plan. */
+    /**
+     * List the active plans available to an account.
+     * @param accountId - Defaults to the active account when omitted.
+     */
+    listPlans(accountId?: string): Promise<AccountPlan[]>;
+    /**
+     * Get the current subscription state (plan + status) of an account.
+     * @param accountId - Defaults to the active account when omitted.
+     */
+    getSubscription(accountId?: string): Promise<AccountSubscription>;
+    /**
+     * Start a subscription checkout session for a plan, then redirect the
+     * browser to the returned `url`. The account defaults to the active one.
+     */
+    startCheckout(params: CheckoutParams): Promise<CheckoutSession>;
     startCheckout(
       accountId: string,
-      params: { plan_id: string; success_url: string; cancel_url: string }
+      params: CheckoutParams
     ): Promise<CheckoutSession>;
   };
 }
