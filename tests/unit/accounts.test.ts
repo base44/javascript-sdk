@@ -49,7 +49,7 @@ describe("Accounts module", () => {
   });
 
   // The active-account behavior (getActiveAccountId + the per-request
-  // X-Active-Account-Id header) is browser-only — `getActiveAccountIdFromPath`
+  // X-Active-Account-Id header) is browser-only — `getStoredActiveAccountId`
   // is gated on a module-load `typeof window` check, so it is exercised in the
   // browser/app context, not this node-environment test suite.
   test("getActiveAccountId returns undefined outside a browser", () => {

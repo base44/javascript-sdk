@@ -1,6 +1,9 @@
 import { AxiosInstance } from "axios";
 
-import { getActiveAccountIdFromPath } from "../utils/common.js";
+import {
+  getStoredActiveAccountId,
+  setStoredActiveAccountId,
+} from "../utils/common.js";
 import type {
   Account,
   AccountMembership,
@@ -28,13 +31,17 @@ export function createAccountsModule(
 
   return {
     getActiveAccountId(): string | undefined {
-      return getActiveAccountIdFromPath(appId);
+      return getStoredActiveAccountId(appId);
     },
 
-    switchAccount(accountId: string, subPath = ""): void {
+    switchAccount(accountId: string): void {
+      setStoredActiveAccountId(appId, accountId);
       if (typeof window === "undefined") return;
-      const clean = subPath.replace(/^\/+/, "");
-      window.location.assign(`/${accountId}${clean ? `/${clean}` : "/"}`);
+      window.location.reload();
+    },
+
+    clearActiveAccount(): void {
+      setStoredActiveAccountId(appId, null);
     },
 
     async listMine(): Promise<MyAccountsResponse> {

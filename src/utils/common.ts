@@ -1,25 +1,55 @@
 export const isNode = typeof window === "undefined";
 export const isInIFrame = !isNode && window.self !== window.top;
 
-// Multi-tenancy: apps are served under `/<account_id>/<route>` where the first
-// path segment is a 24-hex Mongo ObjectId. Read it at request time so the active
-// account is always current — even after client-side (Link/useNavigate) account
-// switches that don't reload the module.
+// Multi-tenancy: the active account is explicit client state, not the URL path.
+// It is persisted in localStorage keyed per app (`base44:active_account:<appId>`)
+// so it survives reloads and works under any base path (e.g. the sandbox/preview
+// where the app is served under a non-account base path). When unset, no header
+// is sent and the backend defaults to the user's sole active account.
 const ACCOUNT_ID_RE = /^[a-f0-9]{24}$/;
 
+const activeAccountStorageKey = (appId: string): string =>
+  `base44:active_account:${appId}`;
+
 /**
- * The active account id from the URL, or undefined.
+ * The active account id from stored client state, or undefined.
  *
- * In the sandbox/preview the app is served under `/<appId>/` (the dev-server base
- * path), so the first segment is the app id — its own base, NOT an account. When
- * `appId` is supplied and matches the leading segment, it's skipped so the app id
- * is never sent as an account id; the account, if any, is the next segment.
+ * Browser-only: reads `localStorage['base44:active_account:<appId>']` and returns
+ * it when it's a valid 24-hex account id, else undefined. Returns undefined in
+ * non-browser environments or if storage access throws.
  */
-export function getActiveAccountIdFromPath(appId?: string): string | undefined {
+export function getStoredActiveAccountId(appId: string): string | undefined {
   if (isNode) return undefined;
-  const segments = window.location.pathname.split("/").filter(Boolean);
-  const candidate = appId && segments[0] === appId ? segments[1] : segments[0];
-  return candidate && ACCOUNT_ID_RE.test(candidate) ? candidate : undefined;
+  try {
+    const stored = window.localStorage.getItem(activeAccountStorageKey(appId));
+    return stored && ACCOUNT_ID_RE.test(stored) ? stored : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Persist (or clear) the active account id in stored client state.
+ *
+ * Browser-only: writes `localStorage['base44:active_account:<appId>']` when
+ * `accountId` is a valid 24-hex id, and removes the key when it is null or
+ * invalid. No-op in non-browser environments or if storage access throws.
+ */
+export function setStoredActiveAccountId(
+  appId: string,
+  accountId: string | null
+): void {
+  if (isNode) return;
+  try {
+    const key = activeAccountStorageKey(appId);
+    if (accountId && ACCOUNT_ID_RE.test(accountId)) {
+      window.localStorage.setItem(key, accountId);
+    } else {
+      window.localStorage.removeItem(key);
+    }
+  } catch {
+    /* storage unavailable — ignore */
+  }
 }
 
 export const generateUuid = () => {

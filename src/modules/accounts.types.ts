@@ -4,8 +4,8 @@
  * An Account groups the app's end-users into an isolated tenant (a company,
  * team, or organization). Users join accounts via membership and act inside one
  * active account at a time. Account-scoped entities are transparently isolated
- * to the active account (carried by the `X-Active-Account-Id` header, derived
- * from the `/<account_id>/...` URL path).
+ * to the active account (carried by the `X-Active-Account-Id` header, read from
+ * stored client state in localStorage, keyed per app).
  */
 
 /** Account-management role. Distinct from the app's business roles. */
@@ -70,15 +70,16 @@ export interface CheckoutSession {
  * Access via `base44.accounts`. Available when the app has multi-tenancy enabled.
  */
 export interface AccountsModule {
-  /** The active account id, read from the current URL path (or `undefined`). */
+  /** The active account id, read from stored client state (or `undefined`). */
   getActiveAccountId(): string | undefined;
   /**
-   * Switch the active account by navigating to its folder (`/<accountId>/...`).
-   * A full navigation re-roots the app so all data follows the new account.
+   * Switch the active account by persisting it to stored client state and
+   * reloading the page so all data follows the new account.
    * @param accountId - The account to switch to.
-   * @param subPath - Optional in-account route to land on (defaults to the root).
    */
-  switchAccount(accountId: string, subPath?: string): void;
+  switchAccount(accountId: string): void;
+  /** Clear the stored active account (the backend falls back to the default). */
+  clearActiveAccount(): void;
   /** List the accounts the current user belongs to, plus the active one. */
   listMine(): Promise<MyAccountsResponse>;
   /** Create a new account; the current user becomes its owner. */
