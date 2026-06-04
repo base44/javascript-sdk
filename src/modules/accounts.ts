@@ -28,7 +28,7 @@ export function createAccountsModule(
 
   return {
     getActiveAccountId(): string | undefined {
-      return getActiveAccountIdFromPath();
+      return getActiveAccountIdFromPath(appId);
     },
 
     switchAccount(accountId: string, subPath = ""): void {

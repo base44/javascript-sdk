@@ -112,6 +112,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     baseURL: `${serverUrl}/api`,
     headers,
     token,
+    appId: String(appId),
     onError: options?.onError,
   });
 
@@ -119,6 +120,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     baseURL: `${serverUrl}/api`,
     headers: functionHeaders,
     token,
+    appId: String(appId),
     interceptResponses: false,
     onError: options?.onError,
   });
@@ -132,6 +134,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     baseURL: `${serverUrl}/api`,
     headers: serviceRoleHeaders,
     token: serviceToken,
+    appId: String(appId),
     onError: options?.onError,
   });
 
@@ -139,6 +142,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     baseURL: `${serverUrl}/api`,
     headers: functionHeaders,
     token: serviceToken,
+    appId: String(appId),
     interceptResponses: false,
   });
 

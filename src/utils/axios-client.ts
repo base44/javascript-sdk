@@ -149,12 +149,14 @@ export function createAxiosClient({
   baseURL,
   headers = {},
   token,
+  appId,
   interceptResponses = true,
   onError,
 }: {
   baseURL: string;
   headers?: Record<string, string>;
   token?: string;
+  appId?: string;
   interceptResponses?: boolean;
   onError?: (error: Error) => void;
 }) {
@@ -180,8 +182,9 @@ export function createAxiosClient({
       // so account-scoped reads/writes stay isolated to the current tenant even
       // after a client-side account switch. The path is the canonical source, so
       // it overrides any stale default header (e.g. one frozen at module load);
-      // no-op for single-tenant apps (no account segment in the path).
-      const activeAccountId = getActiveAccountIdFromPath();
+      // no-op for single-tenant apps (no account segment in the path). The app id
+      // is passed so the sandbox base path (/<appId>/) is never read as an account.
+      const activeAccountId = getActiveAccountIdFromPath(appId);
       if (activeAccountId) {
         config.headers.set("X-Active-Account-Id", activeAccountId);
       }
