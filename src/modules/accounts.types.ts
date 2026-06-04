@@ -38,6 +38,18 @@ export interface MyAccountsResponse {
   active_account_id: string | null;
 }
 
+/**
+ * Public, unauthenticated view of an account (its landing page), resolved by
+ * slug. Carries identity plus only the builder-designated public custom fields.
+ */
+export interface PublicAccount {
+  id: string;
+  name: string;
+  slug: string | null;
+  /** Builder-flagged public companion fields (e.g. logo, tagline). */
+  data: Record<string, unknown>;
+}
+
 /** A user's membership in an account. */
 export interface AccountMembership {
   id: string;
@@ -106,10 +118,30 @@ export interface AccountsModule {
    * @param accountId - The account to switch to.
    */
   switchAccount(accountId: string): void;
+  /**
+   * Persist the active account WITHOUT reloading the page.
+   *
+   * Use on the public landing page to select the account before redirecting to
+   * login, so the app resolves that account after the visitor returns. For
+   * switching accounts inside the running app, use {@link switchAccount} (which
+   * reloads so all data follows the new account).
+   */
+  setActiveAccount(accountId: string): void;
   /** Clear the stored active account (the backend falls back to the default). */
   clearActiveAccount(): void;
   /** List the accounts the current user belongs to, plus the active one. */
   listMine(): Promise<MyAccountsResponse>;
+  /**
+   * Resolve a public account by its slug (unauthenticated) for its landing page.
+   * @param slug - The account's URL slug.
+   */
+  getPublicAccount(slug: string): Promise<PublicAccount>;
+  /**
+   * Self-join an account by slug (the current user becomes a member). Requires
+   * login and that the app enables public joining; otherwise rejects.
+   * @param slug - The account's URL slug.
+   */
+  joinAccount(slug: string): Promise<AccountMembership>;
   /** Create a new account; the current user becomes its owner. */
   create(params: { name: string; data?: Record<string, unknown> }): Promise<Account>;
   /** Rename and/or update an account's custom fields (managers only). */

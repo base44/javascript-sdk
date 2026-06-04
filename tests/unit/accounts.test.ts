@@ -117,11 +117,36 @@ describe("Accounts module", () => {
     expect(scope.isDone()).toBe(true);
   });
 
+  test("getPublicAccount GETs the public by-slug endpoint (unauthenticated)", async () => {
+    const payload = { id: ACCT, name: "Acme", slug: "acme", data: { tagline: "Hi" } };
+    scope.get(`/api/apps/${appId}/accounts/public/by-slug/acme`).reply(200, payload);
+    const res = await base44.accounts.getPublicAccount("acme");
+    expect(res).toEqual(payload);
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test("getPublicAccount url-encodes the slug", async () => {
+    scope.get(`/api/apps/${appId}/accounts/public/by-slug/a%2Fb`).reply(200, { id: ACCT, name: "x", slug: "a-b", data: {} });
+    await base44.accounts.getPublicAccount("a/b");
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test("joinAccount POSTs to the by-slug join endpoint", async () => {
+    scope.post(`/api/apps/${appId}/accounts/by-slug/acme/join`, {}).reply(200, { id: "m1", account_id: ACCT, email: "a@b.com", role: "member", status: "active" });
+    const res = await base44.accounts.joinAccount("acme");
+    expect(res.status).toBe("active");
+    expect(scope.isDone()).toBe(true);
+  });
+
   // The active-account behavior (getActiveAccountId + the per-request
   // X-Active-Account-Id header) is browser-only — `getStoredActiveAccountId`
   // is gated on a module-load `typeof window` check, so it is exercised in the
   // browser/app context, not this node-environment test suite.
   test("getActiveAccountId returns undefined outside a browser", () => {
     expect(base44.accounts.getActiveAccountId()).toBeUndefined();
+  });
+
+  test("setActiveAccount does not throw outside a browser (no reload)", () => {
+    expect(() => base44.accounts.setActiveAccount(ACCT)).not.toThrow();
   });
 });

@@ -14,6 +14,7 @@ import type {
   CheckoutParams,
   CheckoutSession,
   MyAccountsResponse,
+  PublicAccount,
 } from "./accounts.types.js";
 
 /**
@@ -58,12 +59,24 @@ export function createAccountsModule(
       window.location.reload();
     },
 
+    setActiveAccount(accountId: string): void {
+      setStoredActiveAccountId(appId, accountId);
+    },
+
     clearActiveAccount(): void {
       setStoredActiveAccountId(appId, null);
     },
 
     async listMine(): Promise<MyAccountsResponse> {
       return axios.get(`${base}/me`);
+    },
+
+    async getPublicAccount(slug: string): Promise<PublicAccount> {
+      return axios.get(`${base}/public/by-slug/${enc(slug)}`);
+    },
+
+    async joinAccount(slug: string): Promise<AccountMembership> {
+      return axios.post(`${base}/by-slug/${enc(slug)}/join`, {});
     },
 
     async create(params: {
