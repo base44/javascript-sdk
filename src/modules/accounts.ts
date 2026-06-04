@@ -82,13 +82,14 @@ export function createAccountsModule(
     async create(params: {
       name: string;
       data?: Record<string, unknown>;
+      slug?: string;
     }): Promise<Account> {
       return axios.post(base, params);
     },
 
     async update(
       accountId: string,
-      params: { name?: string; data?: Record<string, unknown> }
+      params: { name?: string; data?: Record<string, unknown>; slug?: string }
     ): Promise<Account> {
       return axios.patch(`${base}/${accountId}`, params);
     },

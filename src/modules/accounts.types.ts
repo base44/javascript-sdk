@@ -142,12 +142,16 @@ export interface AccountsModule {
    * @param slug - The account's URL slug.
    */
   joinAccount(slug: string): Promise<AccountMembership>;
-  /** Create a new account; the current user becomes its owner. */
-  create(params: { name: string; data?: Record<string, unknown> }): Promise<Account>;
-  /** Rename and/or update an account's custom fields (managers only). */
+  /**
+   * Create a new account; the current user becomes its owner.
+   * @param params.slug - Optional public landing-page URL segment; auto-derived
+   *   from the name when omitted.
+   */
+  create(params: { name: string; data?: Record<string, unknown>; slug?: string }): Promise<Account>;
+  /** Rename, change the landing-page slug, and/or update an account's custom fields (managers only). */
   update(
     accountId: string,
-    params: { name?: string; data?: Record<string, unknown> }
+    params: { name?: string; data?: Record<string, unknown>; slug?: string }
   ): Promise<Account>;
   /**
    * List an account's members (any active member).
