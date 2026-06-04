@@ -56,26 +56,33 @@ describe("Accounts module", () => {
     expect(scope.isDone()).toBe(true);
   });
 
-  test("billing.getSubscription derives plan + status from /me and plans", async () => {
-    const plan = { id: "p1", name: "Pro", price_amount: 1000, currency: "usd", interval: "month", is_active: true };
-    scope.get(`/api/apps/${appId}/accounts/me`).reply(200, {
-      accounts: [{ id: ACCT, name: "Acme", plan_id: "p1", billing_status: "active" }],
-      active_account_id: ACCT,
-    });
-    scope.get(`/api/apps/${appId}/accounts/${ACCT}/billing/plans`).reply(200, [plan]);
+  test("billing.getSubscription GETs the subscription endpoint (resolving active account)", async () => {
+    const payload = {
+      account_id: ACCT,
+      plan_id: "p1",
+      billing_status: "active",
+      billing_provider: "stripe_connect",
+      plan: { id: "p1", name: "Pro", price_amount: 1000, currency: "usd", interval: "month", is_active: true },
+      current_period_end: "2026-07-01T00:00:00+00:00",
+      cancel_at_period_end: false,
+      canceled_at: null,
+      started_at: "2026-06-01T00:00:00+00:00",
+    };
+    scope.get(`/api/apps/${appId}/accounts/me`).reply(200, { accounts: [], active_account_id: ACCT });
+    scope.get(`/api/apps/${appId}/accounts/${ACCT}/billing/subscription`).reply(200, payload);
     const sub = await base44.accounts.billing.getSubscription();
-    expect(sub).toEqual({ account_id: ACCT, plan_id: "p1", billing_status: "active", plan });
+    expect(sub).toEqual(payload);
     expect(scope.isDone()).toBe(true);
   });
 
-  test("billing.getSubscription returns null plan/none status when unsubscribed", async () => {
-    scope.get(`/api/apps/${appId}/accounts/me`).reply(200, {
-      accounts: [{ id: ACCT, name: "Acme", plan_id: null }],
-      active_account_id: ACCT,
-    });
-    scope.get(`/api/apps/${appId}/accounts/${ACCT}/billing/plans`).reply(200, []);
+  test("billing.getSubscription(accountId) uses the explicit id (no /me)", async () => {
+    const payload = {
+      account_id: ACCT, plan_id: null, billing_status: "none", billing_provider: null,
+      plan: null, current_period_end: null, cancel_at_period_end: false, canceled_at: null, started_at: null,
+    };
+    scope.get(`/api/apps/${appId}/accounts/${ACCT}/billing/subscription`).reply(200, payload);
     const sub = await base44.accounts.billing.getSubscription(ACCT);
-    expect(sub).toEqual({ account_id: ACCT, plan_id: null, billing_status: "none", plan: null });
+    expect(sub).toEqual(payload);
     expect(scope.isDone()).toBe(true);
   });
 

@@ -78,8 +78,18 @@ export interface AccountSubscription {
   plan_id: string | null;
   /** Lifecycle status: "none" | "active" | "past_due" | "canceled". */
   billing_status: string;
-  /** The resolved plan (matched from the account's available plans), or `null`. */
+  /** The payment rail backing the subscription, or `null`. */
+  billing_provider: string | null;
+  /** The current plan, or `null` when the account has no subscription. */
   plan: AccountPlan | null;
+  /** When the current paid period ends / renews (ISO 8601), or `null`. */
+  current_period_end: string | null;
+  /** True when the subscription will not renew at period end. */
+  cancel_at_period_end: boolean;
+  /** When the subscription was canceled (ISO 8601), or `null`. */
+  canceled_at: string | null;
+  /** When the subscription started (ISO 8601), or `null`. */
+  started_at: string | null;
 }
 
 /**
