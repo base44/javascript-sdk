@@ -26,9 +26,9 @@
     "create-docs:process": "node scripts/mintlify-post-processing/file-processing/file-processing.js"
   },
   "dependencies": {
-    "axios": "^1.6.2",
-    "socket.io-client": "^4.7.5",
-    "uuid": "^13.0.0"
+    "axios": "^1.15.2",
+    "socket.io-client": "^4.8.3",
+    "uuid": "^13.0.2"
   },
   "devDependencies": {
     "@types/hast": "^3.0.4",
