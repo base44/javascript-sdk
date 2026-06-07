@@ -1,0 +1,23 @@
+version: 2
+updates:
+  # Keep package.json dependencies patched. Combined with GitHub's
+  # Dependabot security updates (enabled in repo Settings > Security),
+  # this opens PRs for both routine version bumps and CVE fixes.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      # Batch low-risk dev tooling updates into a single PR to cut noise.
+      dev-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Keep the GitHub Actions used by these workflows up to date.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
