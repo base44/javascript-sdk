@@ -36,7 +36,7 @@
     "@types/unist": "^3.0.3",
     "@typescript-eslint/parser": "^8.51.0",
     "@vitest/coverage-istanbul": "^1.0.0",
-    "@vitest/coverage-v8": "^1.0.0",
+    "@vitest/coverage-v8": "^4.1.8",
     "@vitest/ui": "^1.0.0",
     "dotenv": "^16.3.1",
     "eslint": "^9.39.2",
