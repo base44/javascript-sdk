@@ -37,7 +37,7 @@
     "@typescript-eslint/parser": "^8.51.0",
     "@vitest/coverage-istanbul": "^1.0.0",
     "@vitest/coverage-v8": "^1.0.0",
-    "@vitest/ui": "^1.0.0",
+    "@vitest/ui": "^4.1.8",
     "dotenv": "^16.3.1",
     "eslint": "^9.39.2",
     "eslint-plugin-import": "^2.32.0",
