@@ -28,12 +28,17 @@ export interface SendNotificationResult {
 
 /**
  * Service-role-only mobile module.
+ *
+ * This module is exposed only as `base44.asServiceRole.mobile` and is intended
+ * for Base44-hosted backend functions or validated server-side webhooks. Normal
+ * frontend clients do not expose `base44.mobile`.
  */
 export interface MobileModule {
   /**
    * Sends a push notification to an app user.
    *
    * This method is only available through `base44.asServiceRole.mobile`.
+   * Do not call it from generated frontend/client-side app code.
    *
    * @param params - Notification target and content.
    * @returns The notification delivery result.
