@@ -13,6 +13,7 @@ import { createAgentsModule } from "./modules/agents.js";
 import { createAppLogsModule } from "./modules/app-logs.js";
 import { createUsersModule } from "./modules/users.js";
 import { RoomsSocket, RoomsSocketConfig } from "./utils/socket-utils.js";
+import { createMobileModule } from "./modules/mobile.js";
 import type {
   Base44Client,
   CreateClientConfig,
@@ -234,6 +235,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
       token,
     }),
     appLogs: createAppLogsModule(serviceRoleAxiosClient, appId),
+    mobile: createMobileModule(serviceRoleAxiosClient, appId),
     cleanup: () => {
       if (socket) {
         socket.disconnect();

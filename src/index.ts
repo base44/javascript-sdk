@@ -115,6 +115,12 @@ export type {
   CustomIntegrationCallResponse,
 } from "./modules/custom-integrations.types.js";
 
+export type {
+  MobileModule,
+  SendNotificationParams,
+  SendNotificationResult,
+} from "./modules/mobile.types.js";
+
 // Auth utils types
 export type {
   GetAccessTokenOptions,

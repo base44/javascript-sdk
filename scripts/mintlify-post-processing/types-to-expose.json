@@ -21,6 +21,7 @@
   "ImportResult",
   "IntegrationsModule",
   "CoreIntegrations",
+  "MobileModule",
   "SortField",
   "SsoModule",
   "UpdateManyResult"
