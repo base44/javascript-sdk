@@ -87,11 +87,13 @@ export interface AppUserConnectorConnectionResponse {
  * | Calendly | `calendly` |
  * | ClickUp | `clickup` |
  * | Contentful | `contentful` |
+ * | Databricks | `databricks` |
  * | Discord | `discord` |
  * | Dropbox | `dropbox` |
  * | GitHub | `github` |
  * | GitLab | `gitlab` |
  * | Gmail | `gmail` |
+ * | Google Ads | `googleads` |
  * | Google Analytics | `google_analytics` |
  * | Google BigQuery | `googlebigquery` |
  * | Google Calendar | `googlecalendar` |
@@ -112,10 +114,12 @@ export interface AppUserConnectorConnectionResponse {
  * | Microsoft OneDrive | `one_drive` |
  * | Notion | `notion` |
  * | Outlook | `outlook` |
+ * | QuickBooks | `quickbooks` |
  * | Salesforce | `salesforce` |
  * | SharePoint | `share_point` |
  * | Slack User | `slack` |
  * | Slack Bot | `slackbot` |
+ * | Snowflake | `snowflake` |
  * | Splitwise | `splitwise` |
  * | Supabase | `supabase` |
  * | TikTok | `tiktok` |
