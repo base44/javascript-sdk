@@ -10,6 +10,7 @@ import type { FunctionsModule } from "./modules/functions.types.js";
 import type { AgentsModule } from "./modules/agents.types.js";
 import type { AppLogsModule } from "./modules/app-logs.types.js";
 import type { AnalyticsModule } from "./modules/analytics.types.js";
+import type { AccountsModule } from "./modules/accounts.types.js";
 
 /**
  * Options for creating a Base44 client.
@@ -85,6 +86,8 @@ export interface CreateClientConfig {
  * Provides access to all SDK modules for interacting with the app.
  */
 export interface Base44Client {
+  /** {@link AccountsModule | Accounts module} for multi-tenancy (accounts, members, billing). */
+  accounts: AccountsModule;
   /** {@link AgentsModule | Agents module} for managing AI agent conversations. */
   agents: AgentsModule;
   /** {@link AnalyticsModule | Analytics module} for tracking custom events in your app. */

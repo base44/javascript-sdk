@@ -12,6 +12,7 @@ import { createFunctionsModule } from "./modules/functions.js";
 import { createAgentsModule } from "./modules/agents.js";
 import { createAppLogsModule } from "./modules/app-logs.js";
 import { createUsersModule } from "./modules/users.js";
+import { createAccountsModule } from "./modules/accounts.js";
 import { RoomsSocket, RoomsSocketConfig } from "./utils/socket-utils.js";
 import type {
   Base44Client,
@@ -111,6 +112,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     baseURL: `${serverUrl}/api`,
     headers,
     token,
+    appId: String(appId),
     onError: options?.onError,
   });
 
@@ -118,6 +120,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     baseURL: `${serverUrl}/api`,
     headers: functionHeaders,
     token,
+    appId: String(appId),
     interceptResponses: false,
     onError: options?.onError,
   });
@@ -131,6 +134,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     baseURL: `${serverUrl}/api`,
     headers: serviceRoleHeaders,
     token: serviceToken,
+    appId: String(appId),
     onError: options?.onError,
   });
 
@@ -138,6 +142,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     baseURL: `${serverUrl}/api`,
     headers: functionHeaders,
     token: serviceToken,
+    appId: String(appId),
     interceptResponses: false,
   });
 
@@ -192,6 +197,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     }),
     appLogs: createAppLogsModule(axiosClient, appId),
     users: createUsersModule(axiosClient, appId),
+    accounts: createAccountsModule(axiosClient, appId),
     analytics: createAnalyticsModule({
       axiosClient,
       serverUrl,
