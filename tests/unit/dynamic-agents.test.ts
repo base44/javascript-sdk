@@ -1,7 +1,8 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import { resolveConnection, createGatewayTransport } from "../../src/modules/ai-gateway.ts";
 import { Base44Error } from "../../src/index.ts";
-import { tool, serializeTools, buildRequestBody, createDynamicAgentsModule } from "../../src/modules/dynamic-agents.ts";
+import { tool, serializeTools } from "../../src/modules/tool.ts";
+import { buildRequestBody, createDynamicAgentsModule } from "../../src/modules/agent-loop.ts";
 
 const config = {
   serverUrl: "https://app-1.base44.app",
