@@ -113,7 +113,7 @@ export interface DynamicAgentsModule {
   /** Define a reusable agent. */
   create(config: AgentConfig): Agent;
   /** One-shot: `create(config).run({ prompt })`. */
-  run(config: AgentConfig & { prompt: string }, options?: RunOptions): Promise<RunResult>;
+  run(config: AgentConfig & RunInput, options?: RunOptions): Promise<RunResult>;
 }
 
 /**

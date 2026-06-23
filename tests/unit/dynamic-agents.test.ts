@@ -231,7 +231,7 @@ describe("agent loop", () => {
   });
 
   test("stops at maxSteps with finishReason 'max_steps'", async () => {
-    fetchMock.mockResolvedValue(
+    fetchMock.mockImplementation(() =>
       completion({ toolCalls: [{ id: "c", name: "t", arguments: "{}" }], finish: "tool_calls" })
     );
     const agent = createDynamicAgentsModule(config).create({
@@ -247,7 +247,7 @@ describe("agent loop", () => {
   test("run() accepts a full messages array", async () => {
     fetchMock.mockResolvedValue(completion({ content: "ok" }));
     const mod = createDynamicAgentsModule(config);
-    await mod.run({ model: "m", messages: [{ role: "user", content: "a" }] } as any);
+    await mod.run({ model: "m", messages: [{ role: "user", content: "a" }] });
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.messages).toEqual([{ role: "user", content: "a" }]);
   });
