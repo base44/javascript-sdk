@@ -21,7 +21,7 @@ describe("functions.asTool", () => {
     const nock = (await import("nock")).default;
     const scope = nock("https://a.base44.app")
       .post("/api/apps/a/functions/sendOrderEmail", { orderId: "o1" })
-      .reply(200, { data: { sent: true } });
+      .reply(200, { sent: true });
 
     const base44 = createClient(opts);
     const t = base44.functions.asTool("sendOrderEmail", {

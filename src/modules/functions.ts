@@ -112,9 +112,8 @@ export function createFunctionsModule(
         description: opts.description,
         parameters: opts.parameters ?? { type: "object", properties: {}, additionalProperties: true },
         execute: async (args: Record<string, any>) => {
-          const axiosResponse: any = await invoke(name, args ?? {});
-          const body = axiosResponse?.data;
-          return body && typeof body === "object" && "data" in body ? body.data : body;
+          const res: any = await invoke(name, args ?? {});
+          return res?.data;
         },
       };
     },
