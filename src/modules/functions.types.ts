@@ -93,6 +93,17 @@ export interface FunctionsModule {
   invoke(functionName: FunctionName, data?: Record<string, any>): Promise<any>;
 
   /**
+   * Turns a backend function into a {@linkcode Tool} an agent can call.
+   *
+   * Functions are invoked by name with no server-known input schema, so you supply a
+   * `description` and (optionally) JSON Schema `parameters` for the model.
+   *
+   * @param name - The backend function name.
+   * @param opts - `description` (required) and optional JSON Schema `parameters`.
+   */
+  asTool(name: FunctionName, opts: { description: string; parameters?: Record<string, unknown> }): import("./dynamic-agents.types.js").Tool;
+
+  /**
    * Performs a direct HTTP request to a backend function path and returns the native `Response`.
    *
    * Use `fetch()` when you need low-level control that {@linkcode invoke | invoke()} doesn't provide, such as:

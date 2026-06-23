@@ -11,6 +11,38 @@ function reply(content: string) {
   );
 }
 
+describe("functions.asTool", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  beforeEach(() => { fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock); });
+  afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); });
+
+  test("wraps invoke(name, args) with a supplied description and parameters", async () => {
+    // functions module uses axios, not fetch — mock axios post via the function endpoint.
+    const nock = (await import("nock")).default;
+    const scope = nock("https://a.base44.app")
+      .post("/api/apps/a/functions/sendOrderEmail", { orderId: "o1" })
+      .reply(200, { data: { sent: true } });
+
+    const base44 = createClient(opts);
+    const t = base44.functions.asTool("sendOrderEmail", {
+      description: "Email the customer an update.",
+      parameters: { type: "object", properties: { orderId: { type: "string" } }, required: ["orderId"] },
+    });
+
+    expect(t.description).toBe("Email the customer an update.");
+    expect(t.parameters).toEqual({ type: "object", properties: { orderId: { type: "string" } }, required: ["orderId"] });
+    const out = await t.execute({ orderId: "o1" });
+    expect(out).toEqual({ sent: true });
+    scope.done();
+  });
+
+  test("defaults parameters to an open object when omitted", () => {
+    const base44 = createClient(opts);
+    const t = base44.functions.asTool("anyFn", { description: "d" });
+    expect(t.parameters).toEqual({ type: "object", properties: {}, additionalProperties: true });
+  });
+});
+
 describe("Agent.asTool", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
   beforeEach(() => { fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock); });

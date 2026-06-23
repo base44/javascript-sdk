@@ -42,9 +42,9 @@ export function createFunctionsModule(
     return headers;
   };
 
-  return {
-    // Invoke a custom backend function by name
-    async invoke(functionName: string, data: Record<string, any>) {
+  // Hoisted so both the returned `invoke` property and `asTool.execute` can reference it
+  // without relying on `this` (which breaks when the object is spread into the client).
+  const invoke = async (functionName: string, data: Record<string, any>) => {
       // Validate input
       if (typeof data === "string") {
         throw new Error(
@@ -81,7 +81,10 @@ export function createFunctionsModule(
         formData || data,
         { headers: { "Content-Type": contentType } }
       );
-    },
+  };
+
+  return {
+    invoke,
 
     // Fetch a backend function endpoint directly.
     async fetch(path: string, init: FunctionsFetchInit = {}) {
@@ -101,6 +104,19 @@ export function createFunctionsModule(
       );
 
       return response;
+    },
+
+    // Turn a backend function into an agent tool.
+    asTool(name: string, opts: { description: string; parameters?: Record<string, unknown> }) {
+      return {
+        description: opts.description,
+        parameters: opts.parameters ?? { type: "object", properties: {}, additionalProperties: true },
+        execute: async (args: Record<string, any>) => {
+          const axiosResponse: any = await invoke(name, args ?? {});
+          const body = axiosResponse?.data;
+          return body && typeof body === "object" && "data" in body ? body.data : body;
+        },
+      };
     },
   };
 }
