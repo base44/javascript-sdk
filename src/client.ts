@@ -10,6 +10,7 @@ import {
 import { getAccessToken } from "./utils/auth-utils.js";
 import { createFunctionsModule } from "./modules/functions.js";
 import { createAgentsModule } from "./modules/agents.js";
+import { createDynamicAgentsModule } from "./modules/dynamic-agents.js";
 import { createAppLogsModule } from "./modules/app-logs.js";
 import { createUsersModule } from "./modules/users.js";
 import { RoomsSocket, RoomsSocketConfig } from "./utils/socket-utils.js";
@@ -190,6 +191,10 @@ export function createClient(config: CreateClientConfig): Base44Client {
       serverUrl,
       token,
     }),
+    dynamicAgents: createDynamicAgentsModule({
+      serverUrl,
+      getToken: () => token || getAccessToken(),
+    }),
     appLogs: createAppLogsModule(axiosClient, appId),
     users: createUsersModule(axiosClient, appId),
     analytics: createAnalyticsModule({
@@ -232,6 +237,10 @@ export function createClient(config: CreateClientConfig): Base44Client {
       appId,
       serverUrl,
       token,
+    }),
+    dynamicAgents: createDynamicAgentsModule({
+      serverUrl,
+      getToken: () => serviceToken,
     }),
     appLogs: createAppLogsModule(serviceRoleAxiosClient, appId),
     cleanup: () => {

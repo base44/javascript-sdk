@@ -252,3 +252,37 @@ describe("agent loop", () => {
     expect(body.messages).toEqual([{ role: "user", content: "a" }]);
   });
 });
+
+import { createClient } from "../../src/index.ts";
+
+describe("client wiring", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    fetchMock = vi.fn().mockResolvedValue(completion({ content: "ok" }));
+    vi.stubGlobal("fetch", fetchMock);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  });
+
+  test("base44.dynamicAgents.run hits the gateway with the user token", async () => {
+    const base44 = createClient({ serverUrl: "https://app-x.base44.app", appId: "app-x", token: "user-tok" });
+    const result = await base44.dynamicAgents.run({ model: "gpt_5_mini", prompt: "hi" });
+    expect(result.text).toBe("ok");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://app-x.base44.app/api/ai/unified/v1/chat/completions");
+    expect(init.headers.Authorization).toBe("Bearer user-tok");
+  });
+
+  test("asServiceRole.dynamicAgents uses the service token", async () => {
+    const base44 = createClient({
+      serverUrl: "https://app-x.base44.app",
+      appId: "app-x",
+      token: "user-tok",
+      serviceToken: "svc-tok",
+    });
+    await base44.asServiceRole.dynamicAgents.run({ model: "m", prompt: "hi" });
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe("Bearer svc-tok");
+  });
+});
