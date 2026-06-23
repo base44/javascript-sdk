@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import { resolveConnection, createGatewayTransport } from "../../src/modules/ai-gateway.ts";
 import { Base44Error } from "../../src/index.ts";
+import { tool, serializeTools } from "../../src/modules/dynamic-agents.ts";
 
 const config = {
   serverUrl: "https://app-1.base44.app",
@@ -63,5 +64,35 @@ describe("ai-gateway transport", () => {
       message: "insufficient quota",
     });
     await expect(transport.complete({ model: "m", messages: [] })).rejects.toBeInstanceOf(Base44Error);
+  });
+});
+
+describe("tool() + serializeTools()", () => {
+  test("tool() returns its argument unchanged", () => {
+    const t = { description: "d", parameters: { type: "object" }, execute: () => 1 };
+    expect(tool(t)).toBe(t);
+  });
+
+  test("serializeTools maps to OpenAI function-tool shape", () => {
+    const getWeather = {
+      description: "Get weather",
+      parameters: { type: "object", properties: { city: { type: "string" } }, required: ["city"] },
+      execute: async () => ({}),
+    };
+    expect(serializeTools({ getWeather })).toEqual([
+      {
+        type: "function",
+        function: {
+          name: "getWeather",
+          description: "Get weather",
+          parameters: { type: "object", properties: { city: { type: "string" } }, required: ["city"] },
+        },
+      },
+    ]);
+  });
+
+  test("serializeTools returns undefined when there are no tools", () => {
+    expect(serializeTools(undefined)).toBeUndefined();
+    expect(serializeTools({})).toBeUndefined();
   });
 });
