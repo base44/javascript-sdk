@@ -193,7 +193,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     }),
     dynamicAgents: createDynamicAgentsModule({
       serverUrl,
-      getToken: () => token || getAccessToken(),
+      getToken: () => token || getAccessToken() || undefined,
     }),
     appLogs: createAppLogsModule(axiosClient, appId),
     users: createUsersModule(axiosClient, appId),

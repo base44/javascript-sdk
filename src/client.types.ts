@@ -10,6 +10,7 @@ import type { FunctionsModule } from "./modules/functions.types.js";
 import type { AgentsModule } from "./modules/agents.types.js";
 import type { AppLogsModule } from "./modules/app-logs.types.js";
 import type { AnalyticsModule } from "./modules/analytics.types.js";
+import type { DynamicAgentsModule } from "./modules/dynamic-agents.types.js";
 
 /**
  * Options for creating a Base44 client.
@@ -91,6 +92,8 @@ export interface Base44Client {
   analytics: AnalyticsModule;
   /** {@link AppLogsModule | App logs module} for tracking app usage. */
   appLogs: AppLogsModule;
+  /** {@link DynamicAgentsModule | Dynamic agents module} for code-defined AI agents and tool loops. */
+  dynamicAgents: DynamicAgentsModule;
   /** {@link AuthModule | Auth module} for user authentication and management. */
   auth: AuthModule;
   /** {@link UserConnectorsModule | Connectors module} for app-user OAuth flows. */
@@ -131,6 +134,8 @@ export interface Base44Client {
     agents: AgentsModule;
     /** {@link AppLogsModule | App logs module} with elevated permissions. */
     appLogs: AppLogsModule;
+    /** {@link DynamicAgentsModule | Dynamic agents module} with elevated permissions. */
+    dynamicAgents: DynamicAgentsModule;
     /** {@link ConnectorsModule | Connectors module} for OAuth token retrieval. */
     connectors: ConnectorsModule;
     /** {@link EntitiesModule | Entities module} with elevated permissions. */
