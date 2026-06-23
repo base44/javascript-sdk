@@ -12,6 +12,7 @@ import {
   removeAccessToken,
   getLoginUrl,
 } from "./utils/auth-utils.js";
+import { tool } from "./modules/dynamic-agents.js";
 
 export {
   createClient,
@@ -21,6 +22,7 @@ export {
   saveAccessToken,
   removeAccessToken,
   getLoginUrl,
+  tool,
 };
 
 export type {
@@ -114,6 +116,21 @@ export type {
   CustomIntegrationCallParams,
   CustomIntegrationCallResponse,
 } from "./modules/custom-integrations.types.js";
+
+export type {
+  Tool,
+  JSONSchema,
+  ChatMessage,
+  Step,
+  RunUsage,
+  RunResult,
+  RunInput,
+  RunOptions,
+  ToolChoice,
+  AgentConfig,
+  Agent,
+  DynamicAgentsModule,
+} from "./modules/dynamic-agents.types.js";
 
 // Auth utils types
 export type {

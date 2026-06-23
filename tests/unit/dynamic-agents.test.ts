@@ -254,6 +254,13 @@ describe("agent loop", () => {
 });
 
 import { createClient } from "../../src/index.ts";
+import * as sdk from "../../src/index.ts";
+
+describe("public exports", () => {
+  test("tool is exported from the package root", () => {
+    expect(typeof sdk.tool).toBe("function");
+  });
+});
 
 describe("client wiring", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
