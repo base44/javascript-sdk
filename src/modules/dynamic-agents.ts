@@ -169,8 +169,19 @@ export function createDynamicAgentsModule(
         };
       },
 
-      asTool(): never {
-        throw new Error("Agent.asTool() is implemented in Effort 2.");
+      asTool(toolOpts: { name?: string; description: string }): Tool {
+        return {
+          description: toolOpts.description,
+          parameters: {
+            type: "object",
+            properties: { prompt: { type: "string", description: "What to ask the sub-agent." } },
+            required: ["prompt"],
+          },
+          execute: async (args: { prompt: string }) => {
+            const result = await agent.run({ prompt: args.prompt });
+            return result.text;
+          },
+        };
       },
     };
 
