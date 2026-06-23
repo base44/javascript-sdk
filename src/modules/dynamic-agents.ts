@@ -1,4 +1,4 @@
-import type { Tool } from "./dynamic-agents.types.js";
+import type { AgentConfig, ChatMessage, Tool } from "./dynamic-agents.types.js";
 
 /**
  * Defines a tool an agent can call.
@@ -29,4 +29,31 @@ export function serializeTools(tools?: Record<string, Tool>): any[] | undefined 
     type: "function",
     function: { name, description: t.description, parameters: t.parameters },
   }));
+}
+
+/**
+ * Builds the gateway request body from config + messages using an explicit whitelist.
+ * Rejected params (max_tokens, stop, top_p, penalties, logit_bias, seed, n) can never
+ * appear because only the supported keys are ever written.
+ * @internal
+ */
+export function buildRequestBody(
+  config: AgentConfig,
+  messages: ChatMessage[]
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    model: config.model,
+    messages,
+  };
+  if (config.temperature !== undefined) body.temperature = config.temperature;
+  if (config.toolChoice !== undefined) body.tool_choice = config.toolChoice;
+  if (config.responseFormat !== undefined) {
+    body.response_format = {
+      type: "json_schema",
+      json_schema: { name: "response", schema: config.responseFormat, strict: true },
+    };
+  }
+  const tools = serializeTools(config.tools);
+  if (tools) body.tools = tools;
+  return body;
 }

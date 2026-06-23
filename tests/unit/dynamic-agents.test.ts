@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import { resolveConnection, createGatewayTransport } from "../../src/modules/ai-gateway.ts";
 import { Base44Error } from "../../src/index.ts";
-import { tool, serializeTools } from "../../src/modules/dynamic-agents.ts";
+import { tool, serializeTools, buildRequestBody } from "../../src/modules/dynamic-agents.ts";
 
 const config = {
   serverUrl: "https://app-1.base44.app",
@@ -94,5 +94,44 @@ describe("tool() + serializeTools()", () => {
   test("serializeTools returns undefined when there are no tools", () => {
     expect(serializeTools(undefined)).toBeUndefined();
     expect(serializeTools({})).toBeUndefined();
+  });
+});
+
+describe("buildRequestBody()", () => {
+  const messages = [{ role: "user" as const, content: "hi" }];
+
+  test("emits only model and messages by default (temperature omitted)", () => {
+    expect(buildRequestBody({ model: "gpt_5_mini" }, messages)).toEqual({
+      model: "gpt_5_mini",
+      messages,
+    });
+  });
+
+  test("includes temperature, tool_choice, response_format and tools when set", () => {
+    const body = buildRequestBody(
+      {
+        model: "claude_sonnet_4_6",
+        temperature: 0.3,
+        toolChoice: "auto",
+        responseFormat: { type: "object", properties: { a: { type: "string" } } },
+        tools: { t: { description: "d", parameters: { type: "object" }, execute: () => 1 } },
+      },
+      messages
+    );
+    expect(body.temperature).toBe(0.3);
+    expect(body.tool_choice).toBe("auto");
+    expect(body.response_format).toEqual({
+      type: "json_schema",
+      json_schema: { name: "response", schema: { type: "object", properties: { a: { type: "string" } } }, strict: true },
+    });
+    expect(Array.isArray(body.tools)).toBe(true);
+  });
+
+  test("never emits rejected params even if smuggled in via cast", () => {
+    const sneaky = { model: "m", max_tokens: 50, stop: ["x"], top_p: 0.5, seed: 1, n: 2 } as any;
+    const body = buildRequestBody(sneaky, messages);
+    for (const k of ["max_tokens", "max_completion_tokens", "stop", "top_p", "frequency_penalty", "presence_penalty", "logit_bias", "seed", "n"]) {
+      expect(body).not.toHaveProperty(k);
+    }
   });
 });
