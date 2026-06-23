@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import { resolveConnection, createGatewayTransport } from "../../src/modules/ai-gateway.ts";
 import { Base44Error } from "../../src/index.ts";
-import { tool, serializeTools, buildRequestBody } from "../../src/modules/dynamic-agents.ts";
+import { tool, serializeTools, buildRequestBody, createDynamicAgentsModule } from "../../src/modules/dynamic-agents.ts";
 
 const config = {
   serverUrl: "https://app-1.base44.app",
@@ -133,5 +133,122 @@ describe("buildRequestBody()", () => {
     for (const k of ["max_tokens", "max_completion_tokens", "stop", "top_p", "frequency_penalty", "presence_penalty", "logit_bias", "seed", "n"]) {
       expect(body).not.toHaveProperty(k);
     }
+  });
+});
+
+function completion(opts: {
+  content?: string | null;
+  toolCalls?: Array<{ id: string; name: string; arguments: string }>;
+  finish?: string;
+  usage?: Record<string, number>;
+}) {
+  const message: any = { role: "assistant", content: opts.content ?? null };
+  if (opts.toolCalls) {
+    message.tool_calls = opts.toolCalls.map((c) => ({
+      id: c.id,
+      type: "function",
+      function: { name: c.name, arguments: c.arguments },
+    }));
+  }
+  return new Response(
+    JSON.stringify({
+      id: "cmpl",
+      choices: [{ index: 0, message, finish_reason: opts.finish ?? "stop" }],
+      usage: opts.usage ?? { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15, base44_credits: 2 },
+    }),
+    { status: 200, headers: { "Content-Type": "application/json" } }
+  );
+}
+
+describe("agent loop", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  });
+
+  test("run() returns text, usage (incl. credits), and finishReason on a no-tool completion", async () => {
+    fetchMock.mockResolvedValue(completion({ content: "Hello there." }));
+    const mod = createDynamicAgentsModule(config);
+    const result = await mod.run({ model: "gpt_5_mini", system: "Be terse.", prompt: "Hi" });
+
+    expect(result.text).toBe("Hello there.");
+    expect(result.finishReason).toBe("stop");
+    expect(result.usage).toEqual({ promptTokens: 10, completionTokens: 5, totalTokens: 15, credits: 2 });
+    expect(result.steps).toEqual([]);
+    // system + user were sent
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.messages).toEqual([
+      { role: "system", content: "Be terse." },
+      { role: "user", content: "Hi" },
+    ]);
+  });
+
+  test("create().run() executes a tool then continues to a final answer", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        completion({ toolCalls: [{ id: "call_1", name: "getWeather", arguments: '{"city":"Haifa"}' }], finish: "tool_calls" })
+      )
+      .mockResolvedValueOnce(completion({ content: "It's sunny in Haifa." }));
+
+    const execute = vi.fn(async ({ city }: { city: string }) => ({ city, condition: "sunny" }));
+    const agent = createDynamicAgentsModule(config).create({
+      model: "claude_sonnet_4_6",
+      tools: { getWeather: { description: "weather", parameters: { type: "object" }, execute } },
+      maxSteps: 4,
+    });
+    const result = await agent.run({ prompt: "weather in Haifa?" });
+
+    expect(execute).toHaveBeenCalledWith({ city: "Haifa" });
+    expect(result.text).toBe("It's sunny in Haifa.");
+    expect(result.steps).toHaveLength(1);
+    expect(result.steps[0].toolResults[0]).toMatchObject({ toolCallId: "call_1", toolName: "getWeather" });
+    // second request included the tool result message
+    const secondBody = JSON.parse(fetchMock.mock.calls[1][1].body);
+    const toolMsg = secondBody.messages.find((m: any) => m.role === "tool");
+    expect(toolMsg.tool_call_id).toBe("call_1");
+    expect(JSON.parse(toolMsg.content)).toEqual({ city: "Haifa", condition: "sunny" });
+  });
+
+  test("a throwing tool feeds the error back to the model instead of aborting", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        completion({ toolCalls: [{ id: "c1", name: "boom", arguments: "{}" }], finish: "tool_calls" })
+      )
+      .mockResolvedValueOnce(completion({ content: "recovered" }));
+    const agent = createDynamicAgentsModule(config).create({
+      model: "m",
+      tools: { boom: { description: "x", parameters: { type: "object" }, execute: async () => { throw new Error("kaboom"); } } },
+    });
+    const result = await agent.run({ prompt: "go" });
+    expect(result.text).toBe("recovered");
+    const toolMsg = JSON.parse(fetchMock.mock.calls[1][1].body).messages.find((m: any) => m.role === "tool");
+    expect(toolMsg.content).toContain("Error: kaboom");
+  });
+
+  test("stops at maxSteps with finishReason 'max_steps'", async () => {
+    fetchMock.mockResolvedValue(
+      completion({ toolCalls: [{ id: "c", name: "t", arguments: "{}" }], finish: "tool_calls" })
+    );
+    const agent = createDynamicAgentsModule(config).create({
+      model: "m",
+      tools: { t: { description: "x", parameters: { type: "object" }, execute: async () => "ok" } },
+      maxSteps: 2,
+    });
+    const result = await agent.run({ prompt: "loop" });
+    expect(result.finishReason).toBe("max_steps");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  test("run() accepts a full messages array", async () => {
+    fetchMock.mockResolvedValue(completion({ content: "ok" }));
+    const mod = createDynamicAgentsModule(config);
+    await mod.run({ model: "m", messages: [{ role: "user", content: "a" }] } as any);
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.messages).toEqual([{ role: "user", content: "a" }]);
   });
 });

@@ -40,7 +40,7 @@ export function createGatewayTransport(config: DynamicAgentsModuleConfig) {
         signal: opts.signal,
       });
 
-      const json = await res.json().catch(() => null);
+      const json = await res.clone().json().catch(() => null);
 
       if (!res.ok) {
         const err = (json && json.error) || {};
