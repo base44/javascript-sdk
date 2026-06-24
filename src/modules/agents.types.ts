@@ -697,7 +697,7 @@ export interface AgentsModule {
    * another agent as a tool with {@linkcode Agent.asTool | asTool}.
    *
    * @param config - Model alias, optional system prompt, tools, and step limit.
-   * @returns A reusable agent.
+   * @returns A reusable {@linkcode Agent} with {@linkcode Agent.run | run()} and {@linkcode Agent.asTool | asTool()}.
    *
    * @example
    * ```typescript
