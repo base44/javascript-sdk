@@ -45,7 +45,7 @@ export interface FunctionsModuleConfig {
  * This module is available to use with a client in all authentication modes:
  *
  * - **Anonymous or User authentication** (`base44.functions`): Functions are invoked with the current user's permissions. Anonymous users invoke functions without authentication, while authenticated users invoke functions with their authentication context.
- * - **Service role authentication** (`base44.asServiceRole.functions`): Functions are invoked with elevated admin-level permissions. The function code receives a request with admin authentication context.
+ * - **Service role authentication** (`base44.asServiceRole.functions`): Functions are invoked with elevated permissions and no authenticated user. The function code receives a request with no user context.
  *
  * ## Generated Types
  *

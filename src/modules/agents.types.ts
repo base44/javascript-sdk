@@ -207,7 +207,7 @@ export interface AgentsModuleConfig {
  * This module is available to use with a client in all authentication modes:
  *
  * - **Anonymous or User authentication** (`base44.agents`): Access is scoped to the current user's permissions. Users must be authenticated to create and access conversations.
- * - **Service role authentication** (`base44.asServiceRole.agents`): Operations have elevated admin-level permissions. Can access all conversations that the app's admin role has access to.
+ * - **Service role authentication** (`base44.asServiceRole.agents`): Operations run with elevated permissions for backend code that isn't tied to a specific user session.
  *
  * ## Generated Types
  *

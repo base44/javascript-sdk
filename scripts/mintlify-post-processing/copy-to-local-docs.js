@@ -160,47 +160,72 @@ function updateDocsJson(repoDir, sdkFiles) {
     `SDK Reference pages: ${JSON.stringify(sdkReferencePages, null, 2)}`
   );
 
-  // Navigate to: Developers tab -> SDK section -> groups -> SDK Reference
-  // Supports both legacy "anchors" format and current "dropdowns" format.
-  const developersTab = docs.navigation.tabs.find(
-    (tab) => tab.tab === "Developers"
-  );
+  // docs.json supports three navigation shapes we've seen in the wild:
+  //   1. top-level tabs (legacy)                navigation.tabs
+  //   2. top-level tabs with dropdowns/anchors  navigation.tabs[].dropdowns | .anchors
+  //   3. i18n layout (current)                  navigation.languages[].tabs[]...
+  // The SDK reference mdx files are English-only, so for every locale we point its
+  // SDK Reference group at the same English paths. This is what the docs site
+  // effectively shows today anyway.
+  //
+  // We locate the target group by content (any group whose pages reference
+  // `/sdk/docs/`) rather than by tab/group name, because the surrounding labels
+  // are translated per locale while the "SDK" dropdown id and the page paths
+  // stay stable. Preserves the existing translated group label.
+  const tabsContainers =
+    docs.navigation.languages?.map((l) => l.tabs).filter(Boolean) ??
+    [docs.navigation.tabs].filter(Boolean);
 
-  if (!developersTab) {
-    console.error("Could not find 'Developers' tab in docs.json");
+  if (tabsContainers.length === 0) {
+    console.error("Could not find navigation.tabs or navigation.languages in docs.json");
     process.exit(1);
   }
 
-  // Find the SDK section (try dropdowns first, then fall back to anchors)
-  const sdkAnchor =
-    developersTab.dropdowns?.find((d) => d.dropdown === "SDK") ??
-    developersTab.anchors?.find((a) => a.anchor === "SDK");
+  const groupReferencesSdkDocs = (group) =>
+    JSON.stringify(group).includes(`${basePath}/`);
 
-  if (!sdkAnchor) {
-    console.error("Could not find 'SDK' dropdown or anchor in Developers tab");
-    process.exit(1);
+  let updatedCount = 0;
+  for (const tabs of tabsContainers) {
+    for (const tab of tabs) {
+      const sdkAnchor =
+        tab.dropdowns?.find((d) => d.dropdown === "SDK") ??
+        tab.anchors?.find((a) => a.anchor === "SDK");
+      if (!sdkAnchor?.groups) continue;
+
+      const sdkRefIndex = sdkAnchor.groups.findIndex(groupReferencesSdkDocs);
+      if (sdkRefIndex === -1) continue;
+
+      const existing = sdkAnchor.groups[sdkRefIndex];
+
+      // Preserve existing subgroup labels (translated per locale) by position.
+      // Falls back to the English category-map label when no existing subgroup
+      // sits at that index (e.g. a locale that gains a new subgroup).
+      const existingSubgroups = Array.isArray(existing.pages) ? existing.pages : [];
+      const localizedPages = sdkReferencePages.map((g, i) => ({
+        ...g,
+        group: existingSubgroups[i]?.group ?? g.group,
+      }));
+
+      sdkAnchor.groups[sdkRefIndex] = {
+        ...existing,
+        group: existing.group,
+        icon: existing.icon ?? "brackets-curly",
+        expanded: true,
+        pages: localizedPages,
+      };
+      updatedCount++;
+    }
   }
 
-  // Find SDK Reference within the SDK anchor's groups
-  const sdkRefIndex = sdkAnchor.groups.findIndex(
-    (g) => g.group === "SDK Reference"
-  );
-
-  if (sdkRefIndex === -1) {
-    console.error("Could not find 'SDK Reference' group in SDK anchor");
+  if (updatedCount === 0) {
+    console.error(
+      "Could not find any SDK Reference navigation group to update (looked for groups whose pages reference '/sdk/docs/')"
+    );
     process.exit(1);
   }
-
-  // Update the SDK Reference pages with our generated groups
-  sdkAnchor.groups[sdkRefIndex] = {
-    group: "SDK Reference",
-    icon: "brackets-curly",
-    expanded: true,
-    pages: sdkReferencePages,
-  };
 
   // Write updated docs.json
-  console.log(`Writing updated docs.json to ${docsJsonPath}...`);
+  console.log(`Writing updated docs.json to ${docsJsonPath} (${updatedCount} locale(s))...`);
   fs.writeFileSync(docsJsonPath, JSON.stringify(docs, null, 2) + "\n", "utf8");
 
   console.log("Successfully updated docs.json");
