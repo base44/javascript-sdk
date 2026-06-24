@@ -1,4 +1,4 @@
-import type { RunInput, ToolChoice, AgentConfig, Agent, ChatMessage } from "../../src/index.js";
+import type { RunInput, ToolChoice, Agent, ChatMessage, AgentsModule } from "../../src/index.js";
 
 // ---------------------------------------------------------------------------
 // RunInput — union of { prompt: string } | { messages: ChatMessage[] }
@@ -52,10 +52,11 @@ const rejectsMissingFunctionName = (
 // base44.agents.create() return type — Agent exposes run() and asTool()
 // ---------------------------------------------------------------------------
 
-// Verify that the return type of create() satisfies the Agent interface.
-declare function createAgent(config: AgentConfig): Agent;
+// Exercise the real public method: AgentsModule.create's declared return type
+// must be assignable to Agent (and accept a minimal config).
+declare const agents: AgentsModule;
 
-const agent: Agent = createAgent({ model: "claude_sonnet_4_6" });
+const agent: Agent = agents.create({ model: "claude_sonnet_4_6" });
 
 // run exists and returns a Promise
 const _runResult: ReturnType<Agent["run"]> = agent.run({ prompt: "hello" });
