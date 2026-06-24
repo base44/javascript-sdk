@@ -128,7 +128,7 @@ export function createAgent(
         const body = buildRequestBody(agentConfig, messages);
         raw = await transport.complete(body, { signal: options.abortSignal });
 
-        const choice = raw.choices[0];
+        const choice = raw.choices?.[0];
         const message: OpenAIAssistantMessage = choice?.message ?? { role: "assistant", content: "" };
         messages.push(message);
 
@@ -171,7 +171,7 @@ export function createAgent(
       }
 
       // maxSteps exhausted
-      const lastMessage = raw?.choices[0]?.message;
+      const lastMessage = raw?.choices?.[0]?.message;
       return {
         text: lastMessage?.content ?? "",
         steps,
