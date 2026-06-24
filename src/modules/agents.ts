@@ -7,6 +7,8 @@ import {
   AgentsModuleConfig,
   CreateConversationParams,
 } from "./agents.types.js";
+import { createGatewayTransport } from "./ai-gateway.js";
+import { createAgent } from "./agent-loop.js";
 
 export function createAgentsModule({
   axios,
@@ -14,7 +16,12 @@ export function createAgentsModule({
   appId,
   serverUrl,
   token,
+  getToken,
 }: AgentsModuleConfig): AgentsModule {
+  const transport = createGatewayTransport({
+    serverUrl: serverUrl ?? "",
+    getToken: getToken ?? (() => token),
+  });
   const baseURL = `/apps/${appId}/agents`;
 
   // Track active conversations
@@ -135,5 +142,6 @@ export function createAgentsModule({
     subscribeToConversation,
     getWhatsAppConnectURL,
     getTelegramConnectURL,
+    create(config) { return createAgent(config, transport); },
   };
 }

@@ -2,6 +2,117 @@ import { AxiosInstance } from "axios";
 import { RoomsSocket } from "../utils/socket-utils.js";
 import { ModelFilterParams } from "../types.js";
 
+// ---------------------------------------------------------------------------
+// Code-agent types (moved from dynamic-agents.types.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * A JSON Schema object describing a tool's input parameters.
+ * Use the standard JSON Schema `object` shape: `{ type: "object", properties: {...}, required: [...] }`.
+ */
+export type JSONSchema = Record<string, unknown>;
+
+/**
+ * A tool an agent can call. Create one with {@linkcode tool | tool()}, or derive it from a
+ * resource with `.asTool()`.
+ */
+export interface Tool {
+  /** Natural-language description the model uses to decide when to call the tool. */
+  description: string;
+  /** JSON Schema for the tool's arguments. */
+  parameters: JSONSchema;
+  /** Runs the tool. Receives parsed arguments; returns any JSON-serializable value (or a string). */
+  execute: (args: any) => Promise<unknown> | unknown;
+}
+
+/** An OpenAI-shaped chat message used internally and accepted by {@linkcode Agent.run}. */
+export interface ChatMessage {
+  role: "system" | "user" | "assistant" | "tool";
+  content?: string | null;
+  tool_calls?: Array<{
+    id: string;
+    type: "function";
+    function: { name: string; arguments: string };
+  }>;
+  tool_call_id?: string;
+}
+
+/** One iteration of the agent loop: the tool calls the model made and their results. */
+export interface Step {
+  toolResults: Array<{
+    toolCallId: string;
+    toolName: string;
+    args: unknown;
+    result: string;
+  }>;
+}
+
+/** Token/credit usage for a run. `credits` is the Base44 gateway's `base44_credits`. */
+export interface RunUsage {
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  credits?: number;
+}
+
+/** Result of {@linkcode Agent.run}. */
+export interface RunResult {
+  /** The model's final text output. */
+  text: string;
+  /** The loop history (one entry per step that made tool calls). */
+  steps: Step[];
+  /** Why the run ended: `"stop"` (model finished), `"tool_calls"`, or `"max_steps"`. */
+  finishReason: string;
+  /** Token and credit usage from the final completion. */
+  usage: RunUsage;
+  /** The raw final completion body, for advanced use. */
+  raw: unknown;
+}
+
+/** Input to {@linkcode Agent.run}: either a single prompt or a full message list. */
+export type RunInput = { prompt: string } | { messages: ChatMessage[] };
+
+/** Per-run options. */
+export interface RunOptions {
+  /** Abort the run (and the in-flight gateway request). */
+  abortSignal?: AbortSignal;
+}
+
+/** OpenAI-compatible tool choice. */
+export type ToolChoice =
+  | "auto"
+  | "none"
+  | "required"
+  | { type: "function"; function: { name: string } };
+
+/** Configuration for a code-defined agent. */
+export interface AgentConfig {
+  /** Model alias (e.g. `"claude_sonnet_4_6"`, `"gpt_5_mini"`) or vendor id. */
+  model: string;
+  /** System prompt. */
+  system?: string;
+  /** Tools the agent may call, keyed by name. */
+  tools?: Record<string, Tool>;
+  /** Max loop iterations before stopping. Default `8`. */
+  maxSteps?: number;
+  /** Sampling temperature. Omitted unless set. Note: GPT-5 models only accept `1`. */
+  temperature?: number;
+  /** A JSON Schema to constrain output to structured JSON (`response_format: json_schema`). */
+  responseFormat?: JSONSchema;
+  /** Controls whether/which tool the model must call. */
+  toolChoice?: ToolChoice;
+}
+
+/** A reusable code-defined agent. */
+export interface Agent {
+  /** Run the agent's tool-calling loop to completion. */
+  run(input: RunInput, options?: RunOptions): Promise<RunResult>;
+  /**
+   * Turn this agent into a {@linkcode Tool} so another agent can call it as a sub-agent.
+   */
+  asTool(opts: { name?: string; description: string }): Tool;
+}
+
 /**
  * Registry of agent names. The [`types generate`](/developers/references/cli/commands/types-generate) command fills this registry, then [`AgentName`](#agentname) resolves to a union of the keys.
  */
@@ -174,6 +285,8 @@ export interface AgentsModuleConfig {
   serverUrl?: string;
   /** Authentication token */
   token?: string;
+  /** Returns the current bearer token at call time (thunk — never a captured string). Used by `create()`. */
+  getToken?: () => string | undefined;
 }
 
 /**
@@ -386,6 +499,28 @@ export interface AgentsModule {
     conversationId: string,
     onUpdate?: (conversation: AgentConversation) => void
   ): () => void;
+
+  /**
+   * Creates a code-defined agent: you specify the model, system prompt, and tools in code,
+   * and the SDK runs the tool-calling loop against the Base44 AI Gateway.
+   *
+   * Returns a reusable {@linkcode Agent} you can {@linkcode Agent.run | run} or expose to
+   * another agent as a tool with {@linkcode Agent.asTool | asTool}.
+   *
+   * @param config - Model alias, optional system prompt, tools, and step limit.
+   * @returns A reusable agent.
+   *
+   * @example
+   * ```typescript
+   * const agent = base44.agents.create({
+   *   model: "claude_sonnet_4_6",
+   *   system: "You plan trips.",
+   *   tools: { getWeather },
+   * });
+   * const { text } = await agent.run({ prompt: "Plan a day in Haifa." });
+   * ```
+   */
+  create(config: AgentConfig): Agent;
 
   /**
    * Gets WhatsApp connection URL for an agent.

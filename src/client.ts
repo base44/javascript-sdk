@@ -190,6 +190,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
       appId,
       serverUrl,
       token,
+      getToken: () => token || getAccessToken() || undefined,
     }),
     dynamicAgents: createDynamicAgentsModule({
       serverUrl,
@@ -237,6 +238,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
       appId,
       serverUrl,
       token,
+      getToken: () => serviceToken,
     }),
     dynamicAgents: createDynamicAgentsModule({
       serverUrl,

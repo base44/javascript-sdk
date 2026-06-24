@@ -294,3 +294,61 @@ describe("client wiring", () => {
     expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe("Bearer svc-tok");
   });
 });
+
+describe("base44.agents.create client wiring", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    fetchMock = vi.fn().mockResolvedValue(completion({ content: "agent-ok" }));
+    vi.stubGlobal("fetch", fetchMock);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  });
+
+  test("base44.agents.create().run() hits the gateway with the user token", async () => {
+    const base44 = createClient({ serverUrl: "https://app-y.base44.app", appId: "app-y", token: "user-tok-2" });
+    const agent = base44.agents.create({ model: "gpt_5_mini" });
+    const result = await agent.run({ prompt: "hello" });
+
+    expect(result.text).toBe("agent-ok");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://app-y.base44.app/api/ai/unified/v1/chat/completions");
+    expect(init.headers.Authorization).toBe("Bearer user-tok-2");
+  });
+
+  test("asServiceRole.agents.create().run() hits the gateway with the service token", async () => {
+    const base44 = createClient({
+      serverUrl: "https://app-y.base44.app",
+      appId: "app-y",
+      token: "user-tok-2",
+      serviceToken: "svc-tok-2",
+    });
+    const agent = base44.asServiceRole.agents.create({ model: "gpt_5_mini" });
+    await agent.run({ prompt: "hello" });
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://app-y.base44.app/api/ai/unified/v1/chat/completions");
+    expect(init.headers.Authorization).toBe("Bearer svc-tok-2");
+  });
+
+  test("base44.agents.create().run() runs a full tool-calling loop", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        completion({ toolCalls: [{ id: "call_2", name: "ping", arguments: '{"msg":"test"}' }], finish: "tool_calls" })
+      )
+      .mockResolvedValueOnce(completion({ content: "pong" }));
+
+    const execute = vi.fn(async ({ msg }: { msg: string }) => `pong: ${msg}`);
+    const base44 = createClient({ serverUrl: "https://app-y.base44.app", appId: "app-y", token: "user-tok-2" });
+    const agent = base44.agents.create({
+      model: "claude_sonnet_4_6",
+      tools: { ping: { description: "ping tool", parameters: { type: "object" }, execute } },
+    });
+    const result = await agent.run({ prompt: "ping me" });
+
+    expect(execute).toHaveBeenCalledWith({ msg: "test" });
+    expect(result.text).toBe("pong");
+    expect(result.steps).toHaveLength(1);
+  });
+});
