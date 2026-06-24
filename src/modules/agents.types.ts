@@ -72,7 +72,20 @@ export interface RunResult {
 /** Input to {@linkcode Agent.run}: either a single prompt or a full message list. */
 export type RunInput = { prompt: string } | { messages: ChatMessage[] };
 
-/** Per-run options. */
+/**
+ * Per-run options passed as the second argument to {@linkcode Agent.run}.
+ *
+ * @example
+ * ```typescript
+ * const controller = new AbortController();
+ * setTimeout(() => controller.abort(), 10_000);
+ *
+ * const result = await agent.run(
+ *   { prompt: "Summarize last month's sales." },
+ *   { abortSignal: controller.signal },
+ * );
+ * ```
+ */
 export interface RunOptions {
   /** Abort the run (and the in-flight gateway request). */
   abortSignal?: AbortSignal;
@@ -85,30 +98,206 @@ export type ToolChoice =
   | "required"
   | { type: "function"; function: { name: string } };
 
-/** Configuration for a code-defined agent. */
+/**
+ * Configuration for a code-defined agent passed to {@linkcode AgentsModule.create}.
+ *
+ * @example
+ * ```typescript
+ * const agent = base44.agents.create({
+ *   model: "claude_sonnet_4_6",
+ *   system: "You are a concise travel planner.",
+ *   tools: { getWeather, searchFlights },
+ *   maxSteps: 5,
+ * });
+ * ```
+ */
 export interface AgentConfig {
-  /** Model alias (e.g. `"claude_sonnet_4_6"`, `"gpt_5_mini"`) or vendor id. */
+  /**
+   * Model alias or vendor model ID to use for this agent.
+   *
+   * Use a Base44 model alias (e.g. `"claude_sonnet_4_6"`, `"gpt_4o"`, `"gpt_5_mini"`) or a
+   * fully-qualified vendor ID. Available aliases are listed in the Base44 console.
+   */
   model: string;
-  /** System prompt. */
+  /**
+   * System prompt prepended to every run.
+   *
+   * Provide instructions, persona, or constraints for the model.
+   * Omit to let the model run without a system message.
+   */
   system?: string;
-  /** Tools the agent may call, keyed by name. */
+  /**
+   * Tools the agent may call, keyed by their function name.
+   *
+   * Each value must be a {@linkcode Tool} object — use the {@linkcode tool | tool()} factory
+   * to create one, or use `.asTool()` on a resource such as an entity or function.
+   *
+   * @example
+   * ```typescript
+   * import { tool } from "@base44/sdk";
+   *
+   * const getWeather = tool({
+   *   description: "Get the current weather for a city.",
+   *   parameters: { type: "object", properties: { city: { type: "string" } }, required: ["city"] },
+   *   execute: async ({ city }) => fetch(`/weather?city=${city}`).then(r => r.json()),
+   * });
+   *
+   * const agent = base44.agents.create({ model: "claude_sonnet_4_6", tools: { getWeather } });
+   * ```
+   */
   tools?: Record<string, Tool>;
-  /** Max loop iterations before stopping. Default `8`. */
+  /**
+   * Maximum number of tool-calling loop iterations before the run stops.
+   *
+   * Each iteration is one round-trip to the model. If the model keeps calling tools
+   * and this limit is reached, the run ends with `finishReason: "max_steps"`.
+   * Defaults to `8`.
+   */
   maxSteps?: number;
-  /** Sampling temperature. Omitted unless set. Note: GPT-5 models only accept `1`. */
+  /**
+   * Sampling temperature passed to the model.
+   *
+   * Controls output randomness: lower values (e.g. `0`) produce more deterministic
+   * responses; higher values (e.g. `1`) increase variety. Omit to use the model default.
+   *
+   * Note: GPT-5 series models only accept `temperature: 1`.
+   */
   temperature?: number;
-  /** A JSON Schema to constrain output to structured JSON (`response_format: json_schema`). */
+  /**
+   * JSON Schema to constrain the model's output to structured JSON.
+   *
+   * When set, the request is sent with `response_format: { type: "json_schema", … }`.
+   * The model's response will be valid JSON matching the schema; access it by parsing
+   * `RunResult.text`.
+   *
+   * @example
+   * ```typescript
+   * const agent = base44.agents.create({
+   *   model: "claude_sonnet_4_6",
+   *   responseFormat: {
+   *     type: "object",
+   *     properties: { summary: { type: "string" }, score: { type: "number" } },
+   *     required: ["summary", "score"],
+   *   },
+   * });
+   * const { text } = await agent.run({ prompt: "Rate this product description." });
+   * const { summary, score } = JSON.parse(text);
+   * ```
+   */
   responseFormat?: JSONSchema;
-  /** Controls whether/which tool the model must call. */
+  /**
+   * Controls whether and which tool the model must call.
+   *
+   * - `"auto"` (default when tools are provided): the model decides.
+   * - `"none"`: the model must not call any tool.
+   * - `"required"`: the model must call at least one tool.
+   * - `{ type: "function", function: { name } }`: force a specific tool.
+   */
   toolChoice?: ToolChoice;
 }
 
-/** A reusable code-defined agent. */
+/**
+ * A reusable code-defined agent returned by {@linkcode AgentsModule.create}.
+ *
+ * An agent runs a multi-step tool-calling loop: it sends messages to the model,
+ * executes any tool calls the model requests, feeds the results back, and repeats
+ * until the model produces a final answer or `maxSteps` is reached.
+ *
+ * @example
+ * ```typescript
+ * const agent = base44.agents.create({
+ *   model: "claude_sonnet_4_6",
+ *   system: "You are a concise travel planner.",
+ *   tools: { getWeather },
+ * });
+ *
+ * const { text } = await agent.run({ prompt: "What's the weather like in Tel Aviv?" });
+ * console.log(text);
+ * ```
+ */
 export interface Agent {
-  /** Run the agent's tool-calling loop to completion. */
-  run(input: RunInput, options?: RunOptions): Promise<RunResult>;
   /**
-   * Turn this agent into a {@linkcode Tool} so another agent can call it as a sub-agent.
+   * Runs the agent's tool-calling loop to completion and returns the final result.
+   *
+   * Builds an initial message list from `input`, then repeatedly calls the model,
+   * executes any tool calls, and feeds results back until the model stops or
+   * `maxSteps` (from {@linkcode AgentConfig}) is reached.
+   *
+   * Tool errors are fed back to the model as tool results rather than thrown, so
+   * the model can recover or explain the failure.
+   *
+   * @param input - The run input: either `{ prompt: string }` for a simple user
+   *   message, or `{ messages: ChatMessage[] }` to supply a full conversation history.
+   * @param options - Optional {@linkcode RunOptions} (e.g. an `AbortSignal`).
+   * @returns Promise resolving to a {@linkcode RunResult} containing the model's
+   *   final text, per-step tool call history, finish reason, and token/credit usage.
+   *
+   * @example
+   * ```typescript
+   * // Simple prompt
+   * const { text, usage } = await agent.run({ prompt: "Plan a one-day trip to Haifa." });
+   * console.log(text);
+   * console.log(`Credits used: ${usage.credits}`);
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Supply a full message history
+   * const { text } = await agent.run({
+   *   messages: [
+   *     { role: "user", content: "What is the capital of France?" },
+   *     { role: "assistant", content: "Paris." },
+   *     { role: "user", content: "And what is the population?" },
+   *   ],
+   * });
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Cancel a long-running run
+   * const controller = new AbortController();
+   * setTimeout(() => controller.abort(), 15_000);
+   * const { text } = await agent.run(
+   *   { prompt: "Summarize all open support tickets." },
+   *   { abortSignal: controller.signal },
+   * );
+   * ```
+   */
+  run(input: RunInput, options?: RunOptions): Promise<RunResult>;
+
+  /**
+   * Wraps this agent as a {@linkcode Tool} so another agent can call it as a sub-agent.
+   *
+   * The returned tool exposes a single `prompt` parameter. When called, it invokes
+   * {@linkcode Agent.run | run()} with that prompt and returns the text result.
+   * Use this to build agent hierarchies where a coordinator agent delegates tasks
+   * to specialized sub-agents.
+   *
+   * @param opts - Options for the tool wrapper.
+   * @param opts.description - Required. Natural-language description the calling
+   *   model uses to decide when to invoke this sub-agent.
+   * @param opts.name - Optional display name for the tool. Defaults to the
+   *   agent config's model alias when omitted.
+   * @returns A {@linkcode Tool} that can be passed in another agent's `tools` map.
+   *
+   * @example
+   * ```typescript
+   * const researchAgent = base44.agents.create({
+   *   model: "claude_sonnet_4_6",
+   *   tools: { webSearch },
+   * });
+   *
+   * const writerAgent = base44.agents.create({
+   *   model: "claude_sonnet_4_6",
+   *   tools: {
+   *     research: researchAgent.asTool({
+   *       description: "Search the web and return a research summary.",
+   *     }),
+   *   },
+   * });
+   *
+   * const { text } = await writerAgent.run({ prompt: "Write a blog post about coral reefs." });
+   * ```
    */
   asTool(opts: { name?: string; description: string }): Tool;
 }
