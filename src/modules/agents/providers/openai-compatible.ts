@@ -9,28 +9,35 @@ function serializeTools(tools?: Record<string, Tool>): ChatCompletionToolDef[] |
   if (!tools) return undefined;
   const entries = Object.entries(tools);
   if (entries.length === 0) return undefined;
-  return entries.map(([name, t]) => ({ type: "function", function: { name, description: t.description, parameters: t.parameters } }));
+  return entries.map(([name, toolDef]) => ({
+    type: "function",
+    function: { name, description: toolDef.description, parameters: toolDef.parameters },
+  }));
 }
 
 /** Neutral messages -> Chat Completions messages. System role in the array is passed through. */
 function toChatMessages(messages: ModelMessage[]): Record<string, unknown>[] {
-  const out: Record<string, unknown>[] = [];
-  for (const m of messages) {
-    if (m.role === "system") {
-      out.push({ role: "system", content: m.content });
-    } else if (m.role === "user") {
-      out.push({ role: "user", content: m.content });
-    } else if (m.role === "assistant") {
-      const msg: Record<string, unknown> = { role: "assistant", content: m.content ?? null };
-      if (m.toolCalls?.length) {
-        msg.tool_calls = m.toolCalls.map((c) => ({ id: c.id, type: "function", function: { name: c.name, arguments: JSON.stringify(c.args ?? {}) } }));
+  const chatMessages: Record<string, unknown>[] = [];
+  for (const message of messages) {
+    if (message.role === "system") {
+      chatMessages.push({ role: "system", content: message.content });
+    } else if (message.role === "user") {
+      chatMessages.push({ role: "user", content: message.content });
+    } else if (message.role === "assistant") {
+      const assistantMessage: Record<string, unknown> = { role: "assistant", content: message.content ?? null };
+      if (message.toolCalls?.length) {
+        assistantMessage.tool_calls = message.toolCalls.map((call) => ({
+          id: call.id,
+          type: "function",
+          function: { name: call.name, arguments: JSON.stringify(call.args ?? {}) },
+        }));
       }
-      out.push(msg);
+      chatMessages.push(assistantMessage);
     } else {
-      out.push({ role: "tool", tool_call_id: m.toolCallId, content: m.result });
+      chatMessages.push({ role: "tool", tool_call_id: message.toolCallId, content: message.result });
     }
   }
-  return out;
+  return chatMessages;
 }
 
 /** Build the Chat Completions body using the param whitelist (rejected params can never appear). */
@@ -58,13 +65,22 @@ function normalizeFinish(raw: string | undefined, hasToolCalls: boolean): Finish
 function parseChatCompletion(raw: any): GenerateResult {
   const choice = raw?.choices?.[0];
   const message = choice?.message ?? {};
-  const toolCalls: ModelToolCall[] = (message.tool_calls ?? []).map((c: any) => {
+  const toolCalls: ModelToolCall[] = (message.tool_calls ?? []).map((call: any) => {
     let args: unknown = {};
-    try { args = JSON.parse(c.function?.arguments || "{}"); } catch { args = {}; }
-    return { id: c.id, name: c.function?.name, args };
+    try {
+      args = JSON.parse(call.function?.arguments || "{}");
+    } catch {
+      args = {};
+    }
+    return { id: call.id, name: call.function?.name, args };
   });
-  const u = raw?.usage ?? {};
-  const usage: RunUsage = { promptTokens: u.prompt_tokens, completionTokens: u.completion_tokens, totalTokens: u.total_tokens, credits: u.base44_credits };
+  const rawUsage = raw?.usage ?? {};
+  const usage: RunUsage = {
+    inputTokens: rawUsage.prompt_tokens,
+    outputTokens: rawUsage.completion_tokens,
+    totalTokens: rawUsage.total_tokens,
+    credits: rawUsage.base44_credits,
+  };
   return {
     text: message.content ?? "",
     toolCalls,

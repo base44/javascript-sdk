@@ -45,12 +45,14 @@ export interface Step {
     args: unknown;
     result: string;
   }>;
+  /** Token/credit usage of the model call that produced this step's tool calls. */
+  usage?: RunUsage;
 }
 
-/** Token/credit usage for a run. `credits` is the Base44 gateway's `base44_credits`. */
+/** Token/credit usage for a single model call or a sum across calls. `credits` is the Base44 gateway's `base44_credits`. */
 export interface RunUsage {
-  promptTokens?: number;
-  completionTokens?: number;
+  inputTokens?: number;
+  outputTokens?: number;
   totalTokens?: number;
   credits?: number;
 }
@@ -65,6 +67,8 @@ export interface RunResult {
   finishReason: string;
   /** Token and credit usage from the final completion. */
   usage: RunUsage;
+  /** Summed across all model calls in the loop; `usage` is the final call only. */
+  totalUsage: RunUsage;
   /** The raw final completion body, for advanced use. */
   raw: unknown;
 }

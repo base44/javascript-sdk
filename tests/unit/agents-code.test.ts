@@ -137,7 +137,8 @@ describe("Agent loop", () => {
 
     expect(result.text).toBe("Hello there.");
     expect(result.finishReason).toBe("stop");
-    expect(result.usage).toEqual({ promptTokens: 10, completionTokens: 5, totalTokens: 15, credits: 2 });
+    expect(result.usage).toEqual({ inputTokens: 10, outputTokens: 5, totalTokens: 15, credits: 2 });
+    expect(result.totalUsage).toEqual(result.usage);
     expect(result.steps).toEqual([]);
     // system + user were sent
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
@@ -260,6 +261,27 @@ describe("Agent loop", () => {
     expect(body.messages[0]).toEqual({ role: "system", content: "You are a pirate." });
     expect(body.messages[1]).toEqual({ role: "user", content: "hello" });
     expect(body.messages).toHaveLength(2);
+  });
+
+  test("totalUsage sums usage across all model calls; steps[0].usage equals first call's mapped usage", async () => {
+    const firstUsage = { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15, base44_credits: 2 };
+    const secondUsage = { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15, base44_credits: 2 };
+    fetchMock
+      .mockResolvedValueOnce(
+        completion({ toolCalls: [{ id: "c1", name: "t", arguments: "{}" }], finish: "tool_calls", usage: firstUsage })
+      )
+      .mockResolvedValueOnce(completion({ content: "done", usage: secondUsage }));
+
+    const transport = createGatewayTransport(config);
+    const agent = createAgent(
+      { model: "m", tools: { t: { description: "x", parameters: { type: "object" }, execute: async () => "r" } } },
+      openAICompatibleProvider(transport)
+    );
+    const result = await agent.run({ prompt: "go" });
+
+    expect(result.usage).toEqual({ inputTokens: 10, outputTokens: 5, totalTokens: 15, credits: 2 });
+    expect(result.totalUsage).toEqual({ inputTokens: 20, outputTokens: 10, totalTokens: 30, credits: 4 });
+    expect(result.steps[0].usage).toEqual({ inputTokens: 10, outputTokens: 5, totalTokens: 15, credits: 2 });
   });
 });
 

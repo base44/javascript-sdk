@@ -49,7 +49,7 @@ describe("openAICompatibleProvider adapter", () => {
     const r = await model.generate({ model: "m", messages: [{ role: "user", content: "weather?" }] });
     expect(r.toolCalls).toEqual([{ id: "c1", name: "getWeather", args: { city: "Haifa" } }]);
     expect(r.finishReason).toBe("tool-calls");
-    expect(r.usage).toEqual({ promptTokens: 3, completionTokens: 2, totalTokens: 5, credits: 1 });
+    expect(r.usage).toEqual({ inputTokens: 3, outputTokens: 2, totalTokens: 5, credits: 1 });
     expect(r.text).toBe("");
   });
 

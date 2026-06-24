@@ -1,4 +1,4 @@
-import type { RunInput, ToolChoice, Agent, ChatMessage, AgentsModule } from "../../src/index.js";
+import type { RunInput, ToolChoice, Agent, ChatMessage, AgentsModule, RunResult, RunUsage } from "../../src/index.js";
 
 // ---------------------------------------------------------------------------
 // RunInput — union of { prompt: string } | { messages: ChatMessage[] }
@@ -70,3 +70,8 @@ const rejectsAsToolWithoutDescription = agent.asTool(
   // @ts-expect-error description is required by asTool.
   {}
 );
+
+// RunResult must have usage and totalUsage of type RunUsage
+declare const runResult: RunResult;
+const _usage: RunUsage = runResult.usage;
+const _totalUsage: RunUsage = runResult.totalUsage;
