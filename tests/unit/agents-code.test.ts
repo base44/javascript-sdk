@@ -1,8 +1,10 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
+import { createClient } from "../../src/index.ts";
+import * as sdk from "../../src/index.ts";
 import { resolveConnection, createGatewayTransport } from "../../src/modules/ai-gateway.ts";
 import { Base44Error } from "../../src/index.ts";
 import { tool, serializeTools } from "../../src/modules/tool.ts";
-import { buildRequestBody, createDynamicAgentsModule } from "../../src/modules/agent-loop.ts";
+import { buildRequestBody, createAgent } from "../../src/modules/agent-loop.ts";
 
 const config = {
   serverUrl: "https://app-1.base44.app",
@@ -174,8 +176,9 @@ describe("agent loop", () => {
 
   test("run() returns text, usage (incl. credits), and finishReason on a no-tool completion", async () => {
     fetchMock.mockResolvedValue(completion({ content: "Hello there." }));
-    const mod = createDynamicAgentsModule(config);
-    const result = await mod.run({ model: "gpt_5_mini", system: "Be terse.", prompt: "Hi" });
+    const transport = createGatewayTransport(config);
+    const agent = createAgent({ model: "gpt_5_mini", system: "Be terse." }, transport);
+    const result = await agent.run({ prompt: "Hi" });
 
     expect(result.text).toBe("Hello there.");
     expect(result.finishReason).toBe("stop");
@@ -189,7 +192,7 @@ describe("agent loop", () => {
     ]);
   });
 
-  test("create().run() executes a tool then continues to a final answer", async () => {
+  test("run() executes a tool then continues to a final answer", async () => {
     fetchMock
       .mockResolvedValueOnce(
         completion({ toolCalls: [{ id: "call_1", name: "getWeather", arguments: '{"city":"Haifa"}' }], finish: "tool_calls" })
@@ -197,11 +200,15 @@ describe("agent loop", () => {
       .mockResolvedValueOnce(completion({ content: "It's sunny in Haifa." }));
 
     const execute = vi.fn(async ({ city }: { city: string }) => ({ city, condition: "sunny" }));
-    const agent = createDynamicAgentsModule(config).create({
-      model: "claude_sonnet_4_6",
-      tools: { getWeather: { description: "weather", parameters: { type: "object" }, execute } },
-      maxSteps: 4,
-    });
+    const transport = createGatewayTransport(config);
+    const agent = createAgent(
+      {
+        model: "claude_sonnet_4_6",
+        tools: { getWeather: { description: "weather", parameters: { type: "object" }, execute } },
+        maxSteps: 4,
+      },
+      transport
+    );
     const result = await agent.run({ prompt: "weather in Haifa?" });
 
     expect(execute).toHaveBeenCalledWith({ city: "Haifa" });
@@ -221,10 +228,14 @@ describe("agent loop", () => {
         completion({ toolCalls: [{ id: "c1", name: "boom", arguments: "{}" }], finish: "tool_calls" })
       )
       .mockResolvedValueOnce(completion({ content: "recovered" }));
-    const agent = createDynamicAgentsModule(config).create({
-      model: "m",
-      tools: { boom: { description: "x", parameters: { type: "object" }, execute: async () => { throw new Error("kaboom"); } } },
-    });
+    const transport = createGatewayTransport(config);
+    const agent = createAgent(
+      {
+        model: "m",
+        tools: { boom: { description: "x", parameters: { type: "object" }, execute: async () => { throw new Error("kaboom"); } } },
+      },
+      transport
+    );
     const result = await agent.run({ prompt: "go" });
     expect(result.text).toBe("recovered");
     const toolMsg = JSON.parse(fetchMock.mock.calls[1][1].body).messages.find((m: any) => m.role === "tool");
@@ -235,11 +246,15 @@ describe("agent loop", () => {
     fetchMock.mockImplementation(() =>
       completion({ toolCalls: [{ id: "c", name: "t", arguments: "{}" }], finish: "tool_calls" })
     );
-    const agent = createDynamicAgentsModule(config).create({
-      model: "m",
-      tools: { t: { description: "x", parameters: { type: "object" }, execute: async () => "ok" } },
-      maxSteps: 2,
-    });
+    const transport = createGatewayTransport(config);
+    const agent = createAgent(
+      {
+        model: "m",
+        tools: { t: { description: "x", parameters: { type: "object" }, execute: async () => "ok" } },
+        maxSteps: 2,
+      },
+      transport
+    );
     const result = await agent.run({ prompt: "loop" });
     expect(result.finishReason).toBe("max_steps");
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -247,51 +262,17 @@ describe("agent loop", () => {
 
   test("run() accepts a full messages array", async () => {
     fetchMock.mockResolvedValue(completion({ content: "ok" }));
-    const mod = createDynamicAgentsModule(config);
-    await mod.run({ model: "m", messages: [{ role: "user", content: "a" }] });
+    const transport = createGatewayTransport(config);
+    const agent = createAgent({ model: "m" }, transport);
+    await agent.run({ messages: [{ role: "user", content: "a" }] });
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.messages).toEqual([{ role: "user", content: "a" }]);
   });
 });
 
-import { createClient } from "../../src/index.ts";
-import * as sdk from "../../src/index.ts";
-
 describe("public exports", () => {
   test("tool is exported from the package root", () => {
     expect(typeof sdk.tool).toBe("function");
-  });
-});
-
-describe("client wiring", () => {
-  let fetchMock: ReturnType<typeof vi.fn>;
-  beforeEach(() => {
-    fetchMock = vi.fn().mockResolvedValue(completion({ content: "ok" }));
-    vi.stubGlobal("fetch", fetchMock);
-  });
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.clearAllMocks();
-  });
-
-  test("base44.dynamicAgents.run hits the gateway with the user token", async () => {
-    const base44 = createClient({ serverUrl: "https://app-x.base44.app", appId: "app-x", token: "user-tok" });
-    const result = await base44.dynamicAgents.run({ model: "gpt_5_mini", prompt: "hi" });
-    expect(result.text).toBe("ok");
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe("https://app-x.base44.app/api/ai/unified/v1/chat/completions");
-    expect(init.headers.Authorization).toBe("Bearer user-tok");
-  });
-
-  test("asServiceRole.dynamicAgents uses the service token", async () => {
-    const base44 = createClient({
-      serverUrl: "https://app-x.base44.app",
-      appId: "app-x",
-      token: "user-tok",
-      serviceToken: "svc-tok",
-    });
-    await base44.asServiceRole.dynamicAgents.run({ model: "m", prompt: "hi" });
-    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe("Bearer svc-tok");
   });
 });
 

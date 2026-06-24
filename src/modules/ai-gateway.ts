@@ -1,11 +1,17 @@
 import { Base44Error } from "../utils/axios-client.js";
-import type { DynamicAgentsModuleConfig } from "./dynamic-agents.types.js";
+
+/** @internal */
+export interface GatewayConfig {
+  serverUrl: string;
+  /** Returns the current bearer token at call time (thunk — never a captured string). */
+  getToken: () => string | undefined;
+}
 
 /**
  * Resolves the AI Gateway connection from a client config.
  * @internal
  */
-export function resolveConnection(config: DynamicAgentsModuleConfig): {
+export function resolveConnection(config: GatewayConfig): {
   baseURL: string;
   apiKey: string;
 } {
@@ -23,7 +29,7 @@ export function resolveConnection(config: DynamicAgentsModuleConfig): {
  * later without changing callers of `.complete()`.
  * @internal
  */
-export function createGatewayTransport(config: DynamicAgentsModuleConfig) {
+export function createGatewayTransport(config: GatewayConfig) {
   return {
     async complete(
       body: Record<string, unknown>,

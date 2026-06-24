@@ -12,7 +12,7 @@ import {
   removeAccessToken,
   getLoginUrl,
 } from "./utils/auth-utils.js";
-import { tool } from "./modules/dynamic-agents.js";
+import { tool } from "./modules/tool.js";
 
 export {
   createClient,
@@ -129,8 +129,7 @@ export type {
   ToolChoice,
   AgentConfig,
   Agent,
-  DynamicAgentsModule,
-} from "./modules/dynamic-agents.types.js";
+} from "./modules/agents.types.js";
 
 // Auth utils types
 export type {

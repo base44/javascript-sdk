@@ -2,15 +2,12 @@ import type {
   Agent,
   AgentConfig,
   ChatMessage,
-  DynamicAgentsModule,
-  DynamicAgentsModuleConfig,
   RunInput,
   RunOptions,
   RunResult,
   Step,
   Tool,
-} from "./dynamic-agents.types.js";
-import { createGatewayTransport } from "./ai-gateway.js";
+} from "./agents.types.js";
 import { serializeTools } from "./tool.js";
 
 /**
@@ -156,30 +153,3 @@ export function createAgent(
   return agent;
 }
 
-/**
- * Creates the `base44.dynamicAgents` module.
- * @internal
- */
-export function createDynamicAgentsModule(
-  config: DynamicAgentsModuleConfig
-): DynamicAgentsModule {
-  const transport = createGatewayTransport(config);
-
-  function create(agentConfig: AgentConfig): Agent {
-    return createAgent(agentConfig, transport);
-  }
-
-  function run(
-    runConfig: AgentConfig & ({ prompt: string } | { messages: ChatMessage[] }),
-    options?: RunOptions
-  ): Promise<RunResult> {
-    if ("messages" in runConfig) {
-      const { messages, ...agentConfig } = runConfig as AgentConfig & { messages: ChatMessage[] };
-      return create(agentConfig).run({ messages }, options);
-    }
-    const { prompt, ...agentConfig } = runConfig as AgentConfig & { prompt: string };
-    return create(agentConfig).run({ prompt }, options);
-  }
-
-  return { create, run };
-}

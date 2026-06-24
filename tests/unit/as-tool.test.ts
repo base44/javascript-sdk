@@ -50,7 +50,7 @@ describe("Agent.asTool", () => {
 
   test("produces a prompt-only tool that runs the sub-agent and returns its text", async () => {
     const base44 = createClient(opts);
-    const sub = base44.dynamicAgents.create({ model: "gpt_5_mini", system: "weather bot" });
+    const sub = base44.agents.create({ model: "gpt_5_mini", system: "weather bot" });
     const t = sub.asTool({ name: "weather", description: "Get the weather for a city." });
 
     expect(t.description).toBe("Get the weather for a city.");

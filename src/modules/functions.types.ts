@@ -101,7 +101,7 @@ export interface FunctionsModule {
    * @param name - The backend function name.
    * @param opts - `description` (required) and optional JSON Schema `parameters`.
    */
-  asTool(name: FunctionName, opts: { description: string; parameters?: Record<string, unknown> }): import("./dynamic-agents.types.js").Tool;
+  asTool(name: FunctionName, opts: { description: string; parameters?: Record<string, unknown> }): import("./agents.types.js").Tool;
 
   /**
    * Performs a direct HTTP request to a backend function path and returns the native `Response`.

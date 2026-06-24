@@ -1,4 +1,4 @@
-import type { Tool } from "./dynamic-agents.types.js";
+import type { Tool } from "./agents.types.js";
 
 /**
  * Defines a tool an agent can call.
