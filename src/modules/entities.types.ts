@@ -696,6 +696,26 @@ export interface EntityHandler<T = any> {
    * ```
    */
   subscribe(callback: RealtimeCallback<T>): () => void;
+
+  /**
+   * Turns this entity into a map of agent tools — one per allowed operation
+   * (`read_<Entity>`, `create_<Entity>`, `update_<Entity>`, `delete_<Entity>`).
+   * Read-only by default, pass `operations` to opt into writes. Spread the result into an agent's `tools`.
+   *
+   * @param opts - Optional `operations` (`"read" | "create" | "update" | "delete"`, default `["read"]`).
+   * @returns A map of tool-name -> {@linkcode Tool}.
+   *
+   * @example
+   * ```typescript
+   * const agent = base44.agents.create({
+   *   model: "claude_sonnet_4_6",
+   *   tools: { ...base44.entities.Order.asTool({ operations: ["read", "update"] }) },
+   * });
+   * ```
+   */
+  asTool(opts?: {
+    operations?: ("read" | "create" | "update" | "delete")[];
+  }): Record<string, import("./agents/agents.types.js").Tool>;
 }
 
 /**

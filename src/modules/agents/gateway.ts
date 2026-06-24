@@ -24,9 +24,8 @@ export function resolveConnection(config: GatewayConfig): {
 }
 
 /**
- * Creates the gateway transport. Owns the single HTTP call to the OpenAI-compatible
- * `/chat/completions` endpoint. Shaped so a streaming `.stream()` method can be added
- * later without changing callers of `.complete()`.
+ * Creates the gateway transport — owns the single HTTP call to the OpenAI-compatible
+ * `/chat/completions` endpoint.
  * @internal
  */
 export function createGatewayTransport(config: GatewayConfig) {

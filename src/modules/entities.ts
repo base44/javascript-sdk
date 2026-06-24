@@ -13,6 +13,7 @@ import {
   UpdateManyResult,
 } from "./entities.types";
 import { RoomsSocket } from "../utils/socket-utils.js";
+import type { Tool } from "./agents/agents.types.js";
 
 /**
  * Configuration for the entities module.
@@ -93,7 +94,7 @@ function createEntityHandler<T = any>(
 ): EntityHandler<T> {
   const baseURL = `/apps/${appId}/entities/${entityName}`;
 
-  return {
+  const handler: EntityHandler<T> = {
     // List entities with optional pagination and sorting
     async list<K extends keyof T = keyof T>(
       sort?: SortField<T>,
@@ -223,5 +224,65 @@ function createEntityHandler<T = any>(
 
       return unsubscribe;
     },
+
+    asTool(opts: { operations?: ("read" | "create" | "update" | "delete")[] } = {}): Record<string, Tool> {
+      const operations = opts.operations ?? ["read"];
+      const tools: Record<string, Tool> = {};
+
+      if (operations.includes("read")) {
+        tools[`read_${entityName}`] = {
+          description: `Read ${entityName} entities. For the query param, use MongoDB query syntax, e.g. { "status": "open", "price": { "$gt": 30 } }.`,
+          parameters: {
+            type: "object",
+            properties: {
+              query: { type: "object", description: `MongoDB-style filter over ${entityName} fields.`, additionalProperties: true },
+              sort: { type: "string", description: "Field to sort by; prefix with '-' for descending (e.g. '-created_date')." },
+              limit: { type: "number", description: "Maximum number of records to return." },
+              skip: { type: "number", description: "Number of records to skip (pagination)." },
+              fields: { type: "array", items: { type: "string" }, description: "Subset of fields to return." },
+            },
+          },
+          execute: (args: { query?: Record<string, unknown>; sort?: string; limit?: number; skip?: number; fields?: string[] } = {}) =>
+            handler.filter((args.query ?? {}) as EntityFilterQuery<T>, args.sort as SortField<T> | undefined, args.limit, args.skip, args.fields as (keyof T)[] | undefined),
+        };
+      }
+      if (operations.includes("create")) {
+        tools[`create_${entityName}`] = {
+          description: `Create a new ${entityName} entity`,
+          // open object: the SDK has no runtime schema, so the model supplies fields directly
+          parameters: { type: "object", additionalProperties: true },
+          execute: (args: Record<string, unknown> = {}) => handler.create(args as Partial<T>),
+        };
+      }
+      if (operations.includes("update")) {
+        tools[`update_${entityName}`] = {
+          description: `Update an existing ${entityName} entity`,
+          parameters: {
+            type: "object",
+            properties: { id: { type: "string", description: `The id of the ${entityName} to update.` } },
+            required: ["id"],
+            additionalProperties: true,
+          },
+          execute: (args: { id: string } & Record<string, unknown>) => {
+            const { id, ...data } = args ?? ({} as { id: string });
+            return handler.update(id, data as Partial<T>);
+          },
+        };
+      }
+      if (operations.includes("delete")) {
+        tools[`delete_${entityName}`] = {
+          description: `Delete an existing ${entityName} entity`,
+          parameters: {
+            type: "object",
+            properties: { id: { type: "string", description: `The id of the ${entityName} to delete.` } },
+            required: ["id"],
+          },
+          execute: (args: { id: string }) => handler.delete(args.id),
+        };
+      }
+      return tools;
+    },
   };
+
+  return handler;
 }

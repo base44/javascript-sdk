@@ -92,8 +92,7 @@ function parseChatCompletion(raw: any): GenerateResult {
 
 /**
  * OpenAI-compatible provider: speaks the Chat Completions wire format over the Base44
- * gateway transport. Most vendors (and the gateway) expose this protocol; a future
- * `openai-responses` or native `anthropic` provider would sit beside this file.
+ * gateway transport.
  * @internal
  */
 export function openAICompatibleProvider(transport: GatewayTransport): LanguageModel {
