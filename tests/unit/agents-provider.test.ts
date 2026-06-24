@@ -1,5 +1,5 @@
 import { describe, test, expect, afterEach, vi } from "vitest";
-import { openAIProvider } from "../../src/modules/agents/providers/openai.ts";
+import { openAICompatibleProvider } from "../../src/modules/agents/providers/openai-compatible.ts";
 
 const transportFor = (body: object) => {
   const fetchMock = vi.fn().mockResolvedValue(
@@ -9,13 +9,13 @@ const transportFor = (body: object) => {
   return fetchMock;
 };
 
-describe("openAIProvider adapter", () => {
+describe("openAICompatibleProvider adapter", () => {
   afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); });
 
   // build a transport bound to the gateway
   const makeModel = async () => {
     const { createGatewayTransport } = await import("../../src/modules/agents/gateway.ts");
-    return openAIProvider(createGatewayTransport({ serverUrl: "https://a.base44.app", getToken: () => "t" }));
+    return openAICompatibleProvider(createGatewayTransport({ serverUrl: "https://a.base44.app", getToken: () => "t" }));
   };
 
   test("system role message is serialized as a leading OpenAI system message", async () => {

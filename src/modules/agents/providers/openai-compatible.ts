@@ -3,17 +3,17 @@ import type { GenerateRequest, GenerateResult, LanguageModel, ModelMessage, Mode
 
 interface GatewayTransport { complete(body: Record<string, unknown>, opts?: { signal?: AbortSignal }): Promise<any> }
 
-interface OpenAIToolDef { type: "function"; function: { name: string; description: string; parameters: JSONSchema } }
+interface ChatCompletionToolDef { type: "function"; function: { name: string; description: string; parameters: JSONSchema } }
 
-function serializeTools(tools?: Record<string, Tool>): OpenAIToolDef[] | undefined {
+function serializeTools(tools?: Record<string, Tool>): ChatCompletionToolDef[] | undefined {
   if (!tools) return undefined;
   const entries = Object.entries(tools);
   if (entries.length === 0) return undefined;
   return entries.map(([name, t]) => ({ type: "function", function: { name, description: t.description, parameters: t.parameters } }));
 }
 
-/** Neutral messages -> OpenAI chat messages. System role in the array is passed through. */
-function toOpenAIMessages(messages: ModelMessage[]): Record<string, unknown>[] {
+/** Neutral messages -> Chat Completions messages. System role in the array is passed through. */
+function toChatMessages(messages: ModelMessage[]): Record<string, unknown>[] {
   const out: Record<string, unknown>[] = [];
   for (const m of messages) {
     if (m.role === "system") {
@@ -33,9 +33,9 @@ function toOpenAIMessages(messages: ModelMessage[]): Record<string, unknown>[] {
   return out;
 }
 
-/** Build the OpenAI body using the same param whitelist as before (rejected params can never appear). */
-function buildOpenAIBody(req: GenerateRequest): Record<string, unknown> {
-  const body: Record<string, unknown> = { model: req.model, messages: toOpenAIMessages(req.messages) };
+/** Build the Chat Completions body using the param whitelist (rejected params can never appear). */
+function buildChatCompletionsBody(req: GenerateRequest): Record<string, unknown> {
+  const body: Record<string, unknown> = { model: req.model, messages: toChatMessages(req.messages) };
   if (req.temperature !== undefined) body.temperature = req.temperature;
   if (req.toolChoice !== undefined) body.tool_choice = req.toolChoice;
   if (req.responseFormat !== undefined) {
@@ -55,7 +55,7 @@ function normalizeFinish(raw: string | undefined, hasToolCalls: boolean): Finish
   return "other";
 }
 
-function parseOpenAICompletion(raw: any): GenerateResult {
+function parseChatCompletion(raw: any): GenerateResult {
   const choice = raw?.choices?.[0];
   const message = choice?.message ?? {};
   const toolCalls: ModelToolCall[] = (message.tool_calls ?? []).map((c: any) => {
@@ -74,12 +74,17 @@ function parseOpenAICompletion(raw: any): GenerateResult {
   };
 }
 
-/** OpenAI-compatible adapter over the Base44 gateway transport. @internal */
-export function openAIProvider(transport: GatewayTransport): LanguageModel {
+/**
+ * OpenAI-compatible provider: speaks the Chat Completions wire format over the Base44
+ * gateway transport. Most vendors (and the gateway) expose this protocol; a future
+ * `openai-responses` or native `anthropic` provider would sit beside this file.
+ * @internal
+ */
+export function openAICompatibleProvider(transport: GatewayTransport): LanguageModel {
   return {
     async generate(req: GenerateRequest): Promise<GenerateResult> {
-      const raw = await transport.complete(buildOpenAIBody(req), { signal: req.signal });
-      return parseOpenAICompletion(raw);
+      const raw = await transport.complete(buildChatCompletionsBody(req), { signal: req.signal });
+      return parseChatCompletion(raw);
     },
   };
 }

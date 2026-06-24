@@ -46,5 +46,4 @@ export interface GenerateResult {
 /** The provider seam. Adapters translate neutral <-> vendor wire. @internal */
 export interface LanguageModel {
   generate(req: GenerateRequest): Promise<GenerateResult>;
-  // Phase 1B: stream(req: GenerateRequest): AsyncIterable<StreamEvent>;
 }

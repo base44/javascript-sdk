@@ -8,7 +8,7 @@ import {
   CreateConversationParams,
 } from "./agents.types.js";
 import { createGatewayTransport } from "./gateway.js";
-import { openAIProvider } from "./providers/openai.js";
+import { openAICompatibleProvider } from "./providers/openai-compatible.js";
 import { createAgent } from "./loop.js";
 
 export function createAgentsModule({
@@ -19,7 +19,7 @@ export function createAgentsModule({
   token,
   getToken,
 }: AgentsModuleConfig): AgentsModule {
-  const model = openAIProvider(createGatewayTransport({
+  const model = openAICompatibleProvider(createGatewayTransport({
     serverUrl: serverUrl ?? "",
     getToken: getToken ?? (() => token),
   }));

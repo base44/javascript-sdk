@@ -5,7 +5,7 @@ import { Base44Error } from "../../src/index.ts";
 import { resolveConnection, createGatewayTransport } from "../../src/modules/agents/gateway.ts";
 import { tool } from "../../src/modules/agents/tool.ts";
 import { createAgent } from "../../src/modules/agents/loop.ts";
-import { openAIProvider } from "../../src/modules/agents/providers/openai.ts";
+import { openAICompatibleProvider } from "../../src/modules/agents/providers/openai-compatible.ts";
 
 const config = {
   serverUrl: "https://app-1.base44.app",
@@ -132,7 +132,7 @@ describe("Agent loop", () => {
   test("should return text, usage (incl. credits), and finishReason on a no-tool completion", async () => {
     fetchMock.mockResolvedValue(completion({ content: "Hello there." }));
     const transport = createGatewayTransport(config);
-    const agent = createAgent({ model: "gpt_5_mini", system: "Be terse." }, openAIProvider(transport));
+    const agent = createAgent({ model: "gpt_5_mini", system: "Be terse." }, openAICompatibleProvider(transport));
     const result = await agent.run({ prompt: "Hi" });
 
     expect(result.text).toBe("Hello there.");
@@ -162,7 +162,7 @@ describe("Agent loop", () => {
         tools: { getWeather: { description: "weather", parameters: { type: "object" }, execute } },
         maxSteps: 4,
       },
-      openAIProvider(transport)
+      openAICompatibleProvider(transport)
     );
     const result = await agent.run({ prompt: "weather in Haifa?" });
 
@@ -189,7 +189,7 @@ describe("Agent loop", () => {
         model: "m",
         tools: { boom: { description: "x", parameters: { type: "object" }, execute: async () => { throw new Error("kaboom"); } } },
       },
-      openAIProvider(transport)
+      openAICompatibleProvider(transport)
     );
     const result = await agent.run({ prompt: "go" });
     expect(result.text).toBe("recovered");
@@ -208,7 +208,7 @@ describe("Agent loop", () => {
         tools: { t: { description: "x", parameters: { type: "object" }, execute: async () => "ok" } },
         maxSteps: 2,
       },
-      openAIProvider(transport)
+      openAICompatibleProvider(transport)
     );
     const result = await agent.run({ prompt: "loop" });
     expect(result.finishReason).toBe("max_steps");
@@ -218,7 +218,7 @@ describe("Agent loop", () => {
   test("should accept a full messages array as run input", async () => {
     fetchMock.mockResolvedValue(completion({ content: "ok" }));
     const transport = createGatewayTransport(config);
-    const agent = createAgent({ model: "m" }, openAIProvider(transport));
+    const agent = createAgent({ model: "m" }, openAICompatibleProvider(transport));
     await agent.run({ messages: [{ role: "user", content: "a" }] });
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.messages).toEqual([{ role: "user", content: "a" }]);
@@ -227,7 +227,7 @@ describe("Agent loop", () => {
   test("history-replay via run({ messages }): system+tool history preserved faithfully", async () => {
     fetchMock.mockResolvedValue(completion({ content: "28°C" }));
     const transport = createGatewayTransport(config);
-    const agent = createAgent({ model: "m" }, openAIProvider(transport));
+    const agent = createAgent({ model: "m" }, openAICompatibleProvider(transport));
     await agent.run({
       messages: [
         { role: "system", content: "You are a pirate." },
@@ -254,7 +254,7 @@ describe("Agent loop", () => {
   test("create({system}).run({prompt}) sends leading system message then user", async () => {
     fetchMock.mockResolvedValue(completion({ content: "aye" }));
     const transport = createGatewayTransport(config);
-    const agent = createAgent({ model: "m", system: "You are a pirate." }, openAIProvider(transport));
+    const agent = createAgent({ model: "m", system: "You are a pirate." }, openAICompatibleProvider(transport));
     await agent.run({ prompt: "hello" });
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.messages[0]).toEqual({ role: "system", content: "You are a pirate." });
