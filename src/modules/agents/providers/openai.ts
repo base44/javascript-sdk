@@ -1,4 +1,4 @@
-import type { Tool, ToolChoice, JSONSchema, RunUsage } from "../agents.types.js";
+import type { Tool, JSONSchema, RunUsage } from "../agents.types.js";
 import type { GenerateRequest, GenerateResult, LanguageModel, ModelMessage, ModelToolCall, FinishReason } from "../provider.js";
 
 interface GatewayTransport { complete(body: Record<string, unknown>, opts?: { signal?: AbortSignal }): Promise<any> }

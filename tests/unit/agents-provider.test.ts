@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, test, expect, afterEach, vi } from "vitest";
 import { openAIProvider } from "../../src/modules/agents/providers/openai.ts";
 
 const transportFor = (body: object) => {
