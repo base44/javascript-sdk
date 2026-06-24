@@ -1,8 +1,8 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import { createClient } from "../../src/index.ts";
 import * as sdk from "../../src/index.ts";
-import { resolveConnection, createGatewayTransport } from "../../src/modules/ai-gateway.ts";
 import { Base44Error } from "../../src/index.ts";
+import { resolveConnection, createGatewayTransport } from "../../src/modules/ai-gateway.ts";
 import { tool, serializeTools } from "../../src/modules/tool.ts";
 import { buildRequestBody, createAgent } from "../../src/modules/agent-loop.ts";
 
@@ -11,133 +11,9 @@ const config = {
   getToken: () => "tok-123",
 };
 
-describe("ai-gateway transport", () => {
-  let fetchMock: ReturnType<typeof vi.fn>;
-
-  beforeEach(() => {
-    fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-  });
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.clearAllMocks();
-  });
-
-  test("resolveConnection builds the gateway baseURL and apiKey", () => {
-    expect(resolveConnection(config)).toEqual({
-      baseURL: "https://app-1.base44.app/api/ai/unified/v1",
-      apiKey: "tok-123",
-    });
-  });
-
-  test("complete() POSTs to /chat/completions with bearer auth and returns parsed body", async () => {
-    const body = { model: "gpt_5_mini", messages: [{ role: "user", content: "hi" }] };
-    fetchMock.mockResolvedValue(
-      new Response(JSON.stringify({ id: "x", choices: [] }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      })
-    );
-
-    const transport = createGatewayTransport(config);
-    const result = await transport.complete(body);
-
-    expect(result).toEqual({ id: "x", choices: [] });
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe("https://app-1.base44.app/api/ai/unified/v1/chat/completions");
-    expect(init.method).toBe("POST");
-    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer tok-123");
-    expect((init.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
-    expect(JSON.parse(init.body as string)).toEqual(body);
-  });
-
-  test("complete() maps the OpenAI error envelope to a Base44Error", async () => {
-    fetchMock.mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          error: { message: "insufficient quota", type: "insufficient_quota", code: null, param: null },
-        }),
-        { status: 402, headers: { "Content-Type": "application/json" } }
-      )
-    );
-    const transport = createGatewayTransport(config);
-    await expect(transport.complete({ model: "m", messages: [] })).rejects.toMatchObject({
-      name: "Base44Error",
-      status: 402,
-      message: "insufficient quota",
-    });
-    await expect(transport.complete({ model: "m", messages: [] })).rejects.toBeInstanceOf(Base44Error);
-  });
-});
-
-describe("tool() + serializeTools()", () => {
-  test("tool() returns its argument unchanged", () => {
-    const t = { description: "d", parameters: { type: "object" }, execute: () => 1 };
-    expect(tool(t)).toBe(t);
-  });
-
-  test("serializeTools maps to OpenAI function-tool shape", () => {
-    const getWeather = {
-      description: "Get weather",
-      parameters: { type: "object", properties: { city: { type: "string" } }, required: ["city"] },
-      execute: async () => ({}),
-    };
-    expect(serializeTools({ getWeather })).toEqual([
-      {
-        type: "function",
-        function: {
-          name: "getWeather",
-          description: "Get weather",
-          parameters: { type: "object", properties: { city: { type: "string" } }, required: ["city"] },
-        },
-      },
-    ]);
-  });
-
-  test("serializeTools returns undefined when there are no tools", () => {
-    expect(serializeTools(undefined)).toBeUndefined();
-    expect(serializeTools({})).toBeUndefined();
-  });
-});
-
-describe("buildRequestBody()", () => {
-  const messages = [{ role: "user" as const, content: "hi" }];
-
-  test("emits only model and messages by default (temperature omitted)", () => {
-    expect(buildRequestBody({ model: "gpt_5_mini" }, messages)).toEqual({
-      model: "gpt_5_mini",
-      messages,
-    });
-  });
-
-  test("includes temperature, tool_choice, response_format and tools when set", () => {
-    const body = buildRequestBody(
-      {
-        model: "claude_sonnet_4_6",
-        temperature: 0.3,
-        toolChoice: "auto",
-        responseFormat: { type: "object", properties: { a: { type: "string" } } },
-        tools: { t: { description: "d", parameters: { type: "object" }, execute: () => 1 } },
-      },
-      messages
-    );
-    expect(body.temperature).toBe(0.3);
-    expect(body.tool_choice).toBe("auto");
-    expect(body.response_format).toEqual({
-      type: "json_schema",
-      json_schema: { name: "response", schema: { type: "object", properties: { a: { type: "string" } } }, strict: true },
-    });
-    expect(Array.isArray(body.tools)).toBe(true);
-  });
-
-  test("never emits rejected params even if smuggled in via cast", () => {
-    const sneaky = { model: "m", max_tokens: 50, stop: ["x"], top_p: 0.5, seed: 1, n: 2 } as any;
-    const body = buildRequestBody(sneaky, messages);
-    for (const k of ["max_tokens", "max_completion_tokens", "stop", "top_p", "frequency_penalty", "presence_penalty", "logit_bias", "seed", "n"]) {
-      expect(body).not.toHaveProperty(k);
-    }
-  });
-});
+// ---------------------------------------------------------------------------
+// Helper: build a mock completion response
+// ---------------------------------------------------------------------------
 
 function completion(opts: {
   content?: string | null;
@@ -163,7 +39,151 @@ function completion(opts: {
   );
 }
 
-describe("agent loop", () => {
+// ---------------------------------------------------------------------------
+// AI Gateway transport
+// ---------------------------------------------------------------------------
+
+describe("AI Gateway transport", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  });
+
+  test("should build the gateway baseURL and apiKey from config", () => {
+    expect(resolveConnection(config)).toEqual({
+      baseURL: "https://app-1.base44.app/api/ai/unified/v1",
+      apiKey: "tok-123",
+    });
+  });
+
+  test("should POST to /chat/completions with bearer auth and return parsed body", async () => {
+    const body = { model: "gpt_5_mini", messages: [{ role: "user", content: "hi" }] };
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ id: "x", choices: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+
+    const transport = createGatewayTransport(config);
+    const result = await transport.complete(body);
+
+    expect(result).toEqual({ id: "x", choices: [] });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://app-1.base44.app/api/ai/unified/v1/chat/completions");
+    expect(init.method).toBe("POST");
+    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer tok-123");
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
+    expect(JSON.parse(init.body as string)).toEqual(body);
+  });
+
+  test("should map an OpenAI error envelope to a Base44Error", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: { message: "insufficient quota", type: "insufficient_quota", code: null, param: null },
+        }),
+        { status: 402, headers: { "Content-Type": "application/json" } }
+      )
+    );
+    const transport = createGatewayTransport(config);
+    await expect(transport.complete({ model: "m", messages: [] })).rejects.toMatchObject({
+      name: "Base44Error",
+      status: 402,
+      message: "insufficient quota",
+    });
+    await expect(transport.complete({ model: "m", messages: [] })).rejects.toBeInstanceOf(Base44Error);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// tool() + serializeTools()
+// ---------------------------------------------------------------------------
+
+describe("tool() + serializeTools()", () => {
+  test("should return its argument unchanged", () => {
+    const t = { description: "d", parameters: { type: "object" }, execute: () => 1 };
+    expect(tool(t)).toBe(t);
+  });
+
+  test("should map to OpenAI function-tool shape", () => {
+    const getWeather = {
+      description: "Get weather",
+      parameters: { type: "object", properties: { city: { type: "string" } }, required: ["city"] },
+      execute: async () => ({}),
+    };
+    expect(serializeTools({ getWeather })).toEqual([
+      {
+        type: "function",
+        function: {
+          name: "getWeather",
+          description: "Get weather",
+          parameters: { type: "object", properties: { city: { type: "string" } }, required: ["city"] },
+        },
+      },
+    ]);
+  });
+
+  test("should return undefined when there are no tools", () => {
+    expect(serializeTools(undefined)).toBeUndefined();
+    expect(serializeTools({})).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildRequestBody()
+// ---------------------------------------------------------------------------
+
+describe("buildRequestBody()", () => {
+  const messages = [{ role: "user" as const, content: "hi" }];
+
+  test("should emit only model and messages by default (temperature omitted)", () => {
+    expect(buildRequestBody({ model: "gpt_5_mini" }, messages)).toEqual({
+      model: "gpt_5_mini",
+      messages,
+    });
+  });
+
+  test("should include temperature, tool_choice, response_format and tools when set", () => {
+    const body = buildRequestBody(
+      {
+        model: "claude_sonnet_4_6",
+        temperature: 0.3,
+        toolChoice: "auto",
+        responseFormat: { type: "object", properties: { a: { type: "string" } } },
+        tools: { t: { description: "d", parameters: { type: "object" }, execute: () => 1 } },
+      },
+      messages
+    );
+    expect(body.temperature).toBe(0.3);
+    expect(body.tool_choice).toBe("auto");
+    expect(body.response_format).toEqual({
+      type: "json_schema",
+      json_schema: { name: "response", schema: { type: "object", properties: { a: { type: "string" } } }, strict: true },
+    });
+    expect(Array.isArray(body.tools)).toBe(true);
+  });
+
+  test("should never emit rejected params even if smuggled in via cast", () => {
+    const sneaky = { model: "m", max_tokens: 50, stop: ["x"], top_p: 0.5, seed: 1, n: 2 } as any;
+    const body = buildRequestBody(sneaky, messages);
+    for (const k of ["max_tokens", "max_completion_tokens", "stop", "top_p", "frequency_penalty", "presence_penalty", "logit_bias", "seed", "n"]) {
+      expect(body).not.toHaveProperty(k);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Agent loop (createAgent)
+// ---------------------------------------------------------------------------
+
+describe("Agent loop", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
   beforeEach(() => {
     fetchMock = vi.fn();
@@ -174,7 +194,7 @@ describe("agent loop", () => {
     vi.clearAllMocks();
   });
 
-  test("run() returns text, usage (incl. credits), and finishReason on a no-tool completion", async () => {
+  test("should return text, usage (incl. credits), and finishReason on a no-tool completion", async () => {
     fetchMock.mockResolvedValue(completion({ content: "Hello there." }));
     const transport = createGatewayTransport(config);
     const agent = createAgent({ model: "gpt_5_mini", system: "Be terse." }, transport);
@@ -192,7 +212,7 @@ describe("agent loop", () => {
     ]);
   });
 
-  test("run() executes a tool then continues to a final answer", async () => {
+  test("should execute a tool then continue to a final answer", async () => {
     fetchMock
       .mockResolvedValueOnce(
         completion({ toolCalls: [{ id: "call_1", name: "getWeather", arguments: '{"city":"Haifa"}' }], finish: "tool_calls" })
@@ -222,7 +242,7 @@ describe("agent loop", () => {
     expect(JSON.parse(toolMsg.content)).toEqual({ city: "Haifa", condition: "sunny" });
   });
 
-  test("a throwing tool feeds the error back to the model instead of aborting", async () => {
+  test("should feed a throwing tool's error back to the model instead of aborting", async () => {
     fetchMock
       .mockResolvedValueOnce(
         completion({ toolCalls: [{ id: "c1", name: "boom", arguments: "{}" }], finish: "tool_calls" })
@@ -242,7 +262,7 @@ describe("agent loop", () => {
     expect(toolMsg.content).toContain("Error: kaboom");
   });
 
-  test("stops at maxSteps with finishReason 'max_steps'", async () => {
+  test("should stop at maxSteps with finishReason 'max_steps'", async () => {
     fetchMock.mockImplementation(() =>
       completion({ toolCalls: [{ id: "c", name: "t", arguments: "{}" }], finish: "tool_calls" })
     );
@@ -260,7 +280,7 @@ describe("agent loop", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  test("run() accepts a full messages array", async () => {
+  test("should accept a full messages array as run input", async () => {
     fetchMock.mockResolvedValue(completion({ content: "ok" }));
     const transport = createGatewayTransport(config);
     const agent = createAgent({ model: "m" }, transport);
@@ -270,13 +290,21 @@ describe("agent loop", () => {
   });
 });
 
-describe("public exports", () => {
-  test("tool is exported from the package root", () => {
+// ---------------------------------------------------------------------------
+// Public package exports
+// ---------------------------------------------------------------------------
+
+describe("Public package exports", () => {
+  test("should export tool from the package root", () => {
     expect(typeof sdk.tool).toBe("function");
   });
 });
 
-describe("base44.agents.create client wiring", () => {
+// ---------------------------------------------------------------------------
+// base44.agents.create — client wiring
+// ---------------------------------------------------------------------------
+
+describe("base44.agents.create — client wiring", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
   beforeEach(() => {
     fetchMock = vi.fn().mockResolvedValue(completion({ content: "agent-ok" }));
@@ -287,7 +315,7 @@ describe("base44.agents.create client wiring", () => {
     vi.clearAllMocks();
   });
 
-  test("base44.agents.create().run() hits the gateway with the user token", async () => {
+  test("should hit the gateway with the user token", async () => {
     const base44 = createClient({ serverUrl: "https://app-y.base44.app", appId: "app-y", token: "user-tok-2" });
     const agent = base44.agents.create({ model: "gpt_5_mini" });
     const result = await agent.run({ prompt: "hello" });
@@ -298,7 +326,7 @@ describe("base44.agents.create client wiring", () => {
     expect(init.headers.Authorization).toBe("Bearer user-tok-2");
   });
 
-  test("asServiceRole.agents.create().run() hits the gateway with the service token", async () => {
+  test("should hit the gateway with the service token via asServiceRole", async () => {
     const base44 = createClient({
       serverUrl: "https://app-y.base44.app",
       appId: "app-y",
@@ -313,7 +341,7 @@ describe("base44.agents.create client wiring", () => {
     expect(init.headers.Authorization).toBe("Bearer svc-tok-2");
   });
 
-  test("base44.agents.create().run() runs a full tool-calling loop", async () => {
+  test("should run a full tool-calling loop through the client", async () => {
     fetchMock
       .mockResolvedValueOnce(
         completion({ toolCalls: [{ id: "call_2", name: "ping", arguments: '{"msg":"test"}' }], finish: "tool_calls" })

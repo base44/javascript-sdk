@@ -1,4 +1,3 @@
-// tests/unit/as-tool.test.ts
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import { createClient } from "../../src/index.ts";
 
@@ -11,12 +10,16 @@ function reply(content: string) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// functions.asTool
+// ---------------------------------------------------------------------------
+
 describe("functions.asTool", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
   beforeEach(() => { fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock); });
   afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); });
 
-  test("wraps invoke(name, args) with a supplied description and parameters", async () => {
+  test("should wrap invoke(name, args) with a supplied description and parameters", async () => {
     // functions module uses axios, not fetch — mock axios post via the function endpoint.
     const nock = (await import("nock")).default;
     const scope = nock("https://a.base44.app")
@@ -36,19 +39,23 @@ describe("functions.asTool", () => {
     scope.done();
   });
 
-  test("defaults parameters to an open object when omitted", () => {
+  test("should default parameters to an open object when omitted", () => {
     const base44 = createClient(opts);
     const t = base44.functions.asTool("anyFn", { description: "d" });
     expect(t.parameters).toEqual({ type: "object", properties: {}, additionalProperties: true });
   });
 });
 
+// ---------------------------------------------------------------------------
+// Agent.asTool
+// ---------------------------------------------------------------------------
+
 describe("Agent.asTool", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
   beforeEach(() => { fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock); });
   afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); });
 
-  test("produces a prompt-only tool that runs the sub-agent and returns its text", async () => {
+  test("should produce a prompt-only tool that runs the sub-agent and returns its text", async () => {
     const base44 = createClient(opts);
     const sub = base44.agents.create({ model: "gpt_5_mini", system: "weather bot" });
     const t = sub.asTool({ name: "weather", description: "Get the weather for a city." });
