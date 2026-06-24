@@ -1,4 +1,17 @@
-import type { Tool } from "./agents.types.js";
+import type { JSONSchema, Tool } from "./agents.types.js";
+
+/**
+ * The OpenAI function-tool format sent in the `tools[]` request array.
+ * @internal
+ */
+export interface OpenAIToolDef {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: JSONSchema;
+  };
+}
 
 /**
  * Defines a tool an agent can call.
@@ -44,7 +57,7 @@ export function tool(t: Tool): Tool {
  * when empty so the param is omitted from the request body.
  * @internal
  */
-export function serializeTools(tools?: Record<string, Tool>): any[] | undefined {
+export function serializeTools(tools?: Record<string, Tool>): OpenAIToolDef[] | undefined {
   if (!tools) return undefined;
   const entries = Object.entries(tools);
   if (entries.length === 0) return undefined;

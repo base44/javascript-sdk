@@ -1,4 +1,5 @@
 import { Base44Error } from "../utils/axios-client.js";
+import type { OpenAICompletion } from "./agent-loop.js";
 
 /** @internal */
 export interface GatewayConfig {
@@ -34,7 +35,7 @@ export function createGatewayTransport(config: GatewayConfig) {
     async complete(
       body: Record<string, unknown>,
       opts: { signal?: AbortSignal } = {}
-    ): Promise<any> {
+    ): Promise<OpenAICompletion> {
       const { baseURL, apiKey } = resolveConnection(config);
       const res = await fetch(`${baseURL}/chat/completions`, {
         method: "POST",

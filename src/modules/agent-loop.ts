@@ -10,6 +10,52 @@ import type {
 } from "./agents.types.js";
 import { serializeTools } from "./tool.js";
 
+// ---------------------------------------------------------------------------
+// Internal interfaces for the OpenAI-compatible completion shape.
+// These cover only the fields the loop actually reads; unknown extra fields
+// from the gateway are tolerated (no `[key: string]: unknown` needed since
+// the response is typed as the intersection we care about).
+// ---------------------------------------------------------------------------
+
+/** @internal */
+export interface OpenAIToolCall {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string };
+}
+
+/** @internal */
+export interface OpenAIAssistantMessage {
+  role: "assistant";
+  content?: string | null;
+  tool_calls?: OpenAIToolCall[];
+}
+
+/** @internal */
+export interface OpenAIChoice {
+  message: OpenAIAssistantMessage;
+  finish_reason?: string;
+}
+
+/** @internal */
+export interface OpenAIUsage {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  /** Base44 gateway credit cost for the request. */
+  base44_credits?: number;
+}
+
+/**
+ * The subset of an OpenAI-compatible chat completion response that the loop reads.
+ * The gateway may return additional fields; they are tolerated but not accessed.
+ * @internal
+ */
+export interface OpenAICompletion {
+  choices: OpenAIChoice[];
+  usage?: OpenAIUsage;
+}
+
 /**
  * Builds the gateway request body from config + messages using an explicit whitelist.
  * Rejected params (max_tokens, stop, top_p, penalties, logit_bias, seed, n) can never
@@ -48,8 +94,8 @@ function stringifyResult(out: unknown): string {
   return typeof out === "string" ? out : JSON.stringify(out);
 }
 
-function mapUsage(raw: any): RunResult["usage"] {
-  const u = (raw && raw.usage) || {};
+function mapUsage(raw: OpenAICompletion | null): RunResult["usage"] {
+  const u = raw?.usage ?? {};
   return {
     promptTokens: u.prompt_tokens,
     completionTokens: u.completion_tokens,
@@ -64,7 +110,7 @@ function mapUsage(raw: any): RunResult["usage"] {
  */
 export function createAgent(
   agentConfig: AgentConfig,
-  transport: { complete(body: Record<string, unknown>, opts?: { signal?: AbortSignal }): Promise<any> }
+  transport: { complete(body: Record<string, unknown>, opts?: { signal?: AbortSignal }): Promise<OpenAICompletion> }
 ): Agent {
   const maxSteps = agentConfig.maxSteps ?? DEFAULT_MAX_STEPS;
   const tools = agentConfig.tools;
@@ -76,14 +122,14 @@ export function createAgent(
       messages.push(...inputToMessages(input));
 
       const steps: Step[] = [];
-      let raw: any = null;
+      let raw: OpenAICompletion | null = null;
 
       for (let i = 0; i < maxSteps; i++) {
         const body = buildRequestBody(agentConfig, messages);
         raw = await transport.complete(body, { signal: options.abortSignal });
 
-        const choice = raw?.choices?.[0];
-        const message = choice?.message ?? { role: "assistant", content: "" };
+        const choice = raw.choices[0];
+        const message: OpenAIAssistantMessage = choice?.message ?? { role: "assistant", content: "" };
         messages.push(message);
 
         const toolCalls = message.tool_calls;
@@ -99,11 +145,11 @@ export function createAgent(
 
         const toolResults: Step["toolResults"] = [];
         for (const call of toolCalls) {
-          const name = call.function?.name;
+          const name = call.function.name;
           const t = tools?.[name];
           let args: unknown = {};
           try {
-            args = JSON.parse(call.function?.arguments || "{}");
+            args = JSON.parse(call.function.arguments || "{}");
           } catch {
             args = {};
           }
@@ -113,8 +159,9 @@ export function createAgent(
           } else {
             try {
               resultContent = stringifyResult(await t.execute(args));
-            } catch (e: any) {
-              resultContent = `Error: ${e?.message ?? String(e)}`;
+            } catch (e: unknown) {
+              const err = e as { message?: string };
+              resultContent = `Error: ${err?.message ?? String(e)}`;
             }
           }
           messages.push({ role: "tool", tool_call_id: call.id, content: resultContent });
@@ -124,7 +171,7 @@ export function createAgent(
       }
 
       // maxSteps exhausted
-      const lastMessage = raw?.choices?.[0]?.message;
+      const lastMessage = raw?.choices[0]?.message;
       return {
         text: lastMessage?.content ?? "",
         steps,
