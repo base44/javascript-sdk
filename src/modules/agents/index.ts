@@ -8,6 +8,7 @@ import {
   CreateConversationParams,
 } from "./agents.types.js";
 import { createGatewayTransport } from "./gateway.js";
+import { openAIProvider } from "./providers/openai.js";
 import { createAgent } from "./loop.js";
 
 export function createAgentsModule({
@@ -18,10 +19,10 @@ export function createAgentsModule({
   token,
   getToken,
 }: AgentsModuleConfig): AgentsModule {
-  const transport = createGatewayTransport({
+  const model = openAIProvider(createGatewayTransport({
     serverUrl: serverUrl ?? "",
     getToken: getToken ?? (() => token),
-  });
+  }));
   const baseURL = `/apps/${appId}/agents`;
 
   // Track active conversations
@@ -142,6 +143,6 @@ export function createAgentsModule({
     subscribeToConversation,
     getWhatsAppConnectURL,
     getTelegramConnectURL,
-    create(config) { return createAgent(config, transport); },
+    create(config) { return createAgent(config, model); },
   };
 }

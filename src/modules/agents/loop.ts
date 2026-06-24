@@ -1,92 +1,17 @@
-import type {
-  Agent,
-  AgentConfig,
-  ChatMessage,
-  RunInput,
-  RunOptions,
-  RunResult,
-  Step,
-  Tool,
-} from "./agents.types.js";
-import { serializeTools } from "./tool.js";
-
-// ---------------------------------------------------------------------------
-// Internal interfaces for the OpenAI-compatible completion shape.
-// These cover only the fields the loop actually reads; unknown extra fields
-// from the gateway are tolerated (no `[key: string]: unknown` needed since
-// the response is typed as the intersection we care about).
-// ---------------------------------------------------------------------------
-
-/** @internal */
-export interface OpenAIToolCall {
-  id: string;
-  type: "function";
-  function: { name: string; arguments: string };
-}
-
-/** @internal */
-export interface OpenAIAssistantMessage {
-  role: "assistant";
-  content?: string | null;
-  tool_calls?: OpenAIToolCall[];
-}
-
-/** @internal */
-export interface OpenAIChoice {
-  message: OpenAIAssistantMessage;
-  finish_reason?: string;
-}
-
-/** @internal */
-export interface OpenAIUsage {
-  prompt_tokens?: number;
-  completion_tokens?: number;
-  total_tokens?: number;
-  /** Base44 gateway credit cost for the request. */
-  base44_credits?: number;
-}
-
-/**
- * The subset of an OpenAI-compatible chat completion response that the loop reads.
- * The gateway may return additional fields; they are tolerated but not accessed.
- * @internal
- */
-export interface OpenAICompletion {
-  choices: OpenAIChoice[];
-  usage?: OpenAIUsage;
-}
-
-/**
- * Builds the gateway request body from config + messages using an explicit whitelist.
- * Rejected params (max_tokens, stop, top_p, penalties, logit_bias, seed, n) can never
- * appear because only the supported keys are ever written.
- * @internal
- */
-export function buildRequestBody(
-  config: AgentConfig,
-  messages: ChatMessage[]
-): Record<string, unknown> {
-  const body: Record<string, unknown> = {
-    model: config.model,
-    messages,
-  };
-  if (config.temperature !== undefined) body.temperature = config.temperature;
-  if (config.toolChoice !== undefined) body.tool_choice = config.toolChoice;
-  if (config.responseFormat !== undefined) {
-    body.response_format = {
-      type: "json_schema",
-      json_schema: { name: "response", schema: config.responseFormat, strict: true },
-    };
-  }
-  const tools = serializeTools(config.tools);
-  if (tools) body.tools = tools;
-  return body;
-}
+import type { Agent, AgentConfig, RunInput, RunOptions, RunResult, Step, Tool } from "./agents.types.js";
+import type { LanguageModel, ModelMessage } from "./provider.js";
 
 const DEFAULT_MAX_STEPS = 8;
 
-function inputToMessages(input: RunInput): ChatMessage[] {
-  if ("messages" in input) return input.messages;
+function inputToMessages(input: RunInput): ModelMessage[] {
+  if ("messages" in input) {
+    // RunInput messages are the public ChatMessage[]; map to neutral user/assistant text.
+    return input.messages.map((m) =>
+      m.role === "assistant"
+        ? { role: "assistant" as const, content: typeof m.content === "string" ? m.content : "" }
+        : { role: "user" as const, content: typeof m.content === "string" ? m.content : "" }
+    );
+  }
   return [{ role: "user", content: input.prompt }];
 }
 
@@ -94,109 +19,69 @@ function stringifyResult(out: unknown): string {
   return typeof out === "string" ? out : JSON.stringify(out);
 }
 
-function mapUsage(raw: OpenAICompletion | null): RunResult["usage"] {
-  const u = raw?.usage ?? {};
-  return {
-    promptTokens: u.prompt_tokens,
-    completionTokens: u.completion_tokens,
-    totalTokens: u.total_tokens,
-    credits: u.base44_credits,
-  };
-}
-
-/**
- * Creates an Agent from a config and a gateway transport.
- * @internal
- */
-export function createAgent(
-  agentConfig: AgentConfig,
-  transport: { complete(body: Record<string, unknown>, opts?: { signal?: AbortSignal }): Promise<OpenAICompletion> }
-): Agent {
+/** Creates an Agent from a config and a language model. @internal */
+export function createAgent(agentConfig: AgentConfig, model: LanguageModel): Agent {
   const maxSteps = agentConfig.maxSteps ?? DEFAULT_MAX_STEPS;
   const tools = agentConfig.tools;
 
   const agent: Agent = {
     async run(input: RunInput, options: RunOptions = {}): Promise<RunResult> {
-      const messages: ChatMessage[] = [];
-      if (agentConfig.system) messages.push({ role: "system", content: agentConfig.system });
-      messages.push(...inputToMessages(input));
-
+      const messages: ModelMessage[] = inputToMessages(input);
       const steps: Step[] = [];
-      let raw: OpenAICompletion | null = null;
+      let last: Awaited<ReturnType<LanguageModel["generate"]>> | null = null;
 
       for (let i = 0; i < maxSteps; i++) {
-        const body = buildRequestBody(agentConfig, messages);
-        raw = await transport.complete(body, { signal: options.abortSignal });
+        last = await model.generate({
+          model: agentConfig.model,
+          system: agentConfig.system,
+          messages,
+          tools,
+          temperature: agentConfig.temperature,
+          toolChoice: agentConfig.toolChoice,
+          responseFormat: agentConfig.responseFormat,
+          signal: options.abortSignal,
+        });
 
-        const choice = raw.choices?.[0];
-        const message: OpenAIAssistantMessage = choice?.message ?? { role: "assistant", content: "" };
-        messages.push(message);
+        messages.push({
+          role: "assistant",
+          content: last.text || undefined,
+          toolCalls: last.toolCalls.length ? last.toolCalls : undefined,
+        });
 
-        const toolCalls = message.tool_calls;
-        if (!toolCalls || toolCalls.length === 0) {
-          return {
-            text: message.content ?? "",
-            steps,
-            finishReason: choice?.finish_reason ?? "stop",
-            usage: mapUsage(raw),
-            raw,
-          };
+        if (last.toolCalls.length === 0) {
+          return { text: last.text, steps, finishReason: last.finishReason, usage: last.usage, raw: last.raw };
         }
 
         const toolResults: Step["toolResults"] = [];
-        for (const call of toolCalls) {
-          const name = call.function.name;
-          const t = tools?.[name];
-          let args: unknown = {};
-          try {
-            args = JSON.parse(call.function.arguments || "{}");
-          } catch {
-            args = {};
-          }
+        for (const call of last.toolCalls) {
+          const t = tools?.[call.name];
           let resultContent: string;
           if (!t) {
-            resultContent = `Error: tool "${name}" is not available.`;
+            resultContent = `Error: tool "${call.name}" is not available.`;
           } else {
             try {
-              resultContent = stringifyResult(await t.execute(args));
+              resultContent = stringifyResult(await t.execute(call.args));
             } catch (e: unknown) {
               const err = e as { message?: string };
               resultContent = `Error: ${err?.message ?? String(e)}`;
             }
           }
-          messages.push({ role: "tool", tool_call_id: call.id, content: resultContent });
-          toolResults.push({ toolCallId: call.id, toolName: name, args, result: resultContent });
+          messages.push({ role: "tool", toolCallId: call.id, toolName: call.name, result: resultContent });
+          toolResults.push({ toolCallId: call.id, toolName: call.name, args: call.args, result: resultContent });
         }
         steps.push({ toolResults });
       }
 
-      // maxSteps exhausted
-      const lastMessage = raw?.choices?.[0]?.message;
-      return {
-        text: lastMessage?.content ?? "",
-        steps,
-        finishReason: "max_steps",
-        usage: mapUsage(raw),
-        raw,
-      };
+      return { text: last?.text ?? "", steps, finishReason: "max_steps", usage: last?.usage ?? {}, raw: last?.raw ?? null };
     },
 
     asTool(toolOpts: { name?: string; description: string }): Tool {
       return {
         description: toolOpts.description,
-        parameters: {
-          type: "object",
-          properties: { prompt: { type: "string", description: "What to ask the sub-agent." } },
-          required: ["prompt"],
-        },
-        execute: async (args: { prompt: string }) => {
-          const result = await agent.run({ prompt: args.prompt });
-          return result.text;
-        },
+        parameters: { type: "object", properties: { prompt: { type: "string", description: "What to ask the sub-agent." } }, required: ["prompt"] },
+        execute: async (args: { prompt: string }) => (await agent.run({ prompt: args.prompt })).text,
       };
     },
   };
-
   return agent;
 }
-
