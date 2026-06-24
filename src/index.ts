@@ -12,7 +12,7 @@ import {
   removeAccessToken,
   getLoginUrl,
 } from "./utils/auth-utils.js";
-import { tool } from "./modules/tool.js";
+import { tool } from "./modules/agents/tool.js";
 
 export {
   createClient,
@@ -100,7 +100,7 @@ export type {
   AgentMessageCustomContext,
   AgentMessageMetadata,
   CreateConversationParams,
-} from "./modules/agents.types.js";
+} from "./modules/agents/agents.types.js";
 
 export type { AppLogsModule } from "./modules/app-logs.types.js";
 
@@ -129,7 +129,7 @@ export type {
   ToolChoice,
   AgentConfig,
   Agent,
-} from "./modules/agents.types.js";
+} from "./modules/agents/agents.types.js";
 
 // Auth utils types
 export type {

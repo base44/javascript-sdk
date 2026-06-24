@@ -9,7 +9,7 @@ import {
 } from "./modules/connectors.js";
 import { getAccessToken } from "./utils/auth-utils.js";
 import { createFunctionsModule } from "./modules/functions.js";
-import { createAgentsModule } from "./modules/agents.js";
+import { createAgentsModule } from "./modules/agents/index.js";
 import { createAppLogsModule } from "./modules/app-logs.js";
 import { createUsersModule } from "./modules/users.js";
 import { RoomsSocket, RoomsSocketConfig } from "./utils/socket-utils.js";

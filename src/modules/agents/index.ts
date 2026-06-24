@@ -1,5 +1,5 @@
-import { getAccessToken } from "../utils/auth-utils.js";
-import { ModelFilterParams } from "../types.js";
+import { getAccessToken } from "../../utils/auth-utils.js";
+import { ModelFilterParams } from "../../types.js";
 import {
   AgentConversation,
   AgentMessage,
@@ -7,8 +7,8 @@ import {
   AgentsModuleConfig,
   CreateConversationParams,
 } from "./agents.types.js";
-import { createGatewayTransport } from "./ai-gateway.js";
-import { createAgent } from "./agent-loop.js";
+import { createGatewayTransport } from "./gateway.js";
+import { createAgent } from "./loop.js";
 
 export function createAgentsModule({
   axios,

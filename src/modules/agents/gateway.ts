@@ -1,5 +1,5 @@
-import { Base44Error } from "../utils/axios-client.js";
-import type { OpenAICompletion } from "./agent-loop.js";
+import { Base44Error } from "../../utils/axios-client.js";
+import type { OpenAICompletion } from "./loop.js";
 
 /** @internal */
 export interface GatewayConfig {

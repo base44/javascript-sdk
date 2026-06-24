@@ -1,6 +1,6 @@
 import { AxiosInstance } from "axios";
-import { RoomsSocket } from "../utils/socket-utils.js";
-import { ModelFilterParams } from "../types.js";
+import { RoomsSocket } from "../../utils/socket-utils.js";
+import { ModelFilterParams } from "../../types.js";
 
 // ---------------------------------------------------------------------------
 // Code-agent types (moved from dynamic-agents.types.ts)

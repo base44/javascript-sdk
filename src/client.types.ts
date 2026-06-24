@@ -7,7 +7,7 @@ import type {
   UserConnectorsModule,
 } from "./modules/connectors.types.js";
 import type { FunctionsModule } from "./modules/functions.types.js";
-import type { AgentsModule } from "./modules/agents.types.js";
+import type { AgentsModule } from "./modules/agents/agents.types.js";
 import type { AppLogsModule } from "./modules/app-logs.types.js";
 import type { AnalyticsModule } from "./modules/analytics.types.js";
 

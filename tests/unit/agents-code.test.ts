@@ -2,9 +2,9 @@ import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import { createClient } from "../../src/index.ts";
 import * as sdk from "../../src/index.ts";
 import { Base44Error } from "../../src/index.ts";
-import { resolveConnection, createGatewayTransport } from "../../src/modules/ai-gateway.ts";
-import { tool, serializeTools } from "../../src/modules/tool.ts";
-import { buildRequestBody, createAgent } from "../../src/modules/agent-loop.ts";
+import { resolveConnection, createGatewayTransport } from "../../src/modules/agents/gateway.ts";
+import { tool, serializeTools } from "../../src/modules/agents/tool.ts";
+import { buildRequestBody, createAgent } from "../../src/modules/agents/loop.ts";
 
 const config = {
   serverUrl: "https://app-1.base44.app",
