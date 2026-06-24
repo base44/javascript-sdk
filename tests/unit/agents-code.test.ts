@@ -223,6 +223,44 @@ describe("Agent loop", () => {
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.messages).toEqual([{ role: "user", content: "a" }]);
   });
+
+  test("history-replay via run({ messages }): system+tool history preserved faithfully", async () => {
+    fetchMock.mockResolvedValue(completion({ content: "28°C" }));
+    const transport = createGatewayTransport(config);
+    const agent = createAgent({ model: "m" }, openAIProvider(transport));
+    await agent.run({
+      messages: [
+        { role: "system", content: "You are a pirate." },
+        { role: "user", content: "weather in Haifa?" },
+        { role: "assistant", content: null, tool_calls: [{ id: "c1", type: "function", function: { name: "getWeather", arguments: '{"city":"Haifa"}' } }] },
+        { role: "tool", tool_call_id: "c1", content: '{"tempC":28}' },
+        { role: "user", content: "and tomorrow?" },
+      ],
+    });
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    // System message stays as system, not flattened to user
+    expect(body.messages[0]).toEqual({ role: "system", content: "You are a pirate." });
+    expect(body.messages[1]).toEqual({ role: "user", content: "weather in Haifa?" });
+    // Assistant tool_calls re-serialized with arguments as JSON string
+    const asst = body.messages[2];
+    expect(asst.role).toBe("assistant");
+    expect(asst.tool_calls[0].function.arguments).toBe('{"city":"Haifa"}');
+    // Tool result keyed by tool_call_id, not flattened to user
+    expect(body.messages[3]).toEqual({ role: "tool", tool_call_id: "c1", content: '{"tempC":28}' });
+    expect(body.messages[4]).toEqual({ role: "user", content: "and tomorrow?" });
+    expect(body.messages).toHaveLength(5);
+  });
+
+  test("create({system}).run({prompt}) sends leading system message then user", async () => {
+    fetchMock.mockResolvedValue(completion({ content: "aye" }));
+    const transport = createGatewayTransport(config);
+    const agent = createAgent({ model: "m", system: "You are a pirate." }, openAIProvider(transport));
+    await agent.run({ prompt: "hello" });
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.messages[0]).toEqual({ role: "system", content: "You are a pirate." });
+    expect(body.messages[1]).toEqual({ role: "user", content: "hello" });
+    expect(body.messages).toHaveLength(2);
+  });
 });
 
 // ---------------------------------------------------------------------------

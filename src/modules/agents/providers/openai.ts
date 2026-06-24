@@ -12,13 +12,15 @@ function serializeTools(tools?: Record<string, Tool>): OpenAIToolDef[] | undefin
   return entries.map(([name, t]) => ({ type: "function", function: { name, description: t.description, parameters: t.parameters } }));
 }
 
-/** Neutral messages (+ system) -> OpenAI chat messages. */
-function toOpenAIMessages(system: string | undefined, messages: ModelMessage[]): Record<string, unknown>[] {
+/** Neutral messages -> OpenAI chat messages. System role in the array is passed through. */
+function toOpenAIMessages(messages: ModelMessage[]): Record<string, unknown>[] {
   const out: Record<string, unknown>[] = [];
-  if (system) out.push({ role: "system", content: system });
   for (const m of messages) {
-    if (m.role === "user") out.push({ role: "user", content: m.content });
-    else if (m.role === "assistant") {
+    if (m.role === "system") {
+      out.push({ role: "system", content: m.content });
+    } else if (m.role === "user") {
+      out.push({ role: "user", content: m.content });
+    } else if (m.role === "assistant") {
       const msg: Record<string, unknown> = { role: "assistant", content: m.content ?? null };
       if (m.toolCalls?.length) {
         msg.tool_calls = m.toolCalls.map((c) => ({ id: c.id, type: "function", function: { name: c.name, arguments: JSON.stringify(c.args ?? {}) } }));
@@ -33,7 +35,7 @@ function toOpenAIMessages(system: string | undefined, messages: ModelMessage[]):
 
 /** Build the OpenAI body using the same param whitelist as before (rejected params can never appear). */
 function buildOpenAIBody(req: GenerateRequest): Record<string, unknown> {
-  const body: Record<string, unknown> = { model: req.model, messages: toOpenAIMessages(req.system, req.messages) };
+  const body: Record<string, unknown> = { model: req.model, messages: toOpenAIMessages(req.messages) };
   if (req.temperature !== undefined) body.temperature = req.temperature;
   if (req.toolChoice !== undefined) body.tool_choice = req.toolChoice;
   if (req.responseFormat !== undefined) {

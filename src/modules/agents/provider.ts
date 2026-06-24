@@ -4,15 +4,18 @@ import type { Tool, ToolChoice, JSONSchema, RunUsage } from "./agents.types.js";
 export interface ModelToolCall { id: string; name: string; args: unknown }
 
 /**
- * Neutral, provider-agnostic conversation message. `system` is NOT here — it is a
- * first-class field on {@link GenerateRequest}. Content is a string for now; a
- * parts-array variant can be added later for multimodal without breaking this union.
+ * Neutral, provider-agnostic conversation message. `system` is a message role in the
+ * array (the dominant pattern in Vercel AI SDK and LangChain.js); each adapter
+ * relocates it as needed (OpenAI keeps it as a system message; Anthropic lifts it to a
+ * top-level param). Content is a string for now; a parts-array variant can be added
+ * later for multimodal without breaking this union.
  * @internal
  */
 export type ModelMessage =
+  | { role: "system"; content: string }
   | { role: "user"; content: string }
   | { role: "assistant"; content?: string; toolCalls?: ModelToolCall[] }
-  | { role: "tool"; toolCallId: string; toolName: string; result: string };
+  | { role: "tool"; toolCallId: string; toolName?: string; result: string };
 
 /** Finish reasons normalized across providers. @internal */
 export type FinishReason = "stop" | "length" | "tool-calls" | "content-filter" | "error" | "other";
@@ -20,7 +23,6 @@ export type FinishReason = "stop" | "length" | "tool-calls" | "content-filter" |
 /** A request to a language model. @internal */
 export interface GenerateRequest {
   model: string;
-  system?: string;
   messages: ModelMessage[];
   tools?: Record<string, Tool>;
   temperature?: number;

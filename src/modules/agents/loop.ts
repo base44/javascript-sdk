@@ -3,14 +3,31 @@ import type { LanguageModel, ModelMessage } from "./provider.js";
 
 const DEFAULT_MAX_STEPS = 8;
 
+function safeParse(json: string | undefined | null): unknown {
+  try { return JSON.parse(json || "{}"); } catch { return {}; }
+}
+
 function inputToMessages(input: RunInput): ModelMessage[] {
   if ("messages" in input) {
-    // RunInput messages are the public ChatMessage[]; map to neutral user/assistant text.
-    return input.messages.map((m) =>
-      m.role === "assistant"
-        ? { role: "assistant" as const, content: typeof m.content === "string" ? m.content : "" }
-        : { role: "user" as const, content: typeof m.content === "string" ? m.content : "" }
-    );
+    // Map public ChatMessage[] 1:1 to neutral ModelMessage[] by role.
+    return input.messages.map((m): ModelMessage => {
+      if (m.role === "system") {
+        return { role: "system", content: typeof m.content === "string" ? m.content : "" };
+      }
+      if (m.role === "user") {
+        return { role: "user", content: typeof m.content === "string" ? m.content : "" };
+      }
+      if (m.role === "assistant") {
+        const toolCalls = m.tool_calls?.map((c) => ({
+          id: c.id,
+          name: c.function.name,
+          args: safeParse(c.function.arguments),
+        }));
+        return { role: "assistant", content: m.content ?? undefined, toolCalls: toolCalls?.length ? toolCalls : undefined };
+      }
+      // tool
+      return { role: "tool", toolCallId: (m as any).tool_call_id, result: typeof m.content === "string" ? m.content : "" };
+    });
   }
   return [{ role: "user", content: input.prompt }];
 }
@@ -26,14 +43,16 @@ export function createAgent(agentConfig: AgentConfig, model: LanguageModel): Age
 
   const agent: Agent = {
     async run(input: RunInput, options: RunOptions = {}): Promise<RunResult> {
-      const messages: ModelMessage[] = inputToMessages(input);
+      const messages: ModelMessage[] = [
+        ...(agentConfig.system ? [{ role: "system" as const, content: agentConfig.system }] : []),
+        ...inputToMessages(input),
+      ];
       const steps: Step[] = [];
       let last: Awaited<ReturnType<LanguageModel["generate"]>> | null = null;
 
       for (let i = 0; i < maxSteps; i++) {
         last = await model.generate({
           model: agentConfig.model,
-          system: agentConfig.system,
           messages,
           tools,
           temperature: agentConfig.temperature,
