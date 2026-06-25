@@ -177,10 +177,10 @@ export function createAxiosClient({
   client.interceptors.request.use((config) => {
     if (typeof window !== "undefined") {
       config.headers.set("X-Origin-URL", window.location.href);
-      // On unauthenticated clients, attach a stable anonymous visitor id so the
-      // backend can support anonymous agent access (conversation grouping +
-      // ownership). Authenticated clients are identified by their token instead.
-      if (!token) {
+      // On unauthenticated requests, attach a stable anonymous visitor id so the
+      // backend can support anonymous agent access (conversation grouping + ownership).
+      // Authenticated requests are identified by their Authorization header instead.
+      if (!config.headers.get("Authorization")) {
         config.headers.set("X-Base44-Anonymous-Id", getAnalyticsSessionId());
       }
     }
