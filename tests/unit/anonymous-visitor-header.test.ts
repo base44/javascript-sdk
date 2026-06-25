@@ -31,8 +31,18 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function captureRequestHeaders(token?: string) {
+async function captureRequestHeaders(
+  token?: string,
+  { tokenSetAfterConstruction }: { tokenSetAfterConstruction?: string } = {}
+) {
   const client = createAxiosClient({ baseURL: "https://api", token });
+  // Mirrors the common browser path: auth.setToken() applies the Authorization
+  // header on the client's defaults after the client has already been built.
+  if (tokenSetAfterConstruction) {
+    client.defaults.headers.common[
+      "Authorization"
+    ] = `Bearer ${tokenSetAfterConstruction}`;
+  }
   let captured: any;
   client.defaults.adapter = async (config) => {
     captured = config;
@@ -62,5 +72,13 @@ describe("anonymous visitor header", () => {
     const headers = await captureRequestHeaders("a-real-token");
     expect(headers.get("X-Base44-Anonymous-Id")).toBeFalsy();
     expect(headers.get("Authorization")).toBe("Bearer a-real-token");
+  });
+
+  test("token set after construction (browser setToken path) omits the anonymous header", async () => {
+    const headers = await captureRequestHeaders(undefined, {
+      tokenSetAfterConstruction: "a-real-token",
+    });
+    expect(headers.get("Authorization")).toBe("Bearer a-real-token");
+    expect(headers.get("X-Base44-Anonymous-Id")).toBeFalsy();
   });
 });
