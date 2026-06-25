@@ -1,3 +1,5 @@
+import type { Tool } from "./agents/agents.types.js";
+
 /**
  * Event types for realtime entity updates.
  */
@@ -703,7 +705,7 @@ export interface EntityHandler<T = any> {
    * Read-only by default, pass `operations` to opt into writes. Spread the result into an agent's `tools`.
    *
    * @param opts - Optional `operations` (`"read" | "create" | "update" | "delete"`, default `["read"]`).
-   * @returns A map of tool-name -> {@linkcode Tool}.
+   * @returns A map of tool-name to {@linkcode Tool}. Keys follow the pattern `read_<EntityName>`, `create_<EntityName>`, `update_<EntityName>`, `delete_<EntityName>`.
    *
    * @example
    * ```typescript
@@ -715,7 +717,7 @@ export interface EntityHandler<T = any> {
    */
   asTool(opts?: {
     operations?: ("read" | "create" | "update" | "delete")[];
-  }): Record<string, import("./agents/agents.types.js").Tool>;
+  }): Record<string, Tool>;
 }
 
 /**

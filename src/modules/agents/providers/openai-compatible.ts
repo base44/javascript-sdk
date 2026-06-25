@@ -1,7 +1,6 @@
-import type { Tool, JSONSchema, RunUsage } from "../agents.types.js";
-import type { GenerateRequest, GenerateResult, LanguageModel, ModelMessage, ModelToolCall, FinishReason } from "../provider.js";
-
-interface GatewayTransport { complete(body: Record<string, unknown>, opts?: { signal?: AbortSignal }): Promise<any> }
+import type { Tool, JSONSchema, RunUsage, FinishReason } from "../agents.types.js";
+import type { GenerateRequest, GenerateResult, LanguageModel, ModelMessage, ModelToolCall } from "../provider.js";
+import type { GatewayTransport } from "../gateway.js";
 
 interface ChatCompletionToolDef { type: "function"; function: { name: string; description: string; parameters: JSONSchema } }
 

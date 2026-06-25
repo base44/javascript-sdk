@@ -1,4 +1,4 @@
-import type { Tool, ToolChoice, JSONSchema, RunUsage } from "./agents.types.js";
+import type { Tool, ToolChoice, JSONSchema, RunUsage, FinishReason } from "./agents.types.js";
 
 /** A parsed tool call the model wants to make. Args are already parsed (object), never a JSON string. @internal */
 export interface ModelToolCall { id: string; name: string; args: unknown }
@@ -13,9 +13,6 @@ export type ModelMessage =
   | { role: "user"; content: string }
   | { role: "assistant"; content?: string; toolCalls?: ModelToolCall[] }
   | { role: "tool"; toolCallId: string; toolName?: string; result: string };
-
-/** Finish reasons normalized across providers. @internal */
-export type FinishReason = "stop" | "length" | "tool-calls" | "content-filter" | "error" | "other";
 
 /** A request to a language model. @internal */
 export interface GenerateRequest {

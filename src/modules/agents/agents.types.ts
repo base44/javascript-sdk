@@ -2,10 +2,6 @@ import { AxiosInstance } from "axios";
 import { RoomsSocket } from "../../utils/socket-utils.js";
 import { ModelFilterParams } from "../../types.js";
 
-// ---------------------------------------------------------------------------
-// Code-agent types (moved from dynamic-agents.types.ts)
-// ---------------------------------------------------------------------------
-
 /**
  * A JSON Schema object describing a tool's input parameters.
  * Use the standard JSON Schema `object` shape: `{ type: "object", properties: {...}, required: [...] }`.
@@ -25,7 +21,13 @@ export interface Tool {
   execute: (args: any) => Promise<unknown> | unknown;
 }
 
-/** An OpenAI-shaped chat message used internally and accepted by {@linkcode Agent.run}. */
+/**
+ * Why the agent run ended.
+ * `"max_steps"` is set by the SDK when the step cap is hit; all other values come from the model/normalization layer.
+ */
+export type FinishReason = "stop" | "length" | "tool-calls" | "content-filter" | "error" | "other";
+
+/** An OpenAI-shaped chat message accepted by {@linkcode Agent.run}. */
 export interface ChatMessage {
   role: "system" | "user" | "assistant" | "tool";
   content?: string | null;
@@ -63,8 +65,12 @@ export interface RunResult {
   text: string;
   /** The loop history (one entry per step that made tool calls). */
   steps: Step[];
-  /** Why the run ended: `"stop"` (model finished), `"tool_calls"`, or `"max_steps"`. */
-  finishReason: string;
+  /**
+   * Why the run ended.
+   * Values come from the model/normalization layer (`"stop"`, `"length"`, `"tool-calls"`, `"content-filter"`, `"error"`, `"other"`)
+   * or from the SDK itself (`"max_steps"`, set when the step cap is reached).
+   */
+  finishReason: FinishReason | "max_steps";
   /** Token and credit usage from the final completion. */
   usage: RunUsage;
   /** Summed across all model calls in the loop; `usage` is the final call only. */
@@ -173,6 +179,7 @@ export interface AgentConfig {
    * When set, the request is sent with `response_format: { type: "json_schema", … }`.
    * The model's response will be valid JSON matching the schema; access it by parsing
    * `RunResult.text`.
+   * The schema is sent with strict JSON-schema mode, so it should have `additionalProperties: false` and list every property in `required` (otherwise the provider may reject it).
    *
    * @example
    * ```typescript
@@ -283,6 +290,8 @@ export interface Agent {
    * @param opts.name - Optional display name for the tool. Defaults to the
    *   agent config's model alias when omitted.
    * @returns A {@linkcode Tool} that can be passed in another agent's `tools` map.
+   * @note The sub-agent runs independently — the parent's `abortSignal` is not propagated and
+   *   the sub-agent's token/credit usage is not included in the parent's `totalUsage`.
    *
    * @example
    * ```typescript

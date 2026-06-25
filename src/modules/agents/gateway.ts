@@ -1,5 +1,13 @@
 import { Base44Error } from "../../utils/axios-client.js";
 
+/**
+ * Minimal transport shape used by provider adapters to send completions requests.
+ * @internal
+ */
+export type GatewayTransport = {
+  complete(body: Record<string, unknown>, opts?: { signal?: AbortSignal }): Promise<unknown>;
+};
+
 /** @internal */
 export interface GatewayConfig {
   serverUrl: string;

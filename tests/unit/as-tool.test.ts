@@ -44,6 +44,17 @@ describe("functions.asTool", () => {
     const t = base44.functions.asTool("anyFn", { description: "d" });
     expect(t.parameters).toEqual({ type: "object", properties: {}, additionalProperties: true });
   });
+
+  test("should propagate errors when the function endpoint returns 500", async () => {
+    const nock = (await import("nock")).default;
+    nock("https://a.base44.app")
+      .post("/api/apps/a/functions/crashingFn")
+      .reply(500, { error: "Internal Server Error" });
+
+    const base44 = createClient(opts);
+    const t = base44.functions.asTool("crashingFn", { description: "a fn that crashes" });
+    await expect(t.execute({})).rejects.toThrow();
+  });
 });
 
 // ---------------------------------------------------------------------------

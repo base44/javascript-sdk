@@ -1,3 +1,5 @@
+import type { Tool } from "./agents/agents.types.js";
+
 /**
  * Registry of function names. The [`types generate`](/developers/references/cli/commands/types-generate) command fills this registry, then [`FunctionName`](#functionname) resolves to a union of the keys.
  */
@@ -100,8 +102,22 @@ export interface FunctionsModule {
    *
    * @param name - The backend function name.
    * @param opts - `description` (required) and optional JSON Schema `parameters`.
+   * @returns A {@linkcode Tool} for use in an agent's `tools` map.
+   *
+   * @example
+   * ```typescript
+   * const emailTool = base44.functions.asTool("sendOrderEmail", {
+   *   description: "Send an order confirmation email to the customer.",
+   *   parameters: {
+   *     type: "object",
+   *     properties: { orderId: { type: "string" } },
+   *     required: ["orderId"],
+   *   },
+   * });
+   * const agent = base44.agents.create({ model: "claude_sonnet_4_6", tools: { emailTool } });
+   * ```
    */
-  asTool(name: FunctionName, opts: { description: string; parameters?: Record<string, unknown> }): import("./agents/agents.types.js").Tool;
+  asTool(name: FunctionName, opts: { description: string; parameters?: Record<string, unknown> }): Tool;
 
   /**
    * Performs a direct HTTP request to a backend function path and returns the native `Response`.

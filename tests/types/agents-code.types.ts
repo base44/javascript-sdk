@@ -75,3 +75,10 @@ const rejectsAsToolWithoutDescription = agent.asTool(
 declare const runResult: RunResult;
 const _usage: RunUsage = runResult.usage;
 const _totalUsage: RunUsage = runResult.totalUsage;
+
+// AgentConfig rejects non-number temperature
+agents.create({
+  model: "m",
+  // @ts-expect-error temperature must be a number, not a string.
+  temperature: "hot",
+});

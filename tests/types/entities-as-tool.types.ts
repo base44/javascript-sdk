@@ -12,3 +12,8 @@ const _readOnly = base44.entities.Order.asTool();
 
 // @ts-expect-error operations must be from the allowed union
 base44.entities.Order.asTool({ operations: ["purge"] });
+
+import type { Tool } from "../../src/index.js";
+
+// A returned entry is assignable to Tool
+const _t: Tool = tools["read_Order"];

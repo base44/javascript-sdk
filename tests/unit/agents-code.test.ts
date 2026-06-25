@@ -283,6 +283,139 @@ describe("Agent loop", () => {
     expect(result.totalUsage).toEqual({ inputTokens: 20, outputTokens: 10, totalTokens: 30, credits: 4 });
     expect(result.steps[0].usage).toEqual({ inputTokens: 10, outputTokens: 5, totalTokens: 15, credits: 2 });
   });
+
+  test("should execute parallel tool calls (two tool_calls in one completion) and include both role:tool messages in the next request", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        completion({
+          toolCalls: [
+            { id: "c1", name: "toolA", arguments: '{"x":1}' },
+            { id: "c2", name: "toolB", arguments: '{"y":2}' },
+          ],
+          finish: "tool_calls",
+        })
+      )
+      .mockResolvedValueOnce(completion({ content: "all done" }));
+
+    const executeA = vi.fn(async () => "resultA");
+    const executeB = vi.fn(async () => "resultB");
+    const transport = createGatewayTransport(config);
+    const agent = createAgent(
+      {
+        model: "m",
+        tools: {
+          toolA: { description: "a", parameters: { type: "object" }, execute: executeA },
+          toolB: { description: "b", parameters: { type: "object" }, execute: executeB },
+        },
+      },
+      openAICompatibleProvider(transport)
+    );
+    const result = await agent.run({ prompt: "go" });
+
+    expect(executeA).toHaveBeenCalledWith({ x: 1 });
+    expect(executeB).toHaveBeenCalledWith({ y: 2 });
+    expect(result.text).toBe("all done");
+
+    const secondBody = JSON.parse(fetchMock.mock.calls[1][1].body);
+    const toolMsgs = secondBody.messages.filter((m: any) => m.role === "tool");
+    expect(toolMsgs).toHaveLength(2);
+    expect(toolMsgs.find((m: any) => m.tool_call_id === "c1")).toBeDefined();
+    expect(toolMsgs.find((m: any) => m.tool_call_id === "c2")).toBeDefined();
+  });
+
+  test("should feed back 'Error: tool \"<name>\" is not available.' when model calls an unknown tool", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        completion({ toolCalls: [{ id: "c1", name: "unknownTool", arguments: "{}" }], finish: "tool_calls" })
+      )
+      .mockResolvedValueOnce(completion({ content: "sorry" }));
+
+    const transport = createGatewayTransport(config);
+    const agent = createAgent({ model: "m", tools: {} }, openAICompatibleProvider(transport));
+    await agent.run({ prompt: "call missing tool" });
+
+    const secondBody = JSON.parse(fetchMock.mock.calls[1][1].body);
+    const toolMsg = secondBody.messages.find((m: any) => m.role === "tool");
+    expect(toolMsg.content).toBe('Error: tool "unknownTool" is not available.');
+  });
+
+  test("should pass string tool result through as-is (not JSON-quoted)", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        completion({ toolCalls: [{ id: "c1", name: "tempTool", arguments: "{}" }], finish: "tool_calls" })
+      )
+      .mockResolvedValueOnce(completion({ content: "done" }));
+
+    const transport = createGatewayTransport(config);
+    const agent = createAgent(
+      {
+        model: "m",
+        tools: { tempTool: { description: "t", parameters: { type: "object" }, execute: async () => "hot" } },
+      },
+      openAICompatibleProvider(transport)
+    );
+    await agent.run({ prompt: "go" });
+
+    const secondBody = JSON.parse(fetchMock.mock.calls[1][1].body);
+    const toolMsg = secondBody.messages.find((m: any) => m.role === "tool");
+    expect(toolMsg.content).toBe("hot");
+  });
+
+  test("should reject immediately when an already-aborted AbortSignal is passed", async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    fetchMock.mockImplementation((_url: string, init: RequestInit) => {
+      if (init?.signal?.aborted) {
+        return Promise.reject(new DOMException("The operation was aborted.", "AbortError"));
+      }
+      return Promise.resolve(completion({ content: "ok" }));
+    });
+
+    const transport = createGatewayTransport(config);
+    const agent = createAgent({ model: "m" }, openAICompatibleProvider(transport));
+    await expect(agent.run({ prompt: "hi" }, { abortSignal: controller.signal })).rejects.toThrow();
+  });
+
+  test("getToken late-binding: gateway reads getToken() at call time, not construction time", async () => {
+    let currentToken = "v1";
+    const transport = createGatewayTransport({
+      serverUrl: "https://app-z.base44.app",
+      getToken: () => currentToken,
+    });
+    const provider = openAICompatibleProvider(transport);
+    const agent = createAgent({ model: "m" }, provider);
+
+    fetchMock.mockResolvedValue(completion({ content: "ok" }));
+
+    await agent.run({ prompt: "first" });
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe("Bearer v1");
+
+    currentToken = "v2";
+    await agent.run({ prompt: "second" });
+    expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe("Bearer v2");
+  });
+
+  test("no-usage response: totalUsage fields remain numeric (not NaN) after loop", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          id: "cmpl",
+          choices: [{ index: 0, message: { role: "assistant", content: "hi" }, finish_reason: "stop" }],
+          // no usage field
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+    const transport = createGatewayTransport(config);
+    const agent = createAgent({ model: "m" }, openAICompatibleProvider(transport));
+    const result = await agent.run({ prompt: "hello" });
+    // sumUsage defaults undefined to 0, so totalUsage should be numeric
+    expect(typeof result.totalUsage.inputTokens).toBe("number");
+    expect(typeof result.totalUsage.outputTokens).toBe("number");
+    expect(isNaN(result.totalUsage.inputTokens!)).toBe(false);
+    expect(isNaN(result.totalUsage.outputTokens!)).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------

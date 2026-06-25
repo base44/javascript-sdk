@@ -103,4 +103,45 @@ describe("openAICompatibleProvider adapter", () => {
     expect(sent.messages[4]).toEqual({ role: "user", content: "and tomorrow?" });
     expect(sent.messages).toHaveLength(5);
   });
+
+  test("param whitelist: temperature and responseFormat are sent; max_tokens/top_p/seed/stop are never sent; response_format has strict:true", async () => {
+    const fetchMock = transportFor({
+      choices: [{ message: { role: "assistant", content: "done" }, finish_reason: "stop" }],
+      usage: {},
+    });
+    const model = await makeModel();
+    await model.generate({
+      model: "gpt_5_mini",
+      messages: [{ role: "user", content: "hi" }],
+      temperature: 0.5,
+      responseFormat: { type: "object", properties: { a: { type: "string" } } },
+    });
+    const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(sent.temperature).toBe(0.5);
+    expect(sent.response_format).toEqual({
+      type: "json_schema",
+      json_schema: {
+        name: "response",
+        schema: { type: "object", properties: { a: { type: "string" } } },
+        strict: true,
+      },
+    });
+    expect(sent).not.toHaveProperty("max_tokens");
+    expect(sent).not.toHaveProperty("top_p");
+    expect(sent).not.toHaveProperty("seed");
+    expect(sent).not.toHaveProperty("stop");
+  });
+
+  test("no-usage response: result.usage fields are undefined (not NaN)", async () => {
+    transportFor({
+      choices: [{ message: { role: "assistant", content: "ok" }, finish_reason: "stop" }],
+      // no usage field at all
+    });
+    const model = await makeModel();
+    const r = await model.generate({ model: "m", messages: [{ role: "user", content: "hi" }] });
+    expect(r.usage.inputTokens).toBeUndefined();
+    expect(r.usage.outputTokens).toBeUndefined();
+    expect(r.usage.totalTokens).toBeUndefined();
+    expect(r.usage.credits).toBeUndefined();
+  });
 });

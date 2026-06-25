@@ -129,6 +129,7 @@ export type {
   ToolChoice,
   AgentConfig,
   Agent,
+  FinishReason,
 } from "./modules/agents/agents.types.js";
 
 // Auth utils types
