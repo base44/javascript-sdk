@@ -180,10 +180,6 @@ export function createAxiosClient({
       // On unauthenticated clients, attach a stable anonymous visitor id so the
       // backend can support anonymous agent access (conversation grouping +
       // ownership). Authenticated clients are identified by their token instead.
-      // Reuses the persisted analytics session id so an anonymous agent
-      // conversation and that visitor's analytics events share one identity.
-      // (Hardening this id to crypto-strength + decoupling from analytics is a
-      // tracked follow-up.)
       if (!token) {
         config.headers.set("X-Base44-Anonymous-Id", getAnalyticsSessionId());
       }
