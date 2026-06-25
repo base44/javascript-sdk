@@ -73,7 +73,7 @@ describe("AI Gateway transport", () => {
     );
 
     const transport = createGatewayTransport(config);
-    const result = await transport.complete(body);
+    const result = await transport.post("/chat/completions", body);
 
     expect(result).toEqual({ id: "x", choices: [] });
     const [url, init] = fetchMock.mock.calls[0];
@@ -94,12 +94,12 @@ describe("AI Gateway transport", () => {
       )
     );
     const transport = createGatewayTransport(config);
-    await expect(transport.complete({ model: "m", messages: [] })).rejects.toMatchObject({
+    await expect(transport.post("/chat/completions", { model: "m", messages: [] })).rejects.toMatchObject({
       name: "Base44Error",
       status: 402,
       message: "insufficient quota",
     });
-    await expect(transport.complete({ model: "m", messages: [] })).rejects.toBeInstanceOf(Base44Error);
+    await expect(transport.post("/chat/completions", { model: "m", messages: [] })).rejects.toBeInstanceOf(Base44Error);
   });
 });
 

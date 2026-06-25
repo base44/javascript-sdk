@@ -1,11 +1,12 @@
 import { Base44Error } from "../../utils/axios-client.js";
 
 /**
- * Minimal transport shape used by provider adapters to send completions requests.
+ * Minimal authenticated JSON POST against the gateway. The provider supplies the wire-specific
+ * path (e.g. `/chat/completions`), so the transport stays neutral across provider formats.
  * @internal
  */
 export type GatewayTransport = {
-  complete(body: Record<string, unknown>, opts?: { signal?: AbortSignal }): Promise<unknown>;
+  post(path: string, body: Record<string, unknown>, opts?: { signal?: AbortSignal }): Promise<unknown>;
 };
 
 /** @internal */
@@ -38,12 +39,13 @@ export function resolveConnection(config: GatewayConfig): {
  */
 export function createGatewayTransport(config: GatewayConfig) {
   return {
-    async complete(
+    async post(
+      path: string,
       body: Record<string, unknown>,
       opts: { signal?: AbortSignal } = {}
     ): Promise<unknown> {
       const { baseURL, apiKey } = resolveConnection(config);
-      const res = await fetch(`${baseURL}/chat/completions`, {
+      const res = await fetch(`${baseURL}${path}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

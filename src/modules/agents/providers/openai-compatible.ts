@@ -97,7 +97,7 @@ function parseChatCompletion(raw: any): GenerateResult {
 export function openAICompatibleProvider(transport: GatewayTransport): LanguageModel {
   return {
     async generate(req: GenerateRequest): Promise<GenerateResult> {
-      const raw = await transport.complete(buildChatCompletionsBody(req), { signal: req.signal });
+      const raw = await transport.post("/chat/completions", buildChatCompletionsBody(req), { signal: req.signal });
       return parseChatCompletion(raw);
     },
   };
