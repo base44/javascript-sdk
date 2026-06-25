@@ -1,6 +1,7 @@
 import axios from "axios";
 import { isInIFrame } from "./common.js";
 import { v4 as uuidv4 } from "uuid";
+import { getAnalyticsSessionId } from "../modules/analytics.js";
 import type { Base44ErrorJSON } from "./axios-client.types.js";
 
 /**
@@ -176,6 +177,12 @@ export function createAxiosClient({
   client.interceptors.request.use((config) => {
     if (typeof window !== "undefined") {
       config.headers.set("X-Origin-URL", window.location.href);
+      // On unauthenticated clients, attach a stable anonymous visitor id so the
+      // backend can support anonymous agent access (conversation grouping +
+      // ownership). Authenticated clients are identified by their token instead.
+      if (!token) {
+        config.headers.set("X-Base44-Anonymous-Id", getAnalyticsSessionId());
+      }
     }
     const requestId = uuidv4();
     (config as any).requestId = requestId;

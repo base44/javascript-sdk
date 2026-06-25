@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { io } from "socket.io-client";
 import { RoomsSocket } from "../../src/utils/socket-utils.ts";
 
 const socketMock = vi.hoisted(() => ({
@@ -19,6 +20,14 @@ vi.mock("socket.io-client", () => ({
   })),
 }));
 
+vi.mock("../../src/utils/auth-utils.ts", () => ({
+  getAccessToken: vi.fn(() => undefined),
+}));
+
+vi.mock("../../src/modules/analytics.ts", () => ({
+  getAnalyticsSessionId: vi.fn(() => "anon-session-123"),
+}));
+
 describe("RoomsSocket", () => {
   beforeEach(() => {
     socketMock.disconnect.mockClear();
@@ -29,6 +38,39 @@ describe("RoomsSocket", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  describe("handshake auth params", () => {
+    const baseConfig = {
+      serverUrl: "https://api.base44.test",
+      mountPath: "/socket.io/",
+      transports: ["websocket"],
+      appId: "test-app-id",
+    };
+
+    function lastHandshakeQuery(): Record<string, unknown> {
+      const opts = vi.mocked(io).mock.calls.at(-1)?.[1] as
+        | { query?: Record<string, unknown> }
+        | undefined;
+      return opts?.query ?? {};
+    }
+
+    test("sends a stable anonymous_id and no token when unauthenticated", () => {
+      RoomsSocket({ config: { ...baseConfig } });
+
+      const query = lastHandshakeQuery();
+      expect(query.app_id).toBe("test-app-id");
+      expect(query.anonymous_id).toBe("anon-session-123");
+      expect(query.token).toBeUndefined();
+    });
+
+    test("sends the token and no anonymous_id when authenticated", () => {
+      RoomsSocket({ config: { ...baseConfig, token: "test-token" } });
+
+      const query = lastHandshakeQuery();
+      expect(query.token).toBe("test-token");
+      expect(query.anonymous_id).toBeUndefined();
+    });
   });
 
   function createRoomsSocket() {
