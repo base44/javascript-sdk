@@ -36,11 +36,6 @@ export function createAppUserSecretsModule(
       await userAxios.put(`${basePath}/${key}`, { value });
     },
 
-    async consent(key: string): Promise<void> {
-      assertSecretKey(key);
-      await userAxios.post(`${basePath}/${key}/consent`);
-    },
-
     async delete(key: string): Promise<void> {
       assertSecretKey(key);
       await userAxios.delete(`${basePath}/${key}`);

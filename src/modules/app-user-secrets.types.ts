@@ -7,7 +7,7 @@ export interface AppUserSecretStatus {
   version: number;
   is_active: boolean;
   configured: boolean;
-  requires_consent: boolean;
+  requires_reentry: boolean;
 }
 
 export interface AppUserSecretsModule {
@@ -16,9 +16,6 @@ export interface AppUserSecretsModule {
 
   /** Stores or replaces the current app user's value for a declared secret. */
   set(key: string, value: string): Promise<void>;
-
-  /** Consents to the latest access policy for an already configured secret. */
-  consent(key: string): Promise<void>;
 
   /** Deletes the current app user's value for a declared secret. */
   delete(key: string): Promise<void>;
