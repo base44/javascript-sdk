@@ -10,6 +10,7 @@ import type { FunctionsModule } from "./modules/functions.types.js";
 import type { AgentsModule } from "./modules/agents.types.js";
 import type { AppLogsModule } from "./modules/app-logs.types.js";
 import type { AnalyticsModule } from "./modules/analytics.types.js";
+import type { AppUserSecretsModule } from "./modules/app-user-secrets.types.js";
 
 /**
  * Options for creating a Base44 client.
@@ -91,6 +92,8 @@ export interface Base44Client {
   analytics: AnalyticsModule;
   /** {@link AppLogsModule | App logs module} for tracking app usage. */
   appLogs: AppLogsModule;
+  /** App-user secrets module for storing and using user-owned credentials. */
+  appUserSecrets: AppUserSecretsModule;
   /** {@link AuthModule | Auth module} for user authentication and management. */
   auth: AuthModule;
   /** {@link UserConnectorsModule | Connectors module} for app-user OAuth flows. */

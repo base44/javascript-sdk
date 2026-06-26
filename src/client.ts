@@ -19,6 +19,7 @@ import type {
   CreateClientOptions,
 } from "./client.types.js";
 import { createAnalyticsModule } from "./modules/analytics.js";
+import { createAppUserSecretsModule } from "./modules/app-user-secrets.js";
 
 // Re-export client types
 export type { Base44Client, CreateClientConfig, CreateClientOptions };
@@ -122,6 +123,18 @@ export function createClient(config: CreateClientConfig): Base44Client {
     onError: options?.onError,
   });
 
+  const appUserSecretsReadAxiosClient = createAxiosClient({
+    baseURL: `${serverUrl}/api`,
+    headers: {
+      ...headers,
+      ...(serviceToken
+        ? { "Base44-Service-Authorization": `Bearer ${serviceToken}` }
+        : {}),
+    },
+    token,
+    onError: options?.onError,
+  });
+
   const serviceRoleHeaders = {
     ...headers,
     ...(token ? { "on-behalf-of": `Bearer ${token}` } : {}),
@@ -198,6 +211,12 @@ export function createClient(config: CreateClientConfig): Base44Client {
       appId,
       userAuthModule,
     }),
+    appUserSecrets: createAppUserSecretsModule(
+      axiosClient,
+      appUserSecretsReadAxiosClient,
+      appId,
+      serviceToken
+    ),
     cleanup: () => {
       userModules.analytics.cleanup();
       if (socket) {
@@ -278,6 +297,8 @@ export function createClient(config: CreateClientConfig): Base44Client {
      */
     setToken(newToken: string) {
       userModules.auth.setToken(newToken);
+      appUserSecretsReadAxiosClient.defaults.headers.common["Authorization"] =
+        `Bearer ${newToken}`;
       if (socket) {
         socket.updateConfig({
           token: newToken,
