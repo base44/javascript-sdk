@@ -1,6 +1,10 @@
 import { AxiosInstance } from "axios";
 import { IntegrationsModule } from "./integrations.types.js";
 import { createCustomIntegrationsModule } from "./custom-integrations.js";
+import {
+  APP_SESSION_HEADER,
+  createAppSessionProvider,
+} from "../utils/app-session.js";
 
 /**
  * Creates the integrations module for the Base44 SDK.
@@ -16,6 +20,12 @@ export function createIntegrationsModule(
 ): IntegrationsModule {
   // Create the custom integrations module once
   const customModule = createCustomIntegrationsModule(axios, appId);
+
+  // BUG-438: anonymous Core integration calls on public apps carry a
+  // short-lived, app-bound session token so the backend can tell a call from
+  // the served app apart from an arbitrary request. Best-effort — see
+  // createAppSessionProvider.
+  const sessionProvider = createAppSessionProvider(axios, appId);
 
   return new Proxy(
     {},
@@ -89,10 +99,17 @@ export function createIntegrationsModule(
 
                 // For Core package
                 if (packageName === "Core") {
+                  const sessionToken = await sessionProvider.getToken();
+                  const headers: Record<string, string> = {
+                    "Content-Type": contentType,
+                  };
+                  if (sessionToken) {
+                    headers[APP_SESSION_HEADER] = sessionToken;
+                  }
                   return axios.post(
                     `/apps/${appId}/integration-endpoints/Core/${endpointName}`,
                     formData || data,
-                    { headers: { "Content-Type": contentType } }
+                    { headers }
                   );
                 }
 
