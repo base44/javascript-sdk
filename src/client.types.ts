@@ -54,7 +54,7 @@ export interface CreateClientConfig {
    */
   token?: string;
   /**
-   * Service role authentication token. Provides elevated permissions to access data available to the app's admin. Only available in Base44-hosted backend functions. Automatically added to client's created using {@linkcode createClientFromRequest | createClientFromRequest()}.
+   * Service role authentication token. Provides elevated permissions that bypass entity access rules and field-level security. Only available in Base44-hosted backend functions. Automatically added to clients created using {@linkcode createClientFromRequest | createClientFromRequest()}.
    * @internal
    */
   serviceToken?: string;
@@ -122,7 +122,7 @@ export interface Base44Client {
   /**
    * Provides access to supported modules with elevated permissions.
    *
-   * Service role authentication provides elevated permissions for backend operations. Unlike user authentication, which is scoped to a specific user's permissions, service role authentication has access to the data and operations available to the app's admin.
+   * Service role authentication provides elevated permissions for backend operations. Unlike user authentication, which is scoped to a specific user's permissions, service role authentication bypasses entity access rules and field-level security entirely, giving full read and write access to all of the app's data.
    *
    * @throws {Error} When accessed without providing a serviceToken during client creation
    */

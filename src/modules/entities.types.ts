@@ -724,7 +724,7 @@ type DynamicEntitiesModule = {
  * This module is available to use with a client in all authentication modes:
  *
  * - **Anonymous or User authentication** (`base44.entities`): Access is scoped to the current user's permissions. Anonymous users can only access public entities, while authenticated users can access entities they have permission to view or modify.
- * - **Service role authentication** (`base44.asServiceRole.entities`): Operations have elevated admin-level permissions. Can access all entities that the app's admin role has access to.
+ * - **Service role authentication** (`base44.asServiceRole.entities`): Operations bypass entity access rules and field-level security entirely. Can read and write any record in any entity.
  *
  * ## Entity Handlers
  *
@@ -753,7 +753,7 @@ type DynamicEntitiesModule = {
  *
  * @example
  * ```typescript
- * // List all users (admin only)
+ * // List every user, bypassing the User entity's access rules
  * const allUsers = await base44.asServiceRole.entities.User.list();
  * ```
  */

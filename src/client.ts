@@ -35,12 +35,12 @@ export type { Base44Client, CreateClientConfig, CreateClientOptions };
  * The client supports three authentication modes:
  * - **Anonymous**: Access modules without authentication using `base44.moduleName`. Operations are scoped to public data and permissions.
  * - **User authentication**: Access modules with user-level permissions using `base44.moduleName`. Operations are scoped to the authenticated user's data and permissions. Use `base44.auth.loginViaEmailPassword()` or other auth methods to get a token.
- * - **Service role authentication**: Access modules with elevated permissions using `base44.asServiceRole.moduleName`. Operations can access any data available to the app's admin. Only available in Base44-hosted backend functions. Create a client with service role authentication using {@linkcode createClientFromRequest | createClientFromRequest()}.
+ * - **Service role authentication**: Access modules with elevated permissions using `base44.asServiceRole.moduleName`. Operations bypass entity access rules and field-level security, giving full read and write access to all of the app's data. Only available in Base44-hosted backend functions. Create a client with service role authentication using {@linkcode createClientFromRequest | createClientFromRequest()}.
  *
  * For example, when using the {@linkcode EntitiesModule | entities} module:
  * - **Anonymous**: Can only read public data.
  * - **User authentication**: Can access the current user's data.
- * - **Service role authentication**: Can access all data that admins can access.
+ * - **Service role authentication**: Can read and write any record, bypassing access rules.
  *
  * Most modules are available in all three modes, but with different permission levels. However, some modules are only available in specific authentication modes.
  *
@@ -302,7 +302,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     /**
      * Provides access to service role modules.
      *
-     * Service role authentication provides elevated permissions for backend operations. Unlike user authentication, which is scoped to a specific user's permissions, service role authentication has access to the data and operations available to the app's admin.
+     * Service role authentication provides elevated permissions for backend operations. Unlike user authentication, which is scoped to a specific user's permissions, service role authentication bypasses entity access rules and field-level security entirely, giving full read and write access to all of the app's data.
      *
      * @throws {Error} When accessed without providing a serviceToken during client creation.
      *
@@ -313,7 +313,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
      *   serviceToken: 'service-role-token'
      * });
      *
-     * // Also access a module with elevated permissions
+     * // Read every user record, bypassing the User entity's access rules
      * const allUsers = await base44.asServiceRole.entities.User.list();
      * ```
      */
@@ -335,7 +335,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
  *
  * This function is designed for use in Base44-hosted backend functions. For frontends and external backends, use {@linkcode createClient | createClient()} instead.
  *
- * When used in a Base44-hosted backend function, `createClientFromRequest()` automatically extracts authentication tokens from the request headers that Base44 injects when forwarding requests. The returned client includes service role access using `base44.asServiceRole`, which provides admin-level permissions.
+ * When used in a Base44-hosted backend function, `createClientFromRequest()` automatically extracts authentication tokens from the request headers that Base44 injects when forwarding requests. The returned client includes service role access using `base44.asServiceRole`, which bypasses entity access rules and field-level security.
  *
  * To learn more about the Base44 client, see {@linkcode createClient | createClient()}.
  *
@@ -374,7 +374,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
  *   try {
  *     const base44 = createClientFromRequest(req);
  *
- *     // Access admin data with service role permissions
+ *     // Read across all users, bypassing the Orders entity's access rules
  *     const recentOrders = await base44.asServiceRole.entities.Orders.list('-created_at', 50);
  *
  *     return Response.json({ orders: recentOrders });
