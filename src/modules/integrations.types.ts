@@ -393,7 +393,7 @@ export interface CoreIntegrations {
  * This module is available to use with a client in all authentication modes:
  *
  * - **Anonymous or User authentication** (`base44.integrations`): Integration methods are invoked with the current user's permissions. Anonymous users invoke methods without authentication, while authenticated users invoke methods with their authentication context.
- * - **Service role authentication** (`base44.asServiceRole.integrations`): Integration methods are invoked with elevated permissions for backend code that isn't tied to a specific user session.
+ * - **Service role authentication** (`base44.asServiceRole.integrations`): Integration methods are invoked with the service role for backend code that needs elevated permissions.
  */
 export type IntegrationsModule = {
   /**
