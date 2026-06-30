@@ -110,6 +110,8 @@ export type {
 
 export type { SsoModule, SsoAccessTokenResponse } from "./modules/sso.types.js";
 
+export { RealtimeHandler, type Conn } from "./realtime-handler.js";
+
 export type {
   ConnectorsModule,
   UserConnectorsModule,
