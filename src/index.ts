@@ -105,7 +105,8 @@ export type { AppLogsModule } from "./modules/app-logs.types.js";
 export type {
   RealtimeModule,
   RealtimeHandlerClient,
-  RealtimeSubscription,
+  RealtimeHandlerNameRegistry,
+  RealtimeHandlerRegistry,
 } from "./modules/realtime.types.js";
 
 export type { SsoModule, SsoAccessTokenResponse } from "./modules/sso.types.js";

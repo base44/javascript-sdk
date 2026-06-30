@@ -15,23 +15,23 @@ export function createRealtimeModule(config: {
   return new Proxy({} as Record<string, RealtimeHandler>, {
     get(_, handlerName: string) {
       return {
-        async subscribe(
-          instanceId: string,
-          callback: (data: unknown) => void,
-        ): Promise<{ send(data: unknown): void; close(): void }> {
+        subscribe(instanceId: string, callback: (data: unknown) => void): () => void {
           const key = socketKey(handlerName, instanceId);
           // close existing if any
           activeSockets.get(key)?.close();
 
-          const token = await config.getToken(handlerName, instanceId);
           const ws = new PartySocket({
             host: config.dispatcherWsUrl,
             party: handlerName,
             room: instanceId,
-            query: { token },
           });
 
           activeSockets.set(key, ws);
+
+          // Fetch token and attach on connect
+          config.getToken(handlerName, instanceId).then((token) => {
+            ws.updateProperties({ query: { token } });
+          });
 
           ws.addEventListener("message", (ev) => {
             try {
@@ -52,14 +52,9 @@ export function createRealtimeModule(config: {
             }
           });
 
-          return {
-            send(data: unknown) {
-              ws.send(JSON.stringify(data));
-            },
-            close() {
-              activeSockets.delete(key);
-              ws.close();
-            },
+          return () => {
+            activeSockets.delete(key);
+            ws.close();
           };
         },
         send(instanceId: string, data: unknown) {
@@ -74,6 +69,6 @@ export function createRealtimeModule(config: {
 }
 
 interface RealtimeHandler {
-  subscribe(instanceId: string, callback: (data: unknown) => void): Promise<{ send(data: unknown): void; close(): void }>;
+  subscribe(instanceId: string, callback: (data: unknown) => void): () => void;
   send(instanceId: string, data: unknown): void;
 }

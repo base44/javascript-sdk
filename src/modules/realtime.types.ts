@@ -1,37 +1,57 @@
 /**
- * A subscription handle returned by {@link RealtimeHandlerClient.subscribe}.
+ * Extend this interface to add typed `subscribe` callbacks and `send` payloads
+ * for your deployed RealtimeHandlers.
+ *
+ * This is separate from {@link RealtimeHandlerNameRegistry} (which is auto-generated
+ * by `base44 types generate`), so there are no conflicts.
+ *
+ * @example
+ * ```typescript
+ * declare module "@base44/sdk" {
+ *   interface RealtimeHandlerRegistry {
+ *     ChatRoom: {
+ *       inbound:  { type: "joined" | "left" | "message"; userId?: string; from?: string; text?: string };
+ *       outbound: { text: string };
+ *     };
+ *   }
+ * }
+ * ```
  */
-export interface RealtimeSubscription {
-  /** Send a message to all subscribers of this instance. */
-  send(data: unknown): void;
-  /** Close the WebSocket connection and remove the subscription. */
-  close(): void;
-}
+export interface RealtimeHandlerRegistry {}
+
+/**
+ * Auto-populated by `base44 types generate` with the names of your deployed handlers.
+ * Do not edit this interface manually — use {@link RealtimeHandlerRegistry} for message types.
+ */
+export interface RealtimeHandlerNameRegistry {}
+
+type AllHandlerNames = keyof RealtimeHandlerRegistry | keyof RealtimeHandlerNameRegistry;
+
+type InboundFor<N extends string> = N extends keyof RealtimeHandlerRegistry
+  ? RealtimeHandlerRegistry[N] extends { inbound: infer I }
+    ? I
+    : unknown
+  : unknown;
+
+type OutboundFor<N extends string> = N extends keyof RealtimeHandlerRegistry
+  ? RealtimeHandlerRegistry[N] extends { outbound: infer O }
+    ? O
+    : unknown
+  : unknown;
 
 /**
  * Client for a single named RealtimeHandler.
+ * Typed automatically when the handler is registered in {@link RealtimeHandlerRegistry}.
  */
-export interface RealtimeHandlerClient {
-  /**
-   * Subscribe to messages from a specific RealtimeHandler instance.
-   *
-   * @param instanceId - The instance ID of the Durable Object.
-   * @param callback - Called with each parsed message payload.
-   * @returns A subscription handle with `send` and `close` methods.
-   */
+export interface RealtimeHandlerClient<N extends string = string> {
+  /** Open a WebSocket subscription. Returns a synchronous unsubscribe function. */
   subscribe(
     instanceId: string,
-    callback: (data: unknown) => void,
-  ): Promise<RealtimeSubscription>;
+    callback: (data: InboundFor<N>) => void,
+  ): () => void;
 
-  /**
-   * Send a message to an existing active subscription.
-   *
-   * @param instanceId - The instance ID of the Durable Object.
-   * @param data - The data to send (will be JSON-serialized).
-   * @throws {Error} When no active subscription exists for this handler/instance pair.
-   */
-  send(instanceId: string, data: unknown): void;
+  /** Send a message over the open socket. Throws if not subscribed. */
+  send(instanceId: string, data: OutboundFor<N>): void;
 }
 
 /**
@@ -41,10 +61,14 @@ export interface RealtimeHandlerClient {
  * Handler names are accessed as dynamic properties on this module:
  * ```typescript
  * const sub = await base44.realtime.MyHandler.subscribe("room-1", (msg) => {
- *   console.log(msg);
+ *   console.log(msg); // typed if MyHandler is in RealtimeHandlerRegistry
  * });
  * sub.send({ text: "hello" });
  * sub.close();
  * ```
  */
-export type RealtimeModule = Record<string, RealtimeHandlerClient>;
+export type RealtimeModule = {
+  [K in AllHandlerNames]: K extends keyof RealtimeHandlerRegistry
+    ? RealtimeHandlerClient<string & K>
+    : RealtimeHandlerClient;
+} & Record<string, RealtimeHandlerClient>;
