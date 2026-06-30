@@ -10,6 +10,7 @@ import type { FunctionsModule } from "./modules/functions.types.js";
 import type { AgentsModule } from "./modules/agents.types.js";
 import type { AppLogsModule } from "./modules/app-logs.types.js";
 import type { AnalyticsModule } from "./modules/analytics.types.js";
+import type { RealtimeModule } from "./modules/realtime.types.js";
 
 /**
  * Options for creating a Base44 client.
@@ -77,6 +78,13 @@ export interface CreateClientConfig {
    * Additional client options.
    */
   options?: CreateClientOptions;
+  /**
+   * Base WebSocket URL for the Cloudflare Durable Object dispatcher.
+   *
+   * Defaults to the `serverUrl` with `https://` replaced by `wss://` (or `http://` by `ws://`).
+   * Override when the dispatcher lives at a different host than the API.
+   */
+  dispatcherWsUrl?: string;
 }
 
 /**
@@ -91,6 +99,8 @@ export interface Base44Client {
   analytics: AnalyticsModule;
   /** {@link AppLogsModule | App logs module} for tracking app usage. */
   appLogs: AppLogsModule;
+  /** {@link RealtimeModule | Realtime module} for subscribing to and sending messages via Cloudflare Durable Object-backed RealtimeHandlers. */
+  realtime: RealtimeModule;
   /** {@link AuthModule | Auth module} for user authentication and management. */
   auth: AuthModule;
   /** {@link UserConnectorsModule | Connectors module} for app-user OAuth flows. */

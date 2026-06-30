@@ -19,6 +19,7 @@ import type {
   CreateClientOptions,
 } from "./client.types.js";
 import { createAnalyticsModule } from "./modules/analytics.js";
+import { createRealtimeModule } from "./modules/realtime.js";
 
 // Re-export client types
 export type { Base44Client, CreateClientConfig, CreateClientOptions };
@@ -71,10 +72,21 @@ export function createClient(config: CreateClientConfig): Base44Client {
     options,
     functionsVersion,
     headers: optionalHeaders,
+    dispatcherWsUrl,
   } = config;
 
   // Normalize appBaseUrl to always be a string (empty if not provided or invalid)
   const normalizedAppBaseUrl = typeof appBaseUrl === "string" ? appBaseUrl : "";
+
+  // Derive the dispatcher WebSocket URL from serverUrl if not explicitly provided.
+  // Convert https:// → wss:// (or http:// → ws://) and strip trailing slash.
+  const resolvedDispatcherWsUrl = (() => {
+    if (dispatcherWsUrl) return dispatcherWsUrl.replace(/\/$/, "");
+    return serverUrl
+      .replace(/\/$/, "")
+      .replace(/^https:\/\//, "wss://")
+      .replace(/^http:\/\//, "ws://");
+  })();
 
   const socketConfig: RoomsSocketConfig = {
     serverUrl,
@@ -197,6 +209,18 @@ export function createClient(config: CreateClientConfig): Base44Client {
       serverUrl,
       appId,
       userAuthModule,
+    }),
+    realtime: createRealtimeModule({
+      appId,
+      dispatcherWsUrl: resolvedDispatcherWsUrl,
+      getToken: async (handlerName, instanceId) => {
+        // axiosClient interceptors unwrap response.data, so the result is the body directly
+        const data = await axiosClient.post<any, { token: string }>(
+          `/apps/${appId}/realtime-token`,
+          { handler_name: handlerName, instance_id: instanceId }
+        );
+        return data.token;
+      },
     }),
     cleanup: () => {
       userModules.analytics.cleanup();
