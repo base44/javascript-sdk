@@ -30,7 +30,7 @@ export function createRealtimeModule(config: {
 
           // Fetch token and attach on connect
           config.getToken(handlerName, instanceId).then((token) => {
-            ws.updateProperties({ query: { token } });
+            ws.updateProperties({ party: handlerName, room: instanceId, query: { token } });
           });
 
           ws.addEventListener("message", (ev) => {
@@ -46,7 +46,7 @@ export function createRealtimeModule(config: {
             if (activeSockets.get(key) !== ws) return; // replaced
             try {
               const newToken = await config.getToken(handlerName, instanceId);
-              ws.updateProperties({ query: { token: newToken } });
+              ws.updateProperties({ party: handlerName, room: instanceId, query: { token: newToken } });
             } catch {
               // ignore token refresh failure
             }
