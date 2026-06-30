@@ -20,18 +20,15 @@ export function createRealtimeModule(config: {
           // close existing if any
           activeSockets.get(key)?.close();
 
+          // startClosed: don't connect until we have a token
           const ws = new PartySocket({
             host: config.dispatcherWsUrl,
             party: handlerName,
             room: instanceId,
+            startClosed: true,
           });
 
           activeSockets.set(key, ws);
-
-          // Fetch token and attach on connect
-          config.getToken(handlerName, instanceId).then((token) => {
-            ws.updateProperties({ party: handlerName, room: instanceId, query: { token } });
-          });
 
           ws.addEventListener("message", (ev) => {
             try {
@@ -41,16 +38,20 @@ export function createRealtimeModule(config: {
             }
           });
 
-          // Re-fetch token on reconnect
-          ws.addEventListener("close", async () => {
-            if (activeSockets.get(key) !== ws) return; // replaced
+          // Fetch token then open; re-fetch on every close (token expires in 30s)
+          const connect = async () => {
+            if (activeSockets.get(key) !== ws) return;
             try {
-              const newToken = await config.getToken(handlerName, instanceId);
-              ws.updateProperties({ party: handlerName, room: instanceId, query: { token: newToken } });
+              const token = await config.getToken(handlerName, instanceId);
+              ws.updateProperties({ party: handlerName, room: instanceId, query: { token } });
+              ws.reconnect();
             } catch {
-              // ignore token refresh failure
+              // retry on next close
             }
-          });
+          };
+
+          ws.addEventListener("close", () => connect());
+          connect();
 
           return () => {
             activeSockets.delete(key);
