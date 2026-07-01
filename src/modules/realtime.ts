@@ -7,11 +7,6 @@ function socketKey(handlerName: string, instanceId: string) {
   return `${handlerName}:${instanceId}`;
 }
 
-// partyserver maps binding names via camelCaseToKebabCase before routing
-function toKebab(str: string): string {
-  return str.replace(/[A-Z]/g, (l) => `-${l.toLowerCase()}`).replace(/^-/, "");
-}
-
 export function createRealtimeModule(config: {
   appId: string;
   getToken(handlerName: string, instanceId: string): Promise<string>;
@@ -26,10 +21,9 @@ export function createRealtimeModule(config: {
           activeSockets.get(key)?.close();
 
           // query as async fn: called on every (re)connect, fetches a fresh token each time
-          // party must be kebab-case: partyserver maps binding names via camelCaseToKebabCase
           const ws = new PartySocket({
             host: config.dispatcherWsUrl,
-            party: toKebab(handlerName),
+            party: handlerName,
             room: instanceId,
             query: () => config.getToken(handlerName, instanceId).then((token) => ({ token })),
           });
