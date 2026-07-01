@@ -17,11 +17,19 @@ export interface Conn {
   reject(code: number, reason: string): void;
 }
 
+export interface Storage {
+  get<T>(key: string): Promise<T | undefined>;
+  put(key: string, value: unknown): Promise<void>;
+  delete(key: string): Promise<boolean>;
+}
+
 export abstract class RealtimeHandler<_State = unknown, Message = unknown> {
   abstract handleConnect(conn: Conn): void | Promise<void>;
   abstract handleMessage(conn: Conn, msg: Message): void | Promise<void>;
   abstract handleClose(conn: Conn): void | Promise<void>;
   abstract handleTick(): void | Promise<void>;
+
+  onStart(): void | Promise<void> {}
 
   protected broadcast(_data: unknown): void {
     throw new Error("RealtimeHandler.broadcast() is only available inside a deployed handler");
@@ -37,5 +45,9 @@ export abstract class RealtimeHandler<_State = unknown, Message = unknown> {
 
   protected stopLoop(): Promise<void> {
     throw new Error("RealtimeHandler.stopLoop() is only available inside a deployed handler");
+  }
+
+  protected get storage(): Storage {
+    throw new Error("RealtimeHandler.storage is only available inside a deployed handler");
   }
 }
