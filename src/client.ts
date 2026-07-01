@@ -10,6 +10,7 @@ import {
 import { getAccessToken } from "./utils/auth-utils.js";
 import { createFunctionsModule } from "./modules/functions.js";
 import { createAgentsModule } from "./modules/agents.js";
+import { createAiGatewayModule } from "./modules/ai-gateway.js";
 import { createAppLogsModule } from "./modules/app-logs.js";
 import { createUsersModule } from "./modules/users.js";
 import { RoomsSocket, RoomsSocketConfig } from "./utils/socket-utils.js";
@@ -190,6 +191,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
       serverUrl,
       token,
     }),
+    aiGateway: createAiGatewayModule({ serverUrl, token }),
     appLogs: createAppLogsModule(axiosClient, appId),
     users: createUsersModule(axiosClient, appId),
     analytics: createAnalyticsModule({
@@ -233,6 +235,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
       serverUrl,
       token,
     }),
+    aiGateway: createAiGatewayModule({ serverUrl, token: serviceToken }),
     appLogs: createAppLogsModule(serviceRoleAxiosClient, appId),
     cleanup: () => {
       if (socket) {
