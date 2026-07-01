@@ -7,6 +7,11 @@ function socketKey(handlerName: string, instanceId: string) {
   return `${handlerName}:${instanceId}`;
 }
 
+// partyserver maps binding names via camelCaseToKebabCase before routing
+function toKebab(str: string): string {
+  return str.replace(/[A-Z]/g, (l) => `-${l.toLowerCase()}`).replace(/^-/, "");
+}
+
 export function createRealtimeModule(config: {
   appId: string;
   getToken(handlerName: string, instanceId: string): Promise<string>;
@@ -20,12 +25,13 @@ export function createRealtimeModule(config: {
           // close existing if any
           activeSockets.get(key)?.close();
 
-          // startClosed: don't connect until we have a token
+          // query as async fn: called on every (re)connect, fetches a fresh token each time
+          // party must be kebab-case: partyserver maps binding names via camelCaseToKebabCase
           const ws = new PartySocket({
             host: config.dispatcherWsUrl,
-            party: handlerName,
+            party: toKebab(handlerName),
             room: instanceId,
-            startClosed: true,
+            query: () => config.getToken(handlerName, instanceId).then((token) => ({ token })),
           });
 
           activeSockets.set(key, ws);
@@ -37,21 +43,6 @@ export function createRealtimeModule(config: {
               // ignore malformed
             }
           });
-
-          // Fetch token then open; re-fetch on every close (token expires in 30s)
-          const connect = async () => {
-            if (activeSockets.get(key) !== ws) return;
-            try {
-              const token = await config.getToken(handlerName, instanceId);
-              ws.updateProperties({ party: handlerName, room: instanceId, query: { token } });
-              ws.reconnect();
-            } catch {
-              // retry on next close
-            }
-          };
-
-          ws.addEventListener("close", () => connect());
-          connect();
 
           return () => {
             activeSockets.delete(key);

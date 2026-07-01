@@ -9,6 +9,8 @@
  * Cloudflare Durable Object implementation — this file provides types only.
  */
 
+import type { Base44Client } from "./client.types.js";
+
 export interface Conn {
   userId: string;
   appId: string;
@@ -22,6 +24,7 @@ export interface Storage {
   put(key: string, value: unknown): Promise<void>;
   delete(key: string): Promise<boolean>;
 }
+
 
 export abstract class RealtimeHandler<_State = unknown, Message = unknown> {
   abstract handleConnect(conn: Conn): void | Promise<void>;
@@ -47,7 +50,15 @@ export abstract class RealtimeHandler<_State = unknown, Message = unknown> {
     throw new Error("RealtimeHandler.stopLoop() is only available inside a deployed handler");
   }
 
+  protected get instanceId(): string {
+    throw new Error("RealtimeHandler.instanceId is only available inside a deployed handler");
+  }
+
   protected get storage(): Storage {
     throw new Error("RealtimeHandler.storage is only available inside a deployed handler");
+  }
+
+  protected createServiceClient(): Base44Client {
+    throw new Error("RealtimeHandler.createServiceClient() is only available inside a deployed handler");
   }
 }
