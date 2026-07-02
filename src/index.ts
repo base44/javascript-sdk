@@ -102,7 +102,7 @@ export type {
 
 export type {
   AiGatewayModule,
-  GatewayConnection,
+  AiGatewayConnection,
 } from "./modules/ai-gateway.types.js";
 
 export type { AppLogsModule } from "./modules/app-logs.types.js";

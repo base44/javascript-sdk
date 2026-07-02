@@ -2,14 +2,14 @@ import { getAccessToken } from "../utils/auth-utils.js";
 import {
   AiGatewayModule,
   AiGatewayModuleConfig,
-  GatewayConnection,
+  AiGatewayConnection,
 } from "./ai-gateway.types.js";
 
 export function createAiGatewayModule({
   serverUrl,
   token,
 }: AiGatewayModuleConfig): AiGatewayModule {
-  const connection = (): GatewayConnection => ({
+  const connection = (): AiGatewayConnection => ({
     baseURL: `${serverUrl}/api/ai/unified/v1`,
     token: token ?? getAccessToken() ?? "",
   });

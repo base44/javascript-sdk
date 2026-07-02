@@ -4,7 +4,7 @@
  * Contains the base URL and bearer token to use with any OpenAI-compatible client
  * (the OpenAI SDK, Mastra, and others) pointed at the Base44 AI Gateway.
  */
-export interface GatewayConnection {
+export interface AiGatewayConnection {
   /** Base URL of the gateway's OpenAI-compatible endpoint. */
   baseURL: string;
   /** Bearer token used to authenticate requests to the gateway. */
@@ -39,8 +39,10 @@ export interface AiGatewayModule {
    *
    * The `token` is the current caller's bearer token: the app user's token for
    * `base44.aiGateway`, or the service-role token for `base44.asServiceRole.aiGateway`.
+   * When the caller is unauthenticated, `token` is an empty string and gateway
+   * requests will be rejected.
    *
-   * @returns The gateway {@linkcode GatewayConnection | connection} (`baseURL` and `token`).
+   * @returns The gateway {@linkcode AiGatewayConnection | connection} (`baseURL` and `token`).
    *
    * @example
    * ```typescript
@@ -61,5 +63,5 @@ export interface AiGatewayModule {
    * });
    * ```
    */
-  connection(): GatewayConnection;
+  connection(): AiGatewayConnection;
 }
