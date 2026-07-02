@@ -30,15 +30,47 @@ export function createRealtimeModule(config: {
 
           activeSockets.set(key, ws);
 
+          // Heartbeat / half-open detection. PartySocket only reconnects on a
+          // browser close/error event, so a silently-dead connection (TCP alive,
+          // no data — common behind proxies/LBs) hangs until the OS idle timeout
+          // (~60s). We ping periodically and force a reconnect if nothing comes
+          // back within DEAD_MS, cutting detection from ~60s to a few seconds.
+          // Pairs with the handler's setWebSocketAutoResponse("__ping"→"__pong"),
+          // so idle handlers (no app broadcasts) still keep the connection proven.
+          const PING_MS = 5_000;
+          const DEAD_MS = 12_000;
+          let lastMsg = Date.now();
+          const bumpAlive = () => { lastMsg = Date.now(); };
+
+          ws.addEventListener("open", bumpAlive);
           ws.addEventListener("message", (ev) => {
+            bumpAlive();
+            let data: unknown;
             try {
-              callback(JSON.parse(ev.data));
+              data = JSON.parse(ev.data);
             } catch {
-              // ignore malformed
+              return; // ignore malformed
             }
+            // Swallow heartbeat acks — never surface them to the app.
+            if (data && typeof data === "object" && (data as { type?: unknown }).type === "__pong") return;
+            callback(data);
           });
 
+          const heartbeat = setInterval(() => {
+            if (Date.now() - lastMsg > DEAD_MS) {
+              bumpAlive(); // avoid a reconnect storm while the new socket comes up
+              ws.reconnect();
+              return;
+            }
+            try {
+              ws.send(JSON.stringify({ type: "__ping" }));
+            } catch {
+              // socket not open; the watchdog above will force a reconnect
+            }
+          }, PING_MS);
+
           return () => {
+            clearInterval(heartbeat);
             activeSockets.delete(key);
             ws.close();
           };
