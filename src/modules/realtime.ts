@@ -37,8 +37,8 @@ export function createRealtimeModule(config: {
           // back within DEAD_MS, cutting detection from ~60s to a few seconds.
           // Pairs with the handler's setWebSocketAutoResponse("__ping"→"__pong"),
           // so idle handlers (no app broadcasts) still keep the connection proven.
-          const PING_MS = 5_000;
-          const DEAD_MS = 12_000;
+          const PING_MS = 1_000;
+          const DEAD_MS = 3_000;
           let lastMsg = Date.now();
           const bumpAlive = () => { lastMsg = Date.now(); };
 
