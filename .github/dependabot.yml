@@ -1,23 +1,35 @@
+# Dependabot: security + version updates with a 7-day cooldown, grouped to cut churn.
+# Patch/minor are auto-merged by .github/workflows/dependabot-auto-merge.yml; majors are
+# left for a human (and the holistic security bot surfaces majors/no-fix advisories with
+# remediation guidance). Security updates (advisory-driven) also honor the cooldown/groups.
 version: 2
 updates:
-  # Keep package.json dependencies patched. Combined with GitHub's
-  # Dependabot security updates (enabled in repo Settings > Security),
-  # this opens PRs for both routine version bumps and CVE fixes.
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore(deps)"
     groups:
-      # Batch low-risk dev tooling updates into a single PR to cut noise.
-      dev-dependencies:
-        dependency-type: "development"
-        update-types:
-          - "minor"
-          - "patch"
+      npm-minor-patch:
+        update-types: ["minor", "patch"]
 
-  # Keep the GitHub Actions used by these workflows up to date.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore(actions)"
+    groups:
+      actions-minor-patch:
+        update-types: ["minor", "patch"]

@@ -1,0 +1,33 @@
+name: Dependabot auto-merge
+
+# Auto-merge Dependabot's patch/minor updates once required checks pass; leave majors for
+# a human. Rule-based (semver) — the deeper, investigating merge judgment lives in the
+# separate holistic security bot.
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    if: ${{ github.actor == 'dependabot[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Dependabot metadata
+        id: meta
+        uses: dependabot/fetch-metadata@v2
+
+      - name: Auto-merge patch/minor
+        if: ${{ steps.meta.outputs.update-type == 'version-update:semver-patch' || steps.meta.outputs.update-type == 'version-update:semver-minor' }}
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr merge --auto --squash "$PR_URL"
+
+      - name: Leave majors for a human
+        if: ${{ steps.meta.outputs.update-type == 'version-update:semver-major' }}
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr comment "$PR_URL" --body "🚧 Major update — not auto-merged (policy: auto-merge patch/minor only). Leaving for human review."
