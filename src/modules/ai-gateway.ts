@@ -10,7 +10,7 @@ export function createAiGatewayModule({
   token,
 }: AiGatewayModuleConfig): AiGatewayModule {
   const connection = (): AiGatewayConnection => ({
-    baseURL: `${serverUrl}/api/ai/unified/v1`,
+    baseURL: `${serverUrl}/api/ai/openai/v1`,
     token: token ?? getAccessToken() ?? "",
   });
 
