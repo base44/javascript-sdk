@@ -12,6 +12,10 @@
 import type { Base44Client } from "./client.types.js";
 
 export interface Conn {
+  /** Unique per-connection id (one per socket/tab), the same value the client
+   *  receives from `subscribe()`. Use this — not userId — to identify a distinct
+   *  client, so multiple tabs of the same user are separate connections. */
+  id: string;
   userId: string;
   appId: string;
   instanceId: string;
