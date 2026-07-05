@@ -38,15 +38,15 @@ export interface Storage {
  * Base class for a Realtime Handler.
  *
  * @typeParam Incoming - messages this handler *receives* from clients
- *   (`handleMessage`'s `msg`) — the client's outbound direction.
+ *   (`handleMessage`'s `msg`) — the schema's `toServer` section.
  * @typeParam Outgoing - messages this handler *sends* to clients
- *   (`conn.send`/`broadcast`) — the client's inbound direction.
+ *   (`conn.send`/`broadcast`) — the schema's `toClient` section.
  *
  * With a generated `schema.jsonc`, wire both from the registry so they can't drift
  * from the client's types:
  * ```ts
  * type Reg = RealtimeHandlerRegistry["MyHandler"];
- * class MyHandler extends RealtimeHandler<Reg["outbound"], Reg["inbound"]> { ... }
+ * class MyHandler extends RealtimeHandler<Reg["toServer"], Reg["toClient"]> { ... }
  * ```
  */
 export abstract class RealtimeHandler<Incoming = unknown, Outgoing = unknown> {

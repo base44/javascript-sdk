@@ -10,8 +10,8 @@
  * declare module "@base44/sdk" {
  *   interface RealtimeHandlerRegistry {
  *     ChatRoom: {
- *       inbound:  { type: "joined" | "left" | "message"; userId?: string; from?: string; text?: string };
- *       outbound: { text: string };
+ *       toClient: { type: "joined" | "left" | "message"; userId?: string; from?: string; text?: string };
+ *       toServer: { type: "message"; text: string };
  *     };
  *   }
  * }
@@ -27,14 +27,14 @@ export interface RealtimeHandlerNameRegistry {}
 
 type AllHandlerNames = keyof RealtimeHandlerRegistry | keyof RealtimeHandlerNameRegistry;
 
-type InboundFor<N extends string> = N extends keyof RealtimeHandlerRegistry
-  ? RealtimeHandlerRegistry[N] extends { inbound: infer I }
+type ToClientFor<N extends string> = N extends keyof RealtimeHandlerRegistry
+  ? RealtimeHandlerRegistry[N] extends { toClient: infer I }
     ? I
     : unknown
   : unknown;
 
-type OutboundFor<N extends string> = N extends keyof RealtimeHandlerRegistry
-  ? RealtimeHandlerRegistry[N] extends { outbound: infer O }
+type ToServerFor<N extends string> = N extends keyof RealtimeHandlerRegistry
+  ? RealtimeHandlerRegistry[N] extends { toServer: infer O }
     ? O
     : unknown
   : unknown;
@@ -54,12 +54,12 @@ export interface RealtimeHandlerClient<N extends string = string> {
    */
   subscribe(
     instanceId: string,
-    callback: (data: InboundFor<N>) => void,
+    callback: (data: ToClientFor<N>) => void,
     options?: { id?: string },
   ): RealtimeSubscription;
 
   /** Send a message over the open socket. Throws if not subscribed. */
-  send(instanceId: string, data: OutboundFor<N>): void;
+  send(instanceId: string, data: ToServerFor<N>): void;
 }
 
 /** Handle for an active realtime subscription. */
