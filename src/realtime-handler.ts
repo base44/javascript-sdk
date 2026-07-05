@@ -11,7 +11,11 @@
 
 import type { Base44Client } from "./client.types.js";
 
-export interface Conn {
+/**
+ * A single client connection. `Send` is the message type this connection accepts
+ * via {@link send} — the handler's *outgoing* (server→client) messages.
+ */
+export interface Conn<Send = unknown> {
   /** Unique per-connection id (one per socket/tab), the same value the client
    *  receives from `subscribe()`. Use this — not userId — to identify a distinct
    *  client, so multiple tabs of the same user are separate connections. */
@@ -19,7 +23,7 @@ export interface Conn {
   userId: string;
   appId: string;
   instanceId: string;
-  send(data: unknown): void;
+  send(data: Send): void;
   reject(code: number, reason: string): void;
 }
 
@@ -30,10 +34,25 @@ export interface Storage {
 }
 
 
-export abstract class RealtimeHandler<_State = unknown, Message = unknown> {
-  abstract handleConnect(conn: Conn): void | Promise<void>;
-  abstract handleMessage(conn: Conn, msg: Message): void | Promise<void>;
-  abstract handleClose(conn: Conn): void | Promise<void>;
+/**
+ * Base class for a Realtime Handler.
+ *
+ * @typeParam Incoming - messages this handler *receives* from clients
+ *   (`handleMessage`'s `msg`) — the client's outbound direction.
+ * @typeParam Outgoing - messages this handler *sends* to clients
+ *   (`conn.send`/`broadcast`) — the client's inbound direction.
+ *
+ * With a generated `schema.jsonc`, wire both from the registry so they can't drift
+ * from the client's types:
+ * ```ts
+ * type Reg = RealtimeHandlerRegistry["MyHandler"];
+ * class MyHandler extends RealtimeHandler<Reg["outbound"], Reg["inbound"]> { ... }
+ * ```
+ */
+export abstract class RealtimeHandler<Incoming = unknown, Outgoing = unknown> {
+  abstract handleConnect(conn: Conn<Outgoing>): void | Promise<void>;
+  abstract handleMessage(conn: Conn<Outgoing>, msg: Incoming): void | Promise<void>;
+  abstract handleClose(conn: Conn<Outgoing>): void | Promise<void>;
   abstract handleTick(): void | Promise<void>;
 
   onStart(): void | Promise<void> {}
@@ -51,11 +70,11 @@ export abstract class RealtimeHandler<_State = unknown, Message = unknown> {
   protected tickIntervalMs = 100;
   protected shouldTick?(): boolean;
 
-  protected broadcast(_data: unknown): void {
+  protected broadcast(_data: Outgoing): void {
     throw new Error("RealtimeHandler.broadcast() is only available inside a deployed handler");
   }
 
-  protected getConnections(): Conn[] {
+  protected getConnections(): Conn<Outgoing>[] {
     throw new Error("RealtimeHandler.getConnections() is only available inside a deployed handler");
   }
 
