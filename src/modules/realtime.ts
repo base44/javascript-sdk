@@ -15,7 +15,11 @@ export function createRealtimeModule(config: {
   return new Proxy({} as Record<string, RealtimeHandler>, {
     get(_, handlerName: string) {
       return {
-        subscribe(instanceId: string, callback: (data: unknown) => void): () => void {
+        subscribe(
+          instanceId: string,
+          callback: (data: unknown) => void,
+          options?: { id?: string },
+        ): RealtimeSubscription {
           const key = socketKey(handlerName, instanceId);
           // close existing if any
           activeSockets.get(key)?.close();
@@ -25,6 +29,9 @@ export function createRealtimeModule(config: {
             host: config.dispatcherWsUrl,
             party: handlerName,
             room: instanceId,
+            // Connection id: caller-supplied (stable — reuse across reconnects/tabs as
+            // you see fit) or auto-generated per connection. Server sees it as conn.id.
+            id: options?.id,
             query: () => config.getToken(handlerName, instanceId).then((token) => ({ token })),
           });
 
@@ -69,10 +76,13 @@ export function createRealtimeModule(config: {
             }
           }, PING_MS);
 
-          return () => {
-            clearInterval(heartbeat);
-            activeSockets.delete(key);
-            ws.close();
+          return {
+            id: ws.id,   // the connection id (same value the handler sees as conn.id)
+            unsubscribe() {
+              clearInterval(heartbeat);
+              activeSockets.delete(key);
+              ws.close();
+            },
           };
         },
         send(instanceId: string, data: unknown) {
@@ -86,7 +96,19 @@ export function createRealtimeModule(config: {
   });
 }
 
+/** Handle for an active realtime subscription. */
+interface RealtimeSubscription {
+  /** This connection's id — the same value the handler receives as `conn.id`. */
+  id: string;
+  /** Close the subscription and its underlying socket. */
+  unsubscribe(): void;
+}
+
 interface RealtimeHandler {
-  subscribe(instanceId: string, callback: (data: unknown) => void): () => void;
+  subscribe(
+    instanceId: string,
+    callback: (data: unknown) => void,
+    options?: { id?: string },
+  ): RealtimeSubscription;
   send(instanceId: string, data: unknown): void;
 }

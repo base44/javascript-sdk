@@ -44,14 +44,30 @@ type OutboundFor<N extends string> = N extends keyof RealtimeHandlerRegistry
  * Typed automatically when the handler is registered in {@link RealtimeHandlerRegistry}.
  */
 export interface RealtimeHandlerClient<N extends string = string> {
-  /** Open a WebSocket subscription. Returns a synchronous unsubscribe function. */
+  /**
+   * Open a WebSocket subscription. Returns a {@link RealtimeSubscription} with the
+   * connection `id` (same value the handler sees as `conn.id`) and an `unsubscribe()` method.
+   *
+   * Pass `options.id` to control the connection id (e.g. a stable per-tab id so a
+   * reconnect reuses the same server-side connection); omit it for an auto-generated
+   * per-connection id.
+   */
   subscribe(
     instanceId: string,
     callback: (data: InboundFor<N>) => void,
-  ): () => void;
+    options?: { id?: string },
+  ): RealtimeSubscription;
 
   /** Send a message over the open socket. Throws if not subscribed. */
   send(instanceId: string, data: OutboundFor<N>): void;
+}
+
+/** Handle for an active realtime subscription. */
+export interface RealtimeSubscription {
+  /** This connection's id — the same value the handler receives as `conn.id`. */
+  id: string;
+  /** Close the subscription and its underlying socket. */
+  unsubscribe(): void;
 }
 
 /**
@@ -63,8 +79,8 @@ export interface RealtimeHandlerClient<N extends string = string> {
  * const sub = await base44.realtime.MyHandler.subscribe("room-1", (msg) => {
  *   console.log(msg); // typed if MyHandler is in RealtimeHandlerRegistry
  * });
- * sub.send({ text: "hello" });
- * sub.close();
+ * const { id, unsubscribe } = sub;
+ * unsubscribe();
  * ```
  */
 export type RealtimeModule = {
