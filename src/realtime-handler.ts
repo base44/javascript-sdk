@@ -34,6 +34,19 @@ export abstract class RealtimeHandler<_State = unknown, Message = unknown> {
 
   onStart(): void | Promise<void> {}
 
+  /**
+   * Managed ticker (opt-in). Override {@link shouldTick} and the platform runs
+   * {@link handleTick} on a timer of {@link tickIntervalMs} while it returns true,
+   * and stops (letting the Durable Object hibernate — no compute cost) when it
+   * returns false. The platform owns scheduling, rescheduling, self-heal, and
+   * error-safety — you don't call {@link startLoop}/{@link stopLoop}.
+   *
+   * Re-evaluated after every connect/message/close and on every tick, so keep it
+   * cheap and pure (no async, no side effects). Example: `return this.players >= 2`.
+   */
+  protected tickIntervalMs = 100;
+  protected shouldTick?(): boolean;
+
   protected broadcast(_data: unknown): void {
     throw new Error("RealtimeHandler.broadcast() is only available inside a deployed handler");
   }
