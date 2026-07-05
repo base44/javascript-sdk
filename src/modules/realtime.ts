@@ -9,7 +9,7 @@ function socketKey(handlerName: string, instanceId: string) {
 
 export function createRealtimeModule(config: {
   appId: string;
-  getToken(handlerName: string, instanceId: string): Promise<string>;
+  getToken(handlerName: string, instanceId: string, connId: string): Promise<string>;
   dispatcherWsUrl: string;
 }) {
   return new Proxy({} as Record<string, RealtimeHandler>, {
@@ -24,15 +24,21 @@ export function createRealtimeModule(config: {
           // close existing if any
           activeSockets.get(key)?.close();
 
+          // Connection id: caller-supplied (stable — reuse across reconnects/tabs as
+          // you see fit) or auto-generated per subscription. It travels INSIDE the
+          // signed realtime token (never as a WS query param, which proxies strip);
+          // the dispatcher forwards the verified claim as partyserver's _pk, so the
+          // handler sees this exact value as conn.id. Reconnects re-mint the token
+          // with the same id, so conn.id is stable across reconnects.
+          const connId = options?.id ?? crypto.randomUUID();
+
           // query as async fn: called on every (re)connect, fetches a fresh token each time
           const ws = new PartySocket({
             host: config.dispatcherWsUrl,
             party: handlerName,
             room: instanceId,
-            // Connection id: caller-supplied (stable — reuse across reconnects/tabs as
-            // you see fit) or auto-generated per connection. Server sees it as conn.id.
-            id: options?.id,
-            query: () => config.getToken(handlerName, instanceId).then((token) => ({ token })),
+            query: () =>
+              config.getToken(handlerName, instanceId, connId).then((token) => ({ token })),
           });
 
           activeSockets.set(key, ws);
@@ -77,7 +83,7 @@ export function createRealtimeModule(config: {
           }, PING_MS);
 
           return {
-            id: ws.id,   // the connection id (same value the handler sees as conn.id)
+            id: connId,  // the connection id (same value the handler sees as conn.id)
             unsubscribe() {
               clearInterval(heartbeat);
               activeSockets.delete(key);

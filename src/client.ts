@@ -213,11 +213,13 @@ export function createClient(config: CreateClientConfig): Base44Client {
     realtime: createRealtimeModule({
       appId,
       dispatcherWsUrl: resolvedDispatcherWsUrl,
-      getToken: async (handlerName, instanceId) => {
-        // axiosClient interceptors unwrap response.data, so the result is the body directly
+      getToken: async (handlerName, instanceId, connId) => {
+        // axiosClient interceptors unwrap response.data, so the result is the body directly.
+        // conn_id rides inside the signed token (not a WS query param) so it survives
+        // proxies that strip params; the dispatcher forwards it as the handler's conn.id.
         const data = await axiosClient.post<any, { token: string }>(
           `/apps/${appId}/realtime-token`,
-          { handler_name: handlerName, instance_id: instanceId }
+          { handler_name: handlerName, instance_id: instanceId, conn_id: connId }
         );
         return data.token;
       },
