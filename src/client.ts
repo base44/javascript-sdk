@@ -10,6 +10,7 @@ import {
 import { getAccessToken } from "./utils/auth-utils.js";
 import { createFunctionsModule } from "./modules/functions.js";
 import { createAgentsModule } from "./modules/agents.js";
+import { createAiGatewayModule } from "./modules/ai-gateway.js";
 import { createAppLogsModule } from "./modules/app-logs.js";
 import { createUsersModule } from "./modules/users.js";
 import { RoomsSocket, RoomsSocketConfig } from "./utils/socket-utils.js";
@@ -190,6 +191,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
       serverUrl,
       token,
     }),
+    aiGateway: createAiGatewayModule({ serverUrl, appBaseUrl: normalizedAppBaseUrl, token }),
     appLogs: createAppLogsModule(axiosClient, appId),
     users: createUsersModule(axiosClient, appId),
     analytics: createAnalyticsModule({
@@ -233,6 +235,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
       serverUrl,
       token,
     }),
+    aiGateway: createAiGatewayModule({ serverUrl, appBaseUrl: normalizedAppBaseUrl, token: serviceToken }),
     appLogs: createAppLogsModule(serviceRoleAxiosClient, appId),
     cleanup: () => {
       if (socket) {
@@ -392,6 +395,7 @@ export function createClientFromRequest(request: Request): Base44Client {
   );
   const appId = request.headers.get("Base44-App-Id");
   const serverUrlHeader = request.headers.get("Base44-Api-Url");
+  const appBaseUrlHeader = request.headers.get("Base44-App-Base-Url");
   const functionsVersion = request.headers.get("Base44-Functions-Version");
   const stateHeader = request.headers.get("Base44-State");
 
@@ -439,6 +443,7 @@ export function createClientFromRequest(request: Request): Base44Client {
 
   return createClient({
     serverUrl: serverUrlHeader || "https://base44.app",
+    appBaseUrl: appBaseUrlHeader ?? undefined,
     appId,
     token: userToken,
     serviceToken: serviceRoleToken,
