@@ -2,7 +2,8 @@
  * A connection to the Base44 AI Gateway.
  *
  * Contains the base URL and bearer token to use with any OpenAI-compatible client
- * (the OpenAI SDK, Mastra, and others) pointed at the Base44 AI Gateway.
+ * (OpenAI SDK, Mastra, Vercel AI SDK, and others) pointed at the Base44 AI
+ * Gateway.
  */
 export interface AiGatewayConnection {
   /** Base URL of the gateway's OpenAI-compatible endpoint. */
@@ -18,38 +19,72 @@ export interface AiGatewayConnection {
 export interface AiGatewayModuleConfig {
   /** Server URL */
   serverUrl?: string;
-  /** The app's own public base URL (e.g. https://my-app.base44.app). Preferred over
-   * serverUrl for the gateway URL, since the gateway resolves the app by domain. */
+  /** The app's own public base URL (e.g. https://my-app.base44.app). */
   appBaseUrl?: string;
   /** Authentication token */
   token?: string;
 }
 
 /**
- * The AI Gateway module.
+ * AI Gateway module for calling Base44's managed AI models from your own code.
  *
- * Exposes the connection details for the Base44 AI Gateway so you can call it from
- * your own code using any OpenAI-compatible SDK — for example, to build a custom
- * agent on top of the gateway.
+ * The gateway exposes an OpenAI-compatible Chat Completions endpoint, so any
+ * OpenAI-compatible SDK works against it:
+ * - Build custom AI agents with agent SDKs such as Mastra or the Vercel AI SDK
+ * - Uses your app's models, billing, and credit quota, no API key to manage
+ *
+ * Available in user authentication mode (`base44.aiGateway`) and with the
+ * service-role token via `base44.asServiceRole.aiGateway`.
  */
 export interface AiGatewayModule {
   /**
    * Gets the connection details for the Base44 AI Gateway.
    *
-   * Returns the `baseURL` and `token` to pass to any OpenAI-compatible client (the
-   * OpenAI SDK, Mastra, and others), so you can call the gateway from your own code
-   * without constructing the URL or handling the token yourself.
+   * Returns the `baseURL` and `token` to pass to any OpenAI-compatible client.
    *
    * The `token` is the current caller's bearer token: the app user's token for
    * `base44.aiGateway`, or the service-role token for `base44.asServiceRole.aiGateway`.
-   * When the caller is unauthenticated, `token` is an empty string and gateway
-   * requests will be rejected.
+   * When the caller is unauthenticated, `token` is an empty string.
    *
    * @returns The gateway {@linkcode AiGatewayConnection | connection} (`baseURL` and `token`).
    *
    * @example
    * ```typescript
-   * // Inside a backend function, call the gateway with any OpenAI-compatible SDK
+   * // Build an AI agent with Mastra on top of the gateway, inside a backend function
+   * import { createClientFromRequest } from 'npm:@base44/sdk';
+   * import { Agent } from 'npm:@mastra/core/agent';
+   * import { createTool } from 'npm:@mastra/core/tools';
+   * import { createOpenAICompatible } from 'npm:@ai-sdk/openai-compatible';
+   * import { z } from 'npm:zod';
+   *
+   * Deno.serve(async (req) => {
+   *   const base44 = createClientFromRequest(req);
+   *   const { baseURL, token } = base44.aiGateway.connection();
+   *   const models = createOpenAICompatible({ name: 'base44', baseURL, apiKey: token });
+   *
+   *   const agent = new Agent({
+   *     id: 'order-helper',
+   *     name: 'order-helper',
+   *     instructions: 'Help the user with their orders.',
+   *     model: models('claude_sonnet_4_6'),
+   *     tools: {
+   *       lookupOrder: createTool({
+   *         id: 'lookup-order',
+   *         description: 'Fetch an order by id',
+   *         inputSchema: z.object({ orderId: z.string() }),
+   *         execute: async ({ orderId }) => base44.entities.Order.get(orderId),
+   *       }),
+   *     },
+   *   });
+   *
+   *   const { text } = await agent.generate('Where is order 123?');
+   *   return Response.json({ text });
+   * });
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Call a model directly with the OpenAI SDK
    * import { createClientFromRequest } from 'npm:@base44/sdk';
    * import OpenAI from 'npm:openai';
    *
