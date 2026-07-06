@@ -18,6 +18,9 @@ export interface AiGatewayConnection {
 export interface AiGatewayModuleConfig {
   /** Server URL */
   serverUrl?: string;
+  /** The app's own public base URL (e.g. https://my-app.base44.app). Preferred over
+   * serverUrl for the gateway URL, since the gateway resolves the app by domain. */
+  appBaseUrl?: string;
   /** Authentication token */
   token?: string;
 }
