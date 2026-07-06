@@ -25,43 +25,19 @@ describe("AI Gateway Module", () => {
       });
     });
 
-    test("should prefer appBaseUrl over serverUrl (domain-resolved gateway)", () => {
-      const base44 = createClient({
-        serverUrl,
-        appBaseUrl: "https://my-app.base44.app",
-        appId,
-      });
-      expect(base44.aiGateway.connection().baseURL).toBe(
-        "https://my-app.base44.app/api/ai/openai/v1"
-      );
-    });
-
-    test("should build from the Base44-App-Base-Url header in backend functions", () => {
+    test("should build from the Base44-Api-Url header in backend functions", () => {
       const request = new Request("https://functions.internal/run", {
         headers: {
           "Base44-App-Id": appId,
           "Base44-Api-Url": serverUrl,
-          "Base44-App-Base-Url": "https://my-app.base44.app",
           Authorization: "Bearer user-token",
         },
       });
       const base44 = createClientFromRequest(request);
       expect(base44.aiGateway.connection()).toEqual({
-        baseURL: "https://my-app.base44.app/api/ai/openai/v1",
+        baseURL,
         token: "user-token",
       });
-    });
-
-    test("should fall back to serverUrl when the app-base-url header is absent", () => {
-      const request = new Request("https://functions.internal/run", {
-        headers: {
-          "Base44-App-Id": appId,
-          "Base44-Api-Url": serverUrl,
-          Authorization: "Bearer user-token",
-        },
-      });
-      const base44 = createClientFromRequest(request);
-      expect(base44.aiGateway.connection().baseURL).toBe(baseURL);
     });
 
     test("should use the service-role token via asServiceRole", () => {
