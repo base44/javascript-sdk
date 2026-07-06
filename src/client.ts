@@ -71,6 +71,8 @@ export function createClient(config: CreateClientConfig): Base44Client {
     options,
     functionsVersion,
     headers: optionalHeaders,
+    disableAnalytics = false,
+    adapter,
   } = config;
 
   // Normalize appBaseUrl to always be a string (empty if not provided or invalid)
@@ -112,6 +114,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     headers,
     token,
     onError: options?.onError,
+    adapter,
   });
 
   const functionsAxiosClient = createAxiosClient({
@@ -120,6 +123,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     token,
     interceptResponses: false,
     onError: options?.onError,
+    adapter,
   });
 
   const serviceRoleHeaders = {
@@ -132,6 +136,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     headers: serviceRoleHeaders,
     token: serviceToken,
     onError: options?.onError,
+    adapter,
   });
 
   const serviceRoleFunctionsAxiosClient = createAxiosClient({
@@ -139,6 +144,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     headers: functionHeaders,
     token: serviceToken,
     interceptResponses: false,
+    adapter,
   });
 
   const userAuthModule = createAuthModule(
@@ -197,6 +203,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
       serverUrl,
       appId,
       userAuthModule,
+      disabled: disableAnalytics,
     }),
     cleanup: () => {
       userModules.analytics.cleanup();

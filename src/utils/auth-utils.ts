@@ -5,6 +5,86 @@ import {
   GetLoginUrlOptions,
 } from "./auth-utils.types.js";
 
+const ACCESS_TOKEN_COOKIE_ATTRIBUTES = "path=/; SameSite=Lax";
+
+/**
+ * Builds the cookie string that mirrors the access token so subsequent
+ * document requests carry it to server-side rendering (SSR) code.
+ *
+ * @internal
+ */
+export function buildAccessTokenCookie(
+  token: string,
+  {
+    name = "base44_access_token",
+    secure = false,
+  }: { name?: string; secure?: boolean } = {}
+) {
+  return `${name}=${encodeURIComponent(
+    token
+  )}; ${ACCESS_TOKEN_COOKIE_ATTRIBUTES}${secure ? "; Secure" : ""}`;
+}
+
+/**
+ * Builds the cookie string that clears the mirrored access token cookie.
+ *
+ * @internal
+ */
+export function buildClearAccessTokenCookie({
+  name = "base44_access_token",
+  secure = false,
+}: { name?: string; secure?: boolean } = {}) {
+  return `${name}=; ${ACCESS_TOKEN_COOKIE_ATTRIBUTES}; Max-Age=0${
+    secure ? "; Secure" : ""
+  }`;
+}
+
+function isHttpsPage() {
+  return (
+    typeof window !== "undefined" && window.location?.protocol === "https:"
+  );
+}
+
+/**
+ * Mirrors the access token into a cookie (in addition to localStorage) so
+ * subsequent document requests carry the token to SSR. No-op outside a
+ * browser environment.
+ *
+ * @internal
+ */
+export function setAccessTokenCookie(token: string, name?: string) {
+  if (typeof document === "undefined" || !token) {
+    return;
+  }
+  try {
+    document.cookie = buildAccessTokenCookie(token, {
+      name,
+      secure: isHttpsPage(),
+    });
+  } catch (e) {
+    console.error("Error saving token cookie:", e);
+  }
+}
+
+/**
+ * Clears the mirrored access token cookie. No-op outside a browser environment.
+ *
+ * @internal
+ */
+export function clearAccessTokenCookie(name?: string) {
+  if (typeof document === "undefined") {
+    return;
+  }
+  try {
+    document.cookie = buildClearAccessTokenCookie({
+      name,
+      secure: isHttpsPage(),
+    });
+  } catch (e) {
+    console.error("Error removing token cookie:", e);
+  }
+}
+
 /**
  * Retrieves an access token from URL parameters or local storage.
  *
@@ -137,6 +217,8 @@ export function saveAccessToken(
     window.localStorage.setItem(storageKey, token);
     // Set "token" that is set by the built-in SDK of platform version 2
     window.localStorage.setItem("token", token);
+    // Mirror the token into a cookie so document requests carry it to SSR
+    setAccessTokenCookie(token, storageKey);
     return true;
   } catch (e) {
     console.error("Error saving token to local storage:", e);
@@ -177,6 +259,8 @@ export function removeAccessToken(options: RemoveAccessTokenOptions) {
 
   try {
     window.localStorage.removeItem(storageKey);
+    // Clear the cookie that mirrors the token for SSR
+    clearAccessTokenCookie(storageKey);
     return true;
   } catch (e) {
     console.error("Error removing token from local storage:", e);

@@ -1,3 +1,4 @@
+import type { AxiosRequestConfig } from "axios";
 import type { EntitiesModule } from "./modules/entities.types.js";
 import type { IntegrationsModule } from "./modules/integrations.types.js";
 import type { AuthModule } from "./modules/auth.types.js";
@@ -73,6 +74,28 @@ export interface CreateClientConfig {
    * @internal
    */
   headers?: Record<string, string>;
+  /**
+   * Disables the {@link AnalyticsModule | analytics module} entirely.
+   *
+   * When `true`, `base44.analytics.track()` becomes a no-op and no background
+   * processing or heartbeat timers are started. Set this for server-side
+   * clients (SSR, edge runtimes) where background timers must not run.
+   * {@linkcode createServerClient | createServerClient()} sets this automatically.
+   *
+   * Analytics is also automatically disabled outside a browser environment.
+   *
+   * @defaultValue `false`
+   */
+  disableAnalytics?: boolean;
+  /**
+   * Axios adapter override for HTTP requests.
+   *
+   * By default, axios picks an adapter based on the runtime. Set this to
+   * `'fetch'` in edge runtimes such as Cloudflare Workers, where the default
+   * adapter detection can pick the wrong adapter.
+   * {@linkcode createServerClient | createServerClient()} sets this automatically.
+   */
+  adapter?: AxiosRequestConfig["adapter"];
   /**
    * Additional client options.
    */
