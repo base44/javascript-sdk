@@ -7,23 +7,9 @@ function socketKey(handlerName: string, instanceId: string) {
   return `${handlerName}:${instanceId}`;
 }
 
-/** Push a (new) user session token to every open realtime socket — called on
- *  login/refresh so long-lived connections keep a valid credential server-side. */
-export function pushUserTokenToActiveSockets(token: string) {
-  if (!token) return;
-  const payload = JSON.stringify({ type: "__auth", token });
-  for (const ws of activeSockets.values()) {
-    try { ws.send(payload); } catch { /* not open — the open handler will send */ }
-  }
-}
-
 export function createRealtimeModule(config: {
   appId: string;
   getToken(handlerName: string, instanceId: string, connId: string): Promise<string>;
-  /** Current user session token, if signed in. Sent in-band ({type:"__auth"})
-   *  right after every socket open — never in the URL — so the handler can act
-   *  as this user (createUserClient / RLS). */
-  getUserToken?: () => string | null;
   dispatcherWsUrl: string;
   /** WebSocket implementation for runtimes without a global one (Node < 22). */
   webSocketImpl?: unknown;
@@ -61,25 +47,11 @@ export function createRealtimeModule(config: {
 
           activeSockets.set(key, ws);
 
-          // In-band credential delivery (Supabase-style): the user token rides the
-          // open socket, never the URL. Sent on every open (incl. reconnects); the
-          // server may also nudge with {type:"__auth_required"} (e.g. just before
-          // the held token expires) and we answer with the current one.
-          const sendAuth = () => {
-            const t = config.getUserToken?.();
-            if (t) {
-              try { ws.send(JSON.stringify({ type: "__auth", token: t })); } catch { /* not open */ }
-            }
-          };
-          ws.addEventListener("open", sendAuth);
-
           // Heartbeat / half-open detection. PartySocket only reconnects on a
           // browser close/error event, so a silently-dead connection (TCP alive,
           // no data — common behind proxies/LBs) hangs until the OS idle timeout
           // (~60s). We ping periodically and force a reconnect if nothing comes
           // back within DEAD_MS, cutting detection from ~60s to a few seconds.
-          // Pairs with the handler's setWebSocketAutoResponse("__ping"→"__pong"),
-          // so idle handlers (no app broadcasts) still keep the connection proven.
           const PING_MS = 1_000;
           const DEAD_MS = 3_000;
           let lastMsg = Date.now();
@@ -97,7 +69,6 @@ export function createRealtimeModule(config: {
             // Swallow platform messages — never surface them to the app.
             const msgType = data && typeof data === "object" ? (data as { type?: unknown }).type : undefined;
             if (msgType === "__pong") return;
-            if (msgType === "__auth_required") { sendAuth(); return; }
             callback(data);
           });
 

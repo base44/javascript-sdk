@@ -19,7 +19,7 @@ import type {
   CreateClientOptions,
 } from "./client.types.js";
 import { createAnalyticsModule } from "./modules/analytics.js";
-import { createRealtimeModule, pushUserTokenToActiveSockets } from "./modules/realtime.js";
+import { createRealtimeModule } from "./modules/realtime.js";
 
 // Re-export client types
 export type { Base44Client, CreateClientConfig, CreateClientOptions };
@@ -164,22 +164,6 @@ export function createClient(config: CreateClientConfig): Base44Client {
     }
   );
 
-  // Current user session token (axios defaults are the single source of truth —
-  // createClient({token}) and every setToken() land there). Used for in-band
-  // realtime auth; read lazily so refreshes are always picked up.
-  const getUserToken = (): string | null => {
-    const h = axiosClient.defaults.headers.common?.["Authorization"];
-    return typeof h === "string" && h.startsWith("Bearer ") ? h.slice(7) : null;
-  };
-
-  // Login / token refresh must reach long-lived realtime sockets too, so the
-  // handler-side credential never goes stale mid-connection.
-  const originalSetToken = userAuthModule.setToken.bind(userAuthModule);
-  userAuthModule.setToken = (newToken: string, saveToStorage?: boolean) => {
-    originalSetToken(newToken, saveToStorage);
-    pushUserTokenToActiveSockets(newToken);
-  };
-
   // Apply the access token before any module that may issue authenticated
   // requests during construction (notably analytics, which fires an init
   // event whose flush calls auth.me()). Without this, the first User/me
@@ -231,7 +215,6 @@ export function createClient(config: CreateClientConfig): Base44Client {
       appId,
       dispatcherWsUrl: resolvedDispatcherWsUrl,
       webSocketImpl,
-      getUserToken,
       getToken: async (handlerName, instanceId, connId) => {
         // axiosClient interceptors unwrap response.data, so the result is the body directly.
         // conn_id rides inside the signed token (not a WS query param) so it survives
@@ -240,15 +223,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
         // tokens for the *published* realtime script and previews get the draft.
         const data = await axiosClient.post<any, { token: string }>(
           `/apps/${appId}/realtime-token`,
-          {
-            handler_name: handlerName,
-            instance_id: instanceId,
-            conn_id: connId,
-            // Declares "an __auth message follows right after connect" — the
-            // handler delays handleConnect until it arrives (signed into the
-            // token so old SDKs, which never send __auth, are never waited on).
-            supports_inband_auth: getUserToken() != null,
-          },
+          { handler_name: handlerName, instance_id: instanceId, conn_id: connId },
           functionsVersion
             ? { headers: { "Base44-Functions-Version": functionsVersion } }
             : undefined
