@@ -94,6 +94,24 @@ export abstract class RealtimeHandler<Incoming = unknown, Outgoing = unknown> {
     throw new Error("RealtimeHandler.storage is only available inside a deployed handler");
   }
 
+  /**
+   * SDK client acting **as the connected user** — every entity call respects
+   * the app's row-level security, evaluated as that user at call time. The
+   * default wherever a `conn` is in scope (connect/message/close).
+   *
+   * Throws if the connection carries no user credential (anonymous visitor,
+   * signed-out session, or an app SDK that predates in-band auth).
+   */
+  protected createUserClient(conn: Conn): Base44Client {
+    void conn;
+    throw new Error("RealtimeHandler.createUserClient() is only available inside a deployed handler");
+  }
+
+  /**
+   * Service-role SDK client — bypasses RLS. For work with **no user in scope**
+   * (tick, alarm, onStart). Inside handleMessage/handleConnect prefer
+   * `createUserClient(conn)`.
+   */
   protected createServiceClient(): Base44Client {
     throw new Error("RealtimeHandler.createServiceClient() is only available inside a deployed handler");
   }
