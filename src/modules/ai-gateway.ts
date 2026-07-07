@@ -7,12 +7,10 @@ import {
 
 export function createAiGatewayModule({
   serverUrl,
-  appBaseUrl,
   token,
 }: AiGatewayModuleConfig): AiGatewayModule {
-  const gatewayOrigin = appBaseUrl || serverUrl;
   const connection = (): AiGatewayConnection => ({
-    baseURL: `${gatewayOrigin}/api/ai/openai/v1`,
+    baseURL: `${serverUrl}/api/ai/openai/v1`,
     token: token ?? getAccessToken() ?? "",
   });
 
