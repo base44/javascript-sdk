@@ -25,6 +25,8 @@ export function createRealtimeModule(config: {
    *  as this user (createUserClient / RLS). */
   getUserToken?: () => string | null;
   dispatcherWsUrl: string;
+  /** WebSocket implementation for runtimes without a global one (Node < 22). */
+  webSocketImpl?: unknown;
 }) {
   return new Proxy({} as Record<string, RealtimeHandler>, {
     get(_, handlerName: string) {
@@ -51,6 +53,8 @@ export function createRealtimeModule(config: {
             host: config.dispatcherWsUrl,
             party: handlerName,
             room: instanceId,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ...(config.webSocketImpl ? { WebSocket: config.webSocketImpl as any } : {}),
             query: () =>
               config.getToken(handlerName, instanceId, connId).then((token) => ({ token })),
           });

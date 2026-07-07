@@ -85,6 +85,18 @@ export interface CreateClientConfig {
    * Override when the dispatcher lives at a different host than the API.
    */
   dispatcherWsUrl?: string;
+  /**
+   * WebSocket implementation for realtime subscriptions in environments
+   * without a global `WebSocket` (Node.js < 22). Browsers and Node ≥ 22
+   * don't need this.
+   *
+   * @example
+   * ```typescript
+   * import WS from "ws";
+   * const base44 = createClient({ appId, webSocketImpl: WS });
+   * ```
+   */
+  webSocketImpl?: unknown;
 }
 
 /**

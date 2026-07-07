@@ -73,6 +73,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     functionsVersion,
     headers: optionalHeaders,
     dispatcherWsUrl,
+    webSocketImpl,
   } = config;
 
   // Normalize appBaseUrl to always be a string (empty if not provided or invalid)
@@ -229,6 +230,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     realtime: createRealtimeModule({
       appId,
       dispatcherWsUrl: resolvedDispatcherWsUrl,
+      webSocketImpl,
       getUserToken,
       getToken: async (handlerName, instanceId, connId) => {
         // axiosClient interceptors unwrap response.data, so the result is the body directly.
