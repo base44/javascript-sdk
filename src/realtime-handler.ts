@@ -102,15 +102,15 @@ export abstract class RealtimeHandler<Incoming = unknown, Outgoing = unknown> {
    * Anonymous connections get an unauthenticated client — entity calls run
    * under anonymous RLS, just like any public visitor.
    */
-  protected createUserClient(conn: Conn): Base44Client {
+  protected createClientFromConnection(conn: Conn): Base44Client {
     void conn;
-    throw new Error("RealtimeHandler.createUserClient() is only available inside a deployed handler");
+    throw new Error("RealtimeHandler.createClientFromConnection() is only available inside a deployed handler");
   }
 
   /**
    * Service-role SDK client — bypasses RLS. For work with **no user in scope**
    * (tick, alarm, onStart). Inside handleMessage/handleConnect prefer
-   * `createUserClient(conn)`.
+   * `createClientFromConnection(conn)`.
    */
   protected createServiceClient(): Base44Client {
     throw new Error("RealtimeHandler.createServiceClient() is only available inside a deployed handler");
