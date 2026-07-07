@@ -99,7 +99,8 @@ export abstract class RealtimeHandler<Incoming = unknown, Outgoing = unknown> {
    * the app's row-level security, evaluated as that user at call time. The
    * default wherever a `conn` is in scope (connect/message/close).
    *
-   * Throws for anonymous connections (no signed-in user to act as).
+   * Anonymous connections get an unauthenticated client — entity calls run
+   * under anonymous RLS, just like any public visitor.
    */
   protected createUserClient(conn: Conn): Base44Client {
     void conn;
