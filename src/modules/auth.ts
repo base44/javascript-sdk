@@ -6,6 +6,10 @@ import {
   ChangePasswordParams,
   ResetPasswordParams,
 } from "./auth.types";
+import {
+  setAccessTokenCookie,
+  clearAccessTokenCookie,
+} from "../utils/auth-utils.js";
 
 function isInsideIframe(): boolean {
   if (typeof window === "undefined") return false;
@@ -171,6 +175,9 @@ export function createAuthModule(
           }
         }
 
+        // Clear the cookie that mirrors the token for SSR
+        clearAccessTokenCookie();
+
         // Determine the from_url parameter
         const fromUrl = redirectUrl || window.location.href;
 
@@ -203,6 +210,9 @@ export function createAuthModule(
         } catch (e) {
           console.error("Failed to save token to localStorage:", e);
         }
+
+        // Mirror the token into a cookie so document requests carry it to SSR
+        setAccessTokenCookie(token);
       }
     },
 

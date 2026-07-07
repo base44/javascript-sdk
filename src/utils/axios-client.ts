@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { AxiosRequestConfig } from "axios";
 import { isInIFrame } from "./common.js";
 import { v4 as uuidv4 } from "uuid";
 import { getAnalyticsSessionId } from "../modules/analytics.js";
@@ -152,15 +152,18 @@ export function createAxiosClient({
   token,
   interceptResponses = true,
   onError,
+  adapter,
 }: {
   baseURL: string;
   headers?: Record<string, string>;
   token?: string;
   interceptResponses?: boolean;
   onError?: (error: Error) => void;
+  adapter?: AxiosRequestConfig["adapter"];
 }) {
   const client = axios.create({
     baseURL,
+    ...(adapter !== undefined ? { adapter } : {}),
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",

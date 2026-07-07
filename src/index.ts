@@ -5,6 +5,10 @@ import {
   type CreateClientConfig,
   type CreateClientOptions,
 } from "./client.js";
+import {
+  createServerClient,
+  type CreateServerClientOptions,
+} from "./server.js";
 import { Base44Error, type Base44ErrorJSON } from "./utils/axios-client.js";
 import {
   getAccessToken,
@@ -16,6 +20,7 @@ import {
 export {
   createClient,
   createClientFromRequest,
+  createServerClient,
   Base44Error,
   getAccessToken,
   saveAccessToken,
@@ -27,6 +32,7 @@ export type {
   Base44Client,
   CreateClientConfig,
   CreateClientOptions,
+  CreateServerClientOptions,
   Base44ErrorJSON,
 };
 

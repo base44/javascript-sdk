@@ -59,6 +59,8 @@ export interface AnalyticsModuleArgs {
   serverUrl: string;
   appId: string;
   userAuthModule: AuthModule;
+  /** Skips all analytics processing when true (e.g. for server-side clients). */
+  disabled?: boolean;
 }
 
 export const createAnalyticsModule = ({
@@ -66,11 +68,19 @@ export const createAnalyticsModule = ({
   serverUrl,
   appId,
   userAuthModule,
+  disabled = false,
 }: AnalyticsModuleArgs) => {
   // prevent overflow of events //
   const { maxQueueSize, throttleTime, batchSize } = analyticsSharedState.config;
 
-  if (!analyticsSharedState.config?.enabled) {
+  // Analytics is browser-only. Outside a browser (SSR, Cloudflare Workers,
+  // Node) timers would leak — or throw at global scope in Workers — so the
+  // module becomes a no-op there, and when explicitly disabled.
+  if (
+    disabled ||
+    typeof window === "undefined" ||
+    !analyticsSharedState.config?.enabled
+  ) {
     return {
       track: () => {},
       cleanup: () => {},
