@@ -175,6 +175,18 @@ export function createAxiosClient({
 
   // Add origin URL in browser environment
   client.interceptors.request.use((config) => {
+    // Axios selects its Node HTTP adapter in Deno, where DELETE requests with
+    // a body fail in the node:http compatibility layer. deleteMany relies on
+    // that request shape, while Deno's native fetch handles it correctly.
+    if (
+      typeof (globalThis as typeof globalThis & { Deno?: unknown }).Deno !==
+        "undefined" &&
+      config.method?.toLowerCase() === "delete" &&
+      config.data !== undefined
+    ) {
+      config.adapter = "fetch";
+    }
+
     if (typeof window !== "undefined") {
       config.headers.set("X-Origin-URL", window.location.href);
       // On unauthenticated requests, attach a stable anonymous visitor id so the
