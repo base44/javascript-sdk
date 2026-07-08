@@ -175,7 +175,9 @@ export function createAxiosClient({
 
   // Add origin URL in browser environment
   client.interceptors.request.use((config) => {
-    if (typeof window !== "undefined") {
+    // `window.location` is absent on React Native (where `window` still exists),
+    // so guard on it before reading `.href`.
+    if (typeof window !== "undefined" && window.location) {
       config.headers.set("X-Origin-URL", window.location.href);
       // On unauthenticated requests, attach a stable anonymous visitor id so the
       // backend can support anonymous agent access (conversation grouping + ownership).
