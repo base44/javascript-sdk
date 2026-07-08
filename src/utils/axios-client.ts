@@ -1,6 +1,5 @@
 import axios from "axios";
-import { isInIFrame } from "./common.js";
-import { v4 as uuidv4 } from "uuid";
+import { isInIFrame, generateUuid } from "./common.js";
 import { getAnalyticsSessionId } from "../modules/analytics.js";
 import type { Base44ErrorJSON } from "./axios-client.types.js";
 
@@ -186,7 +185,10 @@ export function createAxiosClient({
         config.headers.set("X-Base44-Anonymous-Id", getAnalyticsSessionId());
       }
     }
-    const requestId = uuidv4();
+    // Correlation id for the in-iframe request logging below; only needs to be
+    // unique, not cryptographically random. `uuid` would pull in
+    // `crypto.getRandomValues`, which React Native lacks, so use `generateUuid`.
+    const requestId = generateUuid();
     (config as any).requestId = requestId;
     if (isInIFrame) {
       try {

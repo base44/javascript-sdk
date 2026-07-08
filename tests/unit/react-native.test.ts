@@ -59,4 +59,26 @@ describe("React Native environment", () => {
     expect(isNode).toBe(false);
     expect(isReactNative).toBe(true);
   });
+
+  test("requests succeed without crypto.getRandomValues", async () => {
+    stubReactNativeGlobals();
+    // React Native (Hermes) has no `crypto.getRandomValues`; the request
+    // interceptor's correlation id must not depend on it (the `uuid` lib does).
+    vi.stubGlobal("crypto", undefined);
+    vi.resetModules();
+    const { createAxiosClient } = await import(
+      "../../src/utils/axios-client.ts"
+    );
+
+    const client = createAxiosClient({ baseURL: "https://api.base44.com" });
+    let captured: any;
+    client.defaults.adapter = async (config) => {
+      captured = config;
+      return { data: {}, status: 200, statusText: "OK", headers: {}, config };
+    };
+
+    await expect(client.get("/health")).resolves.toBeDefined();
+    // The interceptor still attaches a unique correlation id.
+    expect(captured.requestId).toBeTruthy();
+  });
 });
