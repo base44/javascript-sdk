@@ -1,9 +1,9 @@
 /**
- * Type-only base class for Realtime Handlers.
+ * Type-only base class for Actors.
  *
- * Import and extend this in your handler files:
- *   import { RealtimeHandler } from "@base44/sdk";
- *   export class MyHandler extends RealtimeHandler { ... }
+ * Import and extend this in your actor files:
+ *   import { Actor } from "@base44/sdk";
+ *   export class MyActor extends Actor { ... }
  *
  * At deploy time the bundler replaces this import with the compiled
  * Cloudflare Durable Object implementation — this file provides types only.
@@ -13,7 +13,7 @@ import type { Base44Client } from "./client.types.js";
 
 /**
  * A single client connection. `Send` is the message type this connection accepts
- * via {@link send} — the handler's *outgoing* (server→client) messages.
+ * via {@link send} — the actor's *outgoing* (server→client) messages.
  */
 export interface Conn<Send = unknown> {
   /** Unique per-connection id (one per socket/tab), the same value the client
@@ -35,21 +35,21 @@ export interface Storage {
 
 
 /**
- * Base class for a Realtime Handler.
+ * Base class for an Actor.
  *
- * @typeParam Incoming - messages this handler *receives* from clients
+ * @typeParam Incoming - messages this actor *receives* from clients
  *   (`handleMessage`'s `msg`) — the schema's `toServer` section.
- * @typeParam Outgoing - messages this handler *sends* to clients
+ * @typeParam Outgoing - messages this actor *sends* to clients
  *   (`conn.send`/`broadcast`) — the schema's `toClient` section.
  *
  * With a generated `schema.jsonc`, wire both from the registry so they can't drift
  * from the client's types:
  * ```ts
- * type Reg = RealtimeHandlerRegistry["MyHandler"];
- * class MyHandler extends RealtimeHandler<Reg["toServer"], Reg["toClient"]> { ... }
+ * type Reg = ActorRegistry["MyActor"];
+ * class MyActor extends Actor<Reg["toServer"], Reg["toClient"]> { ... }
  * ```
  */
-export abstract class RealtimeHandler<Incoming = unknown, Outgoing = unknown> {
+export abstract class Actor<Incoming = unknown, Outgoing = unknown> {
   abstract handleConnect(conn: Conn<Outgoing>): void | Promise<void>;
   abstract handleMessage(conn: Conn<Outgoing>, msg: Incoming): void | Promise<void>;
   abstract handleClose(conn: Conn<Outgoing>): void | Promise<void>;
@@ -71,27 +71,27 @@ export abstract class RealtimeHandler<Incoming = unknown, Outgoing = unknown> {
   protected shouldTick?(): boolean;
 
   protected broadcast(_data: Outgoing): void {
-    throw new Error("RealtimeHandler.broadcast() is only available inside a deployed handler");
+    throw new Error("Actor.broadcast() is only available inside a deployed actor");
   }
 
   protected getConnections(): Conn<Outgoing>[] {
-    throw new Error("RealtimeHandler.getConnections() is only available inside a deployed handler");
+    throw new Error("Actor.getConnections() is only available inside a deployed actor");
   }
 
   protected startLoop(_ms: number): Promise<void> {
-    throw new Error("RealtimeHandler.startLoop() is only available inside a deployed handler");
+    throw new Error("Actor.startLoop() is only available inside a deployed actor");
   }
 
   protected stopLoop(): Promise<void> {
-    throw new Error("RealtimeHandler.stopLoop() is only available inside a deployed handler");
+    throw new Error("Actor.stopLoop() is only available inside a deployed actor");
   }
 
   protected get instanceId(): string {
-    throw new Error("RealtimeHandler.instanceId is only available inside a deployed handler");
+    throw new Error("Actor.instanceId is only available inside a deployed actor");
   }
 
   protected get storage(): Storage {
-    throw new Error("RealtimeHandler.storage is only available inside a deployed handler");
+    throw new Error("Actor.storage is only available inside a deployed actor");
   }
 
   /**
@@ -104,7 +104,7 @@ export abstract class RealtimeHandler<Incoming = unknown, Outgoing = unknown> {
    */
   protected createClientFromConnection(conn: Conn): Base44Client {
     void conn;
-    throw new Error("RealtimeHandler.createClientFromConnection() is only available inside a deployed handler");
+    throw new Error("Actor.createClientFromConnection() is only available inside a deployed actor");
   }
 
   /**
@@ -113,6 +113,6 @@ export abstract class RealtimeHandler<Incoming = unknown, Outgoing = unknown> {
    * `createClientFromConnection(conn)`.
    */
   protected createServiceClient(): Base44Client {
-    throw new Error("RealtimeHandler.createServiceClient() is only available inside a deployed handler");
+    throw new Error("Actor.createServiceClient() is only available inside a deployed actor");
   }
 }

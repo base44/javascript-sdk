@@ -19,7 +19,7 @@ import type {
   CreateClientOptions,
 } from "./client.types.js";
 import { createAnalyticsModule } from "./modules/analytics.js";
-import { createRealtimeModule } from "./modules/realtime.js";
+import { createActorsModule } from "./modules/actors.js";
 
 // Re-export client types
 export type { Base44Client, CreateClientConfig, CreateClientOptions };
@@ -219,19 +219,19 @@ export function createClient(config: CreateClientConfig): Base44Client {
       appId,
       userAuthModule,
     }),
-    realtime: createRealtimeModule({
+    actors: createActorsModule({
       appId,
       dispatcherWsUrl: resolvedDispatcherWsUrl,
       webSocketImpl,
-      getToken: async (handlerName, instanceId, connId) => {
+      getToken: async (actorName, instanceId, connId) => {
         // axiosClient interceptors unwrap response.data, so the result is the body directly.
         // conn_id rides inside the signed token (not a WS query param) so it survives
-        // proxies that strip params; the dispatcher forwards it as the handler's conn.id.
+        // proxies that strip params; the dispatcher forwards it as the actor's conn.id.
         // Base44-Functions-Version rides along (like function calls) so live apps get
-        // tokens for the *published* realtime script and previews get the draft.
+        // tokens for the *published* actor script and previews get the draft.
         const data = await axiosClient.post<any, { token: string }>(
-          `/apps/${appId}/realtime-token`,
-          { handler_name: handlerName, instance_id: instanceId, conn_id: connId },
+          `/apps/${appId}/actor-token`,
+          { handler_name: actorName, instance_id: instanceId, conn_id: connId },
           functionsVersion
             ? { headers: { "Base44-Functions-Version": functionsVersion } }
             : undefined

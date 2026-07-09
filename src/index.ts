@@ -103,15 +103,15 @@ export type {
 export type { AppLogsModule } from "./modules/app-logs.types.js";
 
 export type {
-  RealtimeModule,
-  RealtimeHandlerClient,
-  RealtimeHandlerNameRegistry,
-  RealtimeHandlerRegistry,
-} from "./modules/realtime.types.js";
+  ActorsModule,
+  ActorClient,
+  ActorNameRegistry,
+  ActorRegistry,
+} from "./modules/actors.types.js";
 
 export type { SsoModule, SsoAccessTokenResponse } from "./modules/sso.types.js";
 
-export { RealtimeHandler, type Conn } from "./realtime-handler.js";
+export { Actor, type Conn } from "./actor.js";
 
 export type {
   ConnectorsModule,

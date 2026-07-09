@@ -10,7 +10,7 @@ import type { FunctionsModule } from "./modules/functions.types.js";
 import type { AgentsModule } from "./modules/agents.types.js";
 import type { AppLogsModule } from "./modules/app-logs.types.js";
 import type { AnalyticsModule } from "./modules/analytics.types.js";
-import type { RealtimeModule } from "./modules/realtime.types.js";
+import type { ActorsModule } from "./modules/actors.types.js";
 
 /**
  * Options for creating a Base44 client.
@@ -114,8 +114,8 @@ export interface Base44Client {
   analytics: AnalyticsModule;
   /** {@link AppLogsModule | App logs module} for tracking app usage. */
   appLogs: AppLogsModule;
-  /** {@link RealtimeModule | Realtime module} for subscribing to and sending messages via Cloudflare Durable Object-backed RealtimeHandlers. */
-  realtime: RealtimeModule;
+  /** {@link ActorsModule | Actors module} for subscribing to and sending messages via Cloudflare Durable Object-backed Actors. */
+  actors: ActorsModule;
   /** {@link AuthModule | Auth module} for user authentication and management. */
   auth: AuthModule;
   /** {@link UserConnectorsModule | Connectors module} for app-user OAuth flows. */

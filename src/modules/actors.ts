@@ -1,47 +1,47 @@
 import PartySocket from "partysocket";
 
-// Module-level map: "HandlerName:instanceId" → active socket
+// Module-level map: "ActorName:instanceId" → active socket
 const activeSockets = new Map<string, PartySocket>();
 
-function socketKey(handlerName: string, instanceId: string) {
-  return `${handlerName}:${instanceId}`;
+function socketKey(actorName: string, instanceId: string) {
+  return `${actorName}:${instanceId}`;
 }
 
-export function createRealtimeModule(config: {
+export function createActorsModule(config: {
   appId: string;
-  getToken(handlerName: string, instanceId: string, connId: string): Promise<string>;
+  getToken(actorName: string, instanceId: string, connId: string): Promise<string>;
   dispatcherWsUrl: string;
   /** WebSocket implementation for runtimes without a global one (Node < 22). */
   webSocketImpl?: unknown;
 }) {
-  return new Proxy({} as Record<string, RealtimeHandler>, {
-    get(_, handlerName: string) {
+  return new Proxy({} as Record<string, ActorClient>, {
+    get(_, actorName: string) {
       return {
         subscribe(
           instanceId: string,
           callback: (data: unknown) => void,
           options?: { id?: string },
-        ): RealtimeSubscription {
-          const key = socketKey(handlerName, instanceId);
+        ): ActorSubscription {
+          const key = socketKey(actorName, instanceId);
           // close existing if any
           activeSockets.get(key)?.close();
 
           // Connection id: caller-supplied (stable — reuse across reconnects/tabs as
           // you see fit) or auto-generated per subscription. It travels INSIDE the
-          // signed realtime token (never as a WS query param, which proxies strip);
+          // signed actor token (never as a WS query param, which proxies strip);
           // the dispatcher forwards the verified claim as partyserver's _pk, so the
-          // handler sees this exact value as conn.id. Reconnects re-mint the token
+          // actor sees this exact value as conn.id. Reconnects re-mint the token
           // with the same id, so conn.id is stable across reconnects.
           const connId = options?.id ?? crypto.randomUUID();
 
           // query as async fn: called on every (re)connect, fetches a fresh token each time
           const ws = new PartySocket({
             host: config.dispatcherWsUrl,
-            party: handlerName,
+            party: actorName,
             room: instanceId,
             ...(config.webSocketImpl ? { WebSocket: config.webSocketImpl as any } : {}),
             query: () =>
-              config.getToken(handlerName, instanceId, connId).then((token) => ({ token })),
+              config.getToken(actorName, instanceId, connId).then((token) => ({ token })),
           });
 
           activeSockets.set(key, ws);
@@ -85,7 +85,7 @@ export function createRealtimeModule(config: {
           }, PING_MS);
 
           return {
-            id: connId,  // the connection id (same value the handler sees as conn.id)
+            id: connId,  // the connection id (same value the actor sees as conn.id)
             unsubscribe() {
               clearInterval(heartbeat);
               activeSockets.delete(key);
@@ -94,9 +94,9 @@ export function createRealtimeModule(config: {
           };
         },
         send(instanceId: string, data: unknown) {
-          const key = socketKey(handlerName, instanceId);
+          const key = socketKey(actorName, instanceId);
           const ws = activeSockets.get(key);
-          if (!ws) throw new Error(`No active subscription for ${handlerName}:${instanceId}`);
+          if (!ws) throw new Error(`No active subscription for ${actorName}:${instanceId}`);
           ws.send(JSON.stringify(data));
         },
       };
@@ -104,19 +104,19 @@ export function createRealtimeModule(config: {
   });
 }
 
-/** Handle for an active realtime subscription. */
-interface RealtimeSubscription {
-  /** This connection's id — the same value the handler receives as `conn.id`. */
+/** Handle for an active actor subscription. */
+interface ActorSubscription {
+  /** This connection's id — the same value the actor receives as `conn.id`. */
   id: string;
   /** Close the subscription and its underlying socket. */
   unsubscribe(): void;
 }
 
-interface RealtimeHandler {
+interface ActorClient {
   subscribe(
     instanceId: string,
     callback: (data: unknown) => void,
     options?: { id?: string },
-  ): RealtimeSubscription;
+  ): ActorSubscription;
   send(instanceId: string, data: unknown): void;
 }
