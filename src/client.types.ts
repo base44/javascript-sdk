@@ -81,8 +81,11 @@ export interface CreateClientConfig {
   /**
    * Base WebSocket URL for the Cloudflare Durable Object dispatcher.
    *
-   * Defaults to the `serverUrl` with `https://` replaced by `wss://` (or `http://` by `ws://`).
-   * Override when the dispatcher lives at a different host than the API.
+   * Defaults to the app's own origin (`appBaseUrl`, else the browser's
+   * `window.location.origin`, else `serverUrl`) with `https://` replaced by
+   * `wss://` (or `http://` by `ws://`) — so the realtime socket is same-origin
+   * with the running app, which proxies `/parties` to the backend.
+   * Override when the dispatcher lives at a different host than the app.
    */
   dispatcherWsUrl?: string;
   /**

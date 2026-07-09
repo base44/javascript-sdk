@@ -79,11 +79,19 @@ export function createClient(config: CreateClientConfig): Base44Client {
   // Normalize appBaseUrl to always be a string (empty if not provided or invalid)
   const normalizedAppBaseUrl = typeof appBaseUrl === "string" ? appBaseUrl : "";
 
-  // Derive the dispatcher WebSocket URL from serverUrl if not explicitly provided.
-  // Convert https:// → wss:// (or http:// → ws://) and strip trailing slash.
+  // Derive the dispatcher WebSocket URL if not explicitly provided. Default to
+  // the app's OWN origin (the app URL proxies /parties to the backend) so the
+  // socket is same-origin with the running app, not the API host: prefer an
+  // explicit appBaseUrl, then the browser origin, then fall back to serverUrl
+  // (Node/SSR, where there's no window). Convert https:// → wss:// (http → ws)
+  // and strip the trailing slash.
   const resolvedDispatcherWsUrl = (() => {
     if (dispatcherWsUrl) return dispatcherWsUrl.replace(/\/$/, "");
-    return serverUrl
+    const appOrigin =
+      normalizedAppBaseUrl ||
+      // React Native has a bare `window` with no `location`, so guard both.
+      (typeof window !== "undefined" ? window.location?.origin ?? "" : "");
+    return (appOrigin || serverUrl)
       .replace(/\/$/, "")
       .replace(/^https:\/\//, "wss://")
       .replace(/^http:\/\//, "ws://");
