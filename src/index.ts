@@ -100,6 +100,11 @@ export type {
   CreateConversationParams,
 } from "./modules/agents.types.js";
 
+export type {
+  AiGatewayModule,
+  AiGatewayConnection,
+} from "./modules/ai-gateway.types.js";
+
 export type { AppLogsModule } from "./modules/app-logs.types.js";
 
 export type {

@@ -8,6 +8,7 @@ import type {
 } from "./modules/connectors.types.js";
 import type { FunctionsModule } from "./modules/functions.types.js";
 import type { AgentsModule } from "./modules/agents.types.js";
+import type { AiGatewayModule } from "./modules/ai-gateway.types.js";
 import type { AppLogsModule } from "./modules/app-logs.types.js";
 import type { AnalyticsModule } from "./modules/analytics.types.js";
 import type { ActorsModule } from "./modules/actors.types.js";
@@ -110,6 +111,8 @@ export interface CreateClientConfig {
 export interface Base44Client {
   /** {@link AgentsModule | Agents module} for managing AI agent conversations. */
   agents: AgentsModule;
+  /** {@link AiGatewayModule | AI Gateway module} for connecting to the Base44 AI Gateway with your own SDK. */
+  aiGateway: AiGatewayModule;
   /** {@link AnalyticsModule | Analytics module} for tracking custom events in your app. */
   analytics: AnalyticsModule;
   /** {@link AppLogsModule | App logs module} for tracking app usage. */
@@ -154,6 +157,8 @@ export interface Base44Client {
   readonly asServiceRole: {
     /** {@link AgentsModule | Agents module} with elevated permissions. */
     agents: AgentsModule;
+    /** {@link AiGatewayModule | AI Gateway module} with the service-role token. */
+    aiGateway: AiGatewayModule;
     /** {@link AppLogsModule | App logs module} with elevated permissions. */
     appLogs: AppLogsModule;
     /** {@link ConnectorsModule | Connectors module} for OAuth token retrieval. */
