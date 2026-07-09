@@ -21,6 +21,8 @@ export interface AiGatewayModuleConfig {
   serverUrl?: string;
   /** Authentication token */
   token?: string;
+  /** Application ID */
+  appId: string;
 }
 
 /**
