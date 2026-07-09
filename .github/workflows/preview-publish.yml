@@ -23,7 +23,9 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - name: Update npm
-        run: npm install -g npm@latest
+        # Pin to npm@11: npm@latest is now 12.x, which requires node >=22 and
+        # fails EBADENGINE on this node-20 runner. npm 11 supports node ^20.17.
+        run: npm install -g npm@11
 
       - name: Install dependencies
         run: npm install

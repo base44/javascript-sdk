@@ -39,7 +39,6 @@ export function createRealtimeModule(config: {
             host: config.dispatcherWsUrl,
             party: handlerName,
             room: instanceId,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             ...(config.webSocketImpl ? { WebSocket: config.webSocketImpl as any } : {}),
             query: () =>
               config.getToken(handlerName, instanceId, connId).then((token) => ({ token })),
