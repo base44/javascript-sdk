@@ -10,6 +10,7 @@ import {
 import { getAccessToken } from "./utils/auth-utils.js";
 import { createFunctionsModule } from "./modules/functions.js";
 import { createAgentsModule } from "./modules/agents.js";
+import { createSuperagentModule } from "./modules/superagent.js";
 import { createAiGatewayModule } from "./modules/ai-gateway.js";
 import { createAppLogsModule } from "./modules/app-logs.js";
 import { createUsersModule } from "./modules/users.js";
@@ -200,8 +201,16 @@ export function createClient(config: CreateClientConfig): Base44Client {
       appId,
       userAuthModule,
     }),
+    // Deliberately not given the host app's token: superagent access is
+    // always anonymous against the sibling superagent app.
+    superagent: createSuperagentModule({
+      serverUrl,
+      headers: optionalHeaders,
+      onError: options?.onError,
+    }),
     cleanup: () => {
       userModules.analytics.cleanup();
+      userModules.superagent.cleanup();
       if (socket) {
         socket.disconnect();
       }
