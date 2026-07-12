@@ -55,7 +55,12 @@ export abstract class Actor<Incoming = unknown, Outgoing = unknown> {
   abstract handleClose(conn: Conn<Outgoing>): void | Promise<void>;
   abstract handleTick(): void | Promise<void>;
 
-  onStart(): void | Promise<void> {}
+  /**
+   * Optional wake hook: runs once when the instance starts, after the
+   * platform's credential setup and before any connection is handled — safe
+   * to use {@link createServiceClient} and load persisted state here.
+   */
+  handleStart(): void | Promise<void> {}
 
   /**
    * Managed ticker (opt-in). Override {@link shouldTick} and the platform runs
@@ -109,7 +114,7 @@ export abstract class Actor<Incoming = unknown, Outgoing = unknown> {
 
   /**
    * Service-role SDK client — bypasses RLS. For work with **no user in scope**
-   * (tick, alarm, onStart). Inside handleMessage/handleConnect prefer
+   * (tick, alarm, handleStart). Inside handleMessage/handleConnect prefer
    * `createClientFromConnection(conn)`.
    */
   protected createServiceClient(): Base44Client {
