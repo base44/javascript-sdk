@@ -445,7 +445,9 @@ export function createClientFromRequest(request: Request): Base44Client {
   // matters for the user-scoped client: unlike the service token, the user JWT
   // carries no data-env, so without forwarding this header the callbacks fall
   // back to production data even when the app runs in test-data mode.
-  if (dataEnvHeader) {
+  // Forward only the known closed set (matches the backend contract) rather
+  // than relaying an arbitrary attacker-supplied header value onward.
+  if (dataEnvHeader === "dev" || dataEnvHeader === "prod") {
     additionalHeaders["X-Data-Env"] = dataEnvHeader;
   }
 

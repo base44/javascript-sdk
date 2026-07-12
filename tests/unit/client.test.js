@@ -569,6 +569,33 @@ describe('Service Role Authorization Headers', () => {
     expect(scope.isDone()).toBe(true);
   });
 
+  test('should not forward an X-Data-Env value outside the dev/prod set', async () => {
+    const mockRequest = {
+      headers: {
+        get: (name) => {
+          const headers = {
+            'Authorization': 'Bearer user-token-123',
+            'Base44-App-Id': appId,
+            'Base44-Api-Url': serverUrl,
+            'X-Data-Env': 'evil'
+          };
+          return headers[name] || null;
+        }
+      }
+    };
+
+    const client = createClientFromRequest(mockRequest);
+
+    scope.get(`/api/apps/${appId}/entities/Todo`)
+      .matchHeader('X-Data-Env', (val) => !val) // arbitrary value must not be relayed
+      .matchHeader('Authorization', 'Bearer user-token-123')
+      .reply(200, { items: [], total: 0 });
+
+    await client.entities.Todo.list();
+
+    expect(scope.isDone()).toBe(true);
+  });
+
   test('should not include X-Data-Env header when not present in original request', async () => {
     const mockRequest = {
       headers: {
