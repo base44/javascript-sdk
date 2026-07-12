@@ -191,7 +191,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
       serverUrl,
       token,
     }),
-    aiGateway: createAiGatewayModule({ serverUrl, token }),
+    aiGateway: createAiGatewayModule({ serverUrl, token, appId }),
     appLogs: createAppLogsModule(axiosClient, appId),
     users: createUsersModule(axiosClient, appId),
     analytics: createAnalyticsModule({
@@ -235,7 +235,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
       serverUrl,
       token,
     }),
-    aiGateway: createAiGatewayModule({ serverUrl, token: serviceToken }),
+    aiGateway: createAiGatewayModule({ serverUrl, token: serviceToken, appId }),
     appLogs: createAppLogsModule(serviceRoleAxiosClient, appId),
     cleanup: () => {
       if (socket) {

@@ -8,9 +8,10 @@ import {
 export function createAiGatewayModule({
   serverUrl,
   token,
+  appId,
 }: AiGatewayModuleConfig): AiGatewayModule {
   const connection = (): AiGatewayConnection => ({
-    baseURL: `${serverUrl}/api/ai/openai/v1`,
+    baseURL: `${serverUrl}/api/apps/${appId}/ai/openai/v1`,
     token: token ?? getAccessToken() ?? "",
   });
 

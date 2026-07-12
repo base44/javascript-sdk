@@ -4,7 +4,7 @@ import { createClient, createClientFromRequest } from "../../src/index.ts";
 describe("AI Gateway Module", () => {
   const appId = "test-app-id";
   const serverUrl = "https://api.base44.com";
-  const baseURL = `${serverUrl}/api/ai/openai/v1`;
+  const baseURL = `${serverUrl}/api/apps/${appId}/ai/openai/v1`;
 
   describe("connection", () => {
     test("should return the OpenAI-compatible gateway baseURL", () => {
