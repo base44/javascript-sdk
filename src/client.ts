@@ -397,6 +397,7 @@ export function createClientFromRequest(request: Request): Base44Client {
   const serverUrlHeader = request.headers.get("Base44-Api-Url");
   const functionsVersion = request.headers.get("Base44-Functions-Version");
   const stateHeader = request.headers.get("Base44-State");
+  const dataEnvHeader = request.headers.get("X-Data-Env");
 
   if (!appId) {
     throw new Error(
@@ -438,6 +439,14 @@ export function createClientFromRequest(request: Request): Base44Client {
   const additionalHeaders: Record<string, string> = {};
   if (stateHeader) {
     additionalHeaders["Base44-State"] = stateHeader;
+  }
+  // Propagate the data environment so entity operations from the function stay
+  // in the same environment (e.g. test data) as the triggering request. This
+  // matters for the user-scoped client: unlike the service token, the user JWT
+  // carries no data-env, so without forwarding this header the callbacks fall
+  // back to production data even when the app runs in test-data mode.
+  if (dataEnvHeader) {
+    additionalHeaders["X-Data-Env"] = dataEnvHeader;
   }
 
   return createClient({

@@ -540,6 +540,61 @@ describe('Service Role Authorization Headers', () => {
     expect(scope.isDone()).toBe(true);
   });
 
+  test('should propagate X-Data-Env header on user-scoped API requests when created from request', async () => {
+    const mockRequest = {
+      headers: {
+        get: (name) => {
+          const headers = {
+            'Authorization': 'Bearer user-token-123',
+            'Base44-App-Id': appId,
+            'Base44-Api-Url': serverUrl,
+            'X-Data-Env': 'dev'
+          };
+          return headers[name] || null;
+        }
+      }
+    };
+
+    const client = createClientFromRequest(mockRequest);
+
+    // The user-scoped client (not asServiceRole) must still carry the data env
+    // so test-mode function callbacks hit test data, not production.
+    scope.get(`/api/apps/${appId}/entities/Todo`)
+      .matchHeader('X-Data-Env', 'dev')
+      .matchHeader('Authorization', 'Bearer user-token-123')
+      .reply(200, { items: [], total: 0 });
+
+    await client.entities.Todo.list();
+
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test('should not include X-Data-Env header when not present in original request', async () => {
+    const mockRequest = {
+      headers: {
+        get: (name) => {
+          const headers = {
+            'Authorization': 'Bearer user-token-123',
+            'Base44-App-Id': appId,
+            'Base44-Api-Url': serverUrl
+          };
+          return headers[name] || null;
+        }
+      }
+    };
+
+    const client = createClientFromRequest(mockRequest);
+
+    scope.get(`/api/apps/${appId}/entities/Todo`)
+      .matchHeader('X-Data-Env', (val) => !val) // Should not have this header
+      .matchHeader('Authorization', 'Bearer user-token-123')
+      .reply(200, { items: [], total: 0 });
+
+    await client.entities.Todo.list();
+
+    expect(scope.isDone()).toBe(true);
+  });
+
   test('should not include Base44-State header when not present in original request', async () => {
     const mockRequest = {
       headers: {
