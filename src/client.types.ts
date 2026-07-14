@@ -8,6 +8,7 @@ import type {
 } from "./modules/connectors.types.js";
 import type { FunctionsModule } from "./modules/functions.types.js";
 import type { AgentsModule } from "./modules/agents.types.js";
+import type { AiGatewayModule } from "./modules/ai-gateway.types.js";
 import type { AppLogsModule } from "./modules/app-logs.types.js";
 import type { AnalyticsModule } from "./modules/analytics.types.js";
 
@@ -54,7 +55,7 @@ export interface CreateClientConfig {
    */
   token?: string;
   /**
-   * Service role authentication token. Provides elevated permissions to access data available to the app's admin. Only available in Base44-hosted backend functions. Automatically added to client's created using {@linkcode createClientFromRequest | createClientFromRequest()}.
+   * Service role authentication token. Provides elevated permissions that bypass entity access rules and field-level security. Only available in Base44-hosted backend functions. Automatically added to clients created using {@linkcode createClientFromRequest | createClientFromRequest()}.
    * @internal
    */
   serviceToken?: string;
@@ -87,6 +88,8 @@ export interface CreateClientConfig {
 export interface Base44Client {
   /** {@link AgentsModule | Agents module} for managing AI agent conversations. */
   agents: AgentsModule;
+  /** {@link AiGatewayModule | AI Gateway module} for connecting to the Base44 AI Gateway with your own SDK. */
+  aiGateway: AiGatewayModule;
   /** {@link AnalyticsModule | Analytics module} for tracking custom events in your app. */
   analytics: AnalyticsModule;
   /** {@link AppLogsModule | App logs module} for tracking app usage. */
@@ -122,13 +125,15 @@ export interface Base44Client {
   /**
    * Provides access to supported modules with elevated permissions.
    *
-   * Service role authentication provides elevated permissions for backend operations. Unlike user authentication, which is scoped to a specific user's permissions, service role authentication has access to the data and operations available to the app's admin.
+   * Service role authentication provides elevated permissions for backend operations. Unlike user authentication, which is scoped to a specific user's permissions, service role authentication bypasses entity access rules and field-level security entirely, giving full read and write access to all of the app's data.
    *
    * @throws {Error} When accessed without providing a serviceToken during client creation
    */
   readonly asServiceRole: {
     /** {@link AgentsModule | Agents module} with elevated permissions. */
     agents: AgentsModule;
+    /** {@link AiGatewayModule | AI Gateway module} with the service-role token. */
+    aiGateway: AiGatewayModule;
     /** {@link AppLogsModule | App logs module} with elevated permissions. */
     appLogs: AppLogsModule;
     /** {@link ConnectorsModule | Connectors module} for OAuth token retrieval. */

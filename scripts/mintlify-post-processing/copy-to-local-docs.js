@@ -107,100 +107,109 @@ function updateDocsJson(repoDir, sdkFiles) {
   const docsContent = fs.readFileSync(docsJsonPath, "utf8");
   const docs = JSON.parse(docsContent);
 
-  // Build the new SDK Reference groups using the new path structure
+  // Build the SDK Reference groups. `prefix` is "" for the default (English)
+  // language and "<locale>/" for every other locale. The generated reference
+  // mdx is English-only, but each locale gets its OWN prefixed page paths
+  // (e.g. es/developers/references/sdk/docs/...) pointing at English-content
+  // copies written into that locale's directory. UNIQUE per-locale paths are
+  // essential: pointing multiple locales at the same un-prefixed English path
+  // creates duplicate page records and makes Mintlify emit each SDK page N times
+  // in llms-full.txt. They also make the language switcher resolve to the
+  // in-locale SDK page instead of falling back to the Documentation tab.
   const basePath = SDK_DOCS_TARGET_PATH;
-  const groupMap = new Map(); // group name -> pages array
 
-  const addToGroup = (groupName, pages) => {
-    if (!groupName || pages.length === 0) return;
-    if (!groupMap.has(groupName)) {
-      groupMap.set(groupName, []);
-    }
-    groupMap.get(groupName).push(...pages);
-  };
+  const buildSdkReferencePages = (prefix) => {
+    const groupMap = new Map(); // group name -> pages array
+    const addToGroup = (groupName, pages) => {
+      if (!groupName || pages.length === 0) return;
+      if (!groupMap.has(groupName)) groupMap.set(groupName, []);
+      groupMap.get(groupName).push(...pages);
+    };
+    const p = (kind, file) => `${prefix}${basePath}/${kind}/${file}`;
 
-  if (sdkFiles.functions?.length > 0 && categoryMap.functions) {
-    addToGroup(
-      categoryMap.functions,
-      sdkFiles.functions.map((file) => `${basePath}/functions/${file}`)
-    );
-  }
+    if (sdkFiles.functions?.length > 0 && categoryMap.functions)
+      addToGroup(categoryMap.functions, sdkFiles.functions.map((f) => p("functions", f)));
+    if (sdkFiles.interfaces?.length > 0 && categoryMap.interfaces)
+      addToGroup(categoryMap.interfaces, sdkFiles.interfaces.map((f) => p("interfaces", f)));
+    if (sdkFiles.classes?.length > 0 && categoryMap.classes)
+      addToGroup(categoryMap.classes, sdkFiles.classes.map((f) => p("classes", f)));
+    if (sdkFiles["type-aliases"]?.length > 0 && categoryMap["type-aliases"])
+      addToGroup(categoryMap["type-aliases"], sdkFiles["type-aliases"].map((f) => p("type-aliases", f)));
 
-  if (sdkFiles.interfaces?.length > 0 && categoryMap.interfaces) {
-    addToGroup(
-      categoryMap.interfaces,
-      sdkFiles.interfaces.map((file) => `${basePath}/interfaces/${file}`)
-    );
-  }
-
-  if (sdkFiles.classes?.length > 0 && categoryMap.classes) {
-    addToGroup(
-      categoryMap.classes,
-      sdkFiles.classes.map((file) => `${basePath}/classes/${file}`)
-    );
-  }
-
-  if (sdkFiles["type-aliases"]?.length > 0 && categoryMap["type-aliases"]) {
-    addToGroup(
-      categoryMap["type-aliases"],
-      sdkFiles["type-aliases"].map((file) => `${basePath}/type-aliases/${file}`)
-    );
-  }
-
-  // Convert map to array of nested groups for SDK Reference
-  const sdkReferencePages = Array.from(groupMap.entries()).map(
-    ([groupName, pages]) => ({
-      group: groupName,
+    return Array.from(groupMap.entries()).map(([group, pages]) => ({
+      group,
       expanded: true,
-      pages: pages.sort(), // Sort pages alphabetically within each group
-    })
-  );
-
-  console.debug(
-    `SDK Reference pages: ${JSON.stringify(sdkReferencePages, null, 2)}`
-  );
-
-  // Navigate to: Developers tab -> SDK section -> groups -> SDK Reference
-  // Supports both legacy "anchors" format and current "dropdowns" format.
-  const developersTab = docs.navigation.tabs.find(
-    (tab) => tab.tab === "Developers"
-  );
-
-  if (!developersTab) {
-    console.error("Could not find 'Developers' tab in docs.json");
-    process.exit(1);
-  }
-
-  // Find the SDK section (try dropdowns first, then fall back to anchors)
-  const sdkAnchor =
-    developersTab.dropdowns?.find((d) => d.dropdown === "SDK") ??
-    developersTab.anchors?.find((a) => a.anchor === "SDK");
-
-  if (!sdkAnchor) {
-    console.error("Could not find 'SDK' dropdown or anchor in Developers tab");
-    process.exit(1);
-  }
-
-  // Find SDK Reference within the SDK anchor's groups
-  const sdkRefIndex = sdkAnchor.groups.findIndex(
-    (g) => g.group === "SDK Reference"
-  );
-
-  if (sdkRefIndex === -1) {
-    console.error("Could not find 'SDK Reference' group in SDK anchor");
-    process.exit(1);
-  }
-
-  // Update the SDK Reference pages with our generated groups
-  sdkAnchor.groups[sdkRefIndex] = {
-    group: "SDK Reference",
-    icon: "brackets-curly",
-    expanded: true,
-    pages: sdkReferencePages,
+      pages: pages.sort(),
+    }));
   };
+
+  // docs.json supports three navigation shapes we've seen in the wild:
+  //   1. top-level tabs (legacy)                navigation.tabs
+  //   2. top-level tabs with dropdowns/anchors  navigation.tabs[].dropdowns | .anchors
+  //   3. i18n layout (current)                  navigation.languages[].tabs[]...
+  // We iterate per language so we know each one's locale prefix, and only touch
+  // the SDK Reference group WITHIN that language (matched by its own prefixed
+  // sdk/docs paths). The translated group/subgroup labels are preserved.
+  const languageEntries = docs.navigation.languages
+    ? docs.navigation.languages.map((l) => ({
+        prefix: l.default ? "" : `${l.language}/`,
+        tabs: l.tabs,
+      }))
+    : [{ prefix: "", tabs: docs.navigation.tabs }];
+
+  if (languageEntries.every((e) => !e.tabs)) {
+    console.error("Could not find navigation.tabs or navigation.languages in docs.json");
+    process.exit(1);
+  }
+
+  let updatedCount = 0;
+  for (const { prefix, tabs } of languageEntries) {
+    if (!Array.isArray(tabs)) continue;
+    const localePathPrefix = `${prefix}${basePath}/`;
+    const groupReferencesSdkDocs = (group) =>
+      JSON.stringify(group).includes(localePathPrefix);
+    const sdkReferencePages = buildSdkReferencePages(prefix);
+
+    for (const tab of tabs) {
+      const sdkAnchor =
+        tab.dropdowns?.find((d) => d.dropdown === "SDK") ??
+        tab.anchors?.find((a) => a.anchor === "SDK");
+      if (!sdkAnchor?.groups) continue;
+
+      const sdkRefIndex = sdkAnchor.groups.findIndex(groupReferencesSdkDocs);
+      if (sdkRefIndex === -1) continue;
+
+      const existing = sdkAnchor.groups[sdkRefIndex];
+
+      // Preserve existing subgroup labels (translated per locale) by position.
+      // Falls back to the English category-map label when no existing subgroup
+      // sits at that index (e.g. a locale that gains a new subgroup).
+      const existingSubgroups = Array.isArray(existing.pages) ? existing.pages : [];
+      const localizedPages = sdkReferencePages.map((g, i) => ({
+        ...g,
+        group: existingSubgroups[i]?.group ?? g.group,
+      }));
+
+      sdkAnchor.groups[sdkRefIndex] = {
+        ...existing,
+        group: existing.group,
+        icon: existing.icon ?? "brackets-curly",
+        expanded: true,
+        pages: localizedPages,
+      };
+      updatedCount++;
+    }
+  }
+
+  if (updatedCount === 0) {
+    console.error(
+      "Could not find any SDK Reference navigation group to update (looked for groups whose pages reference '/sdk/docs/')"
+    );
+    process.exit(1);
+  }
 
   // Write updated docs.json
-  console.log(`Writing updated docs.json to ${docsJsonPath}...`);
+  console.log(`Writing updated docs.json to ${docsJsonPath} (${updatedCount} locale(s))...`);
   fs.writeFileSync(docsJsonPath, JSON.stringify(docs, null, 2) + "\n", "utf8");
 
   console.log("Successfully updated docs.json");
@@ -255,6 +264,27 @@ function main() {
     const readmePath = path.join(sdkDocsTarget, "README.mdx");
     if (fs.existsSync(readmePath)) {
       fs.rmSync(readmePath, { force: true });
+    }
+
+    // Mirror the English reference into every non-default locale directory as
+    // English-content copies (see reference-i18n.json, mode "english-copy").
+    // The switcher needs a real page at each locale-prefixed path; the content
+    // stays English so there is no translation drift on regeneration. Mintlify
+    // translation must be disabled for these paths (dashboard exclusion).
+    const docsForLocales = JSON.parse(fs.readFileSync(docsJsonPath, "utf8"));
+    const locales = (docsForLocales.navigation?.languages ?? [])
+      .filter((l) => !l.default)
+      .map((l) => l.language);
+    for (const locale of locales) {
+      const localeTarget = path.join(target, locale, SDK_DOCS_TARGET_PATH);
+      fs.rmSync(localeTarget, { recursive: true, force: true });
+      fs.mkdirSync(localeTarget, { recursive: true });
+      fs.cpSync(DOCS_SOURCE_PATH, localeTarget, { recursive: true });
+      const localeReadme = path.join(localeTarget, "README.mdx");
+      if (fs.existsSync(localeReadme)) fs.rmSync(localeReadme, { force: true });
+    }
+    if (locales.length > 0) {
+      console.log(`Mirrored SDK reference into ${locales.length} locale(s): ${locales.join(", ")}`);
     }
 
     // Scan the sdk-docs directory

@@ -48,9 +48,9 @@ export interface InvokeLLMParams {
   prompt: string;
   /** Optionally specify a model to override the app-level model setting for this specific call.
    *
-   * Options: `"gpt_5_mini"`, `"gemini_3_flash"`, `"gpt_5"`, `"gpt_5_4"`, `"gpt_5_5"`, `"gemini_3_1_pro"`, `"claude_sonnet_4_6"`, `"claude_opus_4_6"`, `"claude_opus_4_7"`
+   * Options: `"gpt_5_mini"`, `"gemini_3_flash"`, `"gpt_5_4"`, `"gpt_5_5"`, `"gemini_3_1_pro"`, `"claude_sonnet_4_6"`, `"claude_opus_4_6"`, `"claude_opus_4_7"`, `"claude_opus_4_8"`
    */
-  model?: 'gpt_5_mini' | 'gemini_3_flash' | 'gpt_5' | 'gpt_5_4' | 'gpt_5_5' | 'gemini_3_1_pro' | 'claude_sonnet_4_6' | 'claude_opus_4_6' | 'claude_opus_4_7';
+  model?: 'gpt_5_mini' | 'gemini_3_flash' | 'gpt_5_4' | 'gpt_5_5' | 'gemini_3_1_pro' | 'claude_sonnet_4_6' | 'claude_opus_4_6' | 'claude_opus_4_7' | 'claude_opus_4_8';
   /** If set to `true`, the LLM will use Google Search, Maps, and News to gather real-time context before answering.
    * @default false
    */
@@ -393,7 +393,7 @@ export interface CoreIntegrations {
  * This module is available to use with a client in all authentication modes:
  *
  * - **Anonymous or User authentication** (`base44.integrations`): Integration methods are invoked with the current user's permissions. Anonymous users invoke methods without authentication, while authenticated users invoke methods with their authentication context.
- * - **Service role authentication** (`base44.asServiceRole.integrations`): Integration methods are invoked with elevated admin-level permissions. The methods execute with admin authentication context.
+ * - **Service role authentication** (`base44.asServiceRole.integrations`): Integration methods are invoked with the service role for backend code that needs elevated permissions.
  */
 export type IntegrationsModule = {
   /**

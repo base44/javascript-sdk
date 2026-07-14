@@ -1,6 +1,6 @@
 {
   "name": "@base44/sdk",
-  "version": "0.8.28",
+  "version": "0.8.39",
   "description": "JavaScript SDK for Base44 API",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -26,18 +26,18 @@
     "create-docs:process": "node scripts/mintlify-post-processing/file-processing/file-processing.js"
   },
   "dependencies": {
-    "axios": "^1.6.2",
-    "socket.io-client": "^4.7.5",
-    "uuid": "^13.0.0"
+    "axios": "^1.17.0",
+    "socket.io-client": "^4.8.3",
+    "uuid": "^13.0.2"
   },
   "devDependencies": {
     "@types/hast": "^3.0.4",
     "@types/node": "^25.0.1",
     "@types/unist": "^3.0.3",
     "@typescript-eslint/parser": "^8.51.0",
-    "@vitest/coverage-istanbul": "^1.0.0",
-    "@vitest/coverage-v8": "^1.0.0",
-    "@vitest/ui": "^1.0.0",
+    "@vitest/coverage-istanbul": "^4.1.9",
+    "@vitest/coverage-v8": "^4.1.9",
+    "@vitest/ui": "^4.1.9",
     "dotenv": "^16.3.1",
     "eslint": "^9.39.2",
     "eslint-plugin-import": "^2.32.0",
@@ -46,7 +46,7 @@
     "typedoc-plugin-markdown": "^4.9.0",
     "typescript": "^5.3.2",
     "typescript-eslint": "^8.51.0",
-    "vitest": "^1.6.1"
+    "vitest": "^4.1.9"
   },
   "keywords": [
     "base44",

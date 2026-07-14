@@ -138,33 +138,29 @@ export interface AuthModule {
   /**
    * Updates the current authenticated user's information.
    *
-   * Only the fields included in the data object will be updated.
-   * Commonly updated fields include `full_name` and custom profile fields.
+   * You can update `role` and any [custom fields](/developers/backend/resources/entities/user-schema#custom-fields) defined in your
+   * User entity schema.
+   * The `role` value must be either `'user'` or `'admin'`.
+   * <Note>
+   * The following fields are read-only and can't be changed with this method:
+   * `id`, `email`, `full_name`, `created_date`, `updated_date`, and `created_by`.
+   * </Note>
    *
    * @param data - Object containing the fields to update.
    * @returns Promise resolving to the updated user data.
    *
    * @example
    * ```typescript
-   * // Update specific fields
-   * const updatedUser = await base44.auth.updateMe({
-   *   full_name: 'John Doe'
-   * });
-   * console.log(`Updated user: ${updatedUser.full_name}`);
-   * ```
-   *
-   * @example
-   * ```typescript
-   * // Update custom fields defined in your User entity
+   * // Update role and custom fields defined in your User entity
    * await base44.auth.updateMe({
+   *   role: 'admin',
    *   bio: 'Software developer',
-   *   phone: '+1234567890',
    *   preferences: { theme: 'dark' }
    * });
    * ```
    */
   updateMe(
-    data: Partial<Omit<User, "id" | "created_date" | "updated_date">>
+    data: Record<string, any>
   ): Promise<User>;
 
   /**
@@ -366,8 +362,10 @@ export interface AuthModule {
   /**
    * Registers a new user account.
    *
-   * Creates a new user account with email and password. After successful registration,
-   * use {@linkcode loginViaEmailPassword | loginViaEmailPassword()} to log in the user.
+   * Creates a new user account with email and password. Registration sends an OTP
+   * code to the user's email. Pass that code to
+   * {@linkcode verifyOtp | verifyOtp()} to complete verification, then log the user
+   * in with {@linkcode loginViaEmailPassword | loginViaEmailPassword()}.
    *
    * @param params - Registration details including email, password, and optional fields.
    * @returns Promise resolving to the registration response.
@@ -381,7 +379,13 @@ export interface AuthModule {
    *   referral_code: 'FRIEND2024'
    * });
    *
-   * // Login after registration
+   * // Verify with the OTP code from the user's email
+   * await base44.auth.verifyOtp({
+   *   email: 'newuser@example.com',
+   *   otpCode: '123456'
+   * });
+   *
+   * // Log the user in after verification
    * const { access_token, user } = await base44.auth.loginViaEmailPassword(
    *   'newuser@example.com',
    *   'securePassword123'
@@ -391,17 +395,23 @@ export interface AuthModule {
   register(params: RegisterParams): Promise<any>;
 
   /**
-   * Verifies an OTP (One-time password) code.
+   * Verifies an OTP (one-time password) code.
    *
-   * Validates an OTP code sent to the user's email during registration
-   * or authentication.
+   * Confirms that the user owns the email address by checking the code sent to
+   * their inbox during {@linkcode register | register()}. After a successful
+   * call, log the user in with
+   * {@linkcode loginViaEmailPassword | loginViaEmailPassword()}. If the code
+   * has expired or the user didn't receive it, send a fresh one with
+   * {@linkcode resendOtp | resendOtp()}.
    *
-   * @param params - Object containing email and OTP code.
-   * @returns Promise resolving to the verification response if valid.
-   * @throws Error if the OTP code is invalid, expired, or verification fails.
+   * @param params - The email being verified and the OTP code the user entered.
+   * @returns Promise resolving to the verification response, which includes an
+   * access token for the now-verified user.
+   * @throws Error if the OTP code is invalid or expired.
    *
    * @example
    * ```typescript
+   * // Verify the code the user entered from their email
    * try {
    *   await base44.auth.verifyOtp({
    *     email: 'user@example.com',
@@ -412,20 +422,46 @@ export interface AuthModule {
    *   console.error('Invalid or expired OTP code');
    * }
    * ```
+   *
+   * @example
+   * ```typescript
+   * // Full registration flow
+   * await base44.auth.register({
+   *   email: 'newuser@example.com',
+   *   password: 'securePassword123'
+   * });
+   *
+   * // The user receives an OTP code by email. Collect it and verify.
+   * await base44.auth.verifyOtp({
+   *   email: 'newuser@example.com',
+   *   otpCode: '123456'
+   * });
+   *
+   * // Log the user in after verification
+   * const { access_token, user } = await base44.auth.loginViaEmailPassword(
+   *   'newuser@example.com',
+   *   'securePassword123'
+   * );
+   * ```
    */
   verifyOtp(params: VerifyOtpParams): Promise<any>;
 
   /**
    * Resends an OTP code to the user's email address.
    *
-   * Requests a new OTP code to be sent to the specified email address.
+   * Call this when the user didn't receive the original code sent by
+   * {@linkcode register | register()}, or when the previous code has expired.
+   * The new code replaces the previous one. Pass it to
+   * {@linkcode verifyOtp | verifyOtp()} to complete verification.
    *
-   * @param email - Email address to send the OTP to.
-   * @returns Promise resolving when the OTP is sent successfully.
+   * @param email - Email address to send the new OTP to.
+   * @returns Promise resolving once the new OTP has been sent, with a
+   * confirmation message and the new code's expiration window.
    * @throws Error if the email is invalid or the request fails.
    *
    * @example
    * ```typescript
+   * // Resend the OTP when the user didn't receive the original
    * try {
    *   await base44.auth.resendOtp('user@example.com');
    *   console.log('OTP resent! Please check your email.');

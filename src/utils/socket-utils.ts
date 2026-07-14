@@ -1,5 +1,6 @@
 import { Socket, io } from "socket.io-client";
 import { getAccessToken } from "./auth-utils.js";
+import { getAnalyticsSessionId } from "../modules/analytics.js";
 
 export interface RoomsSocketConfig {
   serverUrl: string;
@@ -31,17 +32,29 @@ type TEvent = keyof RoomsSocketEventsMap["listen"];
 
 type THandler<E extends TEvent> = RoomsSocketEventsMap["listen"][E];
 
+const ROOM_LEAVE_GRACE_MS = 250;
+
 function initializeSocket(
   config: RoomsSocketConfig,
   handlers: Partial<RoomsSocketEventsMap["listen"]>
 ) {
+  // On unauthenticated clients, send a stable anonymous visitor id on the
+  // handshake so the backend can verify room access for anonymous agent
+  // conversations (mirrors the X-Base44-Anonymous-Id HTTP header). Authenticated
+  // clients are identified by their token instead.
+  const resolvedToken = config.token ?? getAccessToken();
+  const query: Record<string, string | null | undefined> = {
+    app_id: config.appId,
+    token: resolvedToken,
+  };
+  if (!resolvedToken) {
+    query.anonymous_id = getAnalyticsSessionId();
+  }
+
   const socket = io(config.serverUrl, {
     path: config.mountPath,
     transports: config.transports,
-    query: {
-      app_id: config.appId,
-      token: config.token ?? getAccessToken(),
-    },
+    query,
   }) as Socket<RoomsSocketEventsMap["listen"], RoomsSocketEventsMap["emit"]>;
 
   socket.on("connect", async () => {
@@ -73,14 +86,20 @@ export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
     TSocketRoom,
     Partial<RoomsSocketEventsMap["listen"]>[]
   > = {};
+  const pendingRoomLeaves: Record<TSocketRoom, ReturnType<typeof setTimeout>> =
+    {};
 
   const handlers: RoomsSocketEventsMap["listen"] = {
     connect: async () => {
       const promises: Promise<void>[] = [];
       Object.keys(roomsToListeners).forEach((room) => {
-        joinRoom(room);
         const listeners = getListeners(room);
-        listeners?.forEach(({ connect }) => {
+        if (listeners.length === 0) {
+          return;
+        }
+
+        joinRoom(room);
+        listeners.forEach(({ connect }) => {
           const promise = async () => connect?.();
           promises.push(promise());
         });
@@ -110,6 +129,8 @@ export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
   }
 
   function disconnect() {
+    clearPendingRoomLeaves();
+
     if (socket) {
       socket.disconnect();
     }
@@ -138,26 +159,69 @@ export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
   }
 
   function getListeners(room: string) {
-    return roomsToListeners[room];
+    return roomsToListeners[room] ?? [];
+  }
+
+  function cancelPendingRoomLeave(room: TSocketRoom) {
+    const pendingLeave = pendingRoomLeaves[room];
+    if (!pendingLeave) {
+      return;
+    }
+
+    clearTimeout(pendingLeave);
+    delete pendingRoomLeaves[room];
+  }
+
+  function clearPendingRoomLeaves() {
+    Object.keys(pendingRoomLeaves).forEach((room) => {
+      clearTimeout(pendingRoomLeaves[room]);
+      delete pendingRoomLeaves[room];
+
+      if ((roomsToListeners[room]?.length ?? 0) === 0) {
+        delete roomsToListeners[room];
+      }
+    });
+  }
+
+  function scheduleRoomLeave(room: TSocketRoom) {
+    cancelPendingRoomLeave(room);
+    pendingRoomLeaves[room] = setTimeout(() => {
+      delete pendingRoomLeaves[room];
+
+      if ((roomsToListeners[room]?.length ?? 0) > 0) {
+        return;
+      }
+
+      leaveRoom(room);
+      delete roomsToListeners[room];
+    }, ROOM_LEAVE_GRACE_MS);
   }
 
   const subscribeToRoom = (
     room: TSocketRoom,
     handlers: Partial<{ [k in TEvent]: THandler<k> }>
   ) => {
-    if (!roomsToListeners[room]) {
+    if (roomsToListeners[room]) {
+      cancelPendingRoomLeave(room);
+    } else {
       joinRoom(room);
       roomsToListeners[room] = [];
     }
 
     roomsToListeners[room].push(handlers);
+    let unsubscribed = false;
 
     return () => {
+      if (unsubscribed) {
+        return;
+      }
+
+      unsubscribed = true;
       roomsToListeners[room] =
         roomsToListeners[room]?.filter((listener) => listener !== handlers) ??
         [];
       if (roomsToListeners[room].length === 0) {
-        leaveRoom(room);
+        scheduleRoomLeave(room);
       }
     };
   };

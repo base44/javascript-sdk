@@ -10,7 +10,7 @@ import {
 } from "./analytics.types";
 import { getSharedInstance } from "../utils/sharedInstance.js";
 import type { AuthModule } from "./auth.types";
-import { generateUuid } from "../utils/common.js";
+import { generateUuid, isReactNative } from "../utils/common.js";
 
 export const USER_HEARTBEAT_EVENT_NAME = "__user_heartbeat_event__";
 export const ANALYTICS_INITIALIZATION_EVENT_NAME = "__initialization_event__";
@@ -70,7 +70,11 @@ export const createAnalyticsModule = ({
   // prevent overflow of events //
   const { maxQueueSize, throttleTime, batchSize } = analyticsSharedState.config;
 
-  if (!analyticsSharedState.config?.enabled) {
+  // Disable analytics on React Native. It defines `window` but not `document`,
+  // so the per-callsite `typeof window` guards below aren't enough to keep it
+  // from touching `document` (e.g. `document.referrer` on init). Node/SSR is
+  // still handled by those `window` guards, so this doesn't affect it.
+  if (!analyticsSharedState.config?.enabled || isReactNative) {
     return {
       track: () => {},
       cleanup: () => {},
@@ -328,7 +332,10 @@ async function getSessionContext(
 export function getAnalyticsConfigFromUrlParams():
   | AnalyticsModuleOptions
   | undefined {
-  if (typeof window === "undefined") return undefined;
+  // `window.location` is absent on React Native. This runs at module load (via
+  // the shared-state factory), so an unguarded `window.location.search` would
+  // throw on import there.
+  if (typeof window === "undefined" || !window.location) return undefined;
   const urlParams = new URLSearchParams(window.location.search);
   const analyticsEnable = urlParams.get(ANALYTICS_CONFIG_ENABLE_URL_PARAM_KEY);
 

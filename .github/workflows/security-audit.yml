@@ -1,0 +1,44 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Run on a weekly schedule so newly-disclosed CVEs in existing
+  # dependencies are surfaced even when there are no code changes.
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: npm audit (dependencies)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Gating check: fail the build on high/critical vulnerabilities in
+      # the production dependencies declared in package.json. These are the
+      # ones that ship to consumers of the SDK (and show up in their Wiz
+      # scans), so they get the strictest treatment.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      # Informational: report the full picture (including dev/transitive
+      # dependencies) without failing the build.
+      - name: Audit all dependencies (report only)
+        if: always()
+        run: npm audit
+        continue-on-error: true
