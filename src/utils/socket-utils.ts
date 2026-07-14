@@ -1,5 +1,6 @@
 import { Socket, io } from "socket.io-client";
 import { getAccessToken } from "./auth-utils.js";
+import { getAnalyticsSessionId } from "../modules/analytics.js";
 
 export interface RoomsSocketConfig {
   serverUrl: string;
@@ -37,13 +38,23 @@ function initializeSocket(
   config: RoomsSocketConfig,
   handlers: Partial<RoomsSocketEventsMap["listen"]>
 ) {
+  // On unauthenticated clients, send a stable anonymous visitor id on the
+  // handshake so the backend can verify room access for anonymous agent
+  // conversations (mirrors the X-Base44-Anonymous-Id HTTP header). Authenticated
+  // clients are identified by their token instead.
+  const resolvedToken = config.token ?? getAccessToken();
+  const query: Record<string, string | null | undefined> = {
+    app_id: config.appId,
+    token: resolvedToken,
+  };
+  if (!resolvedToken) {
+    query.anonymous_id = getAnalyticsSessionId();
+  }
+
   const socket = io(config.serverUrl, {
     path: config.mountPath,
     transports: config.transports,
-    query: {
-      app_id: config.appId,
-      token: config.token ?? getAccessToken(),
-    },
+    query,
   }) as Socket<RoomsSocketEventsMap["listen"], RoomsSocketEventsMap["emit"]>;
 
   socket.on("connect", async () => {

@@ -59,6 +59,24 @@ export function createConnectorsModule(
       };
     },
 
+    async getWorkspaceConnection(
+      connectorId: string
+    ): Promise<ConnectorConnectionResponse> {
+      if (!connectorId || typeof connectorId !== "string") {
+        throw new Error("Connector ID is required and must be a string");
+      }
+
+      const response = await axios.get<ConnectorAccessTokenResponse>(
+        `/apps/${appId}/external-auth/tokens/connectors/${connectorId}`
+      );
+
+      const data = response as unknown as ConnectorAccessTokenResponse;
+      return {
+        accessToken: data.access_token,
+        connectionConfig: data.connection_config ?? null,
+      };
+    },
+
     /**
      * @deprecated Use getCurrentAppUserConnection(connectorId) and use the returned accessToken (and connectionConfig when needed) instead.
      */

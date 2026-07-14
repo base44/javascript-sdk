@@ -87,11 +87,13 @@ export interface AppUserConnectorConnectionResponse {
  * | Calendly | `calendly` |
  * | ClickUp | `clickup` |
  * | Contentful | `contentful` |
+ * | Databricks | `databricks` |
  * | Discord | `discord` |
  * | Dropbox | `dropbox` |
  * | GitHub | `github` |
  * | GitLab | `gitlab` |
  * | Gmail | `gmail` |
+ * | Google Ads | `googleads` |
  * | Google Analytics | `google_analytics` |
  * | Google BigQuery | `googlebigquery` |
  * | Google Calendar | `googlecalendar` |
@@ -112,10 +114,12 @@ export interface AppUserConnectorConnectionResponse {
  * | Microsoft OneDrive | `one_drive` |
  * | Notion | `notion` |
  * | Outlook | `outlook` |
+ * | QuickBooks | `quickbooks` |
  * | Salesforce | `salesforce` |
  * | SharePoint | `share_point` |
  * | Slack User | `slack` |
  * | Slack Bot | `slackbot` |
+ * | Snowflake | `snowflake` |
  * | Splitwise | `splitwise` |
  * | Supabase | `supabase` |
  * | TikTok | `tiktok` |
@@ -260,6 +264,35 @@ export interface ConnectorsModule {
    */
   getConnection(
     integrationType: ConnectorIntegrationType,
+  ): Promise<ConnectorConnectionResponse>;
+
+  /**
+   * Retrieves the OAuth access token and connection configuration for a **workspace-registered** connector
+   * (a connector backed by an OAuth app registered in the workspace, consented to once by the app builder).
+   *
+   * Use this method when the app's backend function needs to use a connector identified by its
+   * workspace-connector ID rather than a platform integration type. The token returned represents
+   * the app builder's consent against the workspace's OAuth app and is shared across all app users
+   * of the app — identical semantics to the platform-shared {@link getConnection} form,
+   * differing only in which OAuth app was used to produce the token.
+   *
+   * @param connectorId - The ID of the workspace connector (the `OrganizationConnector` database ID) as surfaced in the builder chat context.
+   * @returns Promise resolving to a {@link ConnectorConnectionResponse} with `accessToken` and `connectionConfig`.
+   *
+   * @example
+   * ```typescript
+   * // Get the connection for a workspace-registered connector
+   * const { accessToken, connectionConfig } = await base44.asServiceRole.connectors.getWorkspaceConnection(
+   *   'abc123def',
+   * );
+   *
+   * const response = await fetch(`https://${connectionConfig?.subdomain}.snowflakecomputing.com/api/v2/statements`, {
+   *   headers: { Authorization: `Bearer ${accessToken}` },
+   * });
+   * ```
+   */
+  getWorkspaceConnection(
+    connectorId: string,
   ): Promise<ConnectorConnectionResponse>;
 
   /**

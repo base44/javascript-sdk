@@ -1,5 +1,6 @@
 import axios from "axios";
 import { isInIFrame } from "./common.js";
+import { getAnalyticsSessionId } from "../modules/analytics.js";
 import type { Base44ErrorJSON } from "./axios-client.types.js";
 
 /**
@@ -173,8 +174,16 @@ export function createAxiosClient({
 
   // Add origin URL in browser environment
   client.interceptors.request.use((config) => {
-    if (typeof window !== "undefined") {
+    // `window.location` is absent on React Native (where `window` still exists),
+    // so guard on it before reading `.href`.
+    if (typeof window !== "undefined" && window.location) {
       config.headers.set("X-Origin-URL", window.location.href);
+      // On unauthenticated requests, attach a stable anonymous visitor id so the
+      // backend can support anonymous agent access (conversation grouping + ownership).
+      // Authenticated requests are identified by their Authorization header instead.
+      if (!config.headers.get("Authorization")) {
+        config.headers.set("X-Base44-Anonymous-Id", getAnalyticsSessionId());
+      }
     }
     const requestId = crypto.randomUUID();
     (config as any).requestId = requestId;
