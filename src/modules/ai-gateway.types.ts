@@ -47,8 +47,7 @@ export interface AiGatewayModuleConfig {
  *
  * Build AI agents or call models directly from your app's backend functions.
  * Pass `'automatic'` to let Base44 choose a model, or pin a specific one such
- * as `'claude_sonnet_4_6'`, `'claude_opus_4_8'`, `'gpt_5_5'`, or
- * `'gemini_3_1_pro'`.
+ * as `'claude_sonnet_4_6'`, `'gpt_5_5'`, or `'gemini_3_1_pro'`.
  *
  * See the [`model` options on `InvokeLLM`](/developers/references/sdk/docs/type-aliases/integrations#invokellm)
  * for the current set of models you can use.
