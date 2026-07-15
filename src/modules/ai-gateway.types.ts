@@ -37,10 +37,11 @@ export interface AiGatewayModuleConfig {
  * setup with the underlying model provider required.
  *
  * Call `connection()` from a backend function rather than the browser. That's
- * where you can wire tools that read and write your app's own entities and
- * business logic without shipping that logic to the client. It also keeps the
- * gateway token out of the browser, where it could be stolen and used to
- * spend against your app's shared credit quota.
+ * where your instructions, tools, and business logic stay server-side, where
+ * users can't inspect or tamper with them, and where you can enforce your own
+ * auth checks, rate limits, or spend limits around the call. `token` is the
+ * caller's own session token, the same one the SDK already uses for every
+ * other call, so calling from the browser doesn't expose anything new.
  *
  * ## Models
  *
@@ -80,8 +81,10 @@ export interface AiGatewayModule {
    * @example
    * ```typescript
    * // Call a model directly with the OpenAI SDK, inside a backend function
+   * import { createClientFromRequest } from "@base44/sdk";
    * import OpenAI from "openai";
    *
+   * const base44 = createClientFromRequest(request);
    * const { baseURL, token } = base44.aiGateway.connection();
    * const openai = new OpenAI({ baseURL, apiKey: token });
    *
@@ -96,11 +99,13 @@ export interface AiGatewayModule {
    * @example
    * ```typescript
    * // Review a return request with a tool-using agent, inside a backend function
+   * import { createClientFromRequest } from "@base44/sdk";
    * import { ToolLoopAgent, tool, stepCountIs, hasToolCall } from "ai";
    * import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
    * import { z } from "zod";
    *
-   * const request = await base44.entities.ReturnRequest.get(returnId);
+   * const base44 = createClientFromRequest(request);
+   * const returnRequest = await base44.entities.ReturnRequest.get(returnId);
    * const { baseURL, token } = base44.aiGateway.connection();
    * // Point any OpenAI-compatible client at `baseURL` with `apiKey: token`.
    * const models = createOpenAICompatible({ name: "base44", baseURL, apiKey: token });
@@ -115,7 +120,7 @@ export interface AiGatewayModule {
    *       description: "This customer's past orders, optionally filtered by status",
    *       inputSchema: z.object({ status: z.string().optional() }),
    *       execute: ({ status }) => {
-   *         const query = { customer_email: request.customer_email };
+   *         const query = { customer_email: returnRequest.customer_email };
    *         if (status) query.status = status;
    *         return base44.entities.Order.filter(query, "-created_date", 50);
    *       },
@@ -130,7 +135,7 @@ export interface AiGatewayModule {
    *   stopWhen: [stepCountIs(8), hasToolCall("submitVerdict")],
    * });
    *
-   * await agent.generate({ prompt: `Review this return request: ${JSON.stringify(request)}` });
+   * await agent.generate({ prompt: `Review this return request: ${JSON.stringify(returnRequest)}` });
    * ```
    */
   connection(): AiGatewayConnection;
