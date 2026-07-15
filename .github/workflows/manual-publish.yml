@@ -18,6 +18,11 @@ on:
         required: false
         default: false
         type: boolean
+      notify_skills_repo:
+        description: "Notify the skills repo about the release"
+        required: false
+        default: true
+        type: boolean
 
 jobs:
   publish:
@@ -30,6 +35,7 @@ jobs:
         with:
           app-id: ${{ vars.BASE44_GITHUB_ACTIONS_APP_ID }}
           private-key: ${{ secrets.BASE44_GITHUB_ACTIONS_APP_PRIVATE_KEY }}
+          owner: base44
 
       - name: Checkout code
         uses: actions/checkout@v4
@@ -130,6 +136,19 @@ jobs:
             ### NPM Tag: ${{ github.event.inputs.npm_tag }}
           draft: false
           prerelease: false
+
+      - name: Notify skills repo
+        if: github.event.inputs.dry_run == 'false' && github.event.inputs.notify_skills_repo == 'true'
+        uses: peter-evans/repository-dispatch@v4
+        with:
+          token: ${{ steps.generate-token.outputs.token }}
+          repository: base44/skills
+          event-type: sdk-release
+          client-payload: |
+            {
+              "version": "v${{ env.NEW_VERSION }}",
+              "release_name": "Release v${{ env.NEW_VERSION }}"
+            }
 
 permissions:
   contents: write
