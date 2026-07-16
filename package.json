@@ -27,8 +27,7 @@
   },
   "dependencies": {
     "axios": "^1.17.0",
-    "socket.io-client": "^4.8.3",
-    "uuid": "^13.0.2"
+    "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "@types/hast": "^3.0.4",
