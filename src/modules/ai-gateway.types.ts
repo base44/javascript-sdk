@@ -36,28 +36,25 @@ export interface AiGatewayModuleConfig {
  * against the provider directly, no separate account, API key, or billing
  * setup with the underlying model provider required.
  *
- * Call `connection()` from a backend function rather than the browser. That's
- * where your instructions, tools, and business logic stay server-side, where
- * users can't inspect or tamper with them, and where you can enforce your own
- * auth checks, rate limits, or spend limits around the call. `token` is the
- * caller's own session token, the same one the SDK already uses for every
- * other call, so calling from the browser doesn't expose anything new.
+ * Call `connection()` from a backend function rather than the browser. This
+ * keeps your instructions, tools, and business logic server-side, and lets
+ * you enforce your own auth, rate, and spend limits around the call. The
+ * `token` it returns is the caller's regular session token, the same one
+ * used for every other SDK call.
  *
  * ## Models
  *
- * Build AI agents or call models directly from your app's backend functions.
- * Pass `'automatic'` to let Base44 choose a model, or pin a specific one such
+ * You can use any of the [models available through `InvokeLLM`](/developers/references/sdk/docs/type-aliases/integrations#invokellm).
+ * Pass `'automatic'` to let Base44 choose one, or pin a specific model such
  * as `'claude_sonnet_4_6'`, `'gpt_5_5'`, or `'gemini_3_1_pro'`.
- *
- * See the [`model` options on `InvokeLLM`](/developers/references/sdk/docs/type-aliases/integrations#invokellm)
- * for the current set of models you can use.
  *
  * ## Authentication Modes
  *
- * This module is available to use with a client in all authentication modes:
+ * There's no permission difference between modes. Both just determine which
+ * token `connection()` returns:
  *
- * - **Anonymous or User authentication** (`base44.aiGateway`): The gateway connection is scoped to the current user's permissions.
- * - **Service role authentication** (`base44.asServiceRole.aiGateway`): The gateway connection uses the service role for backend code that needs elevated permissions.
+ * - **User authentication** (`base44.aiGateway`): Returns the signed-in app user's token.
+ * - **Service role authentication** (`base44.asServiceRole.aiGateway`): Returns the service-role token instead, for calling the gateway when there's no signed-in user, such as from a scheduled automation.
  *
  * ## Billing and limits
  *
@@ -65,7 +62,8 @@ export interface AiGatewayModuleConfig {
  * quota your app's built-in AI features use, and isn't split per user. If the
  * app runs out of credits, the gateway stops working for every user of the
  * app until the quota resets. A request is rejected before the model runs if
- * the app is out of credits.
+ * the app is out of credits. If you need to cap usage per user, build that
+ * check yourself, for example by tracking calls per user in your own entity.
  *
  * Streaming responses aren't supported yet, so leave `stream` unset on your requests.
  */
@@ -79,10 +77,11 @@ export interface AiGatewayModule {
    *
    * @example
    * ```typescript
-   * // Call a model directly with the OpenAI SDK, inside a backend function
+   * // Call a model directly
    * import { createClientFromRequest } from "@base44/sdk";
    * import OpenAI from "openai";
    *
+   * // Runs inside a backend function
    * const base44 = createClientFromRequest(request);
    * const { baseURL, token } = base44.aiGateway.connection();
    * const openai = new OpenAI({ baseURL, apiKey: token });
@@ -97,12 +96,13 @@ export interface AiGatewayModule {
    *
    * @example
    * ```typescript
-   * // Review a return request with a tool-using agent, inside a backend function
+   * // Use a tool-calling agent
    * import { createClientFromRequest } from "@base44/sdk";
    * import { ToolLoopAgent, tool, stepCountIs, hasToolCall } from "ai";
    * import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
    * import { z } from "zod";
    *
+   * // Runs inside a backend function, reviewing a return request
    * const base44 = createClientFromRequest(request);
    * const returnRequest = await base44.entities.ReturnRequest.get(returnId);
    * const { baseURL, token } = base44.aiGateway.connection();
