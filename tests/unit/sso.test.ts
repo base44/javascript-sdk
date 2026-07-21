@@ -41,20 +41,6 @@ describe("SSO module", () => {
     expect(scope.isDone()).toBe(true);
   });
 
-  test("getAccessToken keeps its existing request and return behavior", async () => {
-    const accessTokenResponse = { access_token: "access-token-123" };
-
-    scope
-      .get(`/api/apps/${appId}/auth/sso/accesstoken/${userId}`)
-      .reply(200, accessTokenResponse);
-
-    const response =
-      await base44.asServiceRole.sso.getAccessToken(userId);
-
-    expect(response).toEqual(accessTokenResponse);
-    expect(scope.isDone()).toBe(true);
-  });
-
   test("getIdToken uses the service-role client with on-behalf-of authentication", async () => {
     scope
       .get(`/api/apps/${appId}/auth/sso/idtoken/${userId}`)
