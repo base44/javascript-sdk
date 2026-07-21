@@ -1,5 +1,3 @@
-import { AxiosResponse } from "axios";
-
 /**
  * Response from SSO access token endpoint.
  * @internal

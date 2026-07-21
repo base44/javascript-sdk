@@ -6,7 +6,6 @@ import { SsoModule } from "./sso.types";
  *
  * @param axios - Axios instance
  * @param appId - Application ID
- * @param userToken - User authentication token
  * @returns SSO module with authentication methods
  * @internal
  */
@@ -25,6 +24,8 @@ export function createSsoModule(
     async getIdToken(userid: string): Promise<string> {
       const url = `/apps/${appId}/auth/sso/idtoken/${userid}`;
       const response = await axios.get<string>(url);
+      // The configured response interceptor unwraps response.data at runtime,
+      // while AxiosInstance retains AxiosResponse typings.
       return response as unknown as string;
     },
   };
