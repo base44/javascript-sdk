@@ -37,7 +37,7 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           use_sticky_comment: true
           claude_args: |
-            --model claude-sonnet-4-20250514
+            --model claude-sonnet-4-6
             --json-schema '{"type":"object","properties":{"needs_docs":{"type":"boolean","description":"true if the PR has public APIs that need new or improved JSDoc"}},"required":["needs_docs"]}'
 
           prompt: |
