@@ -21,12 +21,9 @@ export function createSsoModule(
     },
 
     // Get the stored SSO OIDC ID token for a specific user
-    async getIdToken(userid: string): Promise<string> {
+    async getIdToken(userid: string) {
       const url = `/apps/${appId}/auth/sso/idtoken/${userid}`;
-      const response = await axios.get<string>(url);
-      // The configured response interceptor unwraps response.data at runtime,
-      // while AxiosInstance retains AxiosResponse typings.
-      return response as unknown as string;
+      return axios.get(url);
     },
   };
 }
