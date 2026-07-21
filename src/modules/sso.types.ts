@@ -1,5 +1,3 @@
-import { AxiosResponse } from "axios";
-
 /**
  * Response from SSO access token endpoint.
  * @internal
@@ -11,9 +9,9 @@ export interface SsoAccessTokenResponse {
 /**
  * SSO (Single Sign-On) module for managing SSO authentication.
  *
- * This module provides methods for retrieving SSO access tokens for users.
- * These tokens allow you to authenticate Base44 users with external
- * systems or services.
+ * This module provides methods for retrieving SSO tokens for users. These
+ * tokens allow you to authenticate Base44 users with external systems or
+ * services.
  *
  * This module is only available to use with a client in service role authentication mode, which means it can only be used in backend environments.
  *
@@ -44,4 +42,29 @@ export interface SsoModule {
    * ```
    */
   getAccessToken(userid: string): Promise<SsoAccessTokenResponse>;
+
+  /**
+   * Gets the stored SSO OIDC ID token for the current app user.
+   *
+   * The service-role client must include an on-behalf-of token for the same
+   * user specified by `userid`. This method returns the stored token as-is and
+   * does not refresh it.
+   *
+   * @param userid - The current app user's ID.
+   * @returns Promise resolving to the raw ID-token string.
+   *
+   * @example
+   * ```typescript
+   * import { createClientFromRequest } from 'npm:@base44/sdk';
+   *
+   * Deno.serve(async (req) => {
+   *   const base44 = createClientFromRequest(req);
+   *   const user = await base44.auth.me();
+   *   const idToken = await base44.asServiceRole.sso.getIdToken(user.id);
+   *
+   *   return Response.json({ idToken });
+   * });
+   * ```
+   */
+  getIdToken(userid: string): Promise<string>;
 }

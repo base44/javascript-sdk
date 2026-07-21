@@ -6,7 +6,6 @@ import { SsoModule } from "./sso.types";
  *
  * @param axios - Axios instance
  * @param appId - Application ID
- * @param userToken - User authentication token
  * @returns SSO module with authentication methods
  * @internal
  */
@@ -18,6 +17,12 @@ export function createSsoModule(
     // Get SSO access token for a specific user
     async getAccessToken(userid: string) {
       const url = `/apps/${appId}/auth/sso/accesstoken/${userid}`;
+      return axios.get(url);
+    },
+
+    // Get the stored SSO OIDC ID token for a specific user
+    async getIdToken(userid: string) {
+      const url = `/apps/${appId}/auth/sso/idtoken/${userid}`;
       return axios.get(url);
     },
   };
