@@ -41,6 +41,22 @@ describe("SSO module", () => {
     expect(scope.isDone()).toBe(true);
   });
 
+  test("getAccessToken issues the existing GET request and returns the raw token", async () => {
+    const rawAccessToken = "access-token-123";
+
+    scope
+      .get(`/api/apps/${appId}/auth/sso/accesstoken/${userId}`)
+      .reply(200, JSON.stringify(rawAccessToken), {
+        "Content-Type": "application/json",
+      });
+
+    const accessToken =
+      await base44.asServiceRole.sso.getAccessToken(userId);
+
+    expect(accessToken).toBe(rawAccessToken);
+    expect(scope.isDone()).toBe(true);
+  });
+
   test("getIdToken uses the service-role client with on-behalf-of authentication", async () => {
     scope
       .get(`/api/apps/${appId}/auth/sso/idtoken/${userId}`)
