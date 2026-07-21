@@ -21,15 +21,9 @@ export interface SsoAccessTokenResponse {
  *
  * @example
  * ```typescript
- * import { createClientFromRequest } from 'npm:@base44/sdk';
- *
- * Deno.serve(async (req) => {
- *   const base44 = createClientFromRequest(req);
- *   const user = await base44.auth.me();
- *   const idToken = await base44.asServiceRole.sso.getIdToken(user.id);
- *
- *   return Response.json({ idToken });
- * });
+ * // Access SSO module with service role
+ * const response = await base44.asServiceRole.sso.getAccessToken('user_123');
+ * console.log(response.data.access_token);
  * ```
  */
 export interface SsoModule {
@@ -60,6 +54,19 @@ export interface SsoModule {
    *
    * @param userid - The current app user's ID.
    * @returns Promise resolving to the raw ID-token string.
+   *
+   * @example
+   * ```typescript
+   * import { createClientFromRequest } from 'npm:@base44/sdk';
+   *
+   * Deno.serve(async (req) => {
+   *   const base44 = createClientFromRequest(req);
+   *   const user = await base44.auth.me();
+   *   const idToken = await base44.asServiceRole.sso.getIdToken(user.id);
+   *
+   *   return Response.json({ idToken });
+   * });
+   * ```
    */
   getIdToken(userid: string): Promise<string>;
 }
