@@ -9,7 +9,6 @@
  * Cloudflare Durable Object implementation — this file provides types only.
  */
 
-import type { Base44Client } from "./client.types.js";
 
 /**
  * A single client connection. `Send` is the message type this connection accepts
@@ -59,9 +58,8 @@ export abstract class Actor<Incoming = unknown, Outgoing = unknown> {
   abstract handleTick(): void | Promise<void>;
 
   /**
-   * Optional wake hook: runs once when the instance starts, after the
-   * platform's credential setup and before any connection is handled — safe
-   * to use {@link createServiceClient} and load persisted state here.
+   * Optional wake hook: runs once when the instance starts, before any
+   * connection is handled — safe to load persisted state here.
    */
   handleStart(): void | Promise<void> {}
 
@@ -102,25 +100,4 @@ export abstract class Actor<Incoming = unknown, Outgoing = unknown> {
     throw new Error("Actor.storage is only available inside a deployed actor");
   }
 
-  /**
-   * SDK client acting **as the connected user** — every entity call respects
-   * the app's row-level security, evaluated as that user at call time. The
-   * default wherever a `conn` is in scope (connect/message/close).
-   *
-   * Anonymous connections get an unauthenticated client — entity calls run
-   * under anonymous RLS, just like any public visitor.
-   */
-  protected createClientFromConnection(conn: Conn): Base44Client {
-    void conn;
-    throw new Error("Actor.createClientFromConnection() is only available inside a deployed actor");
-  }
-
-  /**
-   * Service-role SDK client — bypasses RLS. For work with **no user in scope**
-   * (tick, alarm, handleStart). Inside handleMessage/handleConnect prefer
-   * `createClientFromConnection(conn)`.
-   */
-  protected createServiceClient(): Base44Client {
-    throw new Error("Actor.createServiceClient() is only available inside a deployed actor");
-  }
 }
