@@ -1,13 +1,11 @@
 import PartySocket from "partysocket";
+import type {
+  ActorConnectOptions,
+  ActorRoom,
+  ActorSubscription,
+} from "./actors.types.js";
 
-// Module-level map: "ActorName:instanceId" → active socket
-const activeSockets = new Map<string, PartySocket>();
-
-function socketKey(actorName: string, instanceId: string) {
-  return `${actorName}:${instanceId}`;
-}
-
-export function createActorsModule(config: {
+interface ActorsConfig {
   appId: string;
   /** Current user access token, if authenticated. Rides the WS query (same
    * pattern as the entities socket) so the platform proxy can authenticate the
@@ -19,120 +17,126 @@ export function createActorsModule(config: {
   dispatcherWsUrl: string;
   /** WebSocket implementation for runtimes without a global one (Node < 22). */
   webSocketImpl?: unknown;
-}) {
-  return new Proxy({} as Record<string, ActorClient>, {
+}
+
+// Heartbeat / half-open detection. PartySocket only reconnects on a browser
+// close/error event, so a silently-dead connection (TCP alive, no data — common
+// behind proxies/LBs) hangs until the OS idle timeout (~60s). Ping periodically
+// and force a reconnect if nothing comes back within DEAD_MS.
+const PING_MS = 1_000;
+const DEAD_MS = 3_000;
+
+class Room {
+  private ws: PartySocket | null = null;
+  private readonly listeners = new Set<(data: unknown) => void>();
+  private heartbeat: ReturnType<typeof setInterval> | null = null;
+  private connId: string | null = null;
+
+  constructor(
+    private readonly actorName: string,
+    private readonly instanceId: string,
+    private readonly config: ActorsConfig,
+  ) {}
+
+  get id(): string {
+    if (!this.connId) {
+      throw new Error(`${this.actorName}:${this.instanceId}: connect() before reading id`);
+    }
+    return this.connId;
+  }
+
+  connect(options?: ActorConnectOptions): this {
+    if (this.ws) return this;
+
+    // The client picks its own conn id; it becomes _pk → the actor's conn.id.
+    const connId = options?.id ?? crypto.randomUUID();
+    this.connId = connId;
+
+    const ws = new PartySocket({
+      host: this.config.dispatcherWsUrl,
+      party: this.actorName,
+      room: this.instanceId,
+      id: connId,
+      ...(this.config.webSocketImpl ? { WebSocket: this.config.webSocketImpl as any } : {}),
+      // Re-read on every (re)connect so a login/logout between reconnects is
+      // picked up. The platform proxy authenticates the connection itself —
+      // no pre-connect token mint.
+      query: () => {
+        const token = this.config.getAuthToken();
+        return {
+          app_id: this.config.appId,
+          handler: this.actorName,
+          ...(token ? { token } : {}),
+          ...(this.config.functionsVersion ? { fv: this.config.functionsVersion } : {}),
+        };
+      },
+    });
+    this.ws = ws;
+
+    let lastMsg = Date.now();
+    const bumpAlive = () => { lastMsg = Date.now(); };
+    ws.addEventListener("open", bumpAlive);
+    ws.addEventListener("message", (ev) => {
+      bumpAlive();
+      let data: unknown;
+      try {
+        data = JSON.parse(ev.data);
+      } catch {
+        return; // ignore malformed
+      }
+      const msgType = data && typeof data === "object" ? (data as { type?: unknown }).type : undefined;
+      if (msgType === "__pong") return; // platform message — never surface it
+      for (const listener of this.listeners) listener(data);
+    });
+
+    this.heartbeat = setInterval(() => {
+      if (Date.now() - lastMsg > DEAD_MS) {
+        bumpAlive(); // avoid a reconnect storm while the new socket comes up
+        ws.reconnect();
+        return;
+      }
+      try {
+        ws.send(JSON.stringify({ type: "__ping" }));
+      } catch {
+        // socket not open; the watchdog above will force a reconnect
+      }
+    }, PING_MS);
+
+    return this;
+  }
+
+  subscribe(callback: (data: unknown) => void): ActorSubscription {
+    if (!this.ws) {
+      throw new Error(`${this.actorName}:${this.instanceId}: connect() before subscribe()`);
+    }
+    this.listeners.add(callback);
+    return {
+      unsubscribe: () => { this.listeners.delete(callback); },
+    };
+  }
+
+  send(data: unknown): void {
+    if (!this.ws) {
+      throw new Error(`${this.actorName}:${this.instanceId}: connect() before send()`);
+    }
+    this.ws.send(JSON.stringify(data));
+  }
+
+  close(): void {
+    if (this.heartbeat) {
+      clearInterval(this.heartbeat);
+      this.heartbeat = null;
+    }
+    this.listeners.clear();
+    this.ws?.close();
+    this.ws = null;
+  }
+}
+
+export function createActorsModule(config: ActorsConfig) {
+  return new Proxy({} as Record<string, (instanceId: string) => ActorRoom>, {
     get(_, actorName: string) {
-      return {
-        subscribe(
-          instanceId: string,
-          callback: (data: unknown) => void,
-          options?: { id?: string },
-        ): ActorSubscription {
-          const key = socketKey(actorName, instanceId);
-          // close existing if any
-          activeSockets.get(key)?.close();
-
-          // Connection id: caller-supplied (stable — reuse across reconnects/tabs as
-          // you see fit) or auto-generated per subscription. PartySocket sends it
-          // as ?_pk=; the platform proxy validates it and the actor sees this exact
-          // value as conn.id, stable across reconnects.
-          const connId = options?.id ?? crypto.randomUUID();
-
-          // No pre-connect token mint: the platform proxy authenticates the
-          // connection itself, exactly like a backend-function call. `handler`
-          // carries the case-preserved actor name (the `party` path segment is
-          // lowercased by PartySocket). query as fn: re-read on every (re)connect
-          // so a login/logout between reconnects is picked up.
-          const ws = new PartySocket({
-            host: config.dispatcherWsUrl,
-            party: actorName,
-            room: instanceId,
-            id: connId,
-            ...(config.webSocketImpl ? { WebSocket: config.webSocketImpl as any } : {}),
-            query: () => {
-              const token = config.getAuthToken();
-              return {
-                app_id: config.appId,
-                handler: actorName,
-                ...(token ? { token } : {}),
-                ...(config.functionsVersion ? { fv: config.functionsVersion } : {}),
-              };
-            },
-          });
-
-          activeSockets.set(key, ws);
-
-          // Heartbeat / half-open detection. PartySocket only reconnects on a
-          // browser close/error event, so a silently-dead connection (TCP alive,
-          // no data — common behind proxies/LBs) hangs until the OS idle timeout
-          // (~60s). We ping periodically and force a reconnect if nothing comes
-          // back within DEAD_MS, cutting detection from ~60s to a few seconds.
-          const PING_MS = 1_000;
-          const DEAD_MS = 3_000;
-          let lastMsg = Date.now();
-          const bumpAlive = () => { lastMsg = Date.now(); };
-
-          ws.addEventListener("open", bumpAlive);
-          ws.addEventListener("message", (ev) => {
-            bumpAlive();
-            let data: unknown;
-            try {
-              data = JSON.parse(ev.data);
-            } catch {
-              return; // ignore malformed
-            }
-            // Swallow platform messages — never surface them to the app.
-            const msgType = data && typeof data === "object" ? (data as { type?: unknown }).type : undefined;
-            if (msgType === "__pong") return;
-            callback(data);
-          });
-
-          const heartbeat = setInterval(() => {
-            if (Date.now() - lastMsg > DEAD_MS) {
-              bumpAlive(); // avoid a reconnect storm while the new socket comes up
-              ws.reconnect();
-              return;
-            }
-            try {
-              ws.send(JSON.stringify({ type: "__ping" }));
-            } catch {
-              // socket not open; the watchdog above will force a reconnect
-            }
-          }, PING_MS);
-
-          return {
-            id: connId,  // the connection id (same value the actor sees as conn.id)
-            unsubscribe() {
-              clearInterval(heartbeat);
-              activeSockets.delete(key);
-              ws.close();
-            },
-          };
-        },
-        send(instanceId: string, data: unknown) {
-          const key = socketKey(actorName, instanceId);
-          const ws = activeSockets.get(key);
-          if (!ws) throw new Error(`No active subscription for ${actorName}:${instanceId}`);
-          ws.send(JSON.stringify(data));
-        },
-      };
+      return (instanceId: string) => new Room(actorName, instanceId, config) as unknown as ActorRoom;
     },
   });
-}
-
-/** Handle for an active actor subscription. */
-interface ActorSubscription {
-  /** This connection's id — the same value the actor receives as `conn.id`. */
-  id: string;
-  /** Close the subscription and its underlying socket. */
-  unsubscribe(): void;
-}
-
-interface ActorClient {
-  subscribe(
-    instanceId: string,
-    callback: (data: unknown) => void,
-    options?: { id?: string },
-  ): ActorSubscription;
-  send(instanceId: string, data: unknown): void;
 }
