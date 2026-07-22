@@ -9,7 +9,13 @@ function socketKey(actorName: string, instanceId: string) {
 
 export function createActorsModule(config: {
   appId: string;
-  getToken(actorName: string, instanceId: string, connId: string): Promise<string>;
+  /** Current user access token, if authenticated. Rides the WS query (same
+   * pattern as the entities socket) so the platform proxy can authenticate the
+   * connection like a backend-function call; anonymous connects omit it. */
+  getAuthToken(): string | null | undefined;
+  /** Same semantics as function calls: editors with a non-prod version get the
+   * draft actor script; everyone else gets the published one. */
+  functionsVersion?: string;
   dispatcherWsUrl: string;
   /** WebSocket implementation for runtimes without a global one (Node < 22). */
   webSocketImpl?: unknown;
@@ -27,21 +33,31 @@ export function createActorsModule(config: {
           activeSockets.get(key)?.close();
 
           // Connection id: caller-supplied (stable — reuse across reconnects/tabs as
-          // you see fit) or auto-generated per subscription. It travels INSIDE the
-          // signed actor token (never as a WS query param, which proxies strip);
-          // the dispatcher forwards the verified claim as partyserver's _pk, so the
-          // actor sees this exact value as conn.id. Reconnects re-mint the token
-          // with the same id, so conn.id is stable across reconnects.
+          // you see fit) or auto-generated per subscription. PartySocket sends it
+          // as ?_pk=; the platform proxy validates it and the actor sees this exact
+          // value as conn.id, stable across reconnects.
           const connId = options?.id ?? crypto.randomUUID();
 
-          // query as async fn: called on every (re)connect, fetches a fresh token each time
+          // No pre-connect token mint: the platform proxy authenticates the
+          // connection itself, exactly like a backend-function call. `handler`
+          // carries the case-preserved actor name (the `party` path segment is
+          // lowercased by PartySocket). query as fn: re-read on every (re)connect
+          // so a login/logout between reconnects is picked up.
           const ws = new PartySocket({
             host: config.dispatcherWsUrl,
             party: actorName,
             room: instanceId,
+            id: connId,
             ...(config.webSocketImpl ? { WebSocket: config.webSocketImpl as any } : {}),
-            query: () =>
-              config.getToken(actorName, instanceId, connId).then((token) => ({ token })),
+            query: () => {
+              const token = config.getAuthToken();
+              return {
+                app_id: config.appId,
+                handler: actorName,
+                ...(token ? { token } : {}),
+                ...(config.functionsVersion ? { fv: config.functionsVersion } : {}),
+              };
+            },
           });
 
           activeSockets.set(key, ws);

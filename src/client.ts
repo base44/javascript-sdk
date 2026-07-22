@@ -225,21 +225,10 @@ export function createClient(config: CreateClientConfig): Base44Client {
       appId,
       dispatcherWsUrl: resolvedDispatcherWsUrl,
       webSocketImpl,
-      getToken: async (actorName, instanceId, connId) => {
-        // axiosClient interceptors unwrap response.data, so the result is the body directly.
-        // conn_id rides inside the signed token (not a WS query param) so it survives
-        // proxies that strip params; the dispatcher forwards it as the actor's conn.id.
-        // Base44-Functions-Version rides along (like function calls) so live apps get
-        // tokens for the *published* actor script and previews get the draft.
-        const data = await axiosClient.post<any, { token: string }>(
-          `/apps/${appId}/actor-token`,
-          { handler_name: actorName, instance_id: instanceId, conn_id: connId },
-          functionsVersion
-            ? { headers: { "Base44-Functions-Version": functionsVersion } }
-            : undefined
-        );
-        return data.token;
-      },
+      functionsVersion,
+      // Same credential as function calls; the platform proxy authenticates the
+      // WS connection with it (anonymous when absent) — no pre-connect token mint.
+      getAuthToken: () => token || getAccessToken(),
     }),
     cleanup: () => {
       userModules.analytics.cleanup();
