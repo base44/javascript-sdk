@@ -60,11 +60,14 @@ export interface AppUserConnectorConnectionResponse {
  *
  * ## Shared connectors
  *
- * All app users share a single OAuth token. Use this for shared accounts. For example, posting to a company Slack channel or reading from a shared Google Calendar. To use a shared connector:
+ * All app users share a single OAuth token. Use this for shared accounts. For example, posting to a company Slack channel or reading from a shared Google Calendar.
  *
- * 1. Connect the external service account in the app's Integration settings or using the [`connectors push`](/developers/references/cli/commands/connectors-push) CLI command.
- * 2. In a backend function, call {@linkcode getConnection | getConnection()} using the service role client (`base44.asServiceRole.connectors`) with an [integration type](#available-connectors) string to retrieve the shared OAuth token.
- * 3. Use the returned `accessToken` to call the external service's API directly. Some connectors also return a `connectionConfig` with additional values such as a subdomain for building the API URL.
+ * Shared connectors come in two forms, depending on how the connector is set up. Both return the same app-wide token, so they differ only in how you identify the connector in code:
+ *
+ * - **Platform connectors** are connected from the app's Integration settings or with the [`connectors push`](/developers/references/cli/commands/connectors-push) CLI command, and are identified by an [integration type](#available-connectors) string. Retrieve them with {@linkcode getConnection | getConnection()}.
+ * - **Workspace-registered connectors** are backed by your own OAuth app, registered once in Workspace Settings and consented to by the app builder. They are identified by a connector ID instead of an integration type. Retrieve them with {@linkcode getWorkspaceConnection | getWorkspaceConnection()}. Connectors whose OAuth app is specific to your own account, such as Databricks and Snowflake, work this way.
+ *
+ * To use a shared connector, call the matching method on the service role client `base44.asServiceRole.connectors` from a backend function, then use the returned `accessToken` to call the external service's API directly. Some connectors also return a `connectionConfig` with additional values, such as a subdomain, that you need to build the API URL.
  *
  * ## App user connectors
  *
@@ -77,7 +80,7 @@ export interface AppUserConnectorConnectionResponse {
  *
  * ## Available connectors
  *
- * All connectors listed below support both shared and app user connections. For shared connectors, pass the integration type string to {@linkcode getConnection | getConnection()}. For app user connectors, register the connector in Workspace Settings and use the connector ID with {@linkcode getCurrentAppUserConnection | getCurrentAppUserConnection()}.
+ * The connectors below can be used as shared connectors or as app user connectors. For a shared platform connector, pass the integration type string to {@linkcode getConnection | getConnection()}. For a connector you register in Workspace Settings with your own OAuth app, use the connector ID with {@linkcode getWorkspaceConnection | getWorkspaceConnection()} for a shared token, or with {@linkcode getCurrentAppUserConnection | getCurrentAppUserConnection()} for a per-user token.
  *
  * | Service | Type identifier |
  * |---|---|
@@ -212,6 +215,8 @@ export interface ConnectorsModule {
    *
    * Use this when a single shared account is connected and all app users access the same token. For per-user tokens, use [`getCurrentAppUserConnection()`](#getcurrentappuserconnection) instead.
    *
+   * This form is for platform connectors identified by an integration type. Connectors backed by your own OAuth app registered in Workspace Settings, such as Databricks and Snowflake, are retrieved by connector ID with {@linkcode getWorkspaceConnection | getWorkspaceConnection()} instead.
+   *
    * Some connectors require connection-specific parameters to build API calls.
    * In such cases, the returned `connectionConfig` is an object with the additional parameters. If there are no extra parameters needed for the connection, the `connectionConfig` is `null`.
    *
@@ -268,28 +273,27 @@ export interface ConnectorsModule {
   ): Promise<ConnectorConnectionResponse>;
 
   /**
-   * Retrieves the OAuth access token and connection configuration for a **workspace-registered** connector
-   * (a connector backed by an OAuth app registered in the workspace, consented to once by the app builder).
+   * Retrieves the shared OAuth access token and connection configuration for a [workspace-registered connector](#shared-connectors).
    *
-   * Use this method when the app's backend function needs to use a connector identified by its
-   * workspace-connector ID rather than a platform integration type. The token returned represents
-   * the app builder's consent against the workspace's OAuth app and is shared across all app users
-   * of the app — identical semantics to the platform-shared {@link getConnection} form,
-   * differing only in which OAuth app was used to produce the token.
+   * Use this for a connector backed by your own OAuth app that you register in Workspace Settings, such as Databricks or Snowflake. The app builder consents to the connector once, and the returned token is shared across all app users of the app. This is the shared-token counterpart to {@linkcode getCurrentAppUserConnection | getCurrentAppUserConnection()}, which returns a per-user token for the same kind of connector. The semantics match {@linkcode getConnection | getConnection()}, except that you identify the connector by ID rather than by integration type.
    *
-   * @param connectorId - The ID of the workspace connector (the `OrganizationConnector` database ID) as surfaced in the builder chat context.
+   * Some connectors require connection-specific parameters to build API calls. In such cases, the returned `connectionConfig` is an object with those parameters, such as the account subdomain used to construct the API URL. When no extra parameters are needed, `connectionConfig` is `null`.
+   *
+   * @param connectorId - The ID of the workspace connector, not the integration type string. You can find it on the connector's settings page in Workspace Settings.
    * @returns Promise resolving to a {@link ConnectorConnectionResponse} with `accessToken` and `connectionConfig`.
    *
    * @example
    * ```typescript
-   * // Get the connection for a workspace-registered connector
-   * const { accessToken, connectionConfig } = await base44.asServiceRole.connectors.getWorkspaceConnection(
-   *   'abc123def',
+   * // Snowflake connection
+   * // Retrieve the shared token and run a statement against the account
+   * const { accessToken, connectionConfig } = await base44.asServiceRole.connectors.getWorkspaceConnection('abc123def');
+   *
+   * const response = await fetch(
+   *   `https://${connectionConfig?.subdomain}.snowflakecomputing.com/api/v2/statements`,
+   *   { headers: { Authorization: `Bearer ${accessToken}` } }
    * );
    *
-   * const response = await fetch(`https://${connectionConfig?.subdomain}.snowflakecomputing.com/api/v2/statements`, {
-   *   headers: { Authorization: `Bearer ${accessToken}` },
-   * });
+   * const data = await response.json();
    * ```
    */
   getWorkspaceConnection(
