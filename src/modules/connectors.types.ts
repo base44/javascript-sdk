@@ -121,6 +121,7 @@ export interface AppUserConnectorConnectionResponse {
  * | Slack Bot | `slackbot` |
  * | Snowflake | `snowflake` |
  * | Splitwise | `splitwise` |
+ * | Square | `square` |
  * | Supabase | `supabase` |
  * | TikTok | `tiktok` |
  * | Typeform | `typeform` |

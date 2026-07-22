@@ -1,9 +1,8 @@
 /**
  * A connection to the Base44 AI Gateway.
  *
- * Contains the base URL and bearer token to use with any OpenAI-compatible client
- * (OpenAI SDK, Mastra, Vercel AI SDK, and others) pointed at the Base44 AI
- * Gateway.
+ * Contains the base URL and bearer token to use with any OpenAI-compatible
+ * client pointed at the Base44 AI Gateway.
  */
 export interface AiGatewayConnection {
   /** Base URL of the gateway's OpenAI-compatible endpoint. */
@@ -21,6 +20,8 @@ export interface AiGatewayModuleConfig {
   serverUrl?: string;
   /** Authentication token */
   token?: string;
+  /** Application ID */
+  appId: string;
 }
 
 /**
@@ -28,7 +29,7 @@ export interface AiGatewayModuleConfig {
  *
  * The gateway exposes an OpenAI-compatible Chat Completions endpoint, so any
  * OpenAI-compatible SDK works against it:
- * - Build custom AI agents with agent SDKs such as Mastra or the Vercel AI SDK
+ * - Build custom AI agents or call models directly from your backend code
  * - Uses your app's models, billing, and credit quota, no API key to manage
  *
  * Available in user authentication mode (`base44.aiGateway`) and with the
@@ -48,55 +49,41 @@ export interface AiGatewayModule {
    *
    * @example
    * ```typescript
-   * // Build an AI agent with Mastra on top of the gateway, inside a backend function
-   * import { createClientFromRequest } from 'npm:@base44/sdk';
-   * import { Agent } from 'npm:@mastra/core/agent';
-   * import { createTool } from 'npm:@mastra/core/tools';
-   * import { createOpenAICompatible } from 'npm:@ai-sdk/openai-compatible';
-   * import { z } from 'npm:zod';
+   * import { ToolLoopAgent, tool, stepCountIs, hasToolCall } from "ai";
+   * import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+   * import { z } from "zod";
    *
-   * Deno.serve(async (req) => {
-   *   const base44 = createClientFromRequest(req);
-   *   const { baseURL, token } = base44.aiGateway.connection();
-   *   const models = createOpenAICompatible({ name: 'base44', baseURL, apiKey: token });
+   * const request = await base44.entities.ReturnRequest.get(returnId);
+   * const { baseURL, token } = base44.aiGateway.connection();
+   * // Point any OpenAI-compatible client at `baseURL` with `apiKey: token`.
+   * const models = createOpenAICompatible({ name: "base44", baseURL, apiKey: token });
    *
-   *   const agent = new Agent({
-   *     id: 'order-helper',
-   *     name: 'order-helper',
-   *     instructions: 'Help the user with their orders.',
-   *     model: models('claude_sonnet_4_6'),
-   *     tools: {
-   *       lookupOrder: createTool({
-   *         id: 'lookup-order',
-   *         description: 'Fetch an order by id',
-   *         inputSchema: z.object({ orderId: z.string() }),
-   *         execute: async ({ orderId }) => base44.entities.Order.get(orderId),
-   *       }),
-   *     },
-   *   });
-   *
-   *   const { text } = await agent.generate('Where is order 123?');
-   *   return Response.json({ text });
+   * const agent = new ToolLoopAgent({
+   *   model: models("automatic"),
+   *   instructions:
+   *     "Decide whether this return looks fine or needs the owner's attention. " +
+   *     "Check the customer's past orders, then submit your verdict.",
+   *   tools: {
+   *     searchOrders: tool({
+   *       description: "This customer's past orders, optionally filtered by status",
+   *       inputSchema: z.object({ status: z.string().optional() }),
+   *       execute: ({ status }) => {
+   *         const query = { customer_email: request.customer_email };
+   *         if (status) query.status = status;
+   *         return base44.entities.Order.filter(query, "-created_date", 50);
+   *       },
+   *     }),
+   *     submitVerdict: tool({
+   *       description: "Record the final verdict",
+   *       inputSchema: z.object({ decision: z.enum(["approved", "flagged"]), reason: z.string() }),
+   *       execute: ({ decision, reason }) =>
+   *         base44.entities.ReturnRequest.update(returnId, { status: decision, review_note: reason }),
+   *     }),
+   *   },
+   *   stopWhen: [stepCountIs(8), hasToolCall("submitVerdict")],
    * });
-   * ```
    *
-   * @example
-   * ```typescript
-   * // Call a model directly with the OpenAI SDK
-   * import { createClientFromRequest } from 'npm:@base44/sdk';
-   * import OpenAI from 'npm:openai';
-   *
-   * Deno.serve(async (req) => {
-   *   const base44 = createClientFromRequest(req);
-   *   const { baseURL, token } = base44.aiGateway.connection();
-   *
-   *   const openai = new OpenAI({ baseURL, apiKey: token });
-   *   const res = await openai.chat.completions.create({
-   *     model: 'claude_sonnet_4_6',
-   *     messages: [{ role: 'user', content: 'Hello!' }],
-   *   });
-   *   return Response.json({ text: res.choices[0].message.content });
-   * });
+   * await agent.generate({ prompt: `Review this return request: ${JSON.stringify(request)}` });
    * ```
    */
   connection(): AiGatewayConnection;
