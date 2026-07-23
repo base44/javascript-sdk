@@ -7,9 +7,8 @@ import type {
 
 interface ActorsConfig {
   appId: string;
-  /** Current user access token, if authenticated. Rides the WS query (same
-   * pattern as the entities socket) so the platform proxy can authenticate the
-   * connection like a backend-function call; anonymous connects omit it. */
+  /** Current user access token, if authenticated. Rides the WS query so the
+   * platform proxy can authenticate the connection; anonymous connects omit it. */
   getAuthToken(): string | null | undefined;
   /** Same semantics as function calls: editors with a non-prod version get the
    * draft actor script; everyone else gets the published one. */
@@ -19,10 +18,8 @@ interface ActorsConfig {
   webSocketImpl?: unknown;
 }
 
-// Heartbeat / half-open detection. PartySocket only reconnects on a browser
-// close/error event, so a silently-dead connection (TCP alive, no data — common
-// behind proxies/LBs) hangs until the OS idle timeout (~60s). Ping periodically
-// and force a reconnect if nothing comes back within DEAD_MS.
+// Heartbeat / half-open detection: PartySocket only reconnects on a close/error
+// event, so ping periodically and force a reconnect if nothing returns in DEAD_MS.
 const PING_MS = 1_000;
 const DEAD_MS = 3_000;
 
@@ -58,9 +55,7 @@ class Room {
       room: this.instanceId,
       id: connId,
       ...(this.config.webSocketImpl ? { WebSocket: this.config.webSocketImpl as any } : {}),
-      // Re-read on every (re)connect so a login/logout between reconnects is
-      // picked up. The platform proxy authenticates the connection itself —
-      // no pre-connect token mint.
+      // Re-read on every (re)connect so a login/logout is picked up.
       query: () => {
         const token = this.config.getAuthToken();
         return {
