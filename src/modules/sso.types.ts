@@ -1,6 +1,5 @@
 /**
  * Response from SSO access token endpoint.
- * @internal
  */
 export interface SsoAccessTokenResponse {
   access_token: string;
@@ -14,8 +13,6 @@ export interface SsoAccessTokenResponse {
  * services.
  *
  * This module is only available to use with a client in service role authentication mode, which means it can only be used in backend environments.
- *
- * @internal
  *
  * @example
  * ```typescript
@@ -55,6 +52,7 @@ export interface SsoModule {
    *
    * @example
    * ```typescript
+   * // Get the user's ID token to read identity claims such as email
    * import { createClientFromRequest } from 'npm:@base44/sdk';
    *
    * Deno.serve(async (req) => {
