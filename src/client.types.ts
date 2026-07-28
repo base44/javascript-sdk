@@ -144,9 +144,7 @@ export interface Base44Client {
     functions: FunctionsModule;
     /** {@link IntegrationsModule | Integrations module} with elevated permissions. */
     integrations: IntegrationsModule;
-    /** {@link SsoModule | SSO module} for generating SSO tokens.
-     * @internal
-     */
+    /** {@link SsoModule | SSO module} for generating SSO tokens. */
     sso: SsoModule;
     /** Cleanup function to disconnect WebSocket connections. */
     cleanup: () => void;
