@@ -11,6 +11,7 @@ import type { AgentsModule } from "./modules/agents.types.js";
 import type { AiGatewayModule } from "./modules/ai-gateway.types.js";
 import type { AppLogsModule } from "./modules/app-logs.types.js";
 import type { AnalyticsModule } from "./modules/analytics.types.js";
+import type { MobileModule } from "./modules/mobile.types.js";
 
 /**
  * Options for creating a Base44 client.
@@ -144,6 +145,8 @@ export interface Base44Client {
     functions: FunctionsModule;
     /** {@link IntegrationsModule | Integrations module} with elevated permissions. */
     integrations: IntegrationsModule;
+    /** {@link MobileModule | Mobile module} for service-role mobile operations. */
+    mobile: MobileModule;
     /** {@link SsoModule | SSO module} for generating SSO tokens.
      * @internal
      */

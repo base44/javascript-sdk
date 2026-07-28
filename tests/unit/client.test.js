@@ -53,6 +53,8 @@ describe('Client Creation', () => {
     expect(client.asServiceRole.entities).toBeDefined();
     expect(client.asServiceRole.integrations).toBeDefined();
     expect(client.asServiceRole.functions).toBeDefined();
+    expect(client.asServiceRole.mobile).toBeDefined();
+    expect(client.mobile).toBeUndefined();
     // Service role should not have auth module
     expect(client.asServiceRole.auth).toBeUndefined();
   });
@@ -73,6 +75,8 @@ describe('Client Creation', () => {
     expect(client.asServiceRole.entities).toBeDefined();
     expect(client.asServiceRole.integrations).toBeDefined();
     expect(client.asServiceRole.functions).toBeDefined();
+    expect(client.asServiceRole.mobile).toBeDefined();
+    expect(client.mobile).toBeUndefined();
     expect(client.asServiceRole.auth).toBeUndefined();
   });
 
@@ -686,4 +690,4 @@ describe('Service Role Authorization Headers', () => {
     expect(scope.isDone()).toBe(true);
   });
 
-}); 
+});

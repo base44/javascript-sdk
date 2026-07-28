@@ -16,5 +16,8 @@
   "functions": [
     "invoke",
     "fetch"
+  ],
+  "mobile": [
+    "sendNotification"
   ]
 }

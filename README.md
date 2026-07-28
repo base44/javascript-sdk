@@ -29,6 +29,7 @@ The SDK provides access to Base44's functionality through the following modules:
 - **[`entities`](https://docs.base44.com/developers/references/sdk/docs/interfaces/entities)**: Work with your app's data entities using CRUD operations.
 - **[`functions`](https://docs.base44.com/developers/references/sdk/docs/interfaces/functions)**: Execute backend functions.
 - **[`integrations`](https://docs.base44.com/developers/references/sdk/docs/type-aliases/integrations)**: Access pre-built and third-party integrations.
+- **`mobile`**: Send AppUser mobile push notifications from service-role backend code.
 
 ## Quickstarts
 
@@ -95,6 +96,8 @@ Deno.serve(async (req) => {
   return Response.json({ orders: allOrders });
 });
 ```
+
+Service-role-only modules such as `base44.asServiceRole.mobile` are available only in backend functions. Use `base44.asServiceRole.mobile.sendNotification(...)` to send AppUser push notifications from backend code after validating that the caller is allowed to trigger the notification. Do not expose mobile push sending from frontend/client-side code.
 
 ## Learn more
 
