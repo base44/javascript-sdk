@@ -8,6 +8,7 @@ import type {
 } from "./modules/connectors.types.js";
 import type { FunctionsModule } from "./modules/functions.types.js";
 import type { AgentsModule } from "./modules/agents.types.js";
+import type { SuperagentModule } from "./modules/superagent.types.js";
 import type { AiGatewayModule } from "./modules/ai-gateway.types.js";
 import type { AppLogsModule } from "./modules/app-logs.types.js";
 import type { AnalyticsModule } from "./modules/analytics.types.js";
@@ -104,6 +105,8 @@ export interface Base44Client {
   functions: FunctionsModule;
   /** {@link IntegrationsModule | Integrations module} for calling pre-built integration endpoints. */
   integrations: IntegrationsModule;
+  /** {@link SuperagentModule | Superagent module} for anonymous chat with the app's linked public superagent. */
+  superagent: SuperagentModule;
   /** Cleanup function to disconnect WebSocket connections. Call when you're done with the client. */
   cleanup: () => void;
 

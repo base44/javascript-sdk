@@ -8,6 +8,12 @@ export interface RoomsSocketConfig {
   transports: string[];
   appId: string;
   token?: string;
+  /**
+   * Force an anonymous handshake: never attach a token (including the stored
+   * access token fallback), so the connection is identified only by its
+   * anonymous visitor id.
+   */
+  anonymous?: boolean;
 }
 
 export type TSocketRoom = string;
@@ -42,7 +48,9 @@ function initializeSocket(
   // handshake so the backend can verify room access for anonymous agent
   // conversations (mirrors the X-Base44-Anonymous-Id HTTP header). Authenticated
   // clients are identified by their token instead.
-  const resolvedToken = config.token ?? getAccessToken();
+  const resolvedToken = config.anonymous
+    ? undefined
+    : config.token ?? getAccessToken();
   const query: Record<string, string | null | undefined> = {
     app_id: config.appId,
     token: resolvedToken,

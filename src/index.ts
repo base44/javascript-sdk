@@ -101,6 +101,12 @@ export type {
 } from "./modules/agents.types.js";
 
 export type {
+  SuperagentModule,
+  SuperagentHandle,
+  CreateSuperagentConversationParams,
+} from "./modules/superagent.types.js";
+
+export type {
   AiGatewayModule,
   AiGatewayConnection,
 } from "./modules/ai-gateway.types.js";
