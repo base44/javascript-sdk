@@ -130,6 +130,26 @@ class Room {
   }
 }
 
+/**
+ * Base WebSocket URL for Actor connections. An explicit `actorsWsUrl` wins;
+ * otherwise the app's own origin (`appBaseUrl`, else the browser origin, else
+ * `serverUrl`) with `https://`→`wss://` / `http://`→`ws://` and no trailing
+ * slash — the app proxies `/parties` to the backend dispatcher.
+ */
+export function resolveActorsWsUrl(opts: {
+  actorsWsUrl?: string;
+  appBaseUrl?: string;
+  browserOrigin?: string;
+  serverUrl: string;
+}): string {
+  if (opts.actorsWsUrl) return opts.actorsWsUrl.replace(/\/$/, "");
+  const appOrigin = opts.appBaseUrl || opts.browserOrigin || "";
+  return (appOrigin || opts.serverUrl)
+    .replace(/\/$/, "")
+    .replace(/^https:\/\//, "wss://")
+    .replace(/^http:\/\//, "ws://");
+}
+
 export function createActorsModule(config: ActorsConfig) {
   // Live rooms this client opened, so client.cleanup() can reclaim any the app
   // forgot to close() (each room removes itself here on close).

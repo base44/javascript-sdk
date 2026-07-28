@@ -28,7 +28,7 @@ const { sockets, FakeSocket } = vi.hoisted(() => {
 
 vi.mock("partysocket", () => ({ default: FakeSocket }));
 
-import { createActorsModule } from "../../src/modules/actors.ts";
+import { createActorsModule, resolveActorsWsUrl } from "../../src/modules/actors.ts";
 
 describe("Actors Module — room handle", () => {
   const config = {
@@ -130,6 +130,29 @@ describe("Actors Module — room handle", () => {
     expect(sockets).toHaveLength(2);
   });
 
+  test("functionsVersion rides the query as fv when set, omitted when unset", () => {
+    mod().GameRoom("r").connect();
+    expect(sockets[0].opts.query()).not.toHaveProperty("fv");
+    mod({ ...config, functionsVersion: "draft" }).GameRoom("r2").connect();
+    expect(sockets[1].opts.query()).toMatchObject({ fv: "draft" });
+  });
+
+  test("heartbeat pings periodically and reconnects when the link goes silent", () => {
+    vi.useFakeTimers();
+    try {
+      mod().GameRoom("r").connect();
+      const ws = sockets[0];
+      const reconnect = vi.spyOn(ws, "reconnect");
+      vi.advanceTimersByTime(1000); // one PING_MS tick, still within DEAD_MS
+      expect(ws.sent).toContain(JSON.stringify({ type: "__ping" }));
+      expect(reconnect).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(4000); // no inbound message → exceed DEAD_MS
+      expect(reconnect).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   test("module is not thenable (then must not resolve to a room factory)", () => {
     const actors = mod() as unknown as { then?: unknown };
     expect(actors.then).toBeUndefined();
@@ -151,5 +174,35 @@ describe("Actors Module — room handle", () => {
     a.close();
     expect(() => closeAll()).not.toThrow();
     expect(sockets.every((s) => s.closed)).toBe(true);
+  });
+});
+
+describe("resolveActorsWsUrl", () => {
+  test("explicit actorsWsUrl wins, trailing slash stripped", () => {
+    expect(
+      resolveActorsWsUrl({ actorsWsUrl: "wss://edge.example/", serverUrl: "https://api" }),
+    ).toBe("wss://edge.example");
+  });
+
+  test("appBaseUrl over serverUrl; https → wss", () => {
+    expect(
+      resolveActorsWsUrl({ appBaseUrl: "https://app.example/", serverUrl: "https://api.example" }),
+    ).toBe("wss://app.example");
+  });
+
+  test("http → ws", () => {
+    expect(
+      resolveActorsWsUrl({ appBaseUrl: "http://localhost:3000", serverUrl: "https://api" }),
+    ).toBe("ws://localhost:3000");
+  });
+
+  test("browserOrigin used when no appBaseUrl", () => {
+    expect(
+      resolveActorsWsUrl({ browserOrigin: "https://tab.example", serverUrl: "https://api.example" }),
+    ).toBe("wss://tab.example");
+  });
+
+  test("falls back to serverUrl (Node/SSR, no origin)", () => {
+    expect(resolveActorsWsUrl({ serverUrl: "https://api.example" })).toBe("wss://api.example");
   });
 });

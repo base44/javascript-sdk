@@ -20,7 +20,7 @@ import type {
   CreateClientOptions,
 } from "./client.types.js";
 import { createAnalyticsModule } from "./modules/analytics.js";
-import { createActorsModule } from "./modules/actors.js";
+import { createActorsModule, resolveActorsWsUrl } from "./modules/actors.js";
 
 // Re-export client types
 export type { Base44Client, CreateClientConfig, CreateClientOptions };
@@ -79,23 +79,15 @@ export function createClient(config: CreateClientConfig): Base44Client {
   // Normalize appBaseUrl to always be a string (empty if not provided or invalid)
   const normalizedAppBaseUrl = typeof appBaseUrl === "string" ? appBaseUrl : "";
 
-  // Derive the Actor WebSocket URL if not explicitly provided. Default to
-  // the app's OWN origin (the app URL proxies /parties to the backend) so the
-  // socket is same-origin with the running app, not the API host: prefer an
-  // explicit appBaseUrl, then the browser origin, then fall back to serverUrl
-  // (Node/SSR, where there's no window). Convert https:// → wss:// (http → ws)
-  // and strip the trailing slash.
-  const resolvedActorsWsUrl = (() => {
-    if (actorsWsUrl) return actorsWsUrl.replace(/\/$/, "");
-    const appOrigin =
-      normalizedAppBaseUrl ||
-      // React Native has a bare `window` with no `location`, so guard both.
-      (typeof window !== "undefined" ? window.location?.origin ?? "" : "");
-    return (appOrigin || serverUrl)
-      .replace(/\/$/, "")
-      .replace(/^https:\/\//, "wss://")
-      .replace(/^http:\/\//, "ws://");
-  })();
+  // Same-origin with the running app (it proxies /parties to the backend), not
+  // the API host. React Native has a bare `window` with no `location`, so guard both.
+  const resolvedActorsWsUrl = resolveActorsWsUrl({
+    actorsWsUrl,
+    appBaseUrl: normalizedAppBaseUrl,
+    browserOrigin:
+      typeof window !== "undefined" ? window.location?.origin ?? "" : "",
+    serverUrl,
+  });
 
   const socketConfig: RoomsSocketConfig = {
     serverUrl,

@@ -70,7 +70,7 @@ export interface ActorRoom<N extends string = string> {
   /** Register a message listener. Multiple are allowed; returns a per-listener unsubscribe. */
   subscribe(callback: (data: ToClientFor<N>) => void): ActorSubscription;
 
-  /** Send a message. Throws before {@link connect}; buffered by the socket until open. */
+  /** Send a message. Throws before {@link connect}; buffered by the socket once connecting. */
   send(data: ToServerFor<N>): void;
 
   /** Tear down the socket, heartbeat, and all listeners. */
