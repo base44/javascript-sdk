@@ -224,8 +224,6 @@ export function createClient(config: CreateClientConfig): Base44Client {
       appId,
       actorsWsUrl: resolvedActorsWsUrl,
       functionsVersion,
-      // Same credential as function calls; the platform proxy authenticates the
-      // WS connection with it (anonymous when absent) — no pre-connect token mint.
       getAuthToken: () => token || getAccessToken(),
     }),
     cleanup: () => {
