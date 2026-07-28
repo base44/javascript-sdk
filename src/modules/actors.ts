@@ -134,21 +134,13 @@ export function createActorsModule(config: ActorsConfig) {
   // Live rooms this client opened, so client.cleanup() can reclaim any the app
   // forgot to close() (each room removes itself here on close).
   const rooms = new Set<Room>();
-  const api = {
-    closeAll: () => {
-      for (const room of [...rooms]) room.close();
-    },
-  };
-  return new Proxy(
-    api as typeof api & Record<string, (instanceId: string) => ActorRoom>,
+  const module = new Proxy(
+    {} as Record<string, (instanceId: string) => ActorRoom>,
     {
-      get(target, key) {
-        // Own methods (closeAll), inherited/symbol keys, and `then` (so the
-        // module isn't mistaken for a thenable when awaited) resolve normally;
-        // any other string key is an actor name → a room factory.
-        if (key === "then" || typeof key !== "string" || key in target) {
-          return Reflect.get(target, key);
-        }
+      get(_, key) {
+        // Symbols and `then` resolve to undefined (so the module isn't mistaken
+        // for a thenable when awaited); any string key is an actor name.
+        if (typeof key !== "string" || key === "then") return undefined;
         return (instanceId: string) => {
           const room = new Room(key, instanceId, config, () => rooms.delete(room));
           rooms.add(room);
@@ -157,4 +149,10 @@ export function createActorsModule(config: ActorsConfig) {
       },
     },
   );
+  return {
+    module,
+    closeAll: () => {
+      for (const room of [...rooms]) room.close();
+    },
+  };
 }

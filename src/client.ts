@@ -183,6 +183,13 @@ export function createClient(config: CreateClientConfig): Base44Client {
     }
   }
 
+  const actorsModule = createActorsModule({
+    appId,
+    actorsWsUrl: resolvedActorsWsUrl,
+    functionsVersion,
+    getAuthToken: () => token || getAccessToken(),
+  });
+
   const userModules = {
     entities: createEntitiesModule({
       axios: axiosClient,
@@ -220,15 +227,10 @@ export function createClient(config: CreateClientConfig): Base44Client {
       appId,
       userAuthModule,
     }),
-    actors: createActorsModule({
-      appId,
-      actorsWsUrl: resolvedActorsWsUrl,
-      functionsVersion,
-      getAuthToken: () => token || getAccessToken(),
-    }),
+    actors: actorsModule.module,
     cleanup: () => {
       userModules.analytics.cleanup();
-      userModules.actors.closeAll();
+      actorsModule.closeAll();
       if (socket) {
         socket.disconnect();
       }
