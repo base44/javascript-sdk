@@ -228,6 +228,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     }),
     cleanup: () => {
       userModules.analytics.cleanup();
+      userModules.actors.closeAll();
       if (socket) {
         socket.disconnect();
       }

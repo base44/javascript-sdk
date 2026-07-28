@@ -31,6 +31,7 @@ class Room {
     private readonly actorName: string,
     private readonly instanceId: string,
     private readonly config: ActorsConfig,
+    private readonly onClose?: () => void,
   ) {}
 
   get id(): string {
@@ -124,13 +125,32 @@ class Room {
     this.listeners.clear();
     this.ws?.close();
     this.ws = null;
+    this.onClose?.();
   }
 }
 
 export function createActorsModule(config: ActorsConfig) {
-  return new Proxy({} as Record<string, (instanceId: string) => ActorRoom>, {
-    get(_, actorName: string) {
-      return (instanceId: string) => new Room(actorName, instanceId, config) as unknown as ActorRoom;
+  // Live rooms this client opened, so client.cleanup() can reclaim any the app
+  // forgot to close() (each room removes itself here on close).
+  const rooms = new Set<Room>();
+  const api = {
+    closeAll: () => {
+      for (const room of [...rooms]) room.close();
     },
-  });
+  };
+  return new Proxy(
+    api as typeof api & Record<string, (instanceId: string) => ActorRoom>,
+    {
+      get(target, key) {
+        // Own methods (closeAll) and non-string keys resolve normally; any other
+        // string key is an actor name → a room factory.
+        if (typeof key !== "string" || key in target) return Reflect.get(target, key);
+        return (instanceId: string) => {
+          const room = new Room(key, instanceId, config, () => rooms.delete(room));
+          rooms.add(room);
+          return room as unknown as ActorRoom;
+        };
+      },
+    },
+  );
 }

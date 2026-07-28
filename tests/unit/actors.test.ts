@@ -119,4 +119,22 @@ describe("Actors Module — room handle", () => {
     actors.GameRoom("r").connect();
     expect(sockets).toHaveLength(2);
   });
+
+  test("closeAll() tears down every open room", () => {
+    const actors = createActorsModule(config);
+    actors.GameRoom("a").connect();
+    actors.GameRoom("b").connect();
+    expect(sockets.filter((s) => s.closed)).toHaveLength(0);
+    actors.closeAll();
+    expect(sockets.every((s) => s.closed)).toBe(true);
+  });
+
+  test("closeAll() is safe after an individual close() and closes the rest", () => {
+    const actors = createActorsModule(config);
+    const a = actors.GameRoom("a").connect();
+    actors.GameRoom("b").connect();
+    a.close();
+    expect(() => actors.closeAll()).not.toThrow();
+    expect(sockets.every((s) => s.closed)).toBe(true);
+  });
 });
