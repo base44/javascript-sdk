@@ -13,9 +13,7 @@ interface ActorsConfig {
   /** Same semantics as function calls: editors with a non-prod version get the
    * draft actor script; everyone else gets the published one. */
   functionsVersion?: string;
-  dispatcherWsUrl: string;
-  /** WebSocket implementation for runtimes without a global one (Node < 22). */
-  webSocketImpl?: unknown;
+  actorsWsUrl: string;
 }
 
 // Heartbeat / half-open detection: PartySocket only reconnects on a close/error
@@ -50,11 +48,10 @@ class Room {
     this.connId = connId;
 
     const ws = new PartySocket({
-      host: this.config.dispatcherWsUrl,
+      host: this.config.actorsWsUrl,
       party: this.actorName,
       room: this.instanceId,
       id: connId,
-      ...(this.config.webSocketImpl ? { WebSocket: this.config.webSocketImpl as any } : {}),
       // Re-read on every (re)connect so a login/logout is picked up.
       query: () => {
         const token = this.config.getAuthToken();
@@ -91,6 +88,9 @@ class Room {
         return;
       }
       try {
+        // Server contract: the deployed Actor shim echoes __ping with __pong
+        // (see base44-userapp-bundler shim/actor.ts). If that ever stops, an
+        // idle room's lastMsg goes stale and this watchdog reconnects every DEAD_MS.
         ws.send(JSON.stringify({ type: "__ping" }));
       } catch {
         // socket not open; the watchdog above will force a reconnect

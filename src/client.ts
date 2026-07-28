@@ -73,21 +73,20 @@ export function createClient(config: CreateClientConfig): Base44Client {
     options,
     functionsVersion,
     headers: optionalHeaders,
-    dispatcherWsUrl,
-    webSocketImpl,
+    actorsWsUrl,
   } = config;
 
   // Normalize appBaseUrl to always be a string (empty if not provided or invalid)
   const normalizedAppBaseUrl = typeof appBaseUrl === "string" ? appBaseUrl : "";
 
-  // Derive the dispatcher WebSocket URL if not explicitly provided. Default to
+  // Derive the Actor WebSocket URL if not explicitly provided. Default to
   // the app's OWN origin (the app URL proxies /parties to the backend) so the
   // socket is same-origin with the running app, not the API host: prefer an
   // explicit appBaseUrl, then the browser origin, then fall back to serverUrl
   // (Node/SSR, where there's no window). Convert https:// → wss:// (http → ws)
   // and strip the trailing slash.
-  const resolvedDispatcherWsUrl = (() => {
-    if (dispatcherWsUrl) return dispatcherWsUrl.replace(/\/$/, "");
+  const resolvedActorsWsUrl = (() => {
+    if (actorsWsUrl) return actorsWsUrl.replace(/\/$/, "");
     const appOrigin =
       normalizedAppBaseUrl ||
       // React Native has a bare `window` with no `location`, so guard both.
@@ -223,8 +222,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     }),
     actors: createActorsModule({
       appId,
-      dispatcherWsUrl: resolvedDispatcherWsUrl,
-      webSocketImpl,
+      actorsWsUrl: resolvedActorsWsUrl,
       functionsVersion,
       // Same credential as function calls; the platform proxy authenticates the
       // WS connection with it (anonymous when absent) — no pre-connect token mint.

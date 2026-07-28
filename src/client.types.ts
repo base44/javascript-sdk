@@ -80,27 +80,15 @@ export interface CreateClientConfig {
    */
   options?: CreateClientOptions;
   /**
-   * Base WebSocket URL for the Cloudflare Durable Object dispatcher.
+   * Base WebSocket URL for Actor connections.
    *
    * Defaults to the app's own origin (`appBaseUrl`, else the browser's
    * `window.location.origin`, else `serverUrl`) with `https://` replaced by
-   * `wss://` (or `http://` by `ws://`) — so the realtime socket is same-origin
-   * with the running app, which proxies `/parties` to the backend.
-   * Override when the dispatcher lives at a different host than the app.
+   * `wss://` (or `http://` by `ws://`) — so the Actor socket is same-origin
+   * with the running app, which proxies `/parties` to the backend dispatcher.
+   * Override only when the Actor host differs from the app origin.
    */
-  dispatcherWsUrl?: string;
-  /**
-   * WebSocket implementation for realtime subscriptions in environments
-   * without a global `WebSocket` (Node.js < 22). Browsers and Node ≥ 22
-   * don't need this.
-   *
-   * @example
-   * ```typescript
-   * import WS from "ws";
-   * const base44 = createClient({ appId, webSocketImpl: WS });
-   * ```
-   */
-  webSocketImpl?: unknown;
+  actorsWsUrl?: string;
 }
 
 /**

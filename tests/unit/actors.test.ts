@@ -35,7 +35,7 @@ describe("Actors Module — room handle", () => {
     appId: "app-1",
     getAuthToken: () => "user-tok",
     functionsVersion: undefined,
-    dispatcherWsUrl: "wss://disp.example",
+    actorsWsUrl: "wss://disp.example",
   };
 
   beforeEach(() => { sockets.length = 0; });
