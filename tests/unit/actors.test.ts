@@ -120,6 +120,11 @@ describe("Actors Module — room handle", () => {
     expect(sockets).toHaveLength(2);
   });
 
+  test("module is not thenable (then must not resolve to a room factory)", () => {
+    const actors = createActorsModule(config) as unknown as { then?: unknown };
+    expect(actors.then).toBeUndefined();
+  });
+
   test("closeAll() tears down every open room", () => {
     const actors = createActorsModule(config);
     actors.GameRoom("a").connect();

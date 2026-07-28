@@ -142,9 +142,12 @@ export function createActorsModule(config: ActorsConfig) {
     api as typeof api & Record<string, (instanceId: string) => ActorRoom>,
     {
       get(target, key) {
-        // Own methods (closeAll) and non-string keys resolve normally; any other
-        // string key is an actor name → a room factory.
-        if (typeof key !== "string" || key in target) return Reflect.get(target, key);
+        // Own methods (closeAll), inherited/symbol keys, and `then` (so the
+        // module isn't mistaken for a thenable when awaited) resolve normally;
+        // any other string key is an actor name → a room factory.
+        if (key === "then" || typeof key !== "string" || key in target) {
+          return Reflect.get(target, key);
+        }
         return (instanceId: string) => {
           const room = new Room(key, instanceId, config, () => rooms.delete(room));
           rooms.add(room);
