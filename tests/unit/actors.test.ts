@@ -107,6 +107,13 @@ describe("Actors Module — room handle", () => {
     expect(got).toHaveLength(0);
   });
 
+  test("close() clears the id (only valid while connected)", () => {
+    const room = createActorsModule(config).GameRoom("r").connect({ id: "c1" });
+    expect(room.id).toBe("c1");
+    room.close();
+    expect(() => room.id).toThrow(/connect\(\)/);
+  });
+
   test("anonymous connect omits the token", () => {
     const room = createActorsModule({ ...config, getAuthToken: () => null }).GameRoom("r").connect();
     expect(room).toBeDefined();

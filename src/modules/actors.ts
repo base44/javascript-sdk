@@ -125,6 +125,7 @@ class Room {
     this.listeners.clear();
     this.ws?.close();
     this.ws = null;
+    this.connId = null;
     this.onClose?.();
   }
 }
