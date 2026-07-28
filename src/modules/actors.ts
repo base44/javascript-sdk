@@ -74,10 +74,10 @@ class Room {
       try {
         data = JSON.parse(ev.data);
       } catch {
-        return; // ignore malformed
+        return;
       }
       const msgType = data && typeof data === "object" ? (data as { type?: unknown }).type : undefined;
-      if (msgType === "__pong") return; // platform message — never surface it
+      if (msgType === "__pong") return;
       for (const listener of this.listeners) listener(data);
     });
 
@@ -88,12 +88,11 @@ class Room {
         return;
       }
       try {
-        // Server contract: the deployed Actor shim echoes __ping with __pong
-        // (see base44-userapp-bundler shim/actor.ts). If that ever stops, an
-        // idle room's lastMsg goes stale and this watchdog reconnects every DEAD_MS.
+        // The deployed shim echoes __ping → __pong (base44-userapp-bundler
+        // shim/actor.ts); without that, an idle room reconnects every DEAD_MS.
         ws.send(JSON.stringify({ type: "__ping" }));
       } catch {
-        // socket not open; the watchdog above will force a reconnect
+        // not open; the watchdog above will reconnect
       }
     }, PING_MS);
 
