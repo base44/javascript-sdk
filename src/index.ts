@@ -107,6 +107,11 @@ export type {
 
 export type { AppLogsModule } from "./modules/app-logs.types.js";
 
+export type {
+  AppUserSecretsModule,
+  AppUserSecretStatus,
+} from "./modules/app-user-secrets.types.js";
+
 export type { SsoModule, SsoAccessTokenResponse } from "./modules/sso.types.js";
 
 export type {
