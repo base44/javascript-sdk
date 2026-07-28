@@ -1,13 +1,13 @@
 /**
- * A connection to the Base44 AI Gateway.
- *
- * Contains the base URL and bearer token to use with any OpenAI-compatible
- * client pointed at the Base44 AI Gateway.
+ * Connection details for the Base44 AI Gateway.
  */
 export interface AiGatewayConnection {
-  /** Base URL of the gateway's OpenAI-compatible endpoint. */
+  /** Base URL of the gateway's OpenAI-compatible Chat Completions endpoint. */
   baseURL: string;
-  /** Bearer token used to authenticate requests to the gateway. */
+  /**
+   * Bearer token that authenticates the request. Empty string when the caller is
+   * unauthenticated.
+   */
   token: string;
 }
 
@@ -27,13 +27,45 @@ export interface AiGatewayModuleConfig {
 /**
  * AI Gateway module for calling Base44's managed AI models from your own code.
  *
- * The gateway exposes an OpenAI-compatible Chat Completions endpoint, so any
- * OpenAI-compatible SDK works against it:
- * - Build custom AI agents or call models directly from your backend code
- * - Uses your app's models, billing, and credit quota, no API key to manage
+ * `connection()` hands you a `baseURL` and `token` that authenticate as your
+ * Base44 app. An OpenAI-compatible client is any library, such as the `openai`
+ * SDK or the Vercel AI SDK, that has the same request and response format
+ * as OpenAI's Chat Completions API and lets you point it at a custom `baseURL`
+ * instead of OpenAI's own servers. Pass `connection()`'s values to one of
+ * these clients and it works against Base44's gateway exactly as it would
+ * against the provider directly, no separate account, API key, or billing
+ * setup with the underlying model provider required.
  *
- * Available in user authentication mode (`base44.aiGateway`) and with the
- * service-role token via `base44.asServiceRole.aiGateway`.
+ * Call `connection()` from a backend function rather than the browser. This
+ * keeps your instructions, tools, and business logic server-side, and lets
+ * you enforce your own auth, rate, and spend limits around the call. The
+ * `token` it returns is the caller's regular session token, the same one
+ * used for every other SDK call.
+ *
+ * ## Models
+ *
+ * You can use any of the [models available through `InvokeLLM`](/developers/references/sdk/docs/type-aliases/integrations#invokellm).
+ * Pass `'automatic'` to let Base44 choose one, or pin a specific model such
+ * as `'claude_sonnet_4_6'`, `'gpt_5_5'`, or `'gemini_3_1_pro'`.
+ *
+ * ## Authentication Modes
+ *
+ * There's no permission difference between modes. Both just determine which
+ * token `connection()` returns:
+ *
+ * - **User authentication** (`base44.aiGateway`): Returns the signed-in app user's token.
+ * - **Service role authentication** (`base44.asServiceRole.aiGateway`): Returns the service-role token instead, for calling the gateway when there's no signed-in user, such as from a scheduled automation.
+ *
+ * ## Billing and limits
+ *
+ * Requests are billed to your app's credit quota, which is the same shared
+ * quota your app's built-in AI features use, and isn't split per user. If the
+ * app runs out of credits, the gateway stops working for every user of the
+ * app until the quota resets. A request is rejected before the model runs if
+ * the app is out of credits. If you need to cap usage per user, build that
+ * check yourself, for example by tracking calls per user in your own entity.
+ *
+ * Streaming responses aren't supported yet, so leave `stream` unset on your requests.
  */
 export interface AiGatewayModule {
   /**
@@ -41,19 +73,38 @@ export interface AiGatewayModule {
    *
    * Returns the `baseURL` and `token` to pass to any OpenAI-compatible client.
    *
-   * The `token` is the current caller's bearer token: the app user's token for
-   * `base44.aiGateway`, or the service-role token for `base44.asServiceRole.aiGateway`.
-   * When the caller is unauthenticated, `token` is an empty string.
-   *
    * @returns The gateway {@linkcode AiGatewayConnection | connection} (`baseURL` and `token`).
    *
    * @example
    * ```typescript
+   * // Call a model directly
+   * import { createClientFromRequest } from "@base44/sdk";
+   * import OpenAI from "openai";
+   *
+   * // Runs inside a backend function
+   * const base44 = createClientFromRequest(request);
+   * const { baseURL, token } = base44.aiGateway.connection();
+   * const openai = new OpenAI({ baseURL, apiKey: token });
+   *
+   * const response = await openai.chat.completions.create({
+   *   model: "automatic",
+   *   messages: [{ role: "user", content: "Summarize this week's top support tickets." }],
+   * });
+   *
+   * console.log(response.choices[0].message.content);
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Use a tool-calling agent
+   * import { createClientFromRequest } from "@base44/sdk";
    * import { ToolLoopAgent, tool, stepCountIs, hasToolCall } from "ai";
    * import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
    * import { z } from "zod";
    *
-   * const request = await base44.entities.ReturnRequest.get(returnId);
+   * // Runs inside a backend function, reviewing a return request
+   * const base44 = createClientFromRequest(request);
+   * const returnRequest = await base44.entities.ReturnRequest.get(returnId);
    * const { baseURL, token } = base44.aiGateway.connection();
    * // Point any OpenAI-compatible client at `baseURL` with `apiKey: token`.
    * const models = createOpenAICompatible({ name: "base44", baseURL, apiKey: token });
@@ -68,7 +119,7 @@ export interface AiGatewayModule {
    *       description: "This customer's past orders, optionally filtered by status",
    *       inputSchema: z.object({ status: z.string().optional() }),
    *       execute: ({ status }) => {
-   *         const query = { customer_email: request.customer_email };
+   *         const query = { customer_email: returnRequest.customer_email };
    *         if (status) query.status = status;
    *         return base44.entities.Order.filter(query, "-created_date", 50);
    *       },
@@ -83,7 +134,7 @@ export interface AiGatewayModule {
    *   stopWhen: [stepCountIs(8), hasToolCall("submitVerdict")],
    * });
    *
-   * await agent.generate({ prompt: `Review this return request: ${JSON.stringify(request)}` });
+   * await agent.generate({ prompt: `Review this return request: ${JSON.stringify(returnRequest)}` });
    * ```
    */
   connection(): AiGatewayConnection;
