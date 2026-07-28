@@ -98,7 +98,7 @@ describe('appBaseUrl Normalization', () => {
 
     // Verify the redirect URL uses the custom appBaseUrl
     expect(mockLocation.href).toBe(
-      `${customAppBaseUrl}/login?from_url=${encodeURIComponent(nextUrl)}`
+      `${customAppBaseUrl}/login?from_url=${encodeURIComponent(nextUrl)}&app_id=test-app-id`
     );
 
     // Restore window

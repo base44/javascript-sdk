@@ -6,6 +6,7 @@ import {
   ChangePasswordParams,
   ResetPasswordParams,
 } from "./auth.types";
+import { getLoginUrl } from "../utils/auth-utils.js";
 
 function isInsideIframe(): boolean {
   if (typeof window === "undefined") return false;
@@ -116,8 +117,11 @@ export function createAuthModule(
         ? new URL(nextUrl, window.location.origin).toString()
         : window.location.href;
 
-      // Build the login URL
-      const loginUrl = `${options.appBaseUrl}/login?from_url=${encodeURIComponent(redirectUrl)}`;
+      // A foreign origin (e.g. local dev) can't resolve the app by Host, so
+      // the login URL must carry the app id; same-origin keeps the bare path.
+      const loginUrl = options.appBaseUrl
+        ? getLoginUrl(redirectUrl, { serverUrl: options.appBaseUrl, appId })
+        : `/login?from_url=${encodeURIComponent(redirectUrl)}`;
 
       // Redirect to the login page
       window.location.href = loginUrl;

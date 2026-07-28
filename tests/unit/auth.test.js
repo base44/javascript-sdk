@@ -165,7 +165,7 @@ describe('Auth Module', () => {
 
       // Verify the redirect URL was set correctly
       expect(mockLocation.href).toBe(
-        `${appBaseUrl}/login?from_url=${encodeURIComponent(nextUrl)}`
+        `${appBaseUrl}/login?from_url=${encodeURIComponent(nextUrl)}&app_id=${appId}`
       );
 
       // Restore window
@@ -185,7 +185,7 @@ describe('Auth Module', () => {
 
       // Verify the redirect URL uses current URL
       expect(mockLocation.href).toBe(
-        `${appBaseUrl}/login?from_url=${encodeURIComponent(currentUrl)}`
+        `${appBaseUrl}/login?from_url=${encodeURIComponent(currentUrl)}&app_id=${appId}`
       );
 
       // Restore window
@@ -212,7 +212,7 @@ describe('Auth Module', () => {
 
       // Verify the redirect URL uses the custom appBaseUrl
       expect(mockLocation.href).toBe(
-        `${customAppBaseUrl}/login?from_url=${encodeURIComponent(nextUrl)}`
+        `${customAppBaseUrl}/login?from_url=${encodeURIComponent(nextUrl)}&app_id=${appId}`
       );
 
       // Restore window
