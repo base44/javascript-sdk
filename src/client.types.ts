@@ -79,16 +79,6 @@ export interface CreateClientConfig {
    * Additional client options.
    */
   options?: CreateClientOptions;
-  /**
-   * Base WebSocket URL for Actor connections.
-   *
-   * Defaults to the app's own origin (`appBaseUrl`, else the browser's
-   * `window.location.origin`, else `serverUrl`) with `https://` replaced by
-   * `wss://` (or `http://` by `ws://`) — so the Actor socket is same-origin
-   * with the running app, which proxies `/parties` to the backend dispatcher.
-   * Override only when the Actor host differs from the app origin.
-   */
-  actorsWsUrl?: string;
 }
 
 /**

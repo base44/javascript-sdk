@@ -20,7 +20,7 @@ import type {
   CreateClientOptions,
 } from "./client.types.js";
 import { createAnalyticsModule } from "./modules/analytics.js";
-import { createActorsModule, resolveActorsWsUrl } from "./modules/actors.js";
+import { createActorsModule } from "./modules/actors.js";
 
 // Re-export client types
 export type { Base44Client, CreateClientConfig, CreateClientOptions };
@@ -73,21 +73,10 @@ export function createClient(config: CreateClientConfig): Base44Client {
     options,
     functionsVersion,
     headers: optionalHeaders,
-    actorsWsUrl,
   } = config;
 
   // Normalize appBaseUrl to always be a string (empty if not provided or invalid)
   const normalizedAppBaseUrl = typeof appBaseUrl === "string" ? appBaseUrl : "";
-
-  // Same-origin with the running app (it proxies /parties to the backend), not
-  // the API host. React Native has a bare `window` with no `location`, so guard both.
-  const resolvedActorsWsUrl = resolveActorsWsUrl({
-    actorsWsUrl,
-    appBaseUrl: normalizedAppBaseUrl,
-    browserOrigin:
-      typeof window !== "undefined" ? window.location?.origin ?? "" : "",
-    serverUrl,
-  });
 
   const socketConfig: RoomsSocketConfig = {
     serverUrl,
@@ -177,7 +166,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
 
   const actorsModule = createActorsModule({
     appId,
-    actorsWsUrl: resolvedActorsWsUrl,
+    serverUrl,
     functionsVersion,
     getAuthToken: () => token || getAccessToken(),
   });

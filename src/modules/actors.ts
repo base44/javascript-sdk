@@ -13,7 +13,9 @@ interface ActorsConfig {
   /** Same semantics as function calls: editors with a non-prod version get the
    * draft actor script; everyone else gets the published one. */
   functionsVersion?: string;
-  actorsWsUrl: string;
+  /** The app's own origin; PartySocket strips the scheme and connects wss (ws
+   * for localhost), so the socket is same-origin (the app proxies /parties). */
+  serverUrl: string;
 }
 
 // Heartbeat / half-open detection: PartySocket only reconnects on a close/error
@@ -49,7 +51,7 @@ class Room {
     this.connId = connId;
 
     const ws = new PartySocket({
-      host: this.config.actorsWsUrl,
+      host: this.config.serverUrl,
       party: this.actorName,
       room: this.instanceId,
       id: connId,
@@ -128,26 +130,6 @@ class Room {
     this.connId = null;
     this.onClose?.();
   }
-}
-
-/**
- * Base WebSocket URL for Actor connections. An explicit `actorsWsUrl` wins;
- * otherwise the app's own origin (`appBaseUrl`, else the browser origin, else
- * `serverUrl`) with `https://`→`wss://` / `http://`→`ws://` and no trailing
- * slash — the app proxies `/parties` to the backend dispatcher.
- */
-export function resolveActorsWsUrl(opts: {
-  actorsWsUrl?: string;
-  appBaseUrl?: string;
-  browserOrigin?: string;
-  serverUrl: string;
-}): string {
-  if (opts.actorsWsUrl) return opts.actorsWsUrl.replace(/\/$/, "");
-  const appOrigin = opts.appBaseUrl || opts.browserOrigin || "";
-  return (appOrigin || opts.serverUrl)
-    .replace(/\/$/, "")
-    .replace(/^https:\/\//, "wss://")
-    .replace(/^http:\/\//, "ws://");
 }
 
 export function createActorsModule(config: ActorsConfig) {

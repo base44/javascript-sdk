@@ -28,14 +28,14 @@ const { sockets, FakeSocket } = vi.hoisted(() => {
 
 vi.mock("partysocket", () => ({ default: FakeSocket }));
 
-import { createActorsModule, resolveActorsWsUrl } from "../../src/modules/actors.ts";
+import { createActorsModule } from "../../src/modules/actors.ts";
 
 describe("Actors Module — room handle", () => {
   const config = {
     appId: "app-1",
     getAuthToken: () => "user-tok",
     functionsVersion: undefined,
-    actorsWsUrl: "wss://disp.example",
+    serverUrl: "https://app.example",
   };
 
   // The module (Proxy of actor names). closeAll is separate — see its own tests.
@@ -52,6 +52,8 @@ describe("Actors Module — room handle", () => {
     expect(q).toMatchObject({ app_id: "app-1", handler: "GameRoom", token: "user-tok" });
     expect(sockets[0].opts.room).toBe("room-1");
     expect(sockets[0].opts.id).toBe("conn-1");
+    // serverUrl passes straight through as PartySocket's host (it swaps the scheme).
+    expect(sockets[0].opts.host).toBe("https://app.example");
   });
 
   test("connect() is idempotent", () => {
@@ -174,35 +176,5 @@ describe("Actors Module — room handle", () => {
     a.close();
     expect(() => closeAll()).not.toThrow();
     expect(sockets.every((s) => s.closed)).toBe(true);
-  });
-});
-
-describe("resolveActorsWsUrl", () => {
-  test("explicit actorsWsUrl wins, trailing slash stripped", () => {
-    expect(
-      resolveActorsWsUrl({ actorsWsUrl: "wss://edge.example/", serverUrl: "https://api" }),
-    ).toBe("wss://edge.example");
-  });
-
-  test("appBaseUrl over serverUrl; https → wss", () => {
-    expect(
-      resolveActorsWsUrl({ appBaseUrl: "https://app.example/", serverUrl: "https://api.example" }),
-    ).toBe("wss://app.example");
-  });
-
-  test("http → ws", () => {
-    expect(
-      resolveActorsWsUrl({ appBaseUrl: "http://localhost:3000", serverUrl: "https://api" }),
-    ).toBe("ws://localhost:3000");
-  });
-
-  test("browserOrigin used when no appBaseUrl", () => {
-    expect(
-      resolveActorsWsUrl({ browserOrigin: "https://tab.example", serverUrl: "https://api.example" }),
-    ).toBe("wss://tab.example");
-  });
-
-  test("falls back to serverUrl (Node/SSR, no origin)", () => {
-    expect(resolveActorsWsUrl({ serverUrl: "https://api.example" })).toBe("wss://api.example");
   });
 });
