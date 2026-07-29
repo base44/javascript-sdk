@@ -30,7 +30,7 @@ vi.mock("partysocket", () => ({ default: FakeSocket }));
 
 import { createActorsModule, resolveActorsHost } from "../../src/modules/actors.ts";
 
-describe("Actors Module — room handle", () => {
+describe("Actors Module — connection API", () => {
   const config = {
     appId: "app-1",
     getAuthToken: () => "user-tok",
@@ -44,10 +44,9 @@ describe("Actors Module — room handle", () => {
   beforeEach(() => { sockets.length = 0; });
 
   test("connect() opens exactly one socket with the auth query", () => {
-    const actors = mod();
-    const room = actors.GameRoom("room-1").connect({ id: "conn-1" });
+    const conn = mod().GameRoom("room-1").connect({ id: "conn-1" });
     expect(sockets).toHaveLength(1);
-    expect(room.id).toBe("conn-1");
+    expect(conn.id).toBe("conn-1");
     const q = sockets[0].opts.query();
     expect(q).toMatchObject({ app_id: "app-1", handler: "GameRoom", token: "user-tok" });
     expect(sockets[0].opts.room).toBe("room-1");
@@ -56,24 +55,19 @@ describe("Actors Module — room handle", () => {
     expect(sockets[0].opts.host).toBe("https://app.example");
   });
 
-  test("connect() is idempotent", () => {
-    const room = mod().GameRoom("r").connect();
-    room.connect();
+  test("connect() is idempotent per handle", () => {
+    const ref = mod().GameRoom("r");
+    const a = ref.connect();
+    const b = ref.connect();
     expect(sockets).toHaveLength(1);
-  });
-
-  test("subscribe/send/id throw before connect()", () => {
-    const room = mod().GameRoom("r");
-    expect(() => room.subscribe(() => {})).toThrow(/connect\(\)/);
-    expect(() => room.send({})).toThrow(/connect\(\)/);
-    expect(() => room.id).toThrow(/connect\(\)/);
+    expect(a).toBe(b);
   });
 
   test("multiple listeners all receive; unsubscribe removes only its own", () => {
-    const room = mod().GameRoom("r").connect();
+    const conn = mod().GameRoom("r").connect();
     const a: unknown[] = [], b: unknown[] = [];
-    const subA = room.subscribe((m) => a.push(m));
-    room.subscribe((m) => b.push(m));
+    const subA = conn.subscribe((m) => a.push(m));
+    conn.subscribe((m) => b.push(m));
 
     sockets[0].message({ type: "tick", n: 1 });
     expect(a).toHaveLength(1);
@@ -87,25 +81,25 @@ describe("Actors Module — room handle", () => {
   });
 
   test("__pong platform messages are swallowed", () => {
-    const room = mod().GameRoom("r").connect();
+    const conn = mod().GameRoom("r").connect();
     const got: unknown[] = [];
-    room.subscribe((m) => got.push(m));
+    conn.subscribe((m) => got.push(m));
     sockets[0].message({ type: "__pong" });
     sockets[0].message({ type: "tick" });
     expect(got).toEqual([{ type: "tick" }]);
   });
 
   test("send serializes onto the socket", () => {
-    const room = mod().GameRoom("r").connect();
-    room.send({ type: "join", name: "alice" });
+    const conn = mod().GameRoom("r").connect();
+    conn.send({ type: "join", name: "alice" });
     expect(sockets[0].sent).toContain(JSON.stringify({ type: "join", name: "alice" }));
   });
 
   test("close() tears down socket and all listeners", () => {
-    const room = mod().GameRoom("r").connect();
+    const conn = mod().GameRoom("r").connect();
     const got: unknown[] = [];
-    room.subscribe((m) => got.push(m));
-    room.close();
+    conn.subscribe((m) => got.push(m));
+    conn.close();
     expect(sockets[0].closed).toBe(true);
     // a late message reaches nobody (listeners cleared)
     sockets[0].message({ type: "tick" });
@@ -113,25 +107,18 @@ describe("Actors Module — room handle", () => {
   });
 
   test("connect() after close() opens a fresh socket with a new id", () => {
-    const room = mod().GameRoom("r");
-    room.connect({ id: "c1" });
+    const ref = mod().GameRoom("r");
+    const c1 = ref.connect({ id: "c1" });
     expect(sockets).toHaveLength(1);
-    room.close();
-    room.connect({ id: "c2" });
+    c1.close();
+    const c2 = ref.connect({ id: "c2" });
     expect(sockets).toHaveLength(2); // a new socket, not the closed one reused
-    expect(room.id).toBe("c2");
-  });
-
-  test("close() clears the id (only valid while connected)", () => {
-    const room = mod().GameRoom("r").connect({ id: "c1" });
-    expect(room.id).toBe("c1");
-    room.close();
-    expect(() => room.id).toThrow(/connect\(\)/);
+    expect(c2.id).toBe("c2");
   });
 
   test("anonymous connect omits the token", () => {
-    const room = mod({ ...config, getAuthToken: () => null }).GameRoom("r").connect();
-    expect(room).toBeDefined();
+    const conn = mod({ ...config, getAuthToken: () => null }).GameRoom("r").connect();
+    expect(conn).toBeDefined();
     expect(sockets[0].opts.query()).not.toHaveProperty("token");
   });
 
@@ -165,12 +152,12 @@ describe("Actors Module — room handle", () => {
     }
   });
 
-  test("module is not thenable (then must not resolve to a room factory)", () => {
+  test("module is not thenable (then must not resolve to an actor factory)", () => {
     const actors = mod() as unknown as { then?: unknown };
     expect(actors.then).toBeUndefined();
   });
 
-  test("closeAll() tears down every open room", () => {
+  test("closeAll() closes every open connection", () => {
     const { module, closeAll } = createActorsModule(config);
     module.GameRoom("a").connect();
     module.GameRoom("b").connect();

@@ -110,6 +110,10 @@ export type { AppLogsModule } from "./modules/app-logs.types.js";
 export type {
   ActorsModule,
   ActorClient,
+  ActorRef,
+  Connection,
+  ActorSubscription,
+  ActorConnectOptions,
   ActorNameRegistry,
   ActorRegistry,
 } from "./modules/actors.types.js";

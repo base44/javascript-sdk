@@ -39,7 +39,7 @@ type ToServerFor<N extends string> = N extends keyof ActorRegistry
     : unknown
   : unknown;
 
-/** Options for {@link ActorRoom.connect}. */
+/** Options for {@link ActorRef.connect}. */
 export interface ActorConnectOptions {
   /**
    * The connection id — becomes the actor's `conn.id`. Supply a stable value
@@ -49,28 +49,25 @@ export interface ActorConnectOptions {
   id?: string;
 }
 
-/** Handle for one listener registered via {@link ActorRoom.subscribe}. */
+/** Handle for one listener registered via {@link Connection.subscribe}. */
 export interface ActorSubscription {
   /** Remove this listener; other listeners and the socket stay live. */
   unsubscribe(): void;
 }
 
 /**
- * A single actor room. Obtained from {@link ActorClient} (`actors.MyActor(id)`)
- * and made live with {@link connect}. The handle IS the connection: one socket,
- * any number of {@link subscribe} listeners.
+ * A live connection to an actor instance, returned by {@link ActorRef.connect}.
+ * `subscribe`/`send` are always valid — you only get a `Connection` once the
+ * socket has been opened, so there's no pre-connect state to guard against.
  */
-export interface ActorRoom<N extends string = string> {
-  /** The connection id (the value the actor sees as `conn.id`). Throws before {@link connect}. */
+export interface Connection<N extends string = string> {
+  /** The connection id (the value the actor sees as `conn.id`). */
   readonly id: string;
-
-  /** Open the WebSocket (required before subscribe/send). Idempotent; returns this. */
-  connect(options?: ActorConnectOptions): this;
 
   /** Register a message listener. Multiple are allowed; returns a per-listener unsubscribe. */
   subscribe(callback: (data: ToClientFor<N>) => void): ActorSubscription;
 
-  /** Send a message. Throws before {@link connect}; buffered by the socket once connecting. */
+  /** Send a message. Buffered by the socket until it's open. */
   send(data: ToServerFor<N>): void;
 
   /** Tear down the socket, heartbeat, and all listeners. */
@@ -78,12 +75,21 @@ export interface ActorRoom<N extends string = string> {
 }
 
 /**
- * Client for a single named Actor — call it with a room id to get an
- * {@link ActorRoom}. Typed automatically when the actor is registered in
+ * A handle to one actor instance — `base44.actors.MyActor(id)`. Call
+ * {@link connect} to open the socket and get a {@link Connection}.
+ */
+export interface ActorRef<N extends string = string> {
+  /** Open the WebSocket and return the {@link Connection}. Idempotent. */
+  connect(options?: ActorConnectOptions): Connection<N>;
+}
+
+/**
+ * Client for a single named Actor — call it with an instance id to get an
+ * {@link ActorRef}. Typed automatically when the actor is registered in
  * {@link ActorRegistry}.
  */
 export interface ActorClient<N extends string = string> {
-  (instanceId: string): ActorRoom<N>;
+  (instanceId: string): ActorRef<N>;
 }
 
 /**
@@ -91,11 +97,11 @@ export interface ActorClient<N extends string = string> {
  * Actors deployed by the Base44 platform.
  *
  * ```typescript
- * const room = base44.actors.MyActor("room-1").connect();
- * const sub = room.subscribe((msg) => console.log(msg)); // typed via ActorRegistry
- * room.send({ type: "message", text: "hi" });
+ * const conn = base44.actors.MyActor("room-1").connect();
+ * const sub = conn.subscribe((msg) => console.log(msg)); // typed via ActorRegistry
+ * conn.send({ type: "message", text: "hi" });
  * sub.unsubscribe();
- * room.close();
+ * conn.close();
  * ```
  */
 export type ActorsModule = {

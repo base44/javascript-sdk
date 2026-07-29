@@ -1,7 +1,8 @@
 import PartySocket from "partysocket";
 import type {
   ActorConnectOptions,
-  ActorRoom,
+  ActorRef,
+  Connection as ConnectionType,
   ActorSubscription,
 } from "./actors.types.js";
 
@@ -23,46 +24,40 @@ interface ActorsConfig {
 const PING_MS = 1_000;
 const DEAD_MS = 3_000;
 
-class Room {
-  private ws: PartySocket | null = null;
+/**
+ * A live connection to an actor instance. Only obtainable from
+ * {@link ActorRef.connect}, so `subscribe`/`send` are always valid — the socket
+ * exists for this object's whole lifetime.
+ */
+class Connection {
+  private readonly ws: PartySocket;
   private readonly listeners = new Set<(data: unknown) => void>();
   private heartbeat: ReturnType<typeof setInterval> | null = null;
-  private connId: string | null = null;
+  /** The client-chosen conn id — becomes _pk → the actor's conn.id. */
+  readonly id: string;
 
   constructor(
-    private readonly actorName: string,
-    private readonly instanceId: string,
-    private readonly config: ActorsConfig,
-    private readonly onClose?: () => void,
-  ) {}
-
-  get id(): string {
-    if (!this.connId) {
-      throw new Error(`${this.actorName}:${this.instanceId}: connect() before reading id`);
-    }
-    return this.connId;
-  }
-
-  connect(options?: ActorConnectOptions): this {
-    if (this.ws) return this;
-
-    // The client picks its own conn id; it becomes _pk → the actor's conn.id.
-    const connId = options?.id ?? crypto.randomUUID();
-    this.connId = connId;
+    actorName: string,
+    instanceId: string,
+    config: ActorsConfig,
+    options: ActorConnectOptions | undefined,
+    private readonly onClose: () => void,
+  ) {
+    this.id = options?.id ?? crypto.randomUUID();
 
     const ws = new PartySocket({
-      host: this.config.host,
-      party: this.actorName,
-      room: this.instanceId,
-      id: connId,
+      host: config.host,
+      party: actorName,
+      room: instanceId,
+      id: this.id,
       // Re-read on every (re)connect so a login/logout is picked up.
       query: () => {
-        const token = this.config.getAuthToken();
+        const token = config.getAuthToken();
         return {
-          app_id: this.config.appId,
-          handler: this.actorName,
+          app_id: config.appId,
+          handler: actorName,
           ...(token ? { token } : {}),
-          ...(this.config.functionsVersion ? { fv: this.config.functionsVersion } : {}),
+          ...(config.functionsVersion ? { fv: config.functionsVersion } : {}),
         };
       },
     });
@@ -98,14 +93,9 @@ class Room {
         // not open; the watchdog above will reconnect
       }
     }, PING_MS);
-
-    return this;
   }
 
   subscribe(callback: (data: unknown) => void): ActorSubscription {
-    if (!this.ws) {
-      throw new Error(`${this.actorName}:${this.instanceId}: connect() before subscribe()`);
-    }
     this.listeners.add(callback);
     return {
       unsubscribe: () => { this.listeners.delete(callback); },
@@ -113,9 +103,6 @@ class Room {
   }
 
   send(data: unknown): void {
-    if (!this.ws) {
-      throw new Error(`${this.actorName}:${this.instanceId}: connect() before send()`);
-    }
     this.ws.send(JSON.stringify(data));
   }
 
@@ -125,11 +112,31 @@ class Room {
       this.heartbeat = null;
     }
     this.listeners.clear();
-    this.ws?.close();
-    this.ws = null;
-    this.connId = null;
-    this.onClose?.();
+    this.ws.close();
+    this.onClose();
   }
+}
+
+/** Handle for one actor instance: `connect()` opens the socket (idempotent). */
+function makeActorRef(
+  actorName: string,
+  instanceId: string,
+  config: ActorsConfig,
+  connections: Set<Connection>,
+): ActorRef {
+  let conn: Connection | null = null;
+  return {
+    connect(options?: ActorConnectOptions) {
+      if (conn) return conn as unknown as ConnectionType;
+      const c = new Connection(actorName, instanceId, config, options, () => {
+        connections.delete(c);
+        if (conn === c) conn = null; // allow a fresh connect() after close
+      });
+      conn = c;
+      connections.add(c);
+      return c as unknown as ConnectionType;
+    },
+  };
 }
 
 /**
@@ -143,28 +150,25 @@ export function resolveActorsHost(serverUrl: string, browserOrigin?: string): st
 }
 
 export function createActorsModule(config: ActorsConfig) {
-  // Live rooms this client opened, so client.cleanup() can reclaim any the app
-  // forgot to close() (each room removes itself here on close).
-  const rooms = new Set<Room>();
+  // Live connections this client opened, so client.cleanup() can reclaim any the
+  // app forgot to close() (each connection removes itself here on close).
+  const connections = new Set<Connection>();
   const module = new Proxy(
-    {} as Record<string, (instanceId: string) => ActorRoom>,
+    {} as Record<string, (instanceId: string) => ActorRef>,
     {
       get(_, key) {
         // Symbols and `then` resolve to undefined (so the module isn't mistaken
         // for a thenable when awaited); any string key is an actor name.
         if (typeof key !== "string" || key === "then") return undefined;
-        return (instanceId: string) => {
-          const room = new Room(key, instanceId, config, () => rooms.delete(room));
-          rooms.add(room);
-          return room as unknown as ActorRoom;
-        };
+        return (instanceId: string) =>
+          makeActorRef(key, instanceId, config, connections);
       },
     },
   );
   return {
     module,
     closeAll: () => {
-      for (const room of [...rooms]) room.close();
+      for (const c of [...connections]) c.close();
     },
   };
 }
