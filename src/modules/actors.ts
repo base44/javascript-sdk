@@ -13,9 +13,9 @@ interface ActorsConfig {
   /** Same semantics as function calls: editors with a non-prod version get the
    * draft actor script; everyone else gets the published one. */
   functionsVersion?: string;
-  /** The app's own origin; PartySocket strips the scheme and connects wss (ws
-   * for localhost), so the socket is same-origin (the app proxies /parties). */
-  serverUrl: string;
+  /** Absolute host PartySocket dials (it strips the scheme and connects wss, ws
+   * for localhost). Resolved by {@link resolveActorsHost}. */
+  host: string;
 }
 
 // Heartbeat / half-open detection: PartySocket only reconnects on a close/error
@@ -51,7 +51,7 @@ class Room {
     this.connId = connId;
 
     const ws = new PartySocket({
-      host: this.config.serverUrl,
+      host: this.config.host,
       party: this.actorName,
       room: this.instanceId,
       id: connId,
@@ -130,6 +130,16 @@ class Room {
     this.connId = null;
     this.onClose?.();
   }
+}
+
+/**
+ * Absolute host for the actor WebSocket. PartySocket needs an absolute host and
+ * can't resolve a relative/empty `serverUrl` (same-origin apps use a relative
+ * `/api`, so `serverUrl` is often `""`), so fall back to the page origin.
+ * PartySocket handles the scheme (https→wss, ws for localhost).
+ */
+export function resolveActorsHost(serverUrl: string, browserOrigin?: string): string {
+  return serverUrl && !serverUrl.startsWith("/") ? serverUrl : browserOrigin ?? serverUrl;
 }
 
 export function createActorsModule(config: ActorsConfig) {

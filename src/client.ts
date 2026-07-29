@@ -20,7 +20,7 @@ import type {
   CreateClientOptions,
 } from "./client.types.js";
 import { createAnalyticsModule } from "./modules/analytics.js";
-import { createActorsModule } from "./modules/actors.js";
+import { createActorsModule, resolveActorsHost } from "./modules/actors.js";
 
 // Re-export client types
 export type { Base44Client, CreateClientConfig, CreateClientOptions };
@@ -166,7 +166,12 @@ export function createClient(config: CreateClientConfig): Base44Client {
 
   const actorsModule = createActorsModule({
     appId,
-    serverUrl,
+    // serverUrl is often relative/empty (same-origin app); PartySocket needs an
+    // absolute host, so fall back to the page origin.
+    host: resolveActorsHost(
+      serverUrl,
+      typeof window !== "undefined" ? window.location?.origin : undefined,
+    ),
     functionsVersion,
     getAuthToken: () => token || getAccessToken(),
   });

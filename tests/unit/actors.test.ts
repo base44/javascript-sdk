@@ -28,14 +28,14 @@ const { sockets, FakeSocket } = vi.hoisted(() => {
 
 vi.mock("partysocket", () => ({ default: FakeSocket }));
 
-import { createActorsModule } from "../../src/modules/actors.ts";
+import { createActorsModule, resolveActorsHost } from "../../src/modules/actors.ts";
 
 describe("Actors Module — room handle", () => {
   const config = {
     appId: "app-1",
     getAuthToken: () => "user-tok",
     functionsVersion: undefined,
-    serverUrl: "https://app.example",
+    host: "https://app.example",
   };
 
   // The module (Proxy of actor names). closeAll is separate — see its own tests.
@@ -52,7 +52,7 @@ describe("Actors Module — room handle", () => {
     expect(q).toMatchObject({ app_id: "app-1", handler: "GameRoom", token: "user-tok" });
     expect(sockets[0].opts.room).toBe("room-1");
     expect(sockets[0].opts.id).toBe("conn-1");
-    // serverUrl passes straight through as PartySocket's host (it swaps the scheme).
+    // the resolved host is handed to PartySocket (which swaps the scheme).
     expect(sockets[0].opts.host).toBe("https://app.example");
   });
 
@@ -176,5 +176,25 @@ describe("Actors Module — room handle", () => {
     a.close();
     expect(() => closeAll()).not.toThrow();
     expect(sockets.every((s) => s.closed)).toBe(true);
+  });
+});
+
+describe("resolveActorsHost", () => {
+  test("absolute serverUrl is used as-is", () => {
+    expect(resolveActorsHost("https://api.example", "https://tab.example")).toBe(
+      "https://api.example",
+    );
+  });
+
+  test("empty serverUrl falls back to the browser origin", () => {
+    expect(resolveActorsHost("", "https://tab.example")).toBe("https://tab.example");
+  });
+
+  test("relative serverUrl (/api) falls back to the browser origin", () => {
+    expect(resolveActorsHost("/api", "https://tab.example")).toBe("https://tab.example");
+  });
+
+  test("no origin available (non-browser) returns the serverUrl unchanged", () => {
+    expect(resolveActorsHost("", undefined)).toBe("");
   });
 });
