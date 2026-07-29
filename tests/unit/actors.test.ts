@@ -112,6 +112,16 @@ describe("Actors Module — room handle", () => {
     expect(got).toHaveLength(0);
   });
 
+  test("connect() after close() opens a fresh socket with a new id", () => {
+    const room = mod().GameRoom("r");
+    room.connect({ id: "c1" });
+    expect(sockets).toHaveLength(1);
+    room.close();
+    room.connect({ id: "c2" });
+    expect(sockets).toHaveLength(2); // a new socket, not the closed one reused
+    expect(room.id).toBe("c2");
+  });
+
   test("close() clears the id (only valid while connected)", () => {
     const room = mod().GameRoom("r").connect({ id: "c1" });
     expect(room.id).toBe("c1");
