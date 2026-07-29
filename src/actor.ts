@@ -11,7 +11,6 @@
 
 import type { Base44Client } from "./client";
 
-
 /**
  * A single client connection. `Send` is the message type this connection accepts
  * via {@link send} — the actor's *outgoing* (server→client) messages.
@@ -36,7 +35,6 @@ export interface Storage {
    *  later rejoin re-bootstraps exactly like a brand-new room. */
   deleteAll(): Promise<void>;
 }
-
 
 /**
  * Base class for an Actor.
@@ -110,5 +108,4 @@ export abstract class Actor<Incoming = unknown, Outgoing = unknown> {
   protected get client(): Base44Client {
     throw new Error("Actor.client is only available inside a deployed actor");
   }
-
 }
