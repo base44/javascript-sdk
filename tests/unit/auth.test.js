@@ -219,6 +219,23 @@ describe('Auth Module', () => {
       global.window = originalWindow;
     });
 
+    test('should preserve a query string in nextUrl through from_url encoding', () => {
+      const originalWindow = global.window;
+      const mockLocation = { href: '' };
+      global.window = {
+        location: mockLocation
+      };
+
+      const nextUrl = 'https://example.com/dashboard?tab=x&page=2';
+      base44.auth.redirectToLogin(nextUrl);
+
+      expect(mockLocation.href).toBe(
+        `${appBaseUrl}/login?from_url=${encodeURIComponent(nextUrl)}&app_id=${appId}`
+      );
+
+      global.window = originalWindow;
+    });
+
     test('should use relative URL for login redirect when appBaseUrl is not provided', () => {
       // Create a client without appBaseUrl
       const clientWithoutAppBaseUrl = createClient({
