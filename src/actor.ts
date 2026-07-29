@@ -102,7 +102,9 @@ export abstract class Actor<Incoming = unknown, Outgoing = unknown> {
 
   /**
    * Anonymous Base44 client scoped to this actor instance — no user or service
-   * auth, so entity access is RLS-gated (same as a logged-out visitor).
+   * auth, so entity access is RLS-gated (same as a logged-out visitor). Always
+   * operates on production data: an actor runs server-side with no per-connection
+   * identity, so a Test DB preview selected in the editor does not apply here.
    * Example: `const rows = await this.client.entities.Score.list();`
    */
   protected get client(): Base44Client {
