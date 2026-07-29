@@ -107,7 +107,20 @@ export type {
 
 export type { AppLogsModule } from "./modules/app-logs.types.js";
 
+export type {
+  ActorsModule,
+  ActorClient,
+  ActorRef,
+  Connection,
+  ActorSubscription,
+  ActorConnectOptions,
+  ActorNameRegistry,
+  ActorRegistry,
+} from "./modules/actors.types.js";
+
 export type { SsoModule, SsoAccessTokenResponse } from "./modules/sso.types.js";
+
+export { Actor, type Conn } from "./actor.js";
 
 export type {
   ConnectorsModule,
