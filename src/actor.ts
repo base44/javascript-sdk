@@ -9,6 +9,8 @@
  * Cloudflare Durable Object implementation — this file provides types only.
  */
 
+import type { Base44Client } from "./client";
+
 
 /**
  * A single client connection. `Send` is the message type this connection accepts
@@ -98,6 +100,15 @@ export abstract class Actor<Incoming = unknown, Outgoing = unknown> {
 
   protected get storage(): Storage {
     throw new Error("Actor.storage is only available inside a deployed actor");
+  }
+
+  /**
+   * Anonymous Base44 client scoped to this actor instance — no user or service
+   * auth, so entity access is RLS-gated (same as a logged-out visitor).
+   * Example: `const rows = await this.client.entities.Score.list();`
+   */
+  protected get client(): Base44Client {
+    throw new Error("Actor.client is only available inside a deployed actor");
   }
 
 }
