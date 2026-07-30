@@ -8,6 +8,7 @@ import {
   createUserConnectorsModule,
 } from "./modules/connectors.js";
 import { getAccessToken } from "./utils/auth-utils.js";
+import { redeemSessionHandoffCode } from "./utils/session-handoff.js";
 import { createFunctionsModule } from "./modules/functions.js";
 import { createAgentsModule } from "./modules/agents.js";
 import { createAiGatewayModule } from "./modules/ai-gateway.js";
@@ -158,10 +159,31 @@ export function createClient(config: CreateClientConfig): Base44Client {
   // requests during construction (notably analytics, which fires an init
   // event whose flush calls auth.me()). Without this, the first User/me
   // request is built before setToken runs and goes out unauthenticated.
+  //
+  // Precedence: an explicit config token wins (legacy behavior); then a PKCE
+  // session-code handoff in the URL (base44-dev/apper#17216 §5.2) — the user
+  // just completed a login, so it outranks any stored token, mirroring how
+  // getAccessToken prefers a URL access_token over localStorage; then the
+  // legacy capture. When the server spoke legacy — including after a backend
+  // rollback — redeemSessionHandoffCode() returns null synchronously and the
+  // legacy capture below runs unchanged.
+  let tokenBootstrap: Promise<void> | null = null;
   if (typeof window !== "undefined") {
-    const accessToken = token || getAccessToken();
-    if (accessToken) {
-      userAuthModule.setToken(accessToken);
+    const sessionExchange = token ? null : redeemSessionHandoffCode();
+    if (sessionExchange) {
+      tokenBootstrap = sessionExchange.then((exchangedToken) => {
+        // On exchange failure, fall back to any stored token rather than
+        // leaving auth state empty (same fallback getAccessToken applies).
+        const accessToken = exchangedToken || getAccessToken();
+        if (accessToken) {
+          userAuthModule.setToken(accessToken);
+        }
+      });
+    } else {
+      const accessToken = token || getAccessToken();
+      if (accessToken) {
+        userAuthModule.setToken(accessToken);
+      }
     }
   }
 
@@ -265,6 +287,13 @@ export function createClient(config: CreateClientConfig): Base44Client {
     // We perform this check asynchronously to not block client creation
     setTimeout(async () => {
       try {
+        // A pending session-code exchange must settle before the auth probe.
+        // Probing early would see no token, redirect to login, and abandon
+        // the in-flight exchange — minting a fresh code on every round, i.e.
+        // a login loop (the exact BUG-787 failure shape).
+        if (tokenBootstrap) {
+          await tokenBootstrap;
+        }
         const isAuthenticated = await userModules.auth.isAuthenticated();
         if (!isAuthenticated) {
           userModules.auth.redirectToLogin(window.location.href);

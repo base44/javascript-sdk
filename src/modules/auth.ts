@@ -8,6 +8,7 @@ import {
   ResetPasswordParams,
 } from "./auth.types";
 import { resetAnalyticsSessionContext } from "./analytics.js";
+import { prepareSessionHandoffKickoff } from "../utils/session-handoff.js";
 
 function isInsideIframe(): boolean {
   if (typeof window === "undefined") return false;
@@ -179,10 +180,32 @@ export function createAuthModule(
       const loginUrl = `${options.appBaseUrl}/api${authPath}?${queryParams}`;
 
       // When running inside an iframe, use a popup to avoid OAuth providers
-      // blocking iframe navigation.
+      // blocking iframe navigation. Popups stay on the exact legacy kickoff:
+      // they deliver the token via postMessage and never redeem a code (the
+      // backend skips the code mint when popup_origin is present).
       if (isInsideIframe()) {
         const popupLoginUrl = `${loginUrl}&popup_origin=${encodeURIComponent(window.location.origin)}`;
         return loginViaPopup(popupLoginUrl, redirectUrl, window.location.origin);
+      }
+
+      // Full-page SSO redirect: offer the PKCE session-code handoff
+      // (base44-dev/apper#17216 §5.2). The backend decides per request whether
+      // to use it; a server that answers with the legacy ?access_token= —
+      // including after a backend rollback — is honored unchanged at
+      // redemption. If PKCE can't be prepared locally, kick off with the
+      // unmodified legacy URL (version=2 without a valid challenge is a 400
+      // at /login, so it's all-or-nothing).
+      if (provider === "sso") {
+        prepareSessionHandoffKickoff()
+          .then((pkceQuery) => {
+            window.location.href = pkceQuery
+              ? `${loginUrl}${pkceQuery}`
+              : loginUrl;
+          })
+          .catch(() => {
+            window.location.href = loginUrl;
+          });
+        return;
       }
 
       // Default: full-page redirect
