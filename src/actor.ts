@@ -17,12 +17,9 @@ import type { Base44Client } from "./client";
  */
 export interface Conn<Send = unknown> {
   /** Unique per-connection id (one per socket/tab), the same value the client
-   *  receives from `subscribe()`. Use this — not userId — to identify a distinct
-   *  client, so multiple tabs of the same user are separate connections. */
+   *  receives from `subscribe()`. Identifies a distinct client, so multiple
+   *  tabs are separate connections. */
   id: string;
-  userId: string;
-  appId: string;
-  instanceId: string;
   send(data: Send): void;
   reject(code: number, reason: string): void;
 }
@@ -64,11 +61,32 @@ export abstract class Actor<Incoming = unknown, Outgoing = unknown> {
   handleStart(): void | Promise<void> {}
 
   /**
+   * Optional handler for scheduled wakes. Runs when a timer armed via
+   * {@link schedule} comes due, receiving the same `key` that was scheduled.
+   * The schedule is one-shot: it fires once and is cleared before this runs.
+   */
+  protected handleWake(_key: string): void | Promise<void> {}
+
+  /**
+   * Arm a one-shot wake at `at` (epoch ms or a `Date`), identified by `key`.
+   * When it comes due the platform calls {@link handleWake} with this `key`.
+   * Scheduling the same `key` again reschedules it.
+   */
+  protected schedule(_key: string, _at: number | Date): Promise<void> {
+    throw new Error("Actor.schedule() is only available inside a deployed actor");
+  }
+
+  /** Cancel a pending wake previously armed with {@link schedule}. */
+  protected cancelSchedule(_key: string): Promise<void> {
+    throw new Error("Actor.cancelSchedule() is only available inside a deployed actor");
+  }
+
+  /**
    * Managed ticker (opt-in). Override {@link shouldTick} and the platform runs
    * {@link handleTick} on a timer of {@link tickIntervalMs} while it returns true,
    * and stops (letting the Durable Object hibernate — no compute cost) when it
    * returns false. The platform owns scheduling, rescheduling, self-heal, and
-   * error-safety — you don't call {@link startLoop}/{@link stopLoop}.
+   * error-safety.
    *
    * Re-evaluated after every connect/message/close and on every tick, so keep it
    * cheap and pure (no async, no side effects). Example: `return this.players >= 2`.
@@ -82,14 +100,6 @@ export abstract class Actor<Incoming = unknown, Outgoing = unknown> {
 
   protected getConnections(): Conn<Outgoing>[] {
     throw new Error("Actor.getConnections() is only available inside a deployed actor");
-  }
-
-  protected startLoop(_ms: number): Promise<void> {
-    throw new Error("Actor.startLoop() is only available inside a deployed actor");
-  }
-
-  protected stopLoop(): Promise<void> {
-    throw new Error("Actor.stopLoop() is only available inside a deployed actor");
   }
 
   protected get instanceId(): string {
