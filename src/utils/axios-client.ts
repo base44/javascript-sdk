@@ -1,6 +1,5 @@
 import axios from "axios";
 import { isInIFrame } from "./common.js";
-import { v4 as uuidv4 } from "uuid";
 import { getAnalyticsSessionId } from "../modules/analytics.js";
 import type { Base44ErrorJSON } from "./axios-client.types.js";
 
@@ -186,7 +185,7 @@ export function createAxiosClient({
         config.headers.set("X-Base44-Anonymous-Id", getAnalyticsSessionId());
       }
     }
-    const requestId = uuidv4();
+    const requestId = crypto.randomUUID();
     (config as any).requestId = requestId;
     if (isInIFrame) {
       try {
