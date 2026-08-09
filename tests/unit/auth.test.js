@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import nock from 'nock';
 import { createClient } from '../../src/index.ts';
+import { getSharedInstance } from '../../src/utils/sharedInstance.ts';
 
 describe('Auth Module', () => {
   let base44;
@@ -90,8 +91,75 @@ describe('Auth Module', () => {
       // Verify all mocks were called
       expect(scope.isDone()).toBe(true);
     });
+
+    test('shares one in-flight request between concurrent callers', async () => {
+      const mockUser = { id: 'user-123', email: 'test@example.com' };
+
+      // A single interceptor: a second GET would hit disableNetConnect and throw.
+      scope.get(`/api/apps/${appId}/entities/User/me`).reply(200, mockUser);
+
+      const [first, second] = await Promise.all([
+        base44.auth.me(),
+        base44.auth.me(),
+      ]);
+
+      expect(first).toEqual(mockUser);
+      expect(second).toEqual(mockUser);
+      expect(scope.isDone()).toBe(true);
+    });
+
+    test('does not reuse a resolved user across separate calls', async () => {
+      scope.get(`/api/apps/${appId}/entities/User/me`).reply(200, { id: 'user-1' });
+      scope.get(`/api/apps/${appId}/entities/User/me`).reply(200, { id: 'user-2' });
+
+      const first = await base44.auth.me();
+      const second = await base44.auth.me();
+
+      // Sharing is limited to the in-flight window; identity is never cached.
+      expect(first.id).toBe('user-1');
+      expect(second.id).toBe('user-2');
+      expect(scope.isDone()).toBe(true);
+    });
+
+    test('does not retain a rejected request', async () => {
+      const mockUser = { id: 'user-123' };
+      scope.get(`/api/apps/${appId}/entities/User/me`).reply(401, { detail: 'Unauthorized' });
+      scope.get(`/api/apps/${appId}/entities/User/me`).reply(200, mockUser);
+
+      await expect(base44.auth.me()).rejects.toThrow();
+      await expect(base44.auth.me()).resolves.toEqual(mockUser);
+
+      expect(scope.isDone()).toBe(true);
+    });
+
+    test('setToken() drops an in-flight request from the previous identity', async () => {
+      scope
+        .get(`/api/apps/${appId}/entities/User/me`)
+        .delay(50)
+        .reply(200, { id: 'anonymous' });
+      scope.get(`/api/apps/${appId}/entities/User/me`).reply(200, { id: 'logged-in' });
+
+      const beforeLogin = base44.auth.me();
+      base44.auth.setToken('new-access-token', false);
+      const afterLogin = await base44.auth.me();
+
+      // The call made after the identity change must not resolve into the
+      // request that was already in flight for the anonymous one.
+      expect(afterLogin.id).toBe('logged-in');
+      await expect(beforeLogin).resolves.toEqual({ id: 'anonymous' });
+      expect(scope.isDone()).toBe(true);
+    });
+
+    test('setToken() clears the analytics session context', () => {
+      const analyticsState = getSharedInstance('analytics', () => ({}));
+      analyticsState.sessionContext = { user_id: 'anonymous-user', session_id: 's1' };
+
+      base44.auth.setToken('new-access-token', false);
+
+      expect(analyticsState.sessionContext).toBeNull();
+    });
   });
-  
+
   describe('updateMe()', () => {
     test('should update current user data', async () => {
       const updateData = {

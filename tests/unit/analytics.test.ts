@@ -6,6 +6,7 @@ import {
   TrackEventData,
 } from "../../src/index.ts";
 import { getSharedInstance } from "../../src/utils/sharedInstance.ts";
+import { resetAnalyticsSessionContext } from "../../src/modules/analytics.ts";
 import { User } from "../../src/modules/auth.types.ts";
 import { AxiosInstance } from "axios";
 
@@ -80,6 +81,25 @@ describe("Analytics Module", () => {
     expect(base44.analytics.track).toHaveBeenCalledWith({
       eventName: "test-event",
     });
+  });
+
+  test("should clear the memoized session context on reset", () => {
+    expect(sharedState?.sessionContext).toEqual({ user_id: "test-user-id" });
+
+    resetAnalyticsSessionContext();
+
+    // Called on every identity change. Without it, a visitor who loads
+    // anonymously and then logs in keeps reporting the pre-login identity.
+    expect(sharedState?.sessionContext).toBeNull();
+  });
+
+  test("should not start the heartbeat outside a browser", () => {
+    const heartBeatState = sharedState as unknown as {
+      isHeartBeatProcessing: boolean;
+    };
+
+    expect(typeof window).toBe("undefined");
+    expect(heartBeatState.isHeartBeatProcessing).toBeFalsy();
   });
 
   test("should track multiple events", async () => {
