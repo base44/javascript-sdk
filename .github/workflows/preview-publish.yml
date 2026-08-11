@@ -4,32 +4,45 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+# This workflow deliberately does NOT run the Wix gateway proxy: the gateway
+# cannot carry `npm publish` (it rejects `PUT /<package>`), so per secplatform's
+# interim policy for OSS repos this job relies on `npm ci` against the committed
+# package-lock.json plus .npmrc's min-release-age instead. It resolves nothing,
+# so dropping the gateway does not widen what it can pull. Exemption lives in
+# .github/scripts/check_wix_proxy_steps.py.
 jobs:
   publish-preview:
     runs-on: ubuntu-latest
+    permissions:
+      # id-token: write for npm trusted publishing (OIDC).
+      # pull-requests: write for the install-instructions comment.
+      contents: read
+      id-token: write
+      pull-requests: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Wix gateway proxy (mandatory)
-        uses: ./.github/actions/wix-gateway-proxy
-
       - name: Enable corepack
         run: corepack enable
 
+      # Node 24, not 20: its bundled npm (>= 11.17) already covers trusted
+      # publishing (needs >= 11.5.1) and reads .npmrc's min-release-age (needs
+      # >= 11.10.0), so there is no `npm install -g npm@11` fetching a floating
+      # npm release outside the cooldown.
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: "npm"
           registry-url: "https://registry.npmjs.org"
 
-      - name: Update npm
-        run: npm install -g npm@11
-
+      # `npm ci`, not `npm install`: without the gateway in front of this job, a
+      # resolving install is the one thing that could pull a fresh release. `npm ci`
+      # installs exactly what package-lock.json pins and resolves nothing.
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build package
         run: npm run build
@@ -105,11 +118,12 @@ jobs:
 
           echo "✅ Safety check passed. Package name is safe to publish."
 
-      - name: Unpin npm registry for first-party publish
-        # The embargo would refuse the just-built version; installs above stayed gatewayed.
-        run: sudo sed -i '/registry\.npmjs\.org/d' /etc/hosts
-
       - name: Publish preview package
+        # Authenticates via npm trusted publishing (OIDC), so no NPM_TOKEN reaches
+        # the build. Needs a trusted publisher for `@base44-preview/sdk` on
+        # npmjs.com registered against this repo and this workflow filename — the
+        # registry keys on the filename, so this needs its own entry, separate from
+        # manual-publish.yml.
         run: |
           if npm publish --tag preview; then
             echo "✅ Package published successfully"
@@ -212,8 +226,3 @@ jobs:
                 await createOrUpdateComment(context.issue.number);
               }
             }
-
-permissions:
-  contents: read
-  pull-requests: write
-  id-token: write
