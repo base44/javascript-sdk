@@ -49,6 +49,55 @@ export interface AppUserConnectorConnectionResponse {
 }
 
 /**
+ * A request to forward to a metered connector's API through the Base44 proxy.
+ */
+export interface ConnectorApiRequest {
+  /** HTTP method for the upstream request. Defaults to `'GET'`. */
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD";
+  /**
+   * Path relative to the connector's API root, starting with `/`, such as `'/2/tweets'`.
+   *
+   * Must not be an absolute URL. Query parameters may be included here or passed
+   * separately as {@link query}; either way they are forwarded and priced identically.
+   */
+  path: string;
+  /** Query parameters. Merged into the request URL alongside any already present in {@link path}. */
+  query?: Record<string, string | number | boolean | Array<string | number>>;
+  /** Extra request headers. Only headers the connector explicitly allows are forwarded; the rest are dropped. */
+  headers?: Record<string, string>;
+  /** JSON request body. Ignored for `GET`, `HEAD`, and `DELETE`. */
+  body?: unknown;
+}
+
+/**
+ * The upstream API's response, as returned by the Base44 connector proxy.
+ */
+export interface ConnectorApiResponse<T = unknown> {
+  /** `true` when the upstream API returned a 2xx status. */
+  success: boolean;
+  /** The upstream HTTP status code, or `null` if the request never reached the provider. */
+  status: number | null;
+  /** The parsed upstream response body. */
+  data: T;
+  /** The subset of upstream response headers the connector exposes, typically rate-limit counters. */
+  headers: Record<string, string>;
+  /** Integration credits billed to the workspace for this call. */
+  creditsCharged: number;
+}
+
+/**
+ * Raw proxy response shape. Mapped to {@link ConnectorApiResponse} before being returned.
+ * @internal
+ */
+export interface ConnectorProxyRawResponse {
+  success: boolean;
+  status_code: number | null;
+  data: unknown;
+  headers: Record<string, string>;
+  credits_charged: number;
+}
+
+/**
  * Connectors module for managing OAuth tokens for external services.
  *
  * Unlike the {@link IntegrationsModule | integrations} module that provides pre-built functions, connectors give you raw OAuth tokens so you can call external service APIs directly. Use this when you need custom API interactions that the pre-built integrations do not cover.
@@ -77,6 +126,15 @@ export interface AppUserConnectorConnectionResponse {
  * 2. From the frontend, call [connectAppUser()](#connectappuser) with the connector ID to get an authorization URL, then redirect the app user to that URL to complete the OAuth flow.
  * 3. In a backend function, call {@linkcode getCurrentAppUserConnection | getCurrentAppUserConnection()} using the service role client (`base44.asServiceRole.connectors`) with the connector ID to retrieve the app user's token.
  * 4. Use the returned `accessToken` to call the external service's API directly. Some connectors also return a `connectionConfig` with additional values such as a subdomain for building the API URL.
+ *
+ * ## Metered connectors
+ *
+ * A few connectors are backed by paid third-party APIs that charge Base44 per call. For those, the OAuth token is **not** available to your code: {@linkcode getConnection | getConnection()} and its siblings reject with a `403`. Call them through the Base44 proxy instead, with {@linkcode callApi | callApi()}, {@linkcode callWorkspaceApi | callWorkspaceApi()}, or {@linkcode callCurrentAppUserApi | callCurrentAppUserApi()}. Base44 attaches the credential server-side, forwards the request, and bills your workspace's integration credits for the call.
+ *
+ * Two things to keep in mind when writing against a metered connector:
+ *
+ * - **Cost varies by endpoint, sometimes sharply.** The same connector can charge two orders of magnitude more for one endpoint than another, so avoid putting an expensive call inside a loop and batch wherever the provider supports it. Each response reports what it actually cost as `creditsCharged`.
+ * - **An upstream error is returned, not thrown.** A `4xx` or `5xx` from the provider comes back as `success: false` with the provider's own `status` and `data`, because it is a normal outcome of a call that Base44 completed. Only Base44-side failures — no connection, credits exhausted, a rejected request — reject the promise.
  *
  * ## Available connectors
  *
@@ -345,6 +403,89 @@ export interface ConnectorsModule {
   getCurrentAppUserConnection(
     connectorId: string,
   ): Promise<AppUserConnectorConnectionResponse>;
+
+  /**
+   * Calls a [metered connector's](#metered-connectors) API through the Base44 proxy.
+   *
+   * Use this for a shared platform connector identified by an integration type. Base44 adds the OAuth credential to the outgoing request, forwards it, and bills the workspace for the call, so you never handle the token yourself.
+   *
+   * @param integrationType - The type of integration, such as `'x'`. See [Available connectors](#available-connectors).
+   * @param request - The upstream request to forward. See {@link ConnectorApiRequest}.
+   * @returns Promise resolving to a {@link ConnectorApiResponse}. Note that an upstream error is reported in `success` and `status`, not thrown — only Base44-side failures reject.
+   *
+   * @example
+   * ```typescript
+   * // Post to X
+   * const res = await base44.asServiceRole.connectors.callApi('x', {
+   *   method: 'POST',
+   *   path: '/2/tweets',
+   *   body: { text: 'Shipped!' },
+   * });
+   *
+   * if (!res.success) {
+   *   console.error('X rejected the post', res.status, res.data);
+   * }
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Read, with query parameters and a look at what the call cost
+   * const res = await base44.asServiceRole.connectors.callApi('x', {
+   *   path: '/2/tweets/search/recent',
+   *   query: { query: 'base44', max_results: 10 },
+   * });
+   *
+   * console.log(`${res.creditsCharged} credits`, res.data);
+   * ```
+   */
+  callApi<T = unknown>(
+    integrationType: ConnectorIntegrationType,
+    request: ConnectorApiRequest,
+  ): Promise<ConnectorApiResponse<T>>;
+
+  /**
+   * Calls a [metered](#metered-connectors), [workspace-registered connector's](#shared-connectors) API through the Base44 proxy.
+   *
+   * The proxy counterpart to {@linkcode getWorkspaceConnection | getWorkspaceConnection()}: same shared token, identified by connector ID rather than integration type.
+   *
+   * @param connectorId - The ID of the workspace connector, not the integration type string.
+   * @param request - The upstream request to forward. See {@link ConnectorApiRequest}.
+   * @returns Promise resolving to a {@link ConnectorApiResponse}.
+   *
+   * @example
+   * ```typescript
+   * const res = await base44.asServiceRole.connectors.callWorkspaceApi('abc123def', {
+   *   path: '/api/v2/statements',
+   * });
+   * ```
+   */
+  callWorkspaceApi<T = unknown>(
+    connectorId: string,
+    request: ConnectorApiRequest,
+  ): Promise<ConnectorApiResponse<T>>;
+
+  /**
+   * Calls a [metered](#metered-connectors), [app user connector's](#app-user-connectors) API through the Base44 proxy, as the current app user.
+   *
+   * The proxy counterpart to {@linkcode getCurrentAppUserConnection | getCurrentAppUserConnection()}. The client must know which app user to act for, so create it with {@linkcode createClientFromRequest | createClientFromRequest()} inside a backend function.
+   *
+   * @param connectorId - The ID of the app user connector configured in your workspace.
+   * @param request - The upstream request to forward. See {@link ConnectorApiRequest}.
+   * @returns Promise resolving to a {@link ConnectorApiResponse}.
+   *
+   * @example
+   * ```typescript
+   * const res = await base44.asServiceRole.connectors.callCurrentAppUserApi('abc123def', {
+   *   method: 'POST',
+   *   path: '/2/tweets',
+   *   body: { text: 'Posted from my own account' },
+   * });
+   * ```
+   */
+  callCurrentAppUserApi<T = unknown>(
+    connectorId: string,
+    request: ConnectorApiRequest,
+  ): Promise<ConnectorApiResponse<T>>;
 }
 
 /**

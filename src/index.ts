@@ -125,6 +125,8 @@ export { Actor, type Conn } from "./actor.js";
 export type {
   ConnectorsModule,
   UserConnectorsModule,
+  ConnectorApiRequest,
+  ConnectorApiResponse,
 } from "./modules/connectors.types.js";
 
 export type {

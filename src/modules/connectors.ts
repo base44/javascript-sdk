@@ -2,7 +2,10 @@ import { AxiosInstance } from "axios";
 import {
   ConnectorIntegrationType,
   ConnectorAccessTokenResponse,
+  ConnectorApiRequest,
+  ConnectorApiResponse,
   ConnectorConnectionResponse,
+  ConnectorProxyRawResponse,
   AppUserConnectorConnectionResponse,
   ConnectorsModule,
   UserConnectorsModule,
@@ -112,6 +115,85 @@ export function createConnectorsModule(
         connectionConfig: data.connection_config ?? null,
       };
     },
+
+    async callApi<T = unknown>(
+      integrationType: ConnectorIntegrationType,
+      request: ConnectorApiRequest
+    ): Promise<ConnectorApiResponse<T>> {
+      assertNonEmptyString(integrationType, "Integration type");
+      return proxyCall<T>(
+        axios,
+        `/apps/${appId}/connectors/${integrationType}/call`,
+        request
+      );
+    },
+
+    async callWorkspaceApi<T = unknown>(
+      connectorId: string,
+      request: ConnectorApiRequest
+    ): Promise<ConnectorApiResponse<T>> {
+      assertNonEmptyString(connectorId, "Connector ID");
+      return proxyCall<T>(
+        axios,
+        `/apps/${appId}/connectors/by-id/${connectorId}/call`,
+        request
+      );
+    },
+
+    async callCurrentAppUserApi<T = unknown>(
+      connectorId: string,
+      request: ConnectorApiRequest
+    ): Promise<ConnectorApiResponse<T>> {
+      assertNonEmptyString(connectorId, "Connector ID");
+      return proxyCall<T>(
+        axios,
+        `/apps/${appId}/connectors/app-user/${connectorId}/call`,
+        request
+      );
+    },
+  };
+}
+
+function assertNonEmptyString(value: unknown, label: string): void {
+  if (!value || typeof value !== "string") {
+    throw new Error(`${label} is required and must be a string`);
+  }
+}
+
+/**
+ * POST a request to the connector proxy and normalize the response.
+ *
+ * The proxy reports upstream outcomes in the body rather than as HTTP status, so
+ * a provider 4xx/5xx arrives here as a resolved response with `success: false` —
+ * only Base44-side failures reject through the axios error interceptor.
+ *
+ * @internal
+ */
+async function proxyCall<T>(
+  axios: AxiosInstance,
+  url: string,
+  request: ConnectorApiRequest
+): Promise<ConnectorApiResponse<T>> {
+  if (!request || typeof request !== "object") {
+    throw new Error("Request is required and must be an object");
+  }
+  assertNonEmptyString(request.path, "Request path");
+
+  const response = await axios.post(url, {
+    method: (request.method ?? "GET").toUpperCase(),
+    path: request.path,
+    query: request.query ?? {},
+    headers: request.headers ?? {},
+    body: request.body ?? null,
+  });
+
+  const data = response as unknown as ConnectorProxyRawResponse;
+  return {
+    success: data.success,
+    status: data.status_code ?? null,
+    data: data.data as T,
+    headers: data.headers ?? {},
+    creditsCharged: data.credits_charged ?? 0,
   };
 }
 
