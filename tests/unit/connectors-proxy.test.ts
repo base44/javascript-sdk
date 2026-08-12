@@ -133,32 +133,6 @@ describe("Connectors module – metered connector proxy", () => {
     ).rejects.toMatchObject({ status: 402 });
   });
 
-  test("targets the workspace-connector route by connector ID", async () => {
-    scope
-      .post(`/api/apps/${appId}/connectors/by-id/abc123def/call`)
-      .reply(200, proxyResponse);
-
-    const res = await base44.asServiceRole.connectors.callWorkspaceApi(
-      "abc123def",
-      { path: "/api/v2/statements" }
-    );
-
-    expect(res.success).toBe(true);
-  });
-
-  test("targets the app-user route by connector ID", async () => {
-    scope
-      .post(`/api/apps/${appId}/connectors/app-user/abc123def/call`)
-      .reply(200, proxyResponse);
-
-    const res = await base44.asServiceRole.connectors.callCurrentAppUserApi(
-      "abc123def",
-      { method: "POST", path: "/2/tweets", body: { text: "hi" } }
-    );
-
-    expect(res.success).toBe(true);
-  });
-
   test("a metered connector's token request surfaces the actionable refusal", async () => {
     // The backend's 403 detail names the proxy, which is what lets generated
     // code (and the model that wrote it) correct itself.

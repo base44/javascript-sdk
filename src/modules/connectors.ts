@@ -127,30 +127,6 @@ export function createConnectorsModule(
         request
       );
     },
-
-    async callWorkspaceApi<T = unknown>(
-      connectorId: string,
-      request: ConnectorApiRequest
-    ): Promise<ConnectorApiResponse<T>> {
-      assertNonEmptyString(connectorId, "Connector ID");
-      return proxyCall<T>(
-        axios,
-        `/apps/${appId}/connectors/by-id/${connectorId}/call`,
-        request
-      );
-    },
-
-    async callCurrentAppUserApi<T = unknown>(
-      connectorId: string,
-      request: ConnectorApiRequest
-    ): Promise<ConnectorApiResponse<T>> {
-      assertNonEmptyString(connectorId, "Connector ID");
-      return proxyCall<T>(
-        axios,
-        `/apps/${appId}/connectors/app-user/${connectorId}/call`,
-        request
-      );
-    },
   };
 }
 
