@@ -24,9 +24,20 @@ on:
         default: true
         type: boolean
 
+# This workflow deliberately does NOT run the Wix gateway proxy: the gateway
+# cannot carry `npm publish` (it rejects `PUT /<package>`), so per secplatform's
+# interim policy for OSS repos this job relies on `npm ci` against the committed
+# package-lock.json plus .npmrc's min-release-age instead. It resolves nothing,
+# so dropping the gateway does not widen what it can pull. Exemption lives in
+# .github/scripts/check_wix_proxy_steps.py.
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      # contents: write for the version-bump commit, tag, and GitHub Release.
+      # id-token: write for npm trusted publishing (OIDC).
+      contents: write
+      id-token: write
 
     steps:
       - name: Generate a token
@@ -46,15 +57,16 @@ jobs:
       - name: Enable corepack
         run: corepack enable
 
+      # Node 24, not 20: its bundled npm (>= 11.17) already covers trusted
+      # publishing (needs >= 11.5.1) and reads .npmrc's min-release-age (needs
+      # >= 11.10.0), so there is no `npm install -g npm@11` fetching a floating
+      # npm release outside the cooldown.
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: "npm"
           registry-url: "https://registry.npmjs.org"
-
-      - name: Update npm
-        run: npm install -g npm@11
 
       - name: Install dependencies
         run: npm ci
@@ -93,6 +105,10 @@ jobs:
           echo "Dry run: ${{ github.event.inputs.dry_run }}"
 
       - name: Publish to NPM
+        # Authenticates via npm trusted publishing (OIDC), so no NPM_TOKEN reaches
+        # the build. Needs a trusted publisher for `@base44/sdk` on npmjs.com
+        # registered against this repo and this workflow filename — the registry
+        # keys on the filename, so each publish workflow needs its own entry.
         if: github.event.inputs.dry_run == 'false'
         run: |
           npm publish --tag ${{ github.event.inputs.npm_tag }}
@@ -149,8 +165,3 @@ jobs:
               "version": "v${{ env.NEW_VERSION }}",
               "release_name": "Release v${{ env.NEW_VERSION }}"
             }
-
-permissions:
-  contents: write
-  packages: write
-  id-token: write
