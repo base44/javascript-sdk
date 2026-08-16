@@ -93,6 +93,30 @@ describe("Analytics Module", () => {
     expect(sharedState?.sessionContext).toBeNull();
   });
 
+  test("should not restore the pre-reset identity when a lookup settles late", async () => {
+    resetAnalyticsSessionContext();
+
+    let resolveMe: (user: User) => void;
+    vi.spyOn(base44.auth, "me").mockReturnValue(
+      new Promise<User>((resolve) => {
+        resolveMe = resolve;
+      })
+    );
+
+    // Flushing this event resolves the session context, which suspends on me().
+    base44.analytics.track({ eventName: "anonymous-event" });
+    await vi.waitFor(() => expect(base44.auth.me).toHaveBeenCalled());
+
+    // The identity changes while that lookup is still in flight.
+    resetAnalyticsSessionContext();
+    resolveMe!({ id: "anonymous-user" } as User);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // The anonymous identity must not be written back: doing so pins user_id
+    // for the rest of the session, which is the bug the reset exists to prevent.
+    expect(sharedState?.sessionContext).toBeNull();
+  });
+
   test("should not start the heartbeat outside a browser", () => {
     const heartBeatState = sharedState as unknown as {
       isHeartBeatProcessing: boolean;

@@ -111,11 +111,15 @@ export function createAuthModule(
   return {
     // Get current user information
     async me() {
-      const request =
+      const request: Promise<User> =
         pendingMe ??
-        axios
-          .get<any, User>(`/apps/${appId}/entities/User/me`)
-          .finally(clearPendingMe);
+        axios.get<any, User>(`/apps/${appId}/entities/User/me`).finally(() => {
+          // Only retire this request if it is still the shared one. An identity
+          // change mid-flight clears `pendingMe` and the next caller starts a
+          // fresh request; an unconditional clear here would retire that newer
+          // request instead, so a third caller would issue a duplicate.
+          if (pendingMe === request) pendingMe = null;
+        });
       pendingMe = request;
       return request;
     },

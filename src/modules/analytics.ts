@@ -345,7 +345,18 @@ async function getSessionContext(
           session_id: sessionId,
         }));
     }
-    analyticsSharedState.sessionContext = await sessionContextPromise;
+    const pending = sessionContextPromise;
+    const context = await pending;
+    // Publish only if this lookup is still the current one. A reset that lands
+    // while the request is in flight nulls `sessionContextPromise`, and an
+    // unconditional write here would put the pre-reset identity back and pin it
+    // for the rest of the session. The awaited value is still returned: these
+    // events were queued before the identity changed, so that is who they
+    // belong to.
+    if (sessionContextPromise === pending) {
+      analyticsSharedState.sessionContext = context;
+    }
+    return context;
   }
   return analyticsSharedState.sessionContext;
 }

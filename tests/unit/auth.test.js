@@ -150,6 +150,33 @@ describe('Auth Module', () => {
       expect(scope.isDone()).toBe(true);
     });
 
+    test('a superseded request does not retire the current one', async () => {
+      scope
+        .get(`/api/apps/${appId}/entities/User/me`)
+        .delay(50)
+        .reply(200, { id: 'anonymous' });
+      // One interceptor for the post-login identity: if the settling anonymous
+      // request retires it, the third caller issues a second GET and this test
+      // hits disableNetConnect.
+      scope
+        .get(`/api/apps/${appId}/entities/User/me`)
+        .delay(50)
+        .reply(200, { id: 'logged-in' });
+
+      const beforeLogin = base44.auth.me();
+      base44.auth.setToken('new-access-token', false);
+      const afterLogin = base44.auth.me();
+
+      // Let the anonymous request settle while the post-login one is still in
+      // flight, then join it.
+      await expect(beforeLogin).resolves.toEqual({ id: 'anonymous' });
+      const joined = base44.auth.me();
+
+      expect(await afterLogin).toEqual({ id: 'logged-in' });
+      expect(await joined).toEqual({ id: 'logged-in' });
+      expect(scope.isDone()).toBe(true);
+    });
+
     test('setToken() clears the analytics session context', () => {
       const analyticsState = getSharedInstance('analytics', () => ({}));
       analyticsState.sessionContext = { user_id: 'anonymous-user', session_id: 's1' };
