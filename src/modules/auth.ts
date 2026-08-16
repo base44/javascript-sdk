@@ -2,10 +2,12 @@ import { AxiosInstance } from "axios";
 import {
   AuthModule,
   AuthModuleOptions,
+  User,
   VerifyOtpParams,
   ChangePasswordParams,
   ResetPasswordParams,
 } from "./auth.types";
+import { resetAnalyticsSessionContext } from "./analytics.js";
 
 function isInsideIframe(): boolean {
   if (typeof window === "undefined") return false;
@@ -91,10 +93,35 @@ export function createAuthModule(
   appId: string,
   options: AuthModuleOptions
 ): AuthModule {
+  // In-flight `me()` request, shared by concurrent callers. The analytics
+  // module resolves its session context through `me()` at client construction,
+  // at the same moment most apps issue their own `me()`. Browsers serialize the
+  // two identical GETs, so the second pays the first's full latency on every
+  // cold load.
+  //
+  // This shares the pending promise only — it is cleared as soon as the request
+  // settles, so no resolved user is ever retained. Caching the user across
+  // requests would leave the app rendering a stale identity after logout or a
+  // session swap.
+  let pendingMe: Promise<User> | null = null;
+  const clearPendingMe = () => {
+    pendingMe = null;
+  };
+
   return {
     // Get current user information
     async me() {
-      return axios.get(`/apps/${appId}/entities/User/me`);
+      const request: Promise<User> =
+        pendingMe ??
+        axios.get<any, User>(`/apps/${appId}/entities/User/me`).finally(() => {
+          // Only retire this request if it is still the shared one. An identity
+          // change mid-flight clears `pendingMe` and the next caller starts a
+          // fresh request; an unconditional clear here would retire that newer
+          // request instead, so a third caller would issue a duplicate.
+          if (pendingMe === request) pendingMe = null;
+        });
+      pendingMe = request;
+      return request;
     },
 
     // Update current user data
@@ -158,6 +185,11 @@ export function createAuthModule(
       // Remove token from axios headers (always do this)
       delete axios.defaults.headers.common["Authorization"];
 
+      // Drop identity resolved under the previous session: a `me()` already in
+      // flight would otherwise resolve into callers that run after the logout.
+      clearPendingMe();
+      resetAnalyticsSessionContext();
+
       // Only do the rest if in a browser environment
       if (typeof window !== "undefined") {
         // Remove token from localStorage
@@ -183,6 +215,11 @@ export function createAuthModule(
     // Set authentication token
     setToken(token: string, saveToStorage = true) {
       if (!token) return;
+
+      // Same reasoning as in `logout`: the identity changes here, so anything
+      // resolved for the previous one must not be handed to later callers.
+      clearPendingMe();
+      resetAnalyticsSessionContext();
 
       // handle token change for axios clients
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
