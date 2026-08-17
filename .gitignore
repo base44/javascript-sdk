@@ -60,3 +60,7 @@ logs
 
 # Docs
 docs/
+
+# Python bytecode — from running the .github/scripts checks locally.
+__pycache__/
+*.pyc

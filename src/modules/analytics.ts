@@ -229,7 +229,12 @@ async function startAnalyticsProcessor(
 }
 
 function startHeartBeatProcessor(track: (params: TrackEventParams) => void) {
+  // Browser-only, like the other automatic events here (initialization, session
+  // duration, visibility). Outside a browser this timer fired a `me()` every
+  // interval for the lifetime of a long-lived server-side client, and kept the
+  // Node event loop alive. Explicit `analytics.track()` calls still work.
   if (
+    typeof window === "undefined" ||
     analyticsSharedState.isHeartBeatProcessing ||
     (analyticsSharedState.config.heartBeatInterval ?? 0) < 10
   ) {
@@ -307,6 +312,22 @@ function transformEventDataToApiRequestData(sessionContext: SessionContext) {
 }
 
 let sessionContextPromise: Promise<SessionContext> | null = null;
+
+/**
+ * Clears the memoized analytics session context.
+ *
+ * The context holds the `user_id` resolved by `auth.me()` and is reused for the
+ * lifetime of the session, so it has to be dropped whenever the identity
+ * changes. Without this, a visitor who loads a page anonymously and then logs in
+ * keeps reporting `user_id: null` on every subsequent event.
+ *
+ * @internal
+ */
+export function resetAnalyticsSessionContext() {
+  analyticsSharedState.sessionContext = null;
+  sessionContextPromise = null;
+}
+
 async function getSessionContext(
   userAuthModule: AuthModule
 ): Promise<SessionContext> {
@@ -324,7 +345,18 @@ async function getSessionContext(
           session_id: sessionId,
         }));
     }
-    analyticsSharedState.sessionContext = await sessionContextPromise;
+    const pending = sessionContextPromise;
+    const context = await pending;
+    // Publish only if this lookup is still the current one. A reset that lands
+    // while the request is in flight nulls `sessionContextPromise`, and an
+    // unconditional write here would put the pre-reset identity back and pin it
+    // for the rest of the session. The awaited value is still returned: these
+    // events were queued before the identity changed, so that is who they
+    // belong to.
+    if (sessionContextPromise === pending) {
+      analyticsSharedState.sessionContext = context;
+    }
+    return context;
   }
   return analyticsSharedState.sessionContext;
 }
