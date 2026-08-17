@@ -332,6 +332,14 @@ async function getSessionContext(
   userAuthModule: AuthModule
 ): Promise<SessionContext> {
   if (!analyticsSharedState.sessionContext) {
+    // With no token there is no identity to resolve: `me()` can only answer 401,
+    // which the browser logs to the console before any handler here sees it. On
+    // a public page that request is the sole reason an error appears, so skip
+    // it. This is not memoized — a visitor who logs in later must still resolve.
+    if (!userAuthModule.hasToken()) {
+      return { user_id: null, session_id: getAnalyticsSessionId() };
+    }
+
     if (!sessionContextPromise) {
       const sessionId = getAnalyticsSessionId();
       sessionContextPromise = userAuthModule

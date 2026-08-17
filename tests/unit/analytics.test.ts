@@ -26,6 +26,9 @@ describe("Analytics Module", () => {
       createAxiosClient: vi.fn().mockImplementation(
         () =>
           ({
+            // `setToken` and `logout` write through to these, so the mock needs
+            // them present per instance.
+            defaults: { headers: { common: {} as Record<string, string> } },
             request: vi.fn().mockResolvedValue({
               status: 200,
               data: {
@@ -54,9 +57,12 @@ describe("Analytics Module", () => {
       heartBeatInterval: undefined,
     };
 
+    // Token-bearing by default: most tests here exercise the flush path that
+    // resolves an identity, and that lookup is skipped without a session.
     base44 = createClient({
       serverUrl,
       appId,
+      token: "test-access-token",
     });
   });
 
@@ -124,6 +130,55 @@ describe("Analytics Module", () => {
 
     expect(typeof window).toBe("undefined");
     expect(heartBeatState.isHeartBeatProcessing).toBeFalsy();
+  });
+
+  test("should not resolve an identity when no token is set", async () => {
+    resetAnalyticsSessionContext();
+
+    const anonymous = createClient({ serverUrl, appId });
+    const me = vi.spyOn(anonymous.auth, "me");
+
+    anonymous.analytics.track({ eventName: "public-page-event" });
+    await vi.waitFor(() => expect(sharedState?.requestsQueue.length).toBe(0));
+
+    // The whole point: on a public page `me()` can only answer 401, and the
+    // browser logs that to the console before any handler here sees it. The
+    // event still flushes -- anonymous events already reported user_id: null.
+    expect(me).not.toHaveBeenCalled();
+
+    anonymous.cleanup();
+  });
+
+  test("should resolve an identity once a token is set", async () => {
+    resetAnalyticsSessionContext();
+
+    const anonymous = createClient({ serverUrl, appId });
+    const me = vi
+      .spyOn(anonymous.auth, "me")
+      .mockResolvedValue({ id: "user-1" } as User);
+
+    // A visitor who logs in mid-session must start reporting their identity, so
+    // the skip above must not be memoized.
+    anonymous.auth.setToken("token-acquired-after-login", false);
+    anonymous.analytics.track({ eventName: "post-login-event" });
+
+    await vi.waitFor(() => expect(me).toHaveBeenCalled());
+
+    anonymous.cleanup();
+  });
+
+  test("should report token presence across identity changes", () => {
+    const client = createClient({ serverUrl, appId });
+
+    expect(client.auth.hasToken()).toBe(false);
+
+    client.auth.setToken("some-token", false);
+    expect(client.auth.hasToken()).toBe(true);
+
+    client.auth.logout();
+    expect(client.auth.hasToken()).toBe(false);
+
+    client.cleanup();
   });
 
   test("should track multiple events", async () => {
