@@ -49,6 +49,19 @@ export interface AppUserConnectorConnectionResponse {
 }
 
 /**
+ * How far a metered connector call progressed through the Base44 proxy.
+ *
+ * Only `not_sent` proves that the provider did not execute the request.
+ * `timed_out` and `sent_unconfirmed` may have executed upstream, so do not
+ * automatically retry non-idempotent requests based on those phases.
+ */
+export type ConnectorApiResponsePhase =
+  | "not_sent"
+  | "responded"
+  | "timed_out"
+  | "sent_unconfirmed";
+
+/**
  * A request to forward to a metered connector's API through the Base44 proxy.
  */
 export interface ConnectorApiRequest {
@@ -73,11 +86,13 @@ export interface ConnectorApiRequest {
  * The upstream API's response, as returned by the Base44 connector proxy.
  */
 export interface ConnectorApiResponse<T = unknown> {
-  /** `true` when the upstream API returned a 2xx status. */
+  /** `true` only when the upstream API returned a 2xx status. Proxy and upstream errors are `false`. */
   success: boolean;
-  /** The upstream HTTP status code, or `null` if the request never reached the provider. */
+  /** How far the call progressed. Only `not_sent` proves the provider did not execute it. */
+  phase: ConnectorApiResponsePhase;
+  /** The upstream HTTP status code, or `null` when no response was received. */
   status: number | null;
-  /** The parsed upstream response body. */
+  /** The parsed upstream response body, or proxy error details when no response was received. */
   data: T;
   /** The subset of upstream response headers the connector exposes, typically rate-limit counters. */
   headers: Record<string, string>;
@@ -91,6 +106,7 @@ export interface ConnectorApiResponse<T = unknown> {
  */
 export interface ConnectorProxyRawResponse {
   success: boolean;
+  phase: ConnectorApiResponsePhase;
   status_code: number | null;
   data: unknown;
   headers: Record<string, string>;
@@ -136,7 +152,8 @@ export interface ConnectorProxyRawResponse {
  * Two things to keep in mind when writing against a metered connector:
  *
  * - **Cost varies by endpoint, sometimes sharply.** The same connector can charge two orders of magnitude more for one endpoint than another, so avoid putting an expensive call inside a loop and batch wherever the provider supports it. Each response reports what it actually cost as `creditsCharged`.
- * - **An upstream error is returned, not thrown.** A `4xx` or `5xx` from the provider comes back as `success: false` with the provider's own `status` and `data`, because it is a normal outcome of a call that Base44 completed. Only Base44-side failures — no connection, credits exhausted, a rejected request — reject the promise.
+ * - **Provider and transport outcomes are returned, not thrown.** A provider `4xx`/`5xx` or a connection failure comes back as `success: false` with its `phase`; authorization, quota, and invalid proxy requests reject the promise.
+ * - **Only `phase: 'not_sent'` proves the provider did not execute the request.** A timeout or in-flight failure may have executed upstream, so do not automatically retry a non-idempotent call unless the provider supports an idempotency key.
  *
  * ## Available connectors
  *

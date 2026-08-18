@@ -11,6 +11,15 @@ import {
   UserConnectorsModule,
 } from "./connectors.types.js";
 
+const CONNECTOR_API_METHODS = new Set([
+  "GET",
+  "POST",
+  "PUT",
+  "PATCH",
+  "DELETE",
+  "HEAD",
+]);
+
 /**
  * Creates the Connectors module for the Base44 SDK.
  *
@@ -154,9 +163,15 @@ async function proxyCall<T>(
     throw new Error("Request is required and must be an object");
   }
   assertNonEmptyString(request.path, "Request path");
+  const method = request.method ?? "GET";
+  if (!CONNECTOR_API_METHODS.has(method)) {
+    throw new Error(
+      "Request method must be one of GET, POST, PUT, PATCH, DELETE, or HEAD"
+    );
+  }
 
   const response = await axios.post(url, {
-    method: (request.method ?? "GET").toUpperCase(),
+    method,
     path: request.path,
     query: request.query ?? {},
     headers: request.headers ?? {},
@@ -166,6 +181,7 @@ async function proxyCall<T>(
   const data = response as unknown as ConnectorProxyRawResponse;
   return {
     success: data.success,
+    phase: data.phase,
     status: data.status_code ?? null,
     data: data.data as T,
     headers: data.headers ?? {},

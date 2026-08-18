@@ -20,6 +20,7 @@ describe("Connectors module – metered connector proxy", () => {
 
   const proxyResponse = {
     success: true,
+    phase: "responded",
     status_code: 201,
     data: { data: { id: "1" } },
     headers: { "x-rate-limit-remaining": "42" },
@@ -36,7 +37,7 @@ describe("Connectors module – metered connector proxy", () => {
       .reply(200, proxyResponse);
 
     await base44.asServiceRole.connectors.callApi("x", {
-      method: "post",
+      method: "POST",
       path: "/2/tweets",
       body: { text: "hi" },
     });
@@ -91,6 +92,7 @@ describe("Connectors module – metered connector proxy", () => {
     });
 
     expect(res.success).toBe(true);
+    expect(res.phase).toBe("responded");
     expect(res.status).toBe(201);
     expect(res.data).toEqual({ data: { id: "1" } });
     expect(res.headers).toEqual({ "x-rate-limit-remaining": "42" });
@@ -102,6 +104,7 @@ describe("Connectors module – metered connector proxy", () => {
     // so it must be inspectable rather than an exception.
     scope.post(`/api/apps/${appId}/connectors/x/call`).reply(200, {
       success: false,
+      phase: "responded",
       status_code: 400,
       data: { title: "Invalid Request" },
       headers: {},
@@ -115,6 +118,7 @@ describe("Connectors module – metered connector proxy", () => {
     });
 
     expect(res.success).toBe(false);
+    expect(res.phase).toBe("responded");
     expect(res.status).toBe(400);
     expect(res.data).toEqual({ title: "Invalid Request" });
     // Still charged: the vendor counted the request.
@@ -150,9 +154,46 @@ describe("Connectors module – metered connector proxy", () => {
       base44.asServiceRole.connectors.getConnection("x")
     ).rejects.toMatchObject({
       status: 403,
+      code: "metered_connector_requires_proxy",
       message: expect.stringContaining("/connectors/x/call"),
     });
   });
+
+  test.each(["post", "TRACE"])(
+    "rejects unsupported request method %s before sending",
+    async (method) => {
+      await expect(
+        base44.asServiceRole.connectors.callApi("x", {
+          method: method as any,
+          path: "/2/tweets",
+        })
+      ).rejects.toThrow(
+        "Request method must be one of GET, POST, PUT, PATCH, DELETE, or HEAD"
+      );
+    }
+  );
+
+  test.each(["not_sent", "timed_out", "sent_unconfirmed"] as const)(
+    "maps proxy phase %s when no upstream response is available",
+    async (phase) => {
+      scope.post(`/api/apps/${appId}/connectors/x/call`).reply(200, {
+        success: false,
+        phase,
+        status_code: null,
+        data: { error: "request outcome unknown" },
+        headers: {},
+        credits_charged: phase === "not_sent" ? 0 : 3,
+      });
+
+      const res = await base44.asServiceRole.connectors.callApi("x", {
+        path: "/2/tweets",
+      });
+
+      expect(res.phase).toBe(phase);
+      expect(res.status).toBeNull();
+      expect(res.success).toBe(false);
+    }
+  );
 
   test.each([
     ["", "/2/tweets"],

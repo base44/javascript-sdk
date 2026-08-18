@@ -127,6 +127,7 @@ export type {
   UserConnectorsModule,
   ConnectorApiRequest,
   ConnectorApiResponse,
+  ConnectorApiResponsePhase,
 } from "./modules/connectors.types.js";
 
 export type {
