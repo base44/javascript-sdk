@@ -1,7 +1,7 @@
 import { AxiosInstance } from "axios";
 import {
-  AuthModule,
   AuthModuleOptions,
+  InternalAuthModule,
   User,
   VerifyOtpParams,
   ChangePasswordParams,
@@ -92,7 +92,7 @@ export function createAuthModule(
   functionsAxiosClient: AxiosInstance,
   appId: string,
   options: AuthModuleOptions
-): AuthModule {
+): InternalAuthModule {
   // In-flight `me()` request, shared by concurrent callers. The analytics
   // module resolves its session context through `me()` at client construction,
   // at the same moment most apps issue their own `me()`. Browsers serialize the
@@ -108,7 +108,16 @@ export function createAuthModule(
     pendingMe = null;
   };
 
+  // Tracked here rather than read off `axios.defaults` so the answer stays tied
+  // to the identity transitions below (`setToken`, `logout`) instead of to the
+  // header a caller may have set on the instance directly.
+  let hasAccessToken = Boolean(options.token);
+
   return {
+    hasToken() {
+      return hasAccessToken;
+    },
+
     // Get current user information
     async me() {
       const request: Promise<User> =
@@ -189,6 +198,7 @@ export function createAuthModule(
       // flight would otherwise resolve into callers that run after the logout.
       clearPendingMe();
       resetAnalyticsSessionContext();
+      hasAccessToken = false;
 
       // Only do the rest if in a browser environment
       if (typeof window !== "undefined") {
@@ -220,6 +230,7 @@ export function createAuthModule(
       // resolved for the previous one must not be handed to later callers.
       clearPendingMe();
       resetAnalyticsSessionContext();
+      hasAccessToken = true;
 
       // handle token change for axios clients
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;

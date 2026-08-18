@@ -150,6 +150,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     {
       appBaseUrl: normalizedAppBaseUrl,
       serverUrl,
+      token,
     }
   );
 

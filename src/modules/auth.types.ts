@@ -100,6 +100,12 @@ export interface AuthModuleOptions {
   serverUrl: string;
   /** Base URL for the app (used for login redirects). */
   appBaseUrl: string;
+  /**
+   * Access token the client was constructed with, if any. Seeds the module's
+   * view of whether a session exists before {@link AuthModule.setToken} runs,
+   * which is how the server-side SDK reports a token it never sets explicitly.
+   */
+  token?: string;
 }
 
 /**
@@ -543,4 +549,22 @@ export interface AuthModule {
    * ```
    */
   changePassword(params: ChangePasswordParams): Promise<any>;
+}
+
+/**
+ * The auth module as constructed internally, before it is narrowed to
+ * {@link AuthModule} on the public client. Not exported from the package
+ * index — SDK consumers see only {@link AuthModule}.
+ *
+ * @internal
+ */
+export interface InternalAuthModule extends AuthModule {
+  /**
+   * Whether an access token is currently set on the client.
+   *
+   * Reports only the presence of a token, never its validity — an expired or
+   * revoked token still reads as `true`. Callers use this to skip requests that
+   * could not succeed without a session, not to decide that one is valid.
+   */
+  hasToken(): boolean;
 }
