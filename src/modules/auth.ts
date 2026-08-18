@@ -1,7 +1,7 @@
 import { AxiosInstance } from "axios";
 import {
-  AuthModule,
   AuthModuleOptions,
+  InternalAuthModule,
   User,
   VerifyOtpParams,
   ChangePasswordParams,
@@ -92,7 +92,7 @@ export function createAuthModule(
   functionsAxiosClient: AxiosInstance,
   appId: string,
   options: AuthModuleOptions
-): AuthModule {
+): InternalAuthModule {
   // In-flight `me()` request, shared by concurrent callers. The analytics
   // module resolves its session context through `me()` at client construction,
   // at the same moment most apps issue their own `me()`. Browsers serialize the

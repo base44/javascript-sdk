@@ -9,7 +9,7 @@ import {
   SessionContext,
 } from "./analytics.types";
 import { getSharedInstance } from "../utils/sharedInstance.js";
-import type { AuthModule } from "./auth.types";
+import type { InternalAuthModule } from "./auth.types";
 import { generateUuid, isReactNative } from "../utils/common.js";
 
 export const USER_HEARTBEAT_EVENT_NAME = "__user_heartbeat_event__";
@@ -58,7 +58,7 @@ export interface AnalyticsModuleArgs {
   axiosClient: AxiosInstance;
   serverUrl: string;
   appId: string;
-  userAuthModule: AuthModule;
+  userAuthModule: InternalAuthModule;
 }
 
 export const createAnalyticsModule = ({
@@ -329,7 +329,7 @@ export function resetAnalyticsSessionContext() {
 }
 
 async function getSessionContext(
-  userAuthModule: AuthModule
+  userAuthModule: InternalAuthModule
 ): Promise<SessionContext> {
   if (!analyticsSharedState.sessionContext) {
     // With no token there is no identity to resolve: `me()` can only answer 401,

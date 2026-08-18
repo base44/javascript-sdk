@@ -127,17 +127,6 @@ export interface AuthModuleOptions {
  */
 export interface AuthModule {
   /**
-   * Whether an access token is currently set on the client.
-   *
-   * Reports only the presence of a token, never its validity — an expired or
-   * revoked token still reads as `true`. Callers use this to skip requests that
-   * could not succeed without a session, not to decide that one is valid.
-   *
-   * @internal
-   */
-  hasToken(): boolean;
-
-  /**
    * Gets the current authenticated user's information.
    *
    * @returns Promise resolving to the user's profile data.
@@ -560,4 +549,22 @@ export interface AuthModule {
    * ```
    */
   changePassword(params: ChangePasswordParams): Promise<any>;
+}
+
+/**
+ * The auth module as constructed internally, before it is narrowed to
+ * {@link AuthModule} on the public client. Not exported from the package
+ * index — SDK consumers see only {@link AuthModule}.
+ *
+ * @internal
+ */
+export interface InternalAuthModule extends AuthModule {
+  /**
+   * Whether an access token is currently set on the client.
+   *
+   * Reports only the presence of a token, never its validity — an expired or
+   * revoked token still reads as `true`. Callers use this to skip requests that
+   * could not succeed without a session, not to decide that one is valid.
+   */
+  hasToken(): boolean;
 }
