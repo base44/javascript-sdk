@@ -117,10 +117,11 @@ export type {
   ActorNameRegistry,
   ActorRegistry,
 } from "./modules/actors.types.js";
+export { ActorConnectionError } from "./modules/actors.error.js";
 
 export type { SsoModule, SsoAccessTokenResponse } from "./modules/sso.types.js";
 
-export { Actor, type Conn } from "./actor.js";
+export { Actor, type ActorConnectionIdentity, type Conn } from "./actor.js";
 
 export type {
   ConnectorsModule,

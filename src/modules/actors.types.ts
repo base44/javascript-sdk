@@ -1,3 +1,5 @@
+import type { ActorConnectionError } from "./actors.error.js";
+
 /**
  * Extend this interface to add typed `subscribe` callbacks and `send` payloads
  * for your deployed Actors.
@@ -43,31 +45,49 @@ type ToServerFor<N extends string> = N extends keyof ActorRegistry
 export interface ActorConnectOptions {
   /**
    * The connection id — becomes the actor's `conn.id`. Supply a stable value
-   * (e.g. persisted per tab) so a reconnect reuses the same server-side
-   * identity; omit for an auto-generated per-connection id.
+   * (e.g. persisted per tab) containing 1–64 letters, numbers, underscores, or
+   * hyphens so a reconnect reuses the same server-side identity; omit for an
+   * auto-generated per-connection id.
    */
   id?: string;
+
+  /**
+   * Called when this connection's bootstrap or WebSocket fails. Retryable
+   * failures may be reported more than once — the connection keeps retrying
+   * until it either succeeds or exhausts its attempt budget, and the final
+   * report before it gives up is the one where {@link Connection.closed}
+   * becomes `true`.
+   *
+   * Accepted only on the call that creates the connection: a later
+   * `connect({ onError })` throws, because a handler registered then could
+   * never be removed. Use {@link Connection.addErrorListener} for that.
+   */
+  onError?: (error: ActorConnectionError) => void;
 }
 
-/** Handle for one listener registered via {@link Connection.subscribe}. */
+/** Handle for one connection listener. */
 export interface ActorSubscription {
-  /** Remove this listener; other listeners and the socket stay live. */
+  /** Remove this listener; other listeners and the connection stay live. */
   unsubscribe(): void;
 }
 
 /**
- * A live connection to an actor instance, returned by {@link ActorRef.connect}.
- * `subscribe`/`send` are always valid — you only get a `Connection` once the
- * socket has been opened, so there's no pre-connect state to guard against.
+ * A connection to an actor instance, returned by {@link ActorRef.connect}.
  */
 export interface Connection<N extends string = string> {
   /** The connection id (the value the actor sees as `conn.id`). */
   readonly id: string;
 
-  /** Register a message listener. Multiple are allowed; returns a per-listener unsubscribe. */
+  /** Whether this connection has been explicitly or terminally closed. */
+  readonly closed: boolean;
+
+  /** Register a detachable connection-error listener. Throws if the connection has closed. */
+  addErrorListener(listener?: (error: ActorConnectionError) => void): ActorSubscription;
+
+  /** Register a message listener. Throws if the connection has closed. */
   subscribe(callback: (data: ToClientFor<N>) => void): ActorSubscription;
 
-  /** Send a message. Buffered by the socket until it's open. */
+  /** Send a message. Buffered until open; throws instead of buffering after close. */
   send(data: ToServerFor<N>): void;
 
   /** Tear down the socket, heartbeat, and all listeners. */
@@ -79,7 +99,11 @@ export interface Connection<N extends string = string> {
  * {@link connect} to open the socket and get a {@link Connection}.
  */
 export interface ActorRef<N extends string = string> {
-  /** Open the WebSocket and return the {@link Connection}. Idempotent. */
+  /**
+   * Open the WebSocket and return the {@link Connection}. Repeated calls reuse
+   * the live connection; a conflicting explicit id, or an `onError` handler the
+   * reused connection could not later detach, throws.
+   */
   connect(options?: ActorConnectOptions): Connection<N>;
 }
 

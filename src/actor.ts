@@ -11,6 +11,10 @@
 
 import type { Base44Client } from "./client";
 
+export type ActorConnectionIdentity =
+  | Readonly<{ type: "authenticated"; userId: string }>
+  | Readonly<{ type: "anonymous"; anonymousId: string }>;
+
 /**
  * A single client connection. `Send` is the message type this connection accepts
  * via {@link send} — the actor's *outgoing* (server→client) messages.
@@ -20,6 +24,8 @@ export interface Conn<Send = unknown> {
    *  receives from `subscribe()`. Identifies a distinct client, so multiple
    *  tabs are separate connections. */
   id: string;
+  /** Identity verified by the Actor Worker. Legacy Actors may not provide it. */
+  identity?: ActorConnectionIdentity;
   send(data: Send): void;
   reject(code: number, reason: string): void;
 }
@@ -112,9 +118,10 @@ export abstract class Actor<Incoming = unknown, Outgoing = unknown> {
 
   /**
    * Anonymous Base44 client scoped to this actor instance — no user or service
-   * auth, so entity access is RLS-gated (same as a logged-out visitor). Always
-   * operates on production data: an actor runs server-side with no per-connection
-   * identity, so a Test DB preview selected in the editor does not apply here.
+   * auth, so entity access is RLS-gated (same as a logged-out visitor). A
+   * connection's verified `identity` is context only and is never applied to this
+   * client. Always operates on production data, so a Test DB preview selected in
+   * the editor does not apply here.
    * Example: `const rows = await this.client.entities.Score.list();`
    */
   protected get client(): Base44Client {

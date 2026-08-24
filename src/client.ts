@@ -124,6 +124,14 @@ export function createClient(config: CreateClientConfig): Base44Client {
     onError: options?.onError,
   });
 
+  // Actors keeps raw responses for 409 routing and owns error reporting so
+  // response-validation failures use the same onError path as request failures.
+  const actorConnectionClient = createAxiosClient({
+    baseURL: `${serverUrl}/api`,
+    headers,
+    interceptResponses: false,
+  });
+
   const serviceRoleHeaders = {
     ...headers,
     ...(token ? { "on-behalf-of": `Bearer ${token}` } : {}),
@@ -167,14 +175,16 @@ export function createClient(config: CreateClientConfig): Base44Client {
 
   const actorsModule = createActorsModule({
     appId,
-    // serverUrl is often relative/empty (same-origin app); PartySocket needs an
-    // absolute host, so fall back to the page origin.
+    connectionClient: actorConnectionClient,
+    onError: options?.onError,
+    // serverUrl is often relative/empty in same-origin apps, while the legacy
+    // WebSocket fallback needs an absolute host.
     host: resolveActorsHost(
       serverUrl,
       typeof window !== "undefined" ? window.location?.origin : undefined,
     ),
     functionsVersion,
-    getAuthToken: () => token || getAccessToken(),
+    getAuthToken: () => userAuthModule.getToken(),
   });
 
   const userModules = {

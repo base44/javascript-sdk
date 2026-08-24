@@ -182,7 +182,10 @@ export function createAxiosClient({
       // On unauthenticated requests, attach a stable anonymous visitor id so the
       // backend can support anonymous agent access (conversation grouping + ownership).
       // Authenticated requests are identified by their Authorization header instead.
-      if (!config.headers.get("Authorization")) {
+      if (
+        !config.headers.get("Authorization") &&
+        !config.headers.get("X-Base44-Anonymous-Id")
+      ) {
         config.headers.set("X-Base44-Anonymous-Id", getAnalyticsSessionId());
       }
     }

@@ -174,12 +174,15 @@ describe("Analytics Module", () => {
     const auth = client.auth as InternalAuthModule;
 
     expect(auth.hasToken()).toBe(false);
+    expect(auth.getToken()).toBeUndefined();
 
     auth.setToken("some-token", false);
     expect(auth.hasToken()).toBe(true);
+    expect(auth.getToken()).toBe("some-token");
 
     auth.logout();
     expect(auth.hasToken()).toBe(false);
+    expect(auth.getToken()).toBeUndefined();
 
     client.cleanup();
   });

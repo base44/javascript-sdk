@@ -19,6 +19,8 @@ import type { ActorsModule } from "./modules/actors.types.js";
 export interface CreateClientOptions {
   /**
    * Optional error handler that will be called whenever an API error occurs.
+   * Actor connection failures are contextual `ActorConnectionError` instances.
+   * Retryable Actor failures may be reported more than once.
    */
   onError?: (error: Error) => void;
 }

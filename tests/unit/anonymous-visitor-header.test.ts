@@ -68,6 +68,24 @@ describe("anonymous visitor header", () => {
     ).toBe(sessionId);
   });
 
+  test("preserves an explicit anonymous id supplied by a transport", async () => {
+    const client = createAxiosClient({
+      baseURL: "https://api",
+      headers: { "X-Base44-Anonymous-Id": "actor-client-id" },
+    });
+    let captured: any;
+    client.defaults.adapter = async (config) => {
+      captured = config;
+      return { data: {}, status: 200, statusText: "OK", headers: {}, config };
+    };
+
+    await client.get("/actor-connection");
+
+    expect(captured.headers.get("X-Base44-Anonymous-Id")).toBe(
+      "actor-client-id",
+    );
+  });
+
   test("authenticated client sends Authorization, not the anonymous header", async () => {
     const headers = await captureRequestHeaders("a-real-token");
     expect(headers.get("X-Base44-Anonymous-Id")).toBeFalsy();

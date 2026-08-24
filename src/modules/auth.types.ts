@@ -567,4 +567,7 @@ export interface InternalAuthModule extends AuthModule {
    * could not succeed without a session, not to decide that one is valid.
    */
   hasToken(): boolean;
+
+  /** Current access token used by internal transports. */
+  getToken(): string | undefined;
 }
