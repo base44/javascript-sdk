@@ -51,6 +51,63 @@ describe("Connectors module – metered connector proxy", () => {
     expect(received.headers).toEqual({});
   });
 
+  test("forwards a named host, and omits it entirely when unset", async () => {
+    // The payload is built field by field, so anything not explicitly forwarded
+    // is silently dropped — which is what happened to `host` before this.
+    const bodies: any[] = [];
+    scope
+      .post(`/api/apps/${appId}/connectors/googlemaps/call`, (body) => {
+        bodies.push(body);
+        return true;
+      })
+      .twice()
+      .reply(200, proxyResponse);
+
+    await base44.asServiceRole.connectors.callApi("googlemaps", {
+      host: "places",
+      path: "/v1/places:searchText",
+    });
+    await base44.asServiceRole.connectors.callApi("googlemaps", {
+      path: "/maps/api/geocode/json",
+    });
+
+    expect(bodies[0].host).toBe("places");
+    // Absent rather than null, so the proxy picks the connector's default host.
+    expect("host" in bodies[1]).toBe(false);
+  });
+
+  test("maps a binary response to dataBase64 + contentType", async () => {
+    scope.post(`/api/apps/${appId}/connectors/googlemaps/call`).reply(200, {
+      success: true,
+      phase: "responded",
+      status_code: 200,
+      data: null,
+      data_base64: "iVBORw0KGgo=",
+      content_type: "image/png",
+      headers: {},
+      credits_charged: 1,
+    });
+
+    const res = await base44.asServiceRole.connectors.callApi("googlemaps", {
+      path: "/maps/api/staticmap",
+    });
+
+    expect(res.dataBase64).toBe("iVBORw0KGgo=");
+    expect(res.contentType).toBe("image/png");
+    expect(res.data).toBeNull();
+  });
+
+  test("leaves dataBase64 and contentType null for a JSON response", async () => {
+    scope.post(`/api/apps/${appId}/connectors/x/call`).reply(200, proxyResponse);
+
+    const res = await base44.asServiceRole.connectors.callApi("x", {
+      path: "/2/users/me",
+    });
+
+    expect(res.dataBase64).toBeNull();
+    expect(res.contentType).toBeNull();
+  });
+
   test("defaults the method to GET", async () => {
     let received: any;
     scope

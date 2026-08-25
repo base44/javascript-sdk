@@ -68,6 +68,12 @@ export interface ConnectorApiRequest {
   /** HTTP method for the upstream request. Defaults to `'GET'`. */
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD";
   /**
+   * Which of the connector's API hosts to call, by the name it declares.
+   * Omit for its default host (the first one declared). Only relevant for
+   * connectors that expose more than one host.
+   */
+  host?: string;
+  /**
    * Path relative to the connector's API root, starting with `/`, such as `'/2/tweets'`.
    *
    * Must not be an absolute URL. Query parameters may be included here or passed
@@ -78,7 +84,7 @@ export interface ConnectorApiRequest {
   query?: Record<string, string | number | boolean | Array<string | number>>;
   /** Extra request headers. Only headers the connector explicitly allows are forwarded; the rest are dropped. */
   headers?: Record<string, string>;
-  /** JSON request body. Ignored for `GET`, `HEAD`, and `DELETE`. */
+  /** JSON request body. Ignored for `GET` and `HEAD`. */
   body?: unknown;
 }
 
@@ -92,8 +98,18 @@ export interface ConnectorApiResponse<T = unknown> {
   phase: ConnectorApiResponsePhase;
   /** The upstream HTTP status code, or `null` when no response was received. */
   status: number | null;
-  /** The parsed upstream response body, or proxy error details when no response was received. */
+  /**
+   * The parsed upstream response body, or proxy error details when no response
+   * was received. `null` when the response was binary — see {@link dataBase64}.
+   */
   data: T;
+  /**
+   * The response body base64-encoded, for the media types the connector declares
+   * as binary (images, PDFs). Set instead of {@link data}, never alongside it.
+   */
+  dataBase64: string | null;
+  /** The response media type, set only alongside {@link dataBase64}. */
+  contentType: string | null;
   /** The subset of upstream response headers the connector exposes, typically rate-limit counters. */
   headers: Record<string, string>;
   /** Integration credits billed to the workspace for this call. */
@@ -109,6 +125,8 @@ export interface ConnectorProxyRawResponse {
   phase: ConnectorApiResponsePhase;
   status_code: number | null;
   data: unknown;
+  data_base64: string | null;
+  content_type: string | null;
   headers: Record<string, string>;
   credits_charged: number;
 }

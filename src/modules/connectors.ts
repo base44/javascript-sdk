@@ -172,6 +172,9 @@ async function proxyCall<T>(
 
   const response = await axios.post(url, {
     method,
+    // Omitted rather than sent as null so the proxy applies the connector's
+    // declared default host.
+    ...(request.host === undefined ? {} : { host: request.host }),
     path: request.path,
     query: request.query ?? {},
     headers: request.headers ?? {},
@@ -184,6 +187,8 @@ async function proxyCall<T>(
     phase: data.phase,
     status: data.status_code ?? null,
     data: data.data as T,
+    dataBase64: data.data_base64 ?? null,
+    contentType: data.content_type ?? null,
     headers: data.headers ?? {},
     creditsCharged: data.credits_charged ?? 0,
   };
