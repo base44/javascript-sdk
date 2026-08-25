@@ -19,8 +19,20 @@ import type { ActorsModule } from "./modules/actors.types.js";
 export interface CreateClientOptions {
   /**
    * Optional error handler that will be called whenever an API error occurs.
+   *
+   * Also receives {@link ActorsModule | actors} connection failures. Errors
+   * are usually {@linkcode Base44Error} instances — check `error.status`.
    */
   onError?: (error: Error) => void;
+  /**
+   * Forces the actors transport. `"auto"` (default) connects directly to the
+   * actor and falls back to the platform proxy when the app's actors don't
+   * support direct connections; `"proxy"` always uses the platform proxy
+   * (ops rollback — no connection-token calls); `"direct"` disables the
+   * fallback (validation environments).
+   * @internal
+   */
+  actorsTransport?: "auto" | "proxy" | "direct";
 }
 
 /**

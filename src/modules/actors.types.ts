@@ -67,10 +67,15 @@ export interface Connection<N extends string = string> {
   /** Register a message listener. Multiple are allowed; returns a per-listener unsubscribe. */
   subscribe(callback: (data: ToClientFor<N>) => void): ActorSubscription;
 
-  /** Send a message. Buffered by the socket until it's open. */
+  /** Send a message. Buffered by the socket until it's open; dropped after
+   * {@link close}. */
   send(data: ToServerFor<N>): void;
 
-  /** Tear down the socket, heartbeat, and all listeners. */
+  /**
+   * Tear down the socket, heartbeat, and all listeners. Safe to call more
+   * than once. A connection also closes itself when it fails permanently —
+   * see {@link ActorRef.connect}.
+   */
   close(): void;
 }
 
@@ -79,7 +84,15 @@ export interface Connection<N extends string = string> {
  * {@link connect} to open the socket and get a {@link Connection}.
  */
 export interface ActorRef<N extends string = string> {
-  /** Open the WebSocket and return the {@link Connection}. Idempotent. */
+  /**
+   * Open the WebSocket and return the {@link Connection}. Idempotent while the
+   * connection is open.
+   *
+   * A connection that fails permanently (for example, the actor doesn't exist
+   * or the caller isn't allowed to connect) closes itself and reports the
+   * error to the client's `onError` handler. Call `connect()` again after
+   * fixing the cause to get a fresh {@link Connection}, and re-subscribe.
+   */
   connect(options?: ActorConnectOptions): Connection<N>;
 }
 

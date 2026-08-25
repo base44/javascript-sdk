@@ -20,7 +20,11 @@ import type {
   CreateClientOptions,
 } from "./client.types.js";
 import { createAnalyticsModule } from "./modules/analytics.js";
-import { createActorsModule, resolveActorsHost } from "./modules/actors.js";
+import {
+  createActorsModule,
+  resolveActorsHost,
+  type ActorConnectionCredentials,
+} from "./modules/actors.js";
 
 // Re-export client types
 export type { Base44Client, CreateClientConfig, CreateClientOptions };
@@ -143,6 +147,16 @@ export function createClient(config: CreateClientConfig): Base44Client {
     interceptResponses: false,
   });
 
+  // Dedicated client for actor connection-token mints: no onError (a legacy
+  // actor answers every mint with an expected 409 before the proxy fallback,
+  // which must not reach the app's error handler — the actors module forwards
+  // genuine failures itself via onMintError) and no constructor token
+  // (auth is per-request so a login/logout is picked up on every reconnect).
+  const actorsAxiosClient = createAxiosClient({
+    baseURL: `${serverUrl}/api`,
+    headers,
+  });
+
   const userAuthModule = createAuthModule(
     axiosClient,
     functionsAxiosClient,
@@ -167,14 +181,33 @@ export function createClient(config: CreateClientConfig): Base44Client {
 
   const actorsModule = createActorsModule({
     appId,
-    // serverUrl is often relative/empty (same-origin app); PartySocket needs an
-    // absolute host, so fall back to the page origin.
+    // serverUrl is often relative/empty (same-origin app); the proxy-fallback
+    // URL needs an absolute host, so fall back to the page origin.
     host: resolveActorsHost(
       serverUrl,
       typeof window !== "undefined" ? window.location?.origin : undefined,
     ),
     functionsVersion,
     getAuthToken: () => token || getAccessToken(),
+    mintConnectionToken: async (actorName, room, connectionId) => {
+      const authToken = token || getAccessToken();
+      return await actorsAxiosClient.post<unknown, ActorConnectionCredentials>(
+        `/apps/${appId}/actors/${encodeURIComponent(actorName)}/connection-token`,
+        { room, connection_id: connectionId },
+        {
+          headers: {
+            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+            // The mint endpoint resolves draft vs published from this header;
+            // only the functions axios clients send it by default.
+            ...(functionsVersion
+              ? { "Base44-Functions-Version": functionsVersion }
+              : {}),
+          },
+        },
+      );
+    },
+    transport: options?.actorsTransport,
+    onMintError: options?.onError,
   });
 
   const userModules = {
