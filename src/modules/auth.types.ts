@@ -144,12 +144,15 @@ export interface AuthModule {
   /**
    * Updates the current authenticated user's information.
    *
-   * You can update `role` and any [custom fields](/developers/backend/resources/entities/user-schema#custom-fields) defined in your
-   * User entity schema.
-   * The `role` value must be either `'user'` or `'admin'`.
+   * You can update any [custom fields](/developers/backend/resources/entities/user-schema#custom-fields)
+   * defined in your User entity schema.
+   *
+   * Updating `role` requires editor access on the app.
+   *
    * <Note>
-   * The following fields are read-only and can't be changed with this method:
-   * `id`, `email`, `full_name`, `created_date`, `updated_date`, and `created_by`.
+   * These fields can't be changed with this method:
+   * `id`, `email`, `full_name`, `created_date`, `updated_date`, `created_by`,
+   * and `collaborator_role`.
    * </Note>
    *
    * @param data - Object containing the fields to update.
@@ -157,9 +160,8 @@ export interface AuthModule {
    *
    * @example
    * ```typescript
-   * // Update role and custom fields defined in your User entity
+   * // Update custom fields defined in your User entity
    * await base44.auth.updateMe({
-   *   role: 'admin',
    *   bio: 'Software developer',
    *   preferences: { theme: 'dark' }
    * });
