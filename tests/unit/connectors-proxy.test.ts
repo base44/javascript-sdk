@@ -12,10 +12,12 @@ describe("Connectors module – metered connector proxy", () => {
   beforeEach(() => {
     base44 = createClient({ serverUrl, appId, serviceToken });
     scope = nock(serverUrl);
+    nock.disableNetConnect();
   });
 
   afterEach(() => {
     nock.cleanAll();
+    nock.enableNetConnect();
   });
 
   const proxyResponse = {
@@ -51,6 +53,23 @@ describe("Connectors module – metered connector proxy", () => {
     expect(received.headers).toEqual({});
   });
 
+  test("percent-encodes the integration type so it stays on the connectors route", async () => {
+    // The route carries the service-role token, so a runtime-built identifier
+    // containing slashes must select a (nonexistent) connector, not another route.
+    scope
+      .post(
+        `/api/apps/${appId}/connectors/${encodeURIComponent("../evil/route")}/call`
+      )
+      .reply(200, proxyResponse);
+
+    const res = await base44.asServiceRole.connectors.callApi(
+      "../evil/route" as any,
+      { path: "/x" }
+    );
+
+    expect(res.success).toBe(true);
+  });
+
   test("forwards a named host, and omits it entirely when unset", async () => {
     // The payload is built field by field, so anything not explicitly forwarded
     // is silently dropped — which is what happened to `host` before this.
@@ -60,7 +79,7 @@ describe("Connectors module – metered connector proxy", () => {
         bodies.push(body);
         return true;
       })
-      .twice()
+      .times(3)
       .reply(200, proxyResponse);
 
     await base44.asServiceRole.connectors.callApi("googlemaps", {
@@ -70,10 +89,16 @@ describe("Connectors module – metered connector proxy", () => {
     await base44.asServiceRole.connectors.callApi("googlemaps", {
       path: "/maps/api/geocode/json",
     });
+    await base44.asServiceRole.connectors.callApi("googlemaps", {
+      host: null as any,
+      path: "/maps/api/geocode/json",
+    });
 
     expect(bodies[0].host).toBe("places");
     // Absent rather than null, so the proxy picks the connector's default host.
     expect("host" in bodies[1]).toBe(false);
+    // Untyped callers write `host: x ?? null`; null must mean unset, not a host.
+    expect("host" in bodies[2]).toBe(false);
   });
 
   test("maps a binary response to dataBase64 + contentType", async () => {
