@@ -2,11 +2,23 @@ import { AxiosInstance } from "axios";
 import {
   ConnectorIntegrationType,
   ConnectorAccessTokenResponse,
+  ConnectorApiRequest,
+  ConnectorApiResponse,
   ConnectorConnectionResponse,
+  ConnectorProxyRawResponse,
   AppUserConnectorConnectionResponse,
   ConnectorsModule,
   UserConnectorsModule,
 } from "./connectors.types.js";
+
+const CONNECTOR_API_METHODS = new Set([
+  "GET",
+  "POST",
+  "PUT",
+  "PATCH",
+  "DELETE",
+  "HEAD",
+]);
 
 /**
  * Creates the Connectors module for the Base44 SDK.
@@ -112,6 +124,73 @@ export function createConnectorsModule(
         connectionConfig: data.connection_config ?? null,
       };
     },
+
+    async callApi<T = unknown>(
+      integrationType: ConnectorIntegrationType,
+      request: ConnectorApiRequest
+    ): Promise<ConnectorApiResponse<T>> {
+      assertNonEmptyString(integrationType, "Integration type");
+      return proxyCall<T>(
+        axios,
+        `/apps/${appId}/connectors/${integrationType}/call`,
+        request
+      );
+    },
+  };
+}
+
+function assertNonEmptyString(value: unknown, label: string): void {
+  if (!value || typeof value !== "string") {
+    throw new Error(`${label} is required and must be a string`);
+  }
+}
+
+/**
+ * POST a request to the connector proxy and normalize the response.
+ *
+ * The proxy reports upstream outcomes in the body rather than as HTTP status, so
+ * a provider 4xx/5xx arrives here as a resolved response with `success: false` —
+ * only Base44-side failures reject through the axios error interceptor.
+ *
+ * @internal
+ */
+async function proxyCall<T>(
+  axios: AxiosInstance,
+  url: string,
+  request: ConnectorApiRequest
+): Promise<ConnectorApiResponse<T>> {
+  if (!request || typeof request !== "object") {
+    throw new Error("Request is required and must be an object");
+  }
+  assertNonEmptyString(request.path, "Request path");
+  const method = request.method ?? "GET";
+  if (!CONNECTOR_API_METHODS.has(method)) {
+    throw new Error(
+      "Request method must be one of GET, POST, PUT, PATCH, DELETE, or HEAD"
+    );
+  }
+
+  const response = await axios.post(url, {
+    method,
+    // Omitted rather than sent as null so the proxy applies the connector's
+    // declared default host.
+    ...(request.host === undefined ? {} : { host: request.host }),
+    path: request.path,
+    query: request.query ?? {},
+    headers: request.headers ?? {},
+    body: request.body ?? null,
+  });
+
+  const data = response as unknown as ConnectorProxyRawResponse;
+  return {
+    success: data.success,
+    phase: data.phase,
+    status: data.status_code ?? null,
+    data: data.data as T,
+    dataBase64: data.data_base64 ?? null,
+    contentType: data.content_type ?? null,
+    headers: data.headers ?? {},
+    creditsCharged: data.credits_charged ?? 0,
   };
 }
 

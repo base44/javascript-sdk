@@ -128,9 +128,10 @@ export function extractSignatureInfo(
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     // Match function signature: > **methodName**(...): `returnType` or `returnType`\<`generic`\>
+    // Method-level generics appear between the bold name and arguments.
     // Handle both simple types and generic types like `Promise`\<`any`\> or `Promise`\<[`TypeName`](link)\>
     const sigMatch = line.match(
-      /^>\s*\*\*(\w+)\*\*\([^)]*\):\s*`([^`]+)`(?:\\<(.+?)\\>)?/
+      /^>\s*\*\*(\w+)\*\*(?:\\<.*?\\>)?\([^)]*\):\s*`([^`]+)`(?:\\<(.+?)\\>)?/
     );
     if (sigMatch) {
       const methodName = sigMatch[1];
@@ -368,7 +369,9 @@ function rewriteReturnSections(content, options) {
         let sigLineIdx = i - 2; // Go back past the Returns heading
         while (
           sigLineIdx >= 0 &&
-          !lines[sigLineIdx].match(/^>\s*\*\*\w+\*\*\(/)
+          !lines[sigLineIdx].match(
+            /^>\s*\*\*\w+\*\*(?:\\<.*?\\>)?\(/
+          )
         ) {
           sigLineIdx--;
         }
@@ -467,7 +470,9 @@ function rewriteReturnSections(content, options) {
       let sigLineIdx = i - 2; // Go back past the Returns heading
       while (
         sigLineIdx >= 0 &&
-        !lines[sigLineIdx].match(/^>\s*\*\*\w+\*\*\(/)
+        !lines[sigLineIdx].match(
+          /^>\s*\*\*\w+\*\*(?:\\<.*?\\>)?\(/
+        )
       ) {
         sigLineIdx--;
       }
