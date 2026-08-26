@@ -264,7 +264,7 @@ describe("Actors Module — proxy fallback", () => {
     );
   });
 
-  test.each([503, 422])("mint %i falls back to the proxy", async (status) => {
+  test.each([503, 422, 405])("mint %i falls back to the proxy", async (status) => {
     const config = makeConfig();
     config.mintConnectionToken.mockRejectedValueOnce(httpError(status));
     mod(config).GameRoom("r").connect({ id: "c" });
@@ -440,7 +440,7 @@ describe("Actors Module — mint error reporting", () => {
     expect(reported.message).toContain("boom");
   });
 
-  test.each([409, 422, 503])(
+  test.each([405, 409, 422, 503])(
     "the expected fallback status %i is silent",
     async (status) => {
       const config = makeConfig();
@@ -595,6 +595,27 @@ describe("Actors Module — client wiring", () => {
       "wss://base44.app/parties/PongGame/r1?_pk=c1&app_id=app-1&handler=PongGame&token=tok",
     );
     // the fallback handshake is expected — the app's error handler stays quiet
+    expect(onError).not.toHaveBeenCalled();
+    base44.cleanup();
+  });
+
+  test("a 405 mint reply (backend without the endpoint) falls back to the proxy", async () => {
+    // What a pre-direct backend actually answers: its actor deploy routes
+    // match the path via `{handler_name:path}` but not the POST method.
+    nock(serverUrl)
+      .post(`/api/apps/${appId}/actors/PongGame/connection-token`)
+      .reply(405, {
+        error_type: "HTTPException",
+        message: "Method Not Allowed",
+        detail: "Method Not Allowed",
+      });
+
+    const onError = vi.fn();
+    const base44 = createClient({ serverUrl, appId, token: "tok", options: { onError } });
+    base44.actors.PongGame("r1").connect({ id: "c1" });
+    await expect(sockets[0].urlProvider()).resolves.toBe(
+      "wss://base44.app/parties/PongGame/r1?_pk=c1&app_id=app-1&handler=PongGame&token=tok",
+    );
     expect(onError).not.toHaveBeenCalled();
     base44.cleanup();
   });

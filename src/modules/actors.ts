@@ -52,9 +52,11 @@ const DEAD_MS = 3_000;
 // Mint responses that mean "direct can't serve this connection, the proxy can":
 // 409 = legacy-family actor script, 503 = direct connections not provisioned,
 // 422 = no principal (e.g. anonymous outside a browser) or an id/room only the
-// proxy's looser validation accepts. The proxy serves migrated actors too, so
-// falling back is always safe.
-const PROXY_FALLBACK_STATUSES = new Set([409, 422, 503]);
+// proxy's looser validation accepts, 405 = a backend that predates the mint
+// endpoint (its actor deploy routes catch the path via `{handler_name:path}`
+// but not the POST method — and the real endpoint never 405s a POST). The
+// proxy serves migrated actors too, so falling back is always safe.
+const PROXY_FALLBACK_STATUSES = new Set([405, 409, 422, 503]);
 
 // Mint responses no retry can fix (bad request / forbidden / not found): the
 // connection closes instead of re-minting forever; a fresh connect() re-probes.
