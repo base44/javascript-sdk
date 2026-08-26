@@ -47,8 +47,17 @@ const rejectsLowercaseMethod = {
   path: "/2/tweets",
 } satisfies ConnectorApiRequest;
 
+// Even with an explicit type argument, data stays nullable: binary and
+// proxy-error responses carry null, so it must be narrowed before use.
+declare const typedResponse: ConnectorApiResponse<{ id: string }>;
+const narrowableData: { id: string } | null = typedResponse.data;
+// @ts-expect-error data may be null until narrowed.
+const unnarrowedData: { id: string } = typedResponse.data;
+
 void request;
 void response;
 void binaryResponse;
 void hostedRequest;
 void rejectsLowercaseMethod;
+void narrowableData;
+void unnarrowedData;

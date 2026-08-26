@@ -102,7 +102,7 @@ export interface ConnectorApiResponse<T = unknown> {
    * The parsed upstream response body, or proxy error details when no response
    * was received. `null` when the response was binary — see {@link dataBase64}.
    */
-  data: T;
+  data: T | null;
   /**
    * The response body base64-encoded, for the media types the connector declares
    * as binary (images, PDFs). Set instead of {@link data}, never alongside it.

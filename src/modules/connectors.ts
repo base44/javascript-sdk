@@ -46,7 +46,7 @@ export function createConnectorsModule(
       }
 
       const response = await axios.get<ConnectorAccessTokenResponse>(
-        `/apps/${appId}/external-auth/tokens/${integrationType}`
+        `/apps/${appId}/external-auth/tokens/${encodeURIComponent(integrationType)}`
       );
 
       // @ts-expect-error
@@ -61,7 +61,7 @@ export function createConnectorsModule(
       }
 
       const response = await axios.get<ConnectorAccessTokenResponse>(
-        `/apps/${appId}/external-auth/tokens/${integrationType}`
+        `/apps/${appId}/external-auth/tokens/${encodeURIComponent(integrationType)}`
       );
 
       const data = response as unknown as ConnectorAccessTokenResponse;
@@ -79,7 +79,7 @@ export function createConnectorsModule(
       }
 
       const response = await axios.get<ConnectorAccessTokenResponse>(
-        `/apps/${appId}/external-auth/tokens/connectors/${connectorId}`
+        `/apps/${appId}/external-auth/tokens/connectors/${encodeURIComponent(connectorId)}`
       );
 
       const data = response as unknown as ConnectorAccessTokenResponse;
@@ -100,7 +100,7 @@ export function createConnectorsModule(
       }
 
       const response = await axios.get(
-        `/apps/${appId}/app-user-auth/connectors/${connectorId}/token`
+        `/apps/${appId}/app-user-auth/connectors/${encodeURIComponent(connectorId)}/token`
       );
 
       const data = response as unknown as { access_token: string };
@@ -115,7 +115,7 @@ export function createConnectorsModule(
       }
 
       const response = await axios.get(
-        `/apps/${appId}/app-user-auth/connectors/${connectorId}/token`
+        `/apps/${appId}/app-user-auth/connectors/${encodeURIComponent(connectorId)}/token`
       );
 
       const data = response as unknown as ConnectorAccessTokenResponse;
@@ -130,9 +130,11 @@ export function createConnectorsModule(
       request: ConnectorApiRequest
     ): Promise<ConnectorApiResponse<T>> {
       assertNonEmptyString(integrationType, "Integration type");
+      // Encoded so a runtime-built identifier can only ever select a
+      // connector, never re-target another route under this token.
       return proxyCall<T>(
         axios,
-        `/apps/${appId}/connectors/${integrationType}/call`,
+        `/apps/${appId}/connectors/${encodeURIComponent(integrationType)}/call`,
         request
       );
     },
@@ -172,9 +174,9 @@ async function proxyCall<T>(
 
   const response = await axios.post(url, {
     method,
-    // Omitted rather than sent as null so the proxy applies the connector's
-    // declared default host.
-    ...(request.host === undefined ? {} : { host: request.host }),
+    // Omitted when unset (undefined or null, since untyped callers write
+    // either) so the proxy applies the connector's declared default host.
+    ...(request.host == null ? {} : { host: request.host }),
     path: request.path,
     query: request.query ?? {},
     headers: request.headers ?? {},
@@ -213,7 +215,7 @@ export function createUserConnectorsModule(
       }
 
       const response = await axios.post(
-        `/apps/${appId}/app-user-auth/connectors/${connectorId}/initiate`
+        `/apps/${appId}/app-user-auth/connectors/${encodeURIComponent(connectorId)}/initiate`
       );
 
       const data = response as unknown as { redirect_url: string };
@@ -226,7 +228,7 @@ export function createUserConnectorsModule(
       }
 
       await axios.delete(
-        `/apps/${appId}/app-user-auth/connectors/${connectorId}`
+        `/apps/${appId}/app-user-auth/connectors/${encodeURIComponent(connectorId)}`
       );
     },
   };
