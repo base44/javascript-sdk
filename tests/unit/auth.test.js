@@ -770,16 +770,22 @@ describe('Auth Module', () => {
       global.window = originalWindow;
     });
 
-    test('should use SSO URL structure for sso provider', () => {
+    test('should use SSO URL structure for sso provider', async () => {
       const originalWindow = global.window;
       const mockLocation = { href: '', origin: 'https://myapp.com' };
       const win = { location: mockLocation };
       win.parent = win;
       global.window = win;
 
+      // SSO kickoff is async since the PKCE opt-in (#17216 §5.2): the
+      // navigation happens after the (attempted) challenge preparation. This
+      // window stub has no sessionStorage, so PKCE prep fails and the kickoff
+      // falls back to the exact legacy URL — no version=2 opt-in.
       base44.auth.loginWithProvider('sso', '/dashboard');
-
-      expect(mockLocation.href).toContain(`/api/apps/${appId}/auth/sso/login?`);
+      await vi.waitFor(() =>
+        expect(mockLocation.href).toContain(`/api/apps/${appId}/auth/sso/login?`)
+      );
+      expect(mockLocation.href).not.toContain('version=2');
 
       global.window = originalWindow;
     });
