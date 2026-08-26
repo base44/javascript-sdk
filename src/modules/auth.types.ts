@@ -147,8 +147,7 @@ export interface AuthModule {
    * You can update any [custom fields](/developers/backend/resources/entities/user-schema#custom-fields)
    * defined in your User entity schema.
    *
-   * Updating `role` requires editor access on the app. An app user without it
-   * gets a 403 response, and none of the other fields in the request are applied.
+   * Updating `role` requires editor access on the app.
    *
    * <Note>
    * These fields can't be changed with this method:
