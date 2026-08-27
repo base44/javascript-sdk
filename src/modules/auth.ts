@@ -79,6 +79,12 @@ function loginViaPopup(
   window.addEventListener("message", onMessage);
 }
 
+// "token" is the key the platform-v2 built-in SDK wrote.
+function removeStoredAccessTokens() {
+  removeAccessToken({});
+  removeAccessToken({ storageKey: "token" });
+}
+
 /**
  * Creates the auth module for the Base44 SDK.
  *
@@ -159,8 +165,7 @@ export function createAuthModule(
 
       // The login page must not boot with the token that just got us here,
       // or a rejected token redirects to /login forever.
-      removeAccessToken({});
-      removeAccessToken({ storageKey: "token" });
+      removeStoredAccessTokens();
       window.location.href = loginUrl;
     },
 
@@ -207,8 +212,7 @@ export function createAuthModule(
 
       // Only do the rest if in a browser environment
       if (typeof window !== "undefined") {
-        removeAccessToken({});
-        removeAccessToken({ storageKey: "token" });
+        removeStoredAccessTokens();
 
         // Determine the from_url parameter
         const fromUrl = redirectUrl || window.location.href;
