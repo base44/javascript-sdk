@@ -434,7 +434,7 @@ describe('Auth Module', () => {
       base44.auth.logout();
       
       // Verify error was logged
-      expect(consoleSpy).toHaveBeenCalledWith('Failed to remove token from localStorage:', expect.any(Error));
+      expect(consoleSpy).toHaveBeenCalledWith('Error removing token from local storage:', expect.any(Error));
       
       // Restore
       consoleSpy.mockRestore();
