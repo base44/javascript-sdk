@@ -287,6 +287,21 @@ describe('Auth Module', () => {
       global.window = originalWindow;
     });
 
+    test('should drop the stored token before redirecting to login', () => {
+      const mockLocalStorage = { removeItem: vi.fn(), getItem: vi.fn(), setItem: vi.fn(), clear: vi.fn() };
+      const mockLocation = { href: 'https://example.com/current-page' };
+      const originalWindow = global.window;
+      global.window = { localStorage: mockLocalStorage, location: mockLocation };
+
+      base44.auth.redirectToLogin();
+
+      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('base44_access_token');
+      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('token');
+      expect(mockLocation.href).toContain('/login?from_url=');
+
+      global.window = originalWindow;
+    });
+
     test('should use appBaseUrl for login redirect when provided', () => {
       const customAppBaseUrl = 'https://custom-app.example.com';
       const clientWithCustomUrl = createClient({
