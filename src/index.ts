@@ -5,6 +5,12 @@ import {
   type CreateClientConfig,
   type CreateClientOptions,
 } from "./client.js";
+import {
+  createPlatformClient,
+  type CreatePlatformClientConfig,
+  type PlatformClient,
+  type PrincipalClient,
+} from "./platform-client.js";
 import { Base44Error, type Base44ErrorJSON } from "./utils/axios-client.js";
 import {
   getAccessToken,
@@ -16,6 +22,7 @@ import {
 export {
   createClient,
   createClientFromRequest,
+  createPlatformClient,
   Base44Error,
   getAccessToken,
   saveAccessToken,
@@ -28,6 +35,9 @@ export type {
   CreateClientConfig,
   CreateClientOptions,
   Base44ErrorJSON,
+  CreatePlatformClientConfig,
+  PlatformClient,
+  PrincipalClient,
 };
 
 export * from "./types.js";
@@ -119,6 +129,14 @@ export type {
 } from "./modules/actors.types.js";
 
 export type { SsoModule, SsoAccessTokenResponse } from "./modules/sso.types.js";
+
+export type {
+  PlatformsModule,
+  PrincipalRole,
+  ProvisionPrincipalParams,
+  ServicePrincipal,
+  DeprovisionResult,
+} from "./modules/platforms.types.js";
 
 export { Actor, type Conn } from "./actor.js";
 
