@@ -1,8 +1,10 @@
 import { createAxiosClient } from "./utils/axios-client.js";
 import { createPlatformsModule } from "./modules/platforms.js";
+import { createBuilderSessionModule } from "./modules/builder.js";
 import { createPrincipalTokenStore } from "./utils/principal-tokens.js";
 import { createClient } from "./client.js";
 import type { Base44Client } from "./client.types.js";
+import type { BuilderSession } from "./modules/builder.types.js";
 import type {
   CreatePlatformClientConfig,
   PlatformClient,
@@ -35,8 +37,12 @@ export type { CreatePlatformClientConfig, PlatformClient, PrincipalClient };
  *
  * **Server-side only.** This client holds workspace API keys, which authorize
  * every app in the workspace. Never construct one in a browser, and never send
- * either key to one — a browser gets a short-lived token vended *for it*, which
- * is what {@linkcode PrincipalClient.getToken | getToken()} is for.
+ * either key to one.
+ *
+ * Nor a principal's own token: it can start builds and spend credits. The one
+ * credential meant for a browser is a *grant* —
+ * {@linkcode BuilderSession.createGrant | createGrant()} — which reads one builder
+ * session, expires in minutes, and cannot write.
  *
  * @param config - Configuration object for the platform client.
  * @returns A configured platform client.
@@ -57,6 +63,13 @@ export type { CreatePlatformClientConfig, PlatformClient, PrincipalClient };
  * });
  *
  * const asDana = base44.asPrincipal('user_42');
+ *
+ * // Drive the builder as them, and watch it happen.
+ * const builder = asDana.builder(appId);
+ * const { turnId } = await builder.sendMessage('add a footer');
+ * const outcome = await builder.waitForTurn(turnId);
+ *
+ * // Or use the rest of the SDK as them.
  * const app = await asDana.forApp(appId);
  * const todos = await app.entities.Todo.list();
  * ```
@@ -92,6 +105,14 @@ export function createPlatformClient(
     onError: options?.onError,
   });
 
+  // A fourth, and for the same reason as the third: it carries no static
+  // credential. Every builder call is made as a *principal*, whose token rotates,
+  // so the token goes on the request rather than into the client.
+  const builderAxios = createAxiosClient({
+    baseURL: `${serverUrl}/api`,
+    onError: options?.onError,
+  });
+
   const tokens = createPrincipalTokenStore({ mintAxios, oauthAxios });
   const platforms = createPlatformsModule(provisionAxios);
 
@@ -113,6 +134,18 @@ export function createPlatformClient(
       externalId,
 
       getToken,
+
+      // Not cached, unlike `forApp`. A builder session is a handful of closures
+      // over the token store rather than a client with sockets and an analytics
+      // session, so there is nothing to reuse and nothing to leak.
+      builder(appId: string): BuilderSession {
+        return createBuilderSessionModule({
+          axios: builderAxios,
+          appId,
+          serverUrl,
+          getToken,
+        });
+      },
 
       async forApp(appId: string): Promise<Base44Client> {
         const token = await getToken();

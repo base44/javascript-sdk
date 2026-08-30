@@ -1,4 +1,5 @@
 import type { Base44Client, CreateClientOptions } from "./client.types.js";
+import type { BuilderSession } from "./modules/builder.types.js";
 import type { PlatformsModule } from "./modules/platforms.types.js";
 
 /**
@@ -50,6 +51,39 @@ export interface PrincipalClient {
   readonly externalId: string;
 
   /**
+   * The builder session for one app, driven as this principal.
+   *
+   * This is the partner-facing builder: send a message, answer what the agent
+   * asks, stop a turn, and watch the whole thing happen over one resumable
+   * stream. Every write returns as soon as the turn is *accepted*, because a
+   * build takes minutes and no caller should hold a request open through one.
+   *
+   * The principal must be able to edit the app, which it is when it built the
+   * app itself. A workspace that is not enrolled as a platform gets 404 from
+   * every route here — deliberately indistinguishable from "no such app", so an
+   * unenrolled caller cannot tell the surface exists.
+   *
+   * Cheap to call: the session is a handle, not a connection, and it holds no
+   * credential of its own — the principal's token is re-read per request, so one
+   * held across a long build keeps working as the token rotates underneath it.
+   *
+   * @param appId - The app to build.
+   * @returns The session, ready to read and write.
+   *
+   * @example
+   * ```typescript
+   * const builder = base44.asPrincipal('user_42').builder(appId);
+   *
+   * const { turnId } = await builder.sendMessage('add a footer');
+   * const outcome = await builder.waitForTurn(turnId);
+   *
+   * // The browser gets a read-only grant, and nothing else.
+   * const grant = await builder.createGrant({ ttlSeconds: 900 });
+   * ```
+   */
+  builder(appId: string): BuilderSession;
+
+  /**
    * A Base44 client for one app, acting as this principal.
    *
    * This is the bridge to the rest of the SDK: the returned client is an ordinary
@@ -78,9 +112,14 @@ export interface PrincipalClient {
   /**
    * The raw access token for this principal, minting or renewing as needed.
    *
-   * Most code should use {@link PrincipalClient.forApp | forApp()} instead. Reach
-   * for this when you need to authenticate a request the SDK does not make for
-   * you.
+   * Most code should use {@link PrincipalClient.forApp | forApp()} or
+   * {@link PrincipalClient.builder | builder()} instead. Reach for this when you need
+   * to authenticate a request the SDK does not make for you.
+   *
+   * **Not the thing to send to a browser.** This token can start builds and spend
+   * your credits. What a browser gets is a grant from
+   * {@link BuilderSession.createGrant | createGrant()}, which reads one session and
+   * writes nothing.
    *
    * Do not cache what this returns — it is already cached, and holding a copy is
    * how a caller ends up using a token the store has since replaced.

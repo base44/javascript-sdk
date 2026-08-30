@@ -11,6 +11,10 @@ import {
   type PlatformClient,
   type PrincipalClient,
 } from "./platform-client.js";
+import {
+  createBuilderSession,
+  type CreateBuilderSessionConfig,
+} from "./builder-session.js";
 import { Base44Error, type Base44ErrorJSON } from "./utils/axios-client.js";
 import {
   getAccessToken,
@@ -23,6 +27,7 @@ export {
   createClient,
   createClientFromRequest,
   createPlatformClient,
+  createBuilderSession,
   Base44Error,
   getAccessToken,
   saveAccessToken,
@@ -38,6 +43,7 @@ export type {
   CreatePlatformClientConfig,
   PlatformClient,
   PrincipalClient,
+  CreateBuilderSessionConfig,
 };
 
 export * from "./types.js";
@@ -137,6 +143,30 @@ export type {
   ServicePrincipal,
   DeprovisionResult,
 } from "./modules/platforms.types.js";
+
+export type {
+  BuilderEvent,
+  BuilderEventType,
+  BuilderGrant,
+  BuilderMessage,
+  BuilderMessagePage,
+  BuilderResponse,
+  BuilderSession,
+  BuilderSessionReader,
+  BuilderState,
+  BuilderStatus,
+  BuilderToolCall,
+  BuilderTurn,
+  BuilderTurnRef,
+  BuilderWaitingKind,
+  BuilderWaitingOn,
+  CreateBuilderGrantOptions,
+  ListBuilderMessagesOptions,
+  RespondToBuilderOptions,
+  SendBuilderMessageOptions,
+  SubscribeToBuilderOptions,
+  WaitForTurnOptions,
+} from "./modules/builder.types.js";
 
 export { Actor, type Conn } from "./actor.js";
 
