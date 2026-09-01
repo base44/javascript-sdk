@@ -10,7 +10,10 @@ import type { FunctionsModule } from "./modules/functions.types.js";
 import type { AgentsModule } from "./modules/agents.types.js";
 import type { AiGatewayModule } from "./modules/ai-gateway.types.js";
 import type { AppLogsModule } from "./modules/app-logs.types.js";
-import type { AnalyticsModule } from "./modules/analytics.types.js";
+import type {
+  AnalyticsModule,
+  CreateClientAnalyticsOptions,
+} from "./modules/analytics.types.js";
 import type { ActorsModule } from "./modules/actors.types.js";
 
 /**
@@ -87,6 +90,22 @@ export interface CreateClientConfig {
    * @internal
    */
   headers?: Record<string, string>;
+  /**
+   * Analytics configuration for this client.
+   *
+   * By default, analytics is enabled and starts as soon as the client is created: a persistent visitor ID is stored in `localStorage` and automatic events are sent.
+   *
+   * Set `consent: "pending"` to keep analytics dormant until the visitor makes a consent decision, then call {@linkcode AnalyticsModule.optIn | analytics.optIn()} or {@linkcode AnalyticsModule.optOut | analytics.optOut()}. Set `enabled: false` to turn the analytics module off entirely.
+   *
+   * @example
+   * ```typescript
+   * const base44 = createClient({
+   *   appId: 'my-app-id',
+   *   analytics: { consent: 'pending' }
+   * });
+   * ```
+   */
+  analytics?: CreateClientAnalyticsOptions;
   /**
    * Additional client options.
    */

@@ -1,4 +1,8 @@
 {
+  "interfaces/AnalyticsModule": [
+    "type-aliases/AnalyticsConsentStatus",
+    "type-aliases/CreateClientAnalyticsOptions"
+  ],
   "interfaces/ConnectorsModule": [
     "type-aliases/ConnectorIntegrationType",
     "interfaces/ConnectorIntegrationTypeRegistry",
