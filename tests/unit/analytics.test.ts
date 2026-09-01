@@ -69,6 +69,7 @@ describe("Analytics Module", () => {
   afterEach(() => {
     vi.clearAllMocks();
     base44.cleanup();
+    vi.unstubAllGlobals();
     sharedState = null;
   });
 
@@ -87,6 +88,38 @@ describe("Analytics Module", () => {
     expect(base44.analytics.track).toHaveBeenCalledWith({
       eventName: "test-event",
     });
+  });
+
+  test("should have no analytics side effects when disabled in client config", () => {
+    const storage = {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+    };
+    const addEventListener = vi.fn();
+    vi.stubGlobal("localStorage", storage);
+    vi.stubGlobal("document", { referrer: "", visibilityState: "visible" });
+    vi.stubGlobal("window", {
+      addEventListener,
+      removeEventListener: vi.fn(),
+      history: { replaceState: vi.fn() },
+      localStorage: storage,
+      location: { origin: "https://example.com", pathname: "/", search: "" },
+    });
+    const setIntervalSpy = vi.spyOn(globalThis, "setInterval");
+
+    const disabled = createClient({
+      serverUrl,
+      appId,
+      analytics: { enabled: false },
+    });
+    disabled.analytics.track({ eventName: "should-not-track" });
+
+    expect(sharedState?.requestsQueue).toEqual([]);
+    expect(storage.setItem).not.toHaveBeenCalled();
+    expect(setIntervalSpy).not.toHaveBeenCalled();
+    expect(addEventListener).not.toHaveBeenCalled();
+
+    disabled.cleanup();
   });
 
   test("should clear the memoized session context on reset", () => {

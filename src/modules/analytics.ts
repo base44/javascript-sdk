@@ -62,6 +62,7 @@ export interface AnalyticsModuleArgs {
   serverUrl: string;
   appId: string;
   userAuthModule: InternalAuthModule;
+  enabled?: boolean;
 }
 
 export const createAnalyticsModule = ({
@@ -69,6 +70,7 @@ export const createAnalyticsModule = ({
   serverUrl,
   appId,
   userAuthModule,
+  enabled,
 }: AnalyticsModuleArgs) => {
   // prevent overflow of events //
   const { maxQueueSize, throttleTime, batchSize } = analyticsSharedState.config;
@@ -77,7 +79,7 @@ export const createAnalyticsModule = ({
   // so the per-callsite `typeof window` guards below aren't enough to keep it
   // from touching `document` (e.g. `document.referrer` on init). Node/SSR is
   // still handled by those `window` guards, so this doesn't affect it.
-  if (!analyticsSharedState.config?.enabled || isReactNative) {
+  if (enabled === false || !analyticsSharedState.config?.enabled || isReactNative) {
     return {
       track: () => {},
       cleanup: () => {},
