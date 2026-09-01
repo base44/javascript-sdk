@@ -81,4 +81,35 @@ describe("anonymous visitor header", () => {
     expect(headers.get("Authorization")).toBe("Bearer a-real-token");
     expect(headers.get("X-Base44-Anonymous-Id")).toBeFalsy();
   });
+
+  // When localStorage can't persist the id, it must at least stay stable
+  // within the process — not a new "visitor" per request.
+  describe("without persistent storage", () => {
+    // Fresh import so the memo starts empty regardless of earlier tests.
+    async function freshGetAnalyticsSessionId() {
+      vi.resetModules();
+      const { getAnalyticsSessionId: fresh } = await import(
+        "../../src/modules/analytics.ts"
+      );
+      return fresh;
+    }
+
+    test("React Native (window without localStorage): the id is memoized", async () => {
+      vi.stubGlobal("window", {});
+      vi.stubGlobal("localStorage", undefined);
+      const getId = await freshGetAnalyticsSessionId();
+      const first = getId();
+      expect(first).toBeTruthy();
+      expect(getId()).toBe(first);
+    });
+
+    test("Node (no window): the id is memoized", async () => {
+      vi.stubGlobal("window", undefined);
+      vi.stubGlobal("localStorage", undefined);
+      const getId = await freshGetAnalyticsSessionId();
+      const first = getId();
+      expect(first).toBeTruthy();
+      expect(getId()).toBe(first);
+    });
+  });
 });

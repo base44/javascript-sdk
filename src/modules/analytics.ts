@@ -45,6 +45,9 @@ const analyticsSharedState = getSharedInstance(
     wasInitializationTracked: false,
     sessionContext: null as SessionContext | null,
     sessionStartTime: null as string | null,
+    // Memoized session id for when `localStorage` can't persist one — see
+    // getAnalyticsSessionId.
+    fallbackSessionId: null as string | null,
     config: {
       ...defaultConfiguration,
       ...getAnalyticsConfigFromUrlParams(),
@@ -297,7 +300,9 @@ function trackSessionDurationEvent(track: (params: TrackEventParams) => void) {
 function getEventIntrinsicData(): TrackEventIntrinsicData {
   return {
     timestamp: new Date().toISOString(),
-    pageUrl: typeof window !== "undefined" ? window.location.pathname : null,
+    // `window.location` is absent on React Native, so read it optionally.
+    pageUrl:
+      typeof window !== "undefined" ? window.location?.pathname ?? null : null,
   };
 }
 
@@ -394,9 +399,15 @@ export function getAnalyticsConfigFromUrlParams():
   return { enabled: analyticsEnable === "true" };
 }
 
+// When the id can't be persisted (React Native has no `localStorage`), keep
+// it stable for the process instead of minting a fresh one per call.
+function getFallbackSessionId(): string {
+  return (analyticsSharedState.fallbackSessionId ??= generateUuid());
+}
+
 export function getAnalyticsSessionId(): string {
   if (typeof window === "undefined") {
-    return generateUuid();
+    return getFallbackSessionId();
   }
   try {
     const sessionId = localStorage.getItem(
@@ -412,6 +423,6 @@ export function getAnalyticsSessionId(): string {
     }
     return sessionId;
   } catch {
-    return generateUuid();
+    return getFallbackSessionId();
   }
 }
