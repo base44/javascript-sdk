@@ -6,6 +6,8 @@ import {
   AnalyticsApiBatchRequest,
   TrackEventIntrinsicData,
   AnalyticsModuleOptions,
+  AnalyticsConsentStatus,
+  CreateClientAnalyticsOptions,
   SessionContext,
 } from "./analytics.types";
 import { getSharedInstance } from "../utils/sharedInstance.js";
@@ -48,6 +50,9 @@ const analyticsSharedState = getSharedInstance(
     // Memoized session id for when `localStorage` can't persist one — see
     // getAnalyticsSessionId.
     fallbackSessionId: null as string | null,
+    // Consent status shared by every client on the page. `null` means no
+    // client set one explicitly, which keeps the legacy behavior (granted).
+    consent: null as AnalyticsConsentStatus | null,
     config: {
       ...defaultConfiguration,
       ...getAnalyticsConfigFromUrlParams(),
@@ -62,6 +67,47 @@ export interface AnalyticsModuleArgs {
   serverUrl: string;
   appId: string;
   userAuthModule: InternalAuthModule;
+  options?: CreateClientAnalyticsOptions;
+}
+
+// Lower ranks are more restrictive. Used to merge the consent status of
+// multiple clients created on the same page: the shared state (and therefore
+// the shared persistent id) can only honor one status, so the most
+// restrictive explicitly-configured one wins.
+const CONSENT_RESTRICTIVENESS: Record<AnalyticsConsentStatus, number> = {
+  denied: 0,
+  pending: 1,
+  granted: 2,
+};
+
+function applyInitialConsent(consent: AnalyticsConsentStatus | undefined) {
+  if (!consent) return;
+  const current = analyticsSharedState.consent;
+  if (
+    current === null ||
+    CONSENT_RESTRICTIVENESS[consent] < CONSENT_RESTRICTIVENESS[current]
+  ) {
+    analyticsSharedState.consent = consent;
+  }
+}
+
+/**
+ * The effective analytics consent status. `"granted"` when no client set one
+ * explicitly, preserving the legacy always-on behavior.
+ *
+ * @internal
+ */
+export function getAnalyticsConsentStatus(): AnalyticsConsentStatus {
+  return analyticsSharedState.consent ?? "granted";
+}
+
+function clearPersistedAnalyticsSessionId() {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(ANALYTICS_SESSION_ID_LOCAL_STORAGE_KEY);
+  } catch {
+    // Storage unavailable — nothing was persisted, so nothing to clear.
+  }
 }
 
 export const createAnalyticsModule = ({
@@ -69,7 +115,14 @@ export const createAnalyticsModule = ({
   serverUrl,
   appId,
   userAuthModule,
+  options,
 }: AnalyticsModuleArgs) => {
+  // Consent gates more than this module: getAnalyticsSessionId() also backs
+  // the anonymous-id HTTP header and the socket handshake, so the client's
+  // consent choice must be recorded even when the early returns below make
+  // the module itself a no-op.
+  applyInitialConsent(options?.consent);
+
   // prevent overflow of events //
   const { maxQueueSize, throttleTime, batchSize } = analyticsSharedState.config;
 
@@ -77,9 +130,24 @@ export const createAnalyticsModule = ({
   // so the per-callsite `typeof window` guards below aren't enough to keep it
   // from touching `document` (e.g. `document.referrer` on init). Node/SSR is
   // still handled by those `window` guards, so this doesn't affect it.
-  if (!analyticsSharedState.config?.enabled || isReactNative) {
+  if (
+    !analyticsSharedState.config?.enabled ||
+    options?.enabled === false ||
+    isReactNative
+  ) {
     return {
       track: () => {},
+      // Consent still matters with the event pipeline off: it decides whether
+      // the persistent id may back the anonymous-id header and socket
+      // handshake, so opting in/out has to work here too.
+      optIn: () => {
+        analyticsSharedState.consent = "granted";
+      },
+      optOut: () => {
+        analyticsSharedState.consent = "denied";
+        clearPersistedAnalyticsSessionId();
+      },
+      getConsentStatus: getAnalyticsConsentStatus,
       cleanup: () => {},
     };
   }
@@ -138,6 +206,12 @@ export const createAnalyticsModule = ({
   };
 
   const track = (params: TrackEventParams) => {
+    const consent = getAnalyticsConsentStatus();
+    // Denied: drop. Pending: buffer in memory (no network, no storage) so the
+    // events can be delivered if the visitor opts in later.
+    if (consent === "denied") {
+      return;
+    }
     if (analyticsSharedState.requestsQueue.length >= maxQueueSize) {
       return;
     }
@@ -146,7 +220,9 @@ export const createAnalyticsModule = ({
       ...params,
       ...intrinsicData,
     });
-    startProcessing();
+    if (consent === "granted") {
+      startProcessing();
+    }
   };
 
   const onDocVisible = () => {
@@ -177,27 +253,71 @@ export const createAnalyticsModule = ({
     }
   };
 
-  const cleanup = () => {
+  // Everything with a side effect beyond this module — the persistent id,
+  // automatic events, timers, network — starts in activate(), so a client
+  // created with consent "pending" or "denied" stays fully dormant until the
+  // visitor opts in.
+  let isActive = false;
+
+  const activate = () => {
+    if (isActive) return;
+    isActive = true;
+    // start the flusing process ///
+    startProcessing();
+    // start the heart beat processor //
+    clearHeartBeatProcessor = startHeartBeatProcessor(track);
+    // track the referrer event //
+    trackInitializationEvent(track);
+    // start the visibility change listener //
+    if (typeof window !== "undefined") {
+      window.addEventListener("visibilitychange", onVisibilityChange);
+    }
+  };
+
+  const deactivate = () => {
+    if (!isActive) return;
+    isActive = false;
     stopAnalyticsProcessor();
     clearHeartBeatProcessor?.();
+    clearHeartBeatProcessor = undefined;
     if (typeof window !== "undefined") {
       window.removeEventListener("visibilitychange", onVisibilityChange);
     }
   };
 
-  // start the flusing process ///
-  startProcessing();
-  // start the heart beat processor //
-  clearHeartBeatProcessor = startHeartBeatProcessor(track);
-  // track the referrer event //
-  trackInitializationEvent(track);
-  // start the visibility change listener //
-  if (typeof window !== "undefined") {
-    window.addEventListener("visibilitychange", onVisibilityChange);
+  const optIn = () => {
+    analyticsSharedState.consent = "granted";
+    // Persist the id now rather than on the next event: this adopts the
+    // ephemeral pre-consent id (see getAnalyticsSessionId), keeping the
+    // visitor's identity continuous across the consent grant.
+    getAnalyticsSessionId();
+    activate();
+  };
+
+  const optOut = () => {
+    analyticsSharedState.consent = "denied";
+    deactivate();
+    // Drop anything buffered while consent was pending, and forget the
+    // identity: both the persisted id and the memoized session context.
+    analyticsSharedState.requestsQueue.length = 0;
+    analyticsSharedState.sessionStartTime = null;
+    resetAnalyticsSessionContext();
+    clearPersistedAnalyticsSessionId();
+  };
+
+  const cleanup = () => {
+    deactivate();
+  };
+
+  if (getAnalyticsConsentStatus() === "granted") {
+    activate();
   }
 
   return {
     track,
+    optIn,
+    optOut,
+    getConsentStatus: getAnalyticsConsentStatus,
     cleanup,
   };
 };
@@ -409,12 +529,22 @@ export function getAnalyticsSessionId(): string {
   if (typeof window === "undefined") {
     return getFallbackSessionId();
   }
+  // Until consent is granted, never read or write the persistent id — hand out
+  // a per-page-load ephemeral id instead. The anonymous-id HTTP header and the
+  // socket handshake resolve their id through here too, so this single gate
+  // covers every place a persistent identifier could be minted pre-consent.
+  if (getAnalyticsConsentStatus() !== "granted") {
+    return getFallbackSessionId();
+  }
   try {
     const sessionId = localStorage.getItem(
       ANALYTICS_SESSION_ID_LOCAL_STORAGE_KEY
     );
     if (!sessionId) {
-      const newSessionId = generateUuid();
+      // Adopt the ephemeral pre-consent id when one was handed out, so the
+      // visitor keeps a single identity across the consent grant.
+      const newSessionId =
+        analyticsSharedState.fallbackSessionId ?? generateUuid();
       localStorage.setItem(
         ANALYTICS_SESSION_ID_LOCAL_STORAGE_KEY,
         newSessionId

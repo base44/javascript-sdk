@@ -75,6 +75,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     requiresAuth = false,
     appBaseUrl,
     options,
+    analytics: analyticsOptions,
     functionsVersion,
     headers: optionalHeaders,
   } = config;
@@ -246,6 +247,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
       serverUrl,
       appId,
       userAuthModule,
+      options: analyticsOptions,
     }),
     actors: actorsModule.module,
     cleanup: () => {

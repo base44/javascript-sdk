@@ -77,6 +77,43 @@ export type AnalyticsModuleOptions = {
 };
 
 /**
+ * Consent status for analytics tracking.
+ *
+ * - `"granted"`: Analytics is fully active. The SDK persists a visitor ID in `localStorage`, sends automatic events, and delivers tracked events to the server.
+ * - `"pending"`: Analytics is dormant while waiting for a consent decision. No visitor ID is persisted and nothing is sent to the server. Events passed to {@linkcode AnalyticsModule.track | track()} are buffered in memory and delivered if consent is later granted with {@linkcode AnalyticsModule.optIn | optIn()}.
+ * - `"denied"`: Analytics is off. No visitor ID is persisted, nothing is sent to the server, and tracked events are discarded.
+ */
+export type AnalyticsConsentStatus = "granted" | "denied" | "pending";
+
+/**
+ * Analytics configuration for {@linkcode createClient | createClient()}.
+ *
+ * Controls whether analytics runs and whether it waits for a consent decision before persisting a visitor ID or sending events.
+ */
+export type CreateClientAnalyticsOptions = {
+  /**
+   * Whether the analytics module is enabled.
+   *
+   * When `false`, {@linkcode AnalyticsModule.track | track()} is a no-op and no automatic events are sent, regardless of consent status.
+   *
+   * @defaultValue `true`
+   */
+  enabled?: boolean;
+  /**
+   * Initial consent status for analytics.
+   *
+   * Defaults to `"granted"`, which preserves the SDK's original behavior: analytics starts as soon as the client is created.
+   *
+   * Set to `"pending"` when your app needs a consent decision (for example, from a cookie banner) before tracking starts. The client is still created immediately, but analytics stays dormant — no visitor ID is written to `localStorage`, no automatic events fire, and tracked events are buffered in memory. Call {@linkcode AnalyticsModule.optIn | optIn()} once consent is granted, or {@linkcode AnalyticsModule.optOut | optOut()} if it's refused.
+   *
+   * When multiple clients are created on the same page, the most restrictive explicitly-configured consent status wins (`"denied"` over `"pending"` over `"granted"`).
+   *
+   * @defaultValue `"granted"`
+   */
+  consent?: AnalyticsConsentStatus;
+};
+
+/**
  * Analytics module for tracking custom events in your app.
  *
  * Use this module to track specific user actions. Track things like button clicks, form submissions, purchases, and feature usage.
@@ -89,6 +126,10 @@ export type AnalyticsModuleOptions = {
  *
  * - Choose clear, descriptive event names in snake_case like `signup_button_click` or `purchase_completed` rather than generic names like `click`.
  * - Include relevant context in your properties such as identifiers like `product_id`, measurements like `price`, and flags like `is_first_purchase`.
+ *
+ * ## Consent
+ *
+ * Apps that need a consent decision (for example, from a cookie banner) before tracking starts can create the client with `analytics: { consent: 'pending' }` and then call {@linkcode optIn | optIn()} or {@linkcode optOut | optOut()} once the visitor decides. See {@linkcode CreateClientAnalyticsOptions} for details.
  *
  * ## Authentication Modes
  *
@@ -128,4 +169,59 @@ export interface AnalyticsModule {
    * ```
    */
   track(params: TrackEventParams): void;
+
+  /**
+   * Grants analytics consent and activates tracking.
+   *
+   * Use this after the visitor accepts analytics in your consent flow (for example, a cookie banner). It sets the consent status to `"granted"`, persists the visitor ID, starts automatic events, and delivers any events buffered while consent was `"pending"`.
+   *
+   * The visitor keeps a single identity across the consent grant: the temporary in-memory ID used before consent is adopted as the persistent ID.
+   *
+   * Calling this when consent is already `"granted"` has no effect.
+   *
+   * @example
+   * ```typescript
+   * // Create the client without tracking, then activate it once the
+   * // visitor accepts analytics in your consent banner.
+   * const base44 = createClient({
+   *   appId: 'my-app-id',
+   *   analytics: { consent: 'pending' }
+   * });
+   *
+   * onConsentBannerAccept(() => {
+   *   base44.analytics.optIn();
+   * });
+   * ```
+   */
+  optIn(): void;
+
+  /**
+   * Revokes analytics consent and deactivates tracking.
+   *
+   * Use this when the visitor declines analytics in your consent flow, or withdraws consent later. It sets the consent status to `"denied"`, stops automatic events, discards any buffered events, and removes the persistent visitor ID from `localStorage`.
+   *
+   * Tracking can be re-enabled later with {@linkcode optIn | optIn()}.
+   *
+   * @example
+   * ```typescript
+   * onConsentBannerDecline(() => {
+   *   base44.analytics.optOut();
+   * });
+   * ```
+   */
+  optOut(): void;
+
+  /**
+   * Gets the current analytics consent status.
+   *
+   * @returns The current consent status: `"granted"`, `"denied"`, or `"pending"`.
+   *
+   * @example
+   * ```typescript
+   * if (base44.analytics.getConsentStatus() === 'pending') {
+   *   showConsentBanner();
+   * }
+   * ```
+   */
+  getConsentStatus(): AnalyticsConsentStatus;
 }
