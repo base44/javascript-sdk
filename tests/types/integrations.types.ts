@@ -45,9 +45,14 @@ const withFromName = {
   from_name: "My App",
 } satisfies SendEmailParams;
 
+// omitting all three content fields must be a compile error
+// @ts-expect-error At least one of body/html/text is required.
+const missingContent: SendEmailParams = { to: "user@example.com", subject: "Hello" };
+
 void bodyOnly;
 void htmlOnly;
 void textOnly;
 void htmlAndText;
 void bodyAndText;
 void withFromName;
+void missingContent;
