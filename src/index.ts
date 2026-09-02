@@ -2,6 +2,7 @@ import {
   createClient,
   createClientFromRequest,
   type Base44Client,
+  type CreateClientAnalyticsConfig,
   type CreateClientConfig,
   type CreateClientOptions,
 } from "./client.js";
@@ -25,6 +26,7 @@ export {
 
 export type {
   Base44Client,
+  CreateClientAnalyticsConfig,
   CreateClientConfig,
   CreateClientOptions,
   Base44ErrorJSON,

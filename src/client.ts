@@ -17,6 +17,7 @@ import { createUsersModule } from "./modules/users.js";
 import { RoomsSocket, RoomsSocketConfig } from "./utils/socket-utils.js";
 import type {
   Base44Client,
+  CreateClientAnalyticsConfig,
   CreateClientConfig,
   CreateClientOptions,
 } from "./client.types.js";
@@ -28,7 +29,12 @@ import {
 } from "./modules/actors.js";
 
 // Re-export client types
-export type { Base44Client, CreateClientConfig, CreateClientOptions };
+export type {
+  Base44Client,
+  CreateClientAnalyticsConfig,
+  CreateClientConfig,
+  CreateClientOptions,
+};
 
 /**
  * Creates a Base44 client.
@@ -71,6 +77,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
   const {
     serverUrl = "https://base44.app",
     appId,
+    analytics,
     token,
     serviceToken,
     requiresAuth = false,
@@ -248,6 +255,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
       serverUrl,
       appId,
       userAuthModule,
+      enabled: analytics?.enabled ?? true,
     }),
     actors: actorsModule.module,
     cleanup: () => {

@@ -37,6 +37,22 @@ export interface CreateClientOptions {
 }
 
 /**
+ * Configuration for the SDK's app analytics module.
+ */
+export interface CreateClientAnalyticsConfig {
+  /**
+   * Whether app analytics is enabled for this client.
+   *
+   * When disabled, automatic analytics and calls to `analytics.track()` are
+   * no-ops. The SDK does not create an analytics session identifier, start
+   * heartbeat timers, or send analytics requests.
+   *
+   * @defaultValue `true`
+   */
+  enabled: boolean;
+}
+
+/**
  * Configuration for creating a Base44 client.
  */
 export interface CreateClientConfig {
@@ -62,6 +78,12 @@ export interface CreateClientConfig {
    * It's the string between `/apps/` and `/editor/`.
    */
   appId: string;
+  /**
+   * Controls app analytics for this client.
+   *
+   * Omit this option to preserve the default analytics behavior.
+   */
+  analytics?: CreateClientAnalyticsConfig;
   /**
    * User authentication token. Used to authenticate as a specific user.
    *
