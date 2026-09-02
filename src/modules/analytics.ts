@@ -62,7 +62,7 @@ export interface AnalyticsModuleArgs {
   serverUrl: string;
   appId: string;
   userAuthModule: InternalAuthModule;
-  enabled?: boolean;
+  enabled: boolean;
 }
 
 export const createAnalyticsModule = ({
@@ -79,7 +79,7 @@ export const createAnalyticsModule = ({
   // so the per-callsite `typeof window` guards below aren't enough to keep it
   // from touching `document` (e.g. `document.referrer` on init). Node/SSR is
   // still handled by those `window` guards, so this doesn't affect it.
-  if (enabled === false || !analyticsSharedState.config?.enabled || isReactNative) {
+  if (!enabled || !analyticsSharedState.config?.enabled || isReactNative) {
     return {
       track: () => {},
       cleanup: () => {},
