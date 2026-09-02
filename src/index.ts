@@ -106,6 +106,11 @@ export type {
 } from "./modules/ai-gateway.types.js";
 
 export type { AppLogsModule } from "./modules/app-logs.types.js";
+export type {
+  AppModule,
+  AppPublicSettings,
+  AppPublicSettingsResponse,
+} from "./modules/app.types.js";
 
 export type {
   ActorsModule,

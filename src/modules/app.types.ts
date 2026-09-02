@@ -1,4 +1,64 @@
 /**
+ * The app's access policy: whether the app is reachable without an account, and
+ * who may sign in.
+ */
+export type AppPublicSettings =
+  | "private_with_login"
+  | "public_with_login"
+  | "public_without_login"
+  | "workspace_with_login"
+  | string;
+
+/**
+ * The app's public configuration, as returned by {@link AppModule.getPublicSettings}.
+ */
+export interface AppPublicSettingsResponse {
+  /** The app's ID. */
+  id: string;
+  /** The app's access policy. */
+  public_settings: AppPublicSettings;
+}
+
+/**
+ * App module for reading the app's own public configuration.
+ *
+ * Use it to discover how the app is gated before rendering it, so a private app
+ * can send the visitor to login instead of rendering an empty shell.
+ *
+ * ## Authentication Modes
+ *
+ * This module is available to use with a client in all authentication modes. The
+ * client's token, when it has one, is sent with the request — a signed-in visitor
+ * who has no access to the app is reported differently from an anonymous one.
+ */
+export interface AppModule {
+  /**
+   * Get the app's public configuration.
+   *
+   * Rejects with a {@linkcode Base44Error} when the visitor may not open the app:
+   * `status` is `403` and `data.extra_data.reason` says why — `"auth_required"`
+   * when the visitor must sign in, `"user_not_registered"` when the signed-in
+   * visitor has no access to this app.
+   *
+   * @returns Promise resolving to the app's ID and access policy.
+   *
+   * @example
+   * ```typescript
+   * // Decide what to render before the app boots
+   * try {
+   *   const { public_settings } = await base44.app.getPublicSettings();
+   *   console.log('App access policy:', public_settings);
+   * } catch (error) {
+   *   if (error.status === 403) {
+   *     console.log('Blocked because:', error.data?.extra_data?.reason);
+   *   }
+   * }
+   * ```
+   */
+  getPublicSettings(): Promise<AppPublicSettingsResponse>;
+}
+
+/**
  * @internal
  */
 export interface AppMessageContent {
@@ -59,12 +119,7 @@ export interface AppLike {
   agents?: Record<string, any>;
   logo_url?: string;
   slug?: string;
-  public_settings?:
-    | "private_with_login"
-    | "public_with_login"
-    | "public_without_login"
-    | "workspace_with_login"
-    | string;
+  public_settings?: AppPublicSettings;
   is_blocked?: boolean;
   github_repo_url?: string;
   main_page?: string;

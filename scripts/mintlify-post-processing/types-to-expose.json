@@ -6,6 +6,8 @@
   "AiGatewayModule",
   "AnalyticsModule",
   "AppLogsModule",
+  "AppModule",
+  "AppPublicSettingsResponse",
   "AuthModule",
   "ConnectorApiRequest",
   "ConnectorApiResponse",

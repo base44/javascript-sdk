@@ -12,6 +12,7 @@ import { createFunctionsModule } from "./modules/functions.js";
 import { createAgentsModule } from "./modules/agents.js";
 import { createAiGatewayModule } from "./modules/ai-gateway.js";
 import { createAppLogsModule } from "./modules/app-logs.js";
+import { createAppModule } from "./modules/app.js";
 import { createUsersModule } from "./modules/users.js";
 import { RoomsSocket, RoomsSocketConfig } from "./utils/socket-utils.js";
 import type {
@@ -240,6 +241,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     }),
     aiGateway: createAiGatewayModule({ serverUrl, token, appId }),
     appLogs: createAppLogsModule(axiosClient, appId),
+    app: createAppModule(axiosClient, appId),
     users: createUsersModule(axiosClient, appId),
     analytics: createAnalyticsModule({
       axiosClient,
