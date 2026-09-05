@@ -148,6 +148,45 @@ export interface Base44Client {
   cleanup: () => void;
 
   /**
+   * Calls one of your app's own server routes with the signed-in user's access token attached.
+   *
+   * Base44 keeps the user's access token in the browser's local storage, so a plain `fetch()` to your app's server routes arrives without it and the route sees an anonymous caller. `fetchWithAuth()` is the same `fetch()` with the `Authorization: Bearer <token>` header added, which is what lets a server route act on behalf of the signed-in user.
+   *
+   * Requests are restricted to your app's own origin so the token is never sent to a third party: pass a path such as `/api/orders`, not a full URL. An absolute URL, a protocol-relative path, or anything else that resolves to another origin throws. To call a Base44 backend function, use {@linkcode FunctionsModule.fetch | functions.fetch()}; for another origin, use plain `fetch()`.
+   *
+   * When no user is signed in the request is sent without an `Authorization` header, so routes that allow anonymous access keep working.
+   *
+   * This method is browser-only. In server code, read the caller's token from the incoming request instead.
+   *
+   * @param path - A path on your app's own origin, such as `/api/orders`.
+   * @param init - Optional [`RequestInit`](https://developer.mozilla.org/en-US/docs/Web/API/RequestInit) options such as `method`, `headers`, `body`, and `signal`. The auth header is added automatically; an `Authorization` header you set yourself is kept.
+   * @returns Promise resolving to a native [`Response`](https://developer.mozilla.org/en-US/docs/Web/API/Response).
+   * @throws {Error} When `path` resolves to a different origin, or when called outside the browser.
+   *
+   * @example
+   * ```typescript
+   * // Call your app's own server route as the signed-in user
+   * const response = await base44.fetchWithAuth('/api/orders');
+   * const orders = await response.json();
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // POST with a JSON body
+   * const response = await base44.fetchWithAuth('/api/orders', {
+   *   method: 'POST',
+   *   headers: { 'Content-Type': 'application/json' },
+   *   body: JSON.stringify({ productId: 'abc', quantity: 2 }),
+   * });
+   *
+   * if (!response.ok) {
+   *   throw new Error(`Request failed: ${response.status}`);
+   * }
+   * ```
+   */
+  fetchWithAuth(path: string, init?: RequestInit): Promise<Response>;
+
+  /**
    * Sets a new authentication token for all subsequent requests.
    *
    * Updates the token for both HTTP requests and WebSocket connections.
