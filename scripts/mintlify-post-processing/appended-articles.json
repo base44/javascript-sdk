@@ -2,8 +2,12 @@
   "interfaces/ConnectorsModule": [
     "type-aliases/ConnectorIntegrationType",
     "interfaces/ConnectorIntegrationTypeRegistry",
-    "interfaces/UserConnectorsModule"
+    "interfaces/UserConnectorsModule",
+    "interfaces/ConnectorApiRequest",
+    "interfaces/ConnectorApiResponse",
+    "type-aliases/ConnectorApiResponsePhase"
   ],
+  "interfaces/AppModule": ["interfaces/AppPublicSettingsResponse"],
   "type-aliases/EntitiesModule": [
     "interfaces/EntityHandler",
     "type-aliases/EntityRecord",
