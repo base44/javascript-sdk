@@ -10,7 +10,7 @@ export type AppPublicSettings =
   | string;
 
 /**
- * The app's public configuration, as returned by {@link AppModule.getPublicSettings}.
+ * The app's public configuration, as returned by `getPublicSettings()`.
  */
 export interface AppPublicSettingsResponse {
   /** The app's ID. */
