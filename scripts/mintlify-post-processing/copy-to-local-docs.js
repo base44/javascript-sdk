@@ -74,6 +74,14 @@ Examples:
 // Target location within mintlify-docs for SDK reference docs
 const SDK_DOCS_TARGET_PATH = "developers/references/sdk/docs";
 
+/** Compare two nav page paths by the page name a reader actually sees. */
+function byPageName(a, b) {
+  return a
+    .split("/")
+    .pop()
+    .localeCompare(b.split("/").pop(), "en", { sensitivity: "base" });
+}
+
 function scanSdkDocs(sdkDocsDir) {
   const result = {};
 
@@ -139,7 +147,12 @@ function updateDocsJson(repoDir, sdkFiles) {
     return Array.from(groupMap.entries()).map(([group, pages]) => ({
       group,
       expanded: true,
-      pages: pages.sort(),
+      // Sort on the page name, not the full path. A module lands in
+      // interfaces/ or type-aliases/ depending on how it is declared, which is
+      // invisible to the reader, and sorting on the path groups by that
+      // instead: every interfaces/ module first, then the alphabet restarting
+      // for the type-aliases/ ones.
+      pages: pages.sort((a, b) => byPageName(a, b)),
     }));
   };
 
