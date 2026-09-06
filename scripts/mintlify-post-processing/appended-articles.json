@@ -7,7 +7,9 @@
     "interfaces/ConnectorApiResponse",
     "type-aliases/ConnectorApiResponsePhase"
   ],
-  "interfaces/AppModule": ["interfaces/AppPublicSettingsResponse"],
+  "interfaces/AppModule": [
+    "interfaces/AppPublicSettingsResponse"
+  ],
   "type-aliases/EntitiesModule": [
     "interfaces/EntityHandler",
     "type-aliases/EntityRecord",
@@ -25,5 +27,11 @@
   "type-aliases/integrations": [
     "interfaces/CoreIntegrations",
     "interfaces/CustomIntegrationsModule"
+  ],
+  "type-aliases/ActorsModule": [
+    "interfaces/ActorRef",
+    "interfaces/Connection",
+    "interfaces/ActorConnectOptions",
+    "interfaces/ActorRegistry"
   ]
 }
