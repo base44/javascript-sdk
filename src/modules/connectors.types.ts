@@ -100,7 +100,7 @@ export interface ConnectorApiResponse<T = unknown> {
   status: number | null;
   /**
    * The parsed upstream response body, or proxy error details when no response
-   * was received. `null` when the response was binary — see {@link dataBase64}.
+   * was received. It is `null` when the response was binary. See {@link dataBase64}.
    */
   data: T | null;
   /**
@@ -163,9 +163,9 @@ export interface ConnectorProxyRawResponse {
  *
  * ## Metered connectors
  *
- * A few [platform connectors](#shared-connectors) are backed by paid third-party APIs that charge Base44 per call. For those, the OAuth token is **not** available to your code — {@linkcode getConnection | getConnection()} rejects with a `403`. Call them with {@linkcode callApi | callApi()} instead: Base44 attaches the credential server-side, forwards the request, and bills your workspace's integration credits for the call.
+ * A few [platform connectors](#shared-connectors) are backed by paid third-party APIs that charge Base44 per call. For those, the OAuth token is **not** available to your code, and {@linkcode getConnection | getConnection()} rejects with a `403`. Call them with {@linkcode callApi | callApi()} instead. Base44 attaches the credential server-side, forwards the request, and bills your workspace's integration credits for the call.
  *
- * This applies to platform connectors only. A workspace-registered or app user connector runs on **your own** OAuth app, so the provider invoices you directly and there is nothing for Base44 to meter — those keep normal token access via {@linkcode getWorkspaceConnection | getWorkspaceConnection()} and {@linkcode getCurrentAppUserConnection | getCurrentAppUserConnection()}.
+ * This applies to platform connectors only. A workspace-registered or app user connector runs on **your own** OAuth app, so the provider invoices you directly and there is nothing for Base44 to meter. Those keep normal token access via {@linkcode getWorkspaceConnection | getWorkspaceConnection()} and {@linkcode getCurrentAppUserConnection | getCurrentAppUserConnection()}.
  *
  * Two things to keep in mind when writing against a metered connector:
  *
@@ -448,7 +448,7 @@ export interface ConnectorsModule {
    *
    * @param integrationType - The type of integration, such as `'x'`. See [Available connectors](#available-connectors).
    * @param request - The upstream request to forward. See {@link ConnectorApiRequest}.
-   * @returns Promise resolving to a {@link ConnectorApiResponse}. Note that an upstream error is reported in `success` and `status`, not thrown — only Base44-side failures reject.
+   * @returns Promise resolving to a {@link ConnectorApiResponse}. Note that an upstream error is reported in `success` and `status`, not thrown. Only Base44-side failures reject.
    *
    * @example
    * ```typescript

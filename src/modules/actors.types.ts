@@ -21,7 +21,7 @@ export interface ActorRegistry {}
 
 /**
  * Auto-populated by `base44 types generate` with the names of your deployed actors.
- * Do not edit this interface manually — use {@link ActorRegistry} for message types.
+ * Do not edit this interface manually. Use {@link ActorRegistry} for message types.
  */
 export interface ActorNameRegistry {}
 
@@ -42,7 +42,7 @@ type ToServerFor<N extends string> = N extends keyof ActorRegistry
 /** Options for {@link ActorRef.connect}. */
 export interface ActorConnectOptions {
   /**
-   * The connection id — becomes the actor's `conn.id`. Supply a stable value
+   * The connection id, used as the actor's `conn.id`. Supply a stable value
    * (e.g. persisted per tab) so a reconnect reuses the same server-side
    * identity; omit for an auto-generated per-connection id.
    */
@@ -57,7 +57,7 @@ export interface ActorSubscription {
 
 /**
  * A live connection to an actor instance, returned by {@link ActorRef.connect}.
- * `subscribe`/`send` are always valid — you only get a `Connection` once the
+ * `subscribe`/`send` are always valid. You only get a `Connection` once the
  * socket has been opened, so there's no pre-connect state to guard against.
  */
 export interface Connection<N extends string = string> {
@@ -73,14 +73,14 @@ export interface Connection<N extends string = string> {
 
   /**
    * Tear down the socket, heartbeat, and all listeners. Safe to call more
-   * than once. A connection also closes itself when it fails permanently —
-   * see {@link ActorRef.connect}.
+   * than once. A connection also closes itself when it fails permanently.
+   * See {@link ActorRef.connect}.
    */
   close(): void;
 }
 
 /**
- * A handle to one actor instance — `base44.actors.MyActor(id)`. Call
+ * A handle to one actor instance, obtained from `base44.actors.MyActor(id)`. Call
  * {@link connect} to open the socket and get a {@link Connection}.
  */
 export interface ActorRef<N extends string = string> {
@@ -97,7 +97,7 @@ export interface ActorRef<N extends string = string> {
 }
 
 /**
- * Client for a single named Actor — call it with an instance id to get an
+ * Client for a single named Actor. Call it with an instance id to get an
  * {@link ActorRef}. Typed automatically when the actor is registered in
  * {@link ActorRegistry}.
  */

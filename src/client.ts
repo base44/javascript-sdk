@@ -157,7 +157,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
 
   // Dedicated client for actor connection-token mints: no onError (a legacy
   // actor answers every mint with an expected 409 before the proxy fallback,
-  // which must not reach the app's error handler — the actors module forwards
+  // which must not reach the app's error handler; the actors module forwards
   // genuine failures itself via onMintError) and no constructor token
   // (auth is per-request so a login/logout is picked up on every reconnect).
   const actorsAxiosClient = createAxiosClient({
