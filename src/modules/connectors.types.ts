@@ -64,6 +64,13 @@ export type ConnectorApiResponsePhase =
 /**
  * A request to forward to a metered connector's API through the Base44 proxy.
  */
+/** A value acceptable as a query parameter on {@link ConnectorApiRequest.query}. */
+export type ConnectorApiQueryValue =
+  | string
+  | number
+  | boolean
+  | Array<string | number>;
+
 export interface ConnectorApiRequest {
   /** HTTP method for the upstream request. Defaults to `'GET'`. */
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD";
@@ -81,7 +88,7 @@ export interface ConnectorApiRequest {
    */
   path: string;
   /** Query parameters. Merged into the request URL alongside any already present in {@link path}. */
-  query?: Record<string, string | number | boolean | Array<string | number>>;
+  query?: Record<string, ConnectorApiQueryValue>;
   /** Extra request headers. Only headers the connector explicitly allows are forwarded; the rest are dropped. */
   headers?: Record<string, string>;
   /** JSON request body. Ignored for `GET` and `HEAD`. */
