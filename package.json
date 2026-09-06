@@ -4,6 +4,33 @@
   "description": "JavaScript SDK for Base44 API",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./iap": {
+      "types": "./dist/iap/index.d.ts",
+      "default": "./dist/iap/index.js"
+    },
+    "./dist/*.js": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
+    "./dist/*.d.ts": "./dist/*.d.ts",
+    "./dist/*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "iap": [
+        "dist/iap/index.d.ts"
+      ]
+    }
+  },
   "type": "module",
   "files": [
     "dist"
@@ -32,6 +59,7 @@
     "uuid": "^13.0.2"
   },
   "devDependencies": {
+    "@peculiar/x509": "^2.0.0",
     "@types/hast": "^3.0.4",
     "@types/node": "^25.0.1",
     "@types/unist": "^3.0.3",
@@ -43,6 +71,7 @@
     "eslint": "^9.39.2",
     "eslint-plugin-import": "^2.32.0",
     "nock": "^13.4.0",
+    "reflect-metadata": "^0.2.2",
     "typedoc": "^0.28.14",
     "typedoc-plugin-markdown": "^4.9.0",
     "typescript": "^5.3.2",
