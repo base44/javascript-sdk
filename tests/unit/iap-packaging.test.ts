@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 
 const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as {
@@ -65,8 +65,34 @@ describe("package exports", () => {
   test("that dependency is reachable only from the iap subpath, never the main entry", () => {
     // It pulls in node:crypto, Buffer and node-fetch. Browsers must never see
     // it, which the subpath export is what guarantees.
-    const mainEntry = readFileSync("dist/index.js", "utf8");
-    expect(mainEntry).not.toMatch(/app-store-server-library/);
+    //
+    // Checked against the sources rather than the build, because `npm run
+    // test:unit` in CI runs without building — reading dist/ here passes
+    // locally off a stale build and fails on a clean checkout.
+    for (const file of ["src/index.ts", "src/client.ts", "src/client.types.ts"]) {
+      expect(readFileSync(file, "utf8"), `${file} reaches Apple's library`).not.toMatch(
+        /app-store-server-library|apple-verifier/
+      );
+    }
+
+    // Only the subpath's own verifier selection may import it.
+    const importers = readdirSync("src/iap/verify")
+      .filter((name) => name.endsWith(".ts"))
+      .filter((name) =>
+        readFileSync(`src/iap/verify/${name}`, "utf8").includes(
+          "@apple/app-store-server-library"
+        )
+      );
+    expect(importers).toEqual(["apple-verifier.ts"]);
+  });
+
+  test("the built main entry carries none of it either, when a build is present", () => {
+    // The strongest form of the check, but only meaningful after `npm run
+    // build`, so it reports rather than failing on a clean checkout.
+    if (!existsSync("dist/index.js")) return;
+    expect(readFileSync("dist/index.js", "utf8")).not.toMatch(
+      /app-store-server-library/
+    );
   });
 
   test("keeps the certificate-generation library to devDependencies, where it never ships", () => {
