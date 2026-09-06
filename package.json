@@ -53,6 +53,7 @@
     "create-docs:process": "node scripts/mintlify-post-processing/file-processing/file-processing.js"
   },
   "dependencies": {
+    "@apple/app-store-server-library": "^3.1.0",
     "axios": "^1.18.1",
     "partysocket": "^0.0.23",
     "socket.io-client": "^4.8.3",

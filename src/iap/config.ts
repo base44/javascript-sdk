@@ -20,6 +20,7 @@ export interface ResolvedIapConfig {
   readonly testMode: boolean;
   readonly allowLocalTesting: boolean;
   readonly serverApi?: IapServerApiConfig;
+  readonly verifier: "apple" | "builtin";
 }
 
 const PRODUCT_TYPES = new Set<IapProductConfig["type"]>([
@@ -96,6 +97,14 @@ export function resolveConfig(config: IapConfig): ResolvedIapConfig {
   // `null` is treated as absent, not as invalid: a secret that was never set
   // arrives that way, and the right answer then is "the API is not configured"
   // — which the call itself reports clearly — rather than refusing to start.
+  if (
+    config.verifier !== undefined &&
+    config.verifier !== "apple" &&
+    config.verifier !== "builtin"
+  ) {
+    invalid(`'verifier' must be "apple" or "builtin"; got ${JSON.stringify(config.verifier)}`);
+  }
+
   if (config.serverApi !== undefined && config.serverApi !== null) {
     const api = config.serverApi;
     if (typeof api !== "object") {
@@ -131,5 +140,6 @@ export function resolveConfig(config: IapConfig): ResolvedIapConfig {
     testMode: config.testMode === true,
     allowLocalTesting: config.allowLocalTesting === true,
     serverApi: config.serverApi ?? undefined,
+    verifier: config.verifier ?? "apple",
   };
 }

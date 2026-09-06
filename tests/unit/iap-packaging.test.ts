@@ -52,13 +52,21 @@ describe("package exports", () => {
     expect(packageJson.exports["./package.json"]).toBe("./package.json");
   });
 
-  test("adds no production dependency, so the verification code carries none", () => {
+  test("adds exactly one production dependency: Apple's own verification library", () => {
     expect(Object.keys(packageJson.dependencies).sort()).toEqual([
+      "@apple/app-store-server-library",
       "axios",
       "partysocket",
       "socket.io-client",
       "uuid",
     ]);
+  });
+
+  test("that dependency is reachable only from the iap subpath, never the main entry", () => {
+    // It pulls in node:crypto, Buffer and node-fetch. Browsers must never see
+    // it, which the subpath export is what guarantees.
+    const mainEntry = readFileSync("dist/index.js", "utf8");
+    expect(mainEntry).not.toMatch(/app-store-server-library/);
   });
 
   test("keeps the certificate-generation library to devDependencies, where it never ships", () => {
@@ -138,6 +146,9 @@ describe("entry-point isolation", () => {
       "src/iap/verify/payload-checks.ts",
       "src/iap/verify/apple-roots.ts",
     ];
+    // Deliberately NOT in that list: src/iap/verify/apple-verifier.ts. It is
+    // the Node-compatibility path by design — it wraps Apple's library, which
+    // needs `Buffer` and `node:crypto`. Its own guard is below.
     for (const file of files) {
       // Comments are stripped first: several of these files explain in prose
       // why they avoid `Buffer` or `process.env`, and a naive match would

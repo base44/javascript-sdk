@@ -54,6 +54,11 @@ export async function createHarness(
       bundleId: BUNDLE_ID,
       appAppleId: APP_APPLE_ID,
       products: BASE_PRODUCTS,
+      // Both implementations must satisfy the same tests. IAP_TEST_VERIFIER
+      // runs the whole suite against the other one.
+      verifier:
+        (process.env.IAP_TEST_VERIFIER as "apple" | "builtin" | undefined) ??
+        undefined,
       ...options.config,
     },
     internal: {

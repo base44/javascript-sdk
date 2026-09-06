@@ -156,6 +156,20 @@ export interface IapConfig {
    */
   serverApi?: IapServerApiConfig;
   /**
+   * Which implementation verifies Apple's signed tokens.
+   *
+   * `"apple"` (the default) uses Apple's own `app-store-server-library`.
+   * `"builtin"` uses this SDK's own verifier, which needs no Node built-ins
+   * and runs anywhere WebCrypto does.
+   *
+   * Both enforce the same rules and produce the same decoded payloads, so this
+   * can be flipped without touching any other code. Switch to `"builtin"` if
+   * Apple's library turns out not to survive the Cloudflare Workers bundler.
+   *
+   * @defaultValue `"apple"`
+   */
+  verifier?: "apple" | "builtin";
+  /**
    * Whether to ask Apple's servers whether a certificate has been revoked.
    *
    * Not implemented in this version. Setting it to `true` throws when the
