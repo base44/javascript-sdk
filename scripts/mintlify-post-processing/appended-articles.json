@@ -4,10 +4,13 @@
     "interfaces/ConnectorIntegrationTypeRegistry",
     "interfaces/UserConnectorsModule",
     "interfaces/ConnectorApiRequest",
+    "type-aliases/ConnectorApiQueryValue",
     "interfaces/ConnectorApiResponse",
     "type-aliases/ConnectorApiResponsePhase"
   ],
-  "interfaces/AppModule": ["interfaces/AppPublicSettingsResponse"],
+  "interfaces/AppModule": [
+    "interfaces/AppPublicSettingsResponse"
+  ],
   "type-aliases/EntitiesModule": [
     "interfaces/EntityHandler",
     "type-aliases/EntityRecord",

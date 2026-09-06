@@ -357,6 +357,7 @@ export interface AuthModule {
    *
    * @example
    * ```typescript
+   * // Invite a user and handle failure
    * try {
    *   await base44.auth.inviteUser('newuser@example.com', 'user');
    *   console.log('Invitation sent successfully!');
@@ -491,6 +492,7 @@ export interface AuthModule {
    *
    * @example
    * ```typescript
+   * // Request a password reset email
    * try {
    *   await base44.auth.resetPasswordRequest('user@example.com');
    *   console.log('Password reset email sent!');
@@ -513,6 +515,7 @@ export interface AuthModule {
    *
    * @example
    * ```typescript
+   * // Complete a password reset with the emailed token
    * try {
    *   await base44.auth.resetPassword({
    *     resetToken: 'token-from-email',
@@ -538,6 +541,7 @@ export interface AuthModule {
    *
    * @example
    * ```typescript
+   * // Change the password for a signed-in user
    * try {
    *   await base44.auth.changePassword({
    *     userId: 'user-123',
