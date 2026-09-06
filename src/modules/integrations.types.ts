@@ -401,6 +401,7 @@ export type IntegrationsModule = {
    *
    * @example
    * ```typescript
+   * // Summarise text with an LLM
    * const response = await base44.integrations.Core.InvokeLLM({
    *   prompt: 'Explain quantum computing',
    *   model: 'gpt_5'
@@ -414,6 +415,7 @@ export type IntegrationsModule = {
    *
    * @example
    * ```typescript
+   * // Call a custom integration endpoint
    * const result = await base44.integrations.custom.call(
    *   'github',
    *   'get:/repos/{owner}/{repo}',

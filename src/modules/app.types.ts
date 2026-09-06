@@ -10,7 +10,7 @@ export type AppPublicSettings =
   | string;
 
 /**
- * The app's public configuration, as returned by {@link AppModule.getPublicSettings}.
+ * The app's public configuration, as returned by `getPublicSettings()`.
  */
 export interface AppPublicSettingsResponse {
   /** The app's ID. */
@@ -28,7 +28,7 @@ export interface AppPublicSettingsResponse {
  * ## Authentication Modes
  *
  * This module is available to use with a client in all authentication modes. The
- * client's token, when it has one, is sent with the request — a signed-in visitor
+ * client's token, when it has one, is sent with the request, so a signed-in visitor
  * who has no access to the app is reported differently from an anonymous one.
  */
 export interface AppModule {
@@ -36,9 +36,9 @@ export interface AppModule {
    * Get the app's public configuration.
    *
    * Rejects with a {@linkcode Base44Error} when the visitor may not open the app:
-   * `status` is `403` and `data.extra_data.reason` says why — `"auth_required"`
-   * when the visitor must sign in, `"user_not_registered"` when the signed-in
-   * visitor has no access to this app.
+   * `status` is `403` and `data.extra_data.reason` says why. It is
+   * `"auth_required"` when the visitor must sign in, and
+   * `"user_not_registered"` when the signed-in visitor has no access to this app.
    *
    * @returns Promise resolving to the app's ID and access policy.
    *

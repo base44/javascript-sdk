@@ -99,7 +99,7 @@ export function createAuthModule(
   // two identical GETs, so the second pays the first's full latency on every
   // cold load.
   //
-  // This shares the pending promise only — it is cleared as soon as the request
+  // This shares the pending promise only, and it is cleared as soon as the request
   // settles, so no resolved user is ever retained. Caching the user across
   // requests would leave the app rendering a stale identity after logout or a
   // session swap.

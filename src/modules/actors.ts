@@ -54,13 +54,13 @@ const DEAD_MS = 3_000;
 // 422 = no principal (e.g. anonymous outside a browser) or an id/room only the
 // proxy's looser validation accepts, 405 = a backend that predates the mint
 // endpoint (its actor deploy routes catch the path via `{handler_name:path}`
-// but not the POST method — and the real endpoint never 405s a POST). The
+// but not the POST method, and the real endpoint never 405s a POST). The
 // proxy serves migrated actors too, so falling back is always safe.
 const PROXY_FALLBACK_STATUSES = new Set([405, 409, 422, 503]);
 
 // Mint responses no retry can fix (bad request / forbidden / not found): the
 // connection closes instead of re-minting forever; a fresh connect() re-probes.
-// 401 is deliberately absent — the auth token is re-read on every attempt, so a
+// 401 is deliberately absent. The auth token is re-read on every attempt, so a
 // login recovers on the next retry. Disjoint from PROXY_FALLBACK_STATUSES.
 const TERMINAL_MINT_STATUSES = new Set([400, 403, 404]);
 
@@ -80,7 +80,7 @@ function toError(err: unknown): Error {
 
 /**
  * A live connection to an actor instance. Only obtainable from
- * {@link ActorRef.connect}, so `subscribe`/`send` are always valid — the socket
+ * {@link ActorRef.connect}, so `subscribe`/`send` are always valid. The socket
  * exists for this object's whole lifetime.
  */
 class Connection {
@@ -88,7 +88,7 @@ class Connection {
   private readonly listeners = new Set<(data: unknown) => void>();
   private heartbeat: ReturnType<typeof setInterval> | null = null;
   private closed = false;
-  /** The client-chosen conn id — becomes _pk → the actor's conn.id. */
+  /** The client-chosen conn id. It becomes _pk → the actor's conn.id. */
   readonly id: string;
 
   constructor(
@@ -104,7 +104,7 @@ class Connection {
     // mint answers with a fallback status the choice is sticky for this
     // socket's lifetime (a fresh connect() after close() probes direct again,
     // picking up actors migrated in the meantime). Any other mint failure
-    // rejects, which ReconnectingWebSocket retries with backoff — except the
+    // rejects, which ReconnectingWebSocket retries with backoff, except the
     // terminal statuses, which close this connection for good.
     let useProxy = config.transport === "proxy";
     const urlProvider = async (): Promise<string> => {
@@ -245,7 +245,7 @@ function makeActorRef(
  * The legacy platform-proxy URL, byte-for-byte what PartySocket built before
  * the direct path existed: same scheme swap (including its localhost-needs-a-
  * port quirk), case-preserved party segment, `_pk` first in the query. The
- * `handler` param is load-bearing — the proxy reads it for the actor name.
+ * `handler` param is load-bearing. The proxy reads it for the actor name.
  */
 export function buildProxyActorUrl(
   rawHost: string,
