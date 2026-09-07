@@ -133,6 +133,64 @@ function safeErrorLog(prefix: string, error: unknown) {
 }
 
 /**
+ * Convert an arbitrary value into something the structured clone algorithm
+ * (used by `postMessage`) can always serialize. Request/response bodies may
+ * contain functions, streams, or other host objects that make `postMessage`
+ * throw a `DataCloneError`; a JSON round-trip drops those, and a string
+ * fallback covers circular references.
+ */
+export function toSerializable(value: unknown): unknown {
+  if (value === null || value === undefined) return value;
+  const type = typeof value;
+  if (type === "string" || type === "number" || type === "boolean") return value;
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    try {
+      return String(value);
+    } catch {
+      return "[unserializable]";
+    }
+  }
+}
+
+/**
+ * Post a request-activity message to the parent window (the host builder's
+ * Activity Monitor). Posting the raw bodies can throw a `DataCloneError` when
+ * they aren't structured-cloneable; if that happens we retry with a sanitized
+ * payload so the start/end status is never lost. A dropped `api-request-end`
+ * leaves the Activity Monitor stuck on "Pending" for a request that actually
+ * completed (e.g. a backend function returning 200).
+ */
+function postActivityMessage(message: {
+  type: string;
+  requestId: string;
+  data: Record<string, unknown>;
+}) {
+  if (!isInIFrame) return;
+  try {
+    window.parent.postMessage(message, "*");
+  } catch {
+    try {
+      window.parent.postMessage(
+        { ...message, data: toSerializable(message.data) },
+        "*"
+      );
+    } catch {
+      // Drop the bodies entirely but still deliver the status signal.
+      window.parent.postMessage(
+        {
+          type: message.type,
+          requestId: message.requestId,
+          data: { statusCode: message.data?.statusCode },
+        },
+        "*"
+      );
+    }
+  }
+}
+
+/**
  * Creates an axios client with default configuration and interceptors.
  *
  * Sets up an axios instance with:
@@ -190,27 +248,16 @@ export function createAxiosClient({
     }
     const requestId = uuidv4();
     (config as any).requestId = requestId;
-    if (isInIFrame) {
-      try {
-        window.parent.postMessage(
-          {
-            type: "api-request-start",
-            requestId,
-            data: {
-              url: baseURL + config.url,
-              method: config.method,
-              body:
-                config.data instanceof FormData
-                  ? "[FormData object]"
-                  : config.data,
-            },
-          },
-          "*"
-        );
-      } catch {
-        /* skip the logging */
-      }
-    }
+    postActivityMessage({
+      type: "api-request-start",
+      requestId,
+      data: {
+        url: baseURL + config.url,
+        method: config.method,
+        body:
+          config.data instanceof FormData ? "[FormData object]" : config.data,
+      },
+    });
     return config;
   });
 
@@ -219,27 +266,34 @@ export function createAxiosClient({
     client.interceptors.response.use(
       (response) => {
         const requestId = (response.config as any)?.requestId;
-        try {
-          if (isInIFrame && requestId) {
-            window.parent.postMessage(
-              {
-                type: "api-request-end",
-                requestId,
-                data: {
-                  statusCode: response.status,
-                  response: response.data,
-                },
-              },
-              "*"
-            );
-          }
-        } catch {
-          /* do nothing */
+        if (requestId) {
+          postActivityMessage({
+            type: "api-request-end",
+            requestId,
+            data: {
+              statusCode: response.status,
+              response: response.data,
+            },
+          });
         }
 
         return response.data;
       },
       (error) => {
+        // Resolve the Activity Monitor entry on failure too, so a failed
+        // request doesn't stay stuck on "Pending".
+        const requestId = (error.config as any)?.requestId;
+        if (requestId) {
+          postActivityMessage({
+            type: "api-request-end",
+            requestId,
+            data: {
+              statusCode: error.response?.status ?? 0,
+              response: error.response?.data ?? { error: error.message },
+            },
+          });
+        }
+
         const message =
           error.response?.data?.message ||
           error.response?.data?.detail ||
