@@ -13,6 +13,7 @@ import type { AppLogsModule } from "./modules/app-logs.types.js";
 import type { AppModule } from "./modules/app.types.js";
 import type { AnalyticsModule } from "./modules/analytics.types.js";
 import type { ActorsModule } from "./modules/actors.types.js";
+import type { FetchWithAuthInit } from "./utils/fetch-with-auth.js";
 
 /**
  * Options for creating a Base44 client.
@@ -148,24 +149,29 @@ export interface Base44Client {
   cleanup: () => void;
 
   /**
-   * Calls one of your app's own server routes with the signed-in user's access token attached.
+   * Calls one of your app's own server routes with this client's credentials attached.
    *
-   * Base44 keeps the user's access token in the browser's local storage, so a plain `fetch()` to your app's server routes arrives without it and the route sees an anonymous caller. `fetchWithAuth()` is the same `fetch()` with the `Authorization: Bearer <token>` header added, which is what lets a server route act on behalf of the signed-in user.
+   * Base44 keeps a user's access token in the browser's local storage, and the platform puts its own headers on a server request — so a plain `fetch()` to your app's routes carries neither, and the route sees an anonymous caller with no way to build a client. `fetchWithAuth()` is the same `fetch()` with whatever this client holds added, which is what lets the route act on behalf of the caller.
    *
-   * Requests are restricted to your app's own origin so the token is never sent to a third party: pass a relative path beginning with a single `/`, such as `/api/orders`. An absolute URL, a protocol-relative `//host`, or anything else that a URL parser would read as another origin throws. To call a Base44 backend function, use {@linkcode FunctionsModule.fetch | functions.fetch()}; for another origin, use plain `fetch()`.
+   * What that means depends on where the client came from, because a client can only send what it has:
    *
-   * The path is passed to `fetch` unchanged, so this also works in server code, where the runtime's `fetch` decides what a relative path means — a server-side client from {@linkcode createClientFromRequest | createClientFromRequest()} carries the caller's own token. Note that only the `Authorization` header is added: a route that builds its own client from the incoming request also needs the platform's `Base44-App-Id` and `Base44-Api-Url`, which a request you construct yourself does not have.
+   * - In a browser, from {@linkcode createClient | createClient()}: the signed-in user's `Authorization: Bearer <token>`. When nobody is signed in the request goes without it, so routes open to anonymous callers keep working.
+   * - In one of your server routes, from {@linkcode createClientFromRequest | createClientFromRequest()}: everything that function reads back — the caller's token, `Base44-App-Id`, `Base44-Api-Url`, `Base44-Functions-Version`, the signed `Base44-State`, `X-Data-Env`, and the app's per-request service credential. The callee's own `createClientFromRequest()` then rebuilds the client you are holding, service role included.
    *
-   * When no user is signed in the request is sent without an `Authorization` header, so routes that allow anonymous access keep working.
+   * That second case is why route-to-route calls need this. A sub-request carries nothing from the request that triggered it — your framework builds it from your arguments alone — so a route reached by a plain `fetch()` sees no headers at all and its `createClientFromRequest()` throws on the missing `Base44-App-Id`.
+   *
+   * Requests are restricted to your app's own origin, which is what keeps these credentials inside your app: pass a relative path beginning with a single `/`, such as `/api/orders`. An absolute URL, a protocol-relative `//host`, or anything else a URL parser would read as another origin throws. To call a Base44 backend function, use {@linkcode FunctionsModule.fetch | functions.fetch()}; for another origin, use plain `fetch()`.
+   *
+   * Two routes that need the same logic should call a shared function rather than each other — cheaper than an HTTP round trip, and it needs no headers at all. Hop when the hop is the point: rendering a page server-side, or going through a route for its own caching and route rules.
    *
    * @param path - A relative path on your app's own origin, such as `/api/orders`.
-   * @param init - Optional [`RequestInit`](https://developer.mozilla.org/en-US/docs/Web/API/RequestInit) options such as `method`, `headers`, `body`, and `signal`. The auth header is added automatically; an `Authorization` header you set yourself is kept.
+   * @param init - Optional [`RequestInit`](https://developer.mozilla.org/en-US/docs/Web/API/RequestInit) options such as `method`, `headers`, `body`, and `signal`, plus `fetch`: the transport that resolves a root-relative path against your app's routes. It defaults to the global `fetch`, which does that in a browser but not on a server — in Nitro pass its own (`import { fetch } from "nitro"`), which dispatches in-process with no network hop. Any header you set yourself is kept, so you can deliberately hand the callee a different identity.
    * @returns Promise resolving to a native [`Response`](https://developer.mozilla.org/en-US/docs/Web/API/Response).
    * @throws {Error} When `path` is not a relative path on your app's own origin.
    *
    * @example
    * ```typescript
-   * // Call your app's own server route as the signed-in user
+   * // Browser: call your app's own server route as the signed-in user
    * const response = await base44.fetchWithAuth('/api/orders');
    * const orders = await response.json();
    * ```
@@ -183,8 +189,20 @@ export interface Base44Client {
    *   throw new Error(`Request failed: ${response.status}`);
    * }
    * ```
+   *
+   * @example
+   * ```typescript
+   * // Server-side render: reach the app's own route as this request
+   * import { fetch } from 'nitro';
+   * import { createClientFromRequest } from '@base44/sdk';
+   *
+   * const base44 = createClientFromRequest(event.req);
+   * const response = await base44.fetchWithAuth('/api/items', { fetch });
+   * const items = await response.json();
+   * ```
    */
-  fetchWithAuth(path: string, init?: RequestInit): Promise<Response>;
+  fetchWithAuth(path: string, init?: FetchWithAuthInit): Promise<Response>;
+
 
   /**
    * Sets a new authentication token for all subsequent requests.

@@ -325,7 +325,14 @@ export function createClient(config: CreateClientConfig): Base44Client {
     ...userModules,
 
     /** See {@link Base44Client.fetchWithAuth}. */
-    fetchWithAuth: createFetchWithAuth(axiosClient),
+    fetchWithAuth: createFetchWithAuth({
+      axios: axiosClient,
+      serviceRoleAxios: serviceRoleAxiosClient,
+      appId: String(appId),
+      serverUrl,
+      functionsVersion,
+      platformHeaders: optionalHeaders,
+    }),
 
     /**
      * Sets a new authentication token for all subsequent requests.
