@@ -8,6 +8,7 @@ import {
   createUserConnectorsModule,
 } from "./modules/connectors.js";
 import { getAccessToken } from "./utils/auth-utils.js";
+import { createFetchWithAuth } from "./utils/fetch-with-auth.js";
 import { createFunctionsModule } from "./modules/functions.js";
 import { createAgentsModule } from "./modules/agents.js";
 import { createAiGatewayModule } from "./modules/ai-gateway.js";
@@ -322,6 +323,9 @@ export function createClient(config: CreateClientConfig): Base44Client {
   // Assemble and return the client
   const client = {
     ...userModules,
+
+    /** See {@link Base44Client.fetchWithAuth}. */
+    fetchWithAuth: createFetchWithAuth(axiosClient),
 
     /**
      * Sets a new authentication token for all subsequent requests.

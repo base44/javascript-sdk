@@ -148,6 +148,45 @@ export interface Base44Client {
   cleanup: () => void;
 
   /**
+   * Calls one of your app's own server routes with the signed-in user's access token attached.
+   *
+   * Base44 keeps the user's access token in the browser's local storage, so a plain `fetch()` to your app's server routes arrives without it and the route sees an anonymous caller. `fetchWithAuth()` is the same `fetch()` with the `Authorization: Bearer <token>` header added, which is what lets a server route act on behalf of the signed-in user.
+   *
+   * Requests are restricted to your app's own origin so the token is never sent to a third party: pass a relative path beginning with a single `/`, such as `/api/orders`. An absolute URL, a protocol-relative `//host`, or anything else that a URL parser would read as another origin throws. To call a Base44 backend function, use {@linkcode FunctionsModule.fetch | functions.fetch()}; for another origin, use plain `fetch()`.
+   *
+   * The path is passed to `fetch` unchanged, so this also works in server code, where the runtime's `fetch` decides what a relative path means — a server-side client from {@linkcode createClientFromRequest | createClientFromRequest()} carries the caller's own token. Note that only the `Authorization` header is added: a route that builds its own client from the incoming request also needs the platform's `Base44-App-Id` and `Base44-Api-Url`, which a request you construct yourself does not have.
+   *
+   * When no user is signed in the request is sent without an `Authorization` header, so routes that allow anonymous access keep working.
+   *
+   * @param path - A relative path on your app's own origin, such as `/api/orders`.
+   * @param init - Optional [`RequestInit`](https://developer.mozilla.org/en-US/docs/Web/API/RequestInit) options such as `method`, `headers`, `body`, and `signal`. The auth header is added automatically; an `Authorization` header you set yourself is kept.
+   * @returns Promise resolving to a native [`Response`](https://developer.mozilla.org/en-US/docs/Web/API/Response).
+   * @throws {Error} When `path` is not a relative path on your app's own origin.
+   *
+   * @example
+   * ```typescript
+   * // Call your app's own server route as the signed-in user
+   * const response = await base44.fetchWithAuth('/api/orders');
+   * const orders = await response.json();
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // POST with a JSON body
+   * const response = await base44.fetchWithAuth('/api/orders', {
+   *   method: 'POST',
+   *   headers: { 'Content-Type': 'application/json' },
+   *   body: JSON.stringify({ productId: 'abc', quantity: 2 }),
+   * });
+   *
+   * if (!response.ok) {
+   *   throw new Error(`Request failed: ${response.status}`);
+   * }
+   * ```
+   */
+  fetchWithAuth(path: string, init?: RequestInit): Promise<Response>;
+
+  /**
    * Sets a new authentication token for all subsequent requests.
    *
    * Updates the token for both HTTP requests and WebSocket connections.
