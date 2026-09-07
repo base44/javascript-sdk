@@ -1,8 +1,5 @@
 import type { AxiosInstance } from "axios";
 
-/** `fetch`-compatible transport that can resolve a root-relative path. */
-type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
-
 /** Options for {@link Base44Client.fetchWithAuth}. */
 export interface FetchWithAuthInit extends RequestInit {
   /**
@@ -12,7 +9,7 @@ export interface FetchWithAuthInit extends RequestInit {
    * against. In Nitro pass its own, which routes a leading-slash path
    * in-process: `import { fetch } from "nitro"`.
    */
-  fetch?: FetchLike;
+  fetch?: (input: string, init?: RequestInit) => Promise<Response>;
 }
 
 /**
