@@ -68,7 +68,7 @@ describe("fetchWithAuth", () => {
     await base44.fetchWithAuth("/api/orders");
 
     const { url, headers } = lastCall();
-    expect(url).toBe(`${origin}/api/orders`);
+    expect(url).toBe("/api/orders");
     expect(headers.get("Authorization")).toBe("Bearer user-token");
   });
 
@@ -133,13 +133,13 @@ describe("fetchWithAuth", () => {
     expect(headers.get("Authorization")).toBe("Bearer caller-token");
   });
 
-  test("resolves a path relative to the current page", async () => {
+  test("passes the path through untouched", async () => {
     stubBrowser();
     const base44 = createTestClient("user-token");
 
-    await base44.fetchWithAuth("api/orders");
+    await base44.fetchWithAuth("/api/orders?status=open#top");
 
-    expect(lastCall().url).toBe(`${origin}/api/orders`);
+    expect(lastCall().url).toBe("/api/orders?status=open#top");
   });
 
   test.each([
@@ -147,6 +147,12 @@ describe("fetchWithAuth", () => {
     ["a protocol-relative path", "//evil.example/steal"],
     ["a backslash-prefixed path", "/\\evil.example/steal"],
     ["an absolute URL on another port", `${origin}:8443/api/orders`],
+    ["a bare relative path", "api/orders"],
+    // A URL parser drops tabs/newlines and trims leading space, so these read
+    // as "//evil.example" by the time the request is built.
+    ["a tab-split protocol-relative path", "/\t/evil.example/steal"],
+    ["a newline-split protocol-relative path", "/\n/evil.example/steal"],
+    ["a space-padded protocol-relative path", "  //evil.example/steal"],
   ])("rejects %s", async (_label, path) => {
     stubBrowser();
     const base44 = createTestClient("user-token");
@@ -165,12 +171,23 @@ describe("fetchWithAuth", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  test("throws outside the browser", async () => {
-    const base44 = createTestClient("user-token");
+  test("works with no document, as in a server route", async () => {
+    // No stubBrowser(): window is undefined here, the way it is on a worker.
+    const base44 = createTestClient("caller-token");
 
-    await expect(base44.fetchWithAuth("/api/orders")).rejects.toThrow(
-      /only available in the browser/
-    );
+    await base44.fetchWithAuth("/api/orders");
+
+    const { url, headers } = lastCall();
+    expect(url).toBe("/api/orders");
+    expect(headers.get("Authorization")).toBe("Bearer caller-token");
+  });
+
+  test("rejects another origin with no document too", async () => {
+    const base44 = createTestClient("caller-token");
+
+    await expect(
+      base44.fetchWithAuth("https://evil.example/steal")
+    ).rejects.toThrow(/only sends requests to your app's own origin/);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

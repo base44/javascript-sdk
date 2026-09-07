@@ -152,16 +152,16 @@ export interface Base44Client {
    *
    * Base44 keeps the user's access token in the browser's local storage, so a plain `fetch()` to your app's server routes arrives without it and the route sees an anonymous caller. `fetchWithAuth()` is the same `fetch()` with the `Authorization: Bearer <token>` header added, which is what lets a server route act on behalf of the signed-in user.
    *
-   * Requests are restricted to your app's own origin so the token is never sent to a third party: pass a path such as `/api/orders`, not a full URL. An absolute URL, a protocol-relative path, or anything else that resolves to another origin throws. To call a Base44 backend function, use {@linkcode FunctionsModule.fetch | functions.fetch()}; for another origin, use plain `fetch()`.
+   * Requests are restricted to your app's own origin so the token is never sent to a third party: pass a relative path beginning with a single `/`, such as `/api/orders`. An absolute URL, a protocol-relative `//host`, or anything else that a URL parser would read as another origin throws. To call a Base44 backend function, use {@linkcode FunctionsModule.fetch | functions.fetch()}; for another origin, use plain `fetch()`.
+   *
+   * The path is passed to `fetch` unchanged, so this also works in server code, where the runtime's `fetch` decides what a relative path means — a server-side client from {@linkcode createClientFromRequest | createClientFromRequest()} carries the caller's own token. Note that only the `Authorization` header is added: a route that builds its own client from the incoming request also needs the platform's `Base44-App-Id` and `Base44-Api-Url`, which a request you construct yourself does not have.
    *
    * When no user is signed in the request is sent without an `Authorization` header, so routes that allow anonymous access keep working.
    *
-   * This method is browser-only. In server code, read the caller's token from the incoming request instead.
-   *
-   * @param path - A path on your app's own origin, such as `/api/orders`.
+   * @param path - A relative path on your app's own origin, such as `/api/orders`.
    * @param init - Optional [`RequestInit`](https://developer.mozilla.org/en-US/docs/Web/API/RequestInit) options such as `method`, `headers`, `body`, and `signal`. The auth header is added automatically; an `Authorization` header you set yourself is kept.
    * @returns Promise resolving to a native [`Response`](https://developer.mozilla.org/en-US/docs/Web/API/Response).
-   * @throws {Error} When `path` resolves to a different origin, or when called outside the browser.
+   * @throws {Error} When `path` is not a relative path on your app's own origin.
    *
    * @example
    * ```typescript
