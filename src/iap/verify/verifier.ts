@@ -1,151 +1,246 @@
 /**
- * The three verification entry points, assembled from the parts around them.
+ * Verification of Apple's signed tokens, over Apple's own library.
  *
- * Mirrors Apple's `SignedDataVerifier`: one method per kind of signed data,
- * each returning the decoded payload or throwing. There is no "verified but
- * with warnings" result — a token either passes every check or is rejected.
+ * `@apple/app-store-server-library` does the whole job: it walks the
+ * certificate chain to a root **you** supply, checks the Apple marker
+ * extensions on the intermediate and leaf, checks the intermediate's CA basic
+ * constraint, evaluates validity at the payload's own `signedDate`, verifies
+ * the signature, and then confirms the bundle id, app id and environment.
+ *
+ * Two structural facts about that library shape this file.
+ *
+ * **One environment per instance.** `SignedDataVerifier` is constructed for a
+ * single `Environment` and rejects payloads from any other, so accepting more
+ * than one means holding an instance per environment.
+ *
+ * **It checks the app identifier before the environment**, so a sandbox
+ * payload offered to a production instance fails as `INVALID_APP_IDENTIFIER` —
+ * indistinguishable from a token genuinely meant for another app. Tokens are
+ * therefore routed by the environment they declare rather than tried in turn.
+ *
+ * It reaches for Node built-ins (`node:crypto`, `Buffer`, `node-fetch`). Base44
+ * backend functions run on Cloudflare Workers with `nodejs_compat`, which
+ * provides them; this path is verified working there.
  *
  * @internal
  */
-import { IapVerificationError } from "../errors.js";
-import { systemClock, type Clock } from "../runtime/clock.js";
-import type { AppleRoot } from "./apple-roots.js";
-import { parseJws, verifyJws, type ParsedJws } from "./jws.js";
 import {
-  checkAppIdentifiers,
-  checkEnvironment,
-  normalizeEnvironment,
-  type PayloadCheckConfig,
-} from "./payload-checks.js";
+  Environment,
+  SignedDataVerifier,
+  VerificationStatus,
+} from "@apple/app-store-server-library";
+import { base64UrlToBytes } from "../runtime/base64.js";
+import { IapVerificationError } from "../errors.js";
+import type { IapVerificationErrorCode } from "../errors.types.js";
+import { appleRoots } from "./apple-roots.js";
+import { normalizeEnvironment, type PayloadCheckConfig } from "./payload-checks.js";
 import type {
   DecodedNotification,
   DecodedNotificationData,
   DecodedRenewalInfo,
   DecodedTransaction,
-  IapEnvironment,
 } from "./verify.types.js";
+
+/** The verification surface the rest of the module depends on. */
+export interface Verifier {
+  /** Verifies and decodes a signed transaction. */
+  verifyTransaction(jws: string): Promise<DecodedTransaction>;
+  /** Verifies and decodes signed renewal information. */
+  verifyRenewalInfo(jws: string): Promise<DecodedRenewalInfo>;
+  /** Verifies and decodes a notification, including its inner tokens. */
+  verifyNotification(signedPayload: string): Promise<DecodedNotification>;
+}
+
+/** Apple's failure codes, mapped onto this SDK's. */
+const STATUS_TO_CODE: Partial<Record<VerificationStatus, IapVerificationErrorCode>> = {
+  [VerificationStatus.INVALID_APP_IDENTIFIER]: "INVALID_APP_IDENTIFIER",
+  [VerificationStatus.INVALID_ENVIRONMENT]: "INVALID_ENVIRONMENT",
+  [VerificationStatus.INVALID_CHAIN_LENGTH]: "INVALID_CHAIN_LENGTH",
+  [VerificationStatus.INVALID_CERTIFICATE]: "INVALID_CERTIFICATE",
+  [VerificationStatus.VERIFICATION_FAILURE]: "INVALID_SIGNATURE",
+  [VerificationStatus.RETRYABLE_VERIFICATION_FAILURE]: "RETRYABLE_VERIFICATION_FAILURE",
+  [VerificationStatus.FAILURE]: "INVALID_JWS_FORMAT",
+};
+
+function toIapError(error: unknown): IapVerificationError {
+  if (error instanceof IapVerificationError) return error;
+  const status = (error as { status?: VerificationStatus } | undefined)?.status;
+  const code = status !== undefined ? STATUS_TO_CODE[status] : undefined;
+  return new IapVerificationError(
+    code ?? "INVALID_SIGNATURE",
+    error instanceof Error ? error.message : String(error),
+    { cause: error }
+  );
+}
 
 /** Inputs to {@link createVerifier}. */
 export interface CreateVerifierOptions {
   /** The app's identity and which environments it accepts. */
   readonly config: PayloadCheckConfig;
   /**
-   * Trust anchors, for this module's own tests only.
+   * Trust anchors, for this SDK's own tests.
    *
    * Deliberately not reachable from `IapConfig`: an app must never be able to
    * add a root certificate.
    *
    * @internal
    */
-  readonly roots?: readonly AppleRoot[];
-  /** The clock, for tests. @internal */
-  readonly clock?: Clock;
-}
-
-/** The verification surface. */
-export interface Verifier {
-  /** Verifies and decodes a signed transaction. */
-  verifyTransaction(jws: string): Promise<DecodedTransaction>;
-  /** Verifies and decodes signed renewal information. */
-  verifyRenewalInfo(jws: string): Promise<DecodedRenewalInfo>;
-  /** Verifies and decodes an App Store Server Notification, including its inner tokens. */
-  verifyNotification(signedPayload: string): Promise<DecodedNotification>;
-}
-
-/**
- * Whether this token may skip certificate verification.
- *
- * Xcode's local StoreKit testing signs tokens with Xcode's own key rather than
- * Apple's, so they cannot chain to an Apple root — Apple's own library skips
- * chain validation for them too.
- *
- * Reading the environment out of an **unverified** payload to make this
- * decision is only safe because of what gates it: `allowLocalTesting` is off
- * unless a developer turned it on, and with it off this function always
- * returns false, so a forged `environment: "Xcode"` buys an attacker nothing.
- * Never widen this to a flag that could be on in production.
- */
-function mayForgoChainVerification(
-  environment: IapEnvironment | undefined,
-  config: PayloadCheckConfig
-): boolean {
-  return environment === "Xcode" && config.allowLocalTesting;
-}
-
-function requireSignedDate(parsed: ParsedJws, what: string): number {
-  const signedDate = parsed.payload.signedDate;
-  if (typeof signedDate !== "number" || !Number.isFinite(signedDate)) {
-    throw new IapVerificationError(
-      "INVALID_JWS_FORMAT",
-      `the ${what} carries no numeric 'signedDate', so its certificates cannot be ` +
-        "evaluated at the moment Apple signed it"
-    );
-  }
-  return signedDate;
+  readonly roots?: readonly { readonly der: Uint8Array }[];
+  /**
+   * Whether to do OCSP certificate-revocation lookups.
+   *
+   * Off unless explicitly enabled. Turning it on also switches validity
+   * evaluation from the payload's `signedDate` to the current time, which
+   * means a stored token eventually stops verifying.
+   */
+  readonly onlineChecks?: boolean;
 }
 
 export function createVerifier(options: CreateVerifierOptions): Verifier {
-  const { config, roots } = options;
-  const clock = options.clock ?? systemClock;
+  const { config } = options;
 
-  /** Parse, then verify unless this is a local-testing token. */
-  async function parseAndVerify(
+  // Apple's library takes Node Buffers. On Cloudflare Workers these come from
+  // `nodejs_compat`; in tests, from Node itself.
+  const rootBuffers = (options.roots ?? appleRoots()).map((root) =>
+    Buffer.from(root.der)
+  );
+
+  /**
+   * One verifier per accepted environment.
+   *
+   * Production is always accepted. Sandbox needs `testMode`, and Xcode needs
+   * `allowLocalTesting` — so a live app with both flags off honours real
+   * purchases and nothing else.
+   */
+  const verifiers = new Map<string, SignedDataVerifier>();
+  const environments: Environment[] = [Environment.PRODUCTION];
+  if (config.testMode) environments.push(Environment.SANDBOX);
+  // Xcode signs its own tokens rather than Apple, so they cannot chain to an
+  // Apple root. Apple's library skips chain validation for this environment,
+  // which is the only way such a token can ever verify.
+  if (config.allowLocalTesting) environments.push(Environment.XCODE);
+
+  for (const environment of environments) {
+    verifiers.set(
+      environment,
+      new SignedDataVerifier(
+        rootBuffers,
+        options.onlineChecks === true,
+        environment,
+        config.bundleId,
+        // Required in production; absent from Apple's own sandbox payloads.
+        environment === Environment.PRODUCTION ? config.appAppleId : undefined
+      )
+    );
+  }
+
+  /**
+   * Reads the `environment` a token declares, without verifying anything.
+   *
+   * Only ever used to pick which verifier to hand the token to. It cannot be
+   * used to bypass a check: the chosen verifier re-reads the same field and
+   * rejects a mismatch, so a forged value routes the token to an instance that
+   * refuses it.
+   */
+  function declaredEnvironment(token: string): string | undefined {
+    try {
+      const segment = token.split(".")[1];
+      if (!segment) return undefined;
+      const payload = JSON.parse(
+        new TextDecoder().decode(base64UrlToBytes(segment))
+      ) as Record<string, unknown>;
+
+      if (typeof payload.environment === "string") {
+        return normalizeEnvironment(payload.environment);
+      }
+      // A notification carries it inside whichever block it has.
+      for (const key of ["data", "summary", "appData"] as const) {
+        const block = payload[key] as { environment?: unknown } | undefined;
+        if (block && typeof block.environment === "string") {
+          return normalizeEnvironment(block.environment);
+        }
+      }
+    } catch {
+      // Malformed input: let the real verifier produce the error.
+    }
+    return undefined;
+  }
+
+  /** Hands the token to the verifier for the environment it declares. */
+  async function withVerifier<T>(
     token: string,
-    what: string,
-    environmentOf: (payload: Record<string, unknown>) => unknown
-  ): Promise<{ parsed: ParsedJws; environment: IapEnvironment }> {
-    const parsed = parseJws(token);
-    const environment = normalizeEnvironment(environmentOf(parsed.payload));
+    attempt: (verifier: SignedDataVerifier) => Promise<T>
+  ): Promise<T> {
+    const declared = declaredEnvironment(token);
 
-    if (!mayForgoChainVerification(environment, config)) {
-      await verifyJws(parsed, { at: requireSignedDate(parsed, what), roots });
+    if (declared !== undefined && !verifiers.has(declared)) {
+      throw new IapVerificationError(
+        "INVALID_ENVIRONMENT",
+        `this token is from the ${declared} environment, which this app does not ` +
+          "accept (set testMode for Sandbox, or allowLocalTesting for Xcode)"
+      );
     }
 
-    // Payload checks run in both cases: a local-testing token still has to be
-    // for this app.
-    return { parsed, environment: checkEnvironment(environment, config) };
+    const verifier =
+      (declared !== undefined ? verifiers.get(declared) : undefined) ??
+      (verifiers.get(Environment.PRODUCTION) as SignedDataVerifier);
+
+    try {
+      return await attempt(verifier);
+    } catch (error) {
+      throw toIapError(error);
+    }
   }
 
   async function verifyTransaction(jws: string): Promise<DecodedTransaction> {
-    const { parsed, environment } = await parseAndVerify(
-      jws,
-      "transaction",
-      (payload) => payload.environment
+    return withVerifier(jws, async (verifier) =>
+      (await verifier.verifyAndDecodeTransaction(jws)) as DecodedTransaction
     );
-    checkAppIdentifiers(parsed.payload, environment, config);
-    return parsed.payload as DecodedTransaction;
   }
 
   async function verifyRenewalInfo(jws: string): Promise<DecodedRenewalInfo> {
-    // Renewal information carries no bundleId or appAppleId — Apple does not
-    // put them there — so there is nothing to check beyond the environment.
-    const { parsed } = await parseAndVerify(
-      jws,
-      "renewal info",
-      (payload) => payload.environment
+    return withVerifier(jws, async (verifier) =>
+      (await verifier.verifyAndDecodeRenewalInfo(jws)) as DecodedRenewalInfo
     );
-    return parsed.payload as DecodedRenewalInfo;
   }
 
   async function verifyNotification(
     signedPayload: string
   ): Promise<DecodedNotification> {
-    const { parsed, environment } = await parseAndVerify(
-      signedPayload,
-      "notification",
-      (payload) => {
-        // The environment lives inside whichever block this notification type
-        // carries.
-        const data = payload.data as { environment?: unknown } | undefined;
-        const summary = payload.summary as { environment?: unknown } | undefined;
-        return data?.environment ?? summary?.environment;
-      }
+    const decoded = await withVerifier(signedPayload, async (verifier) =>
+      verifier.verifyAndDecodeNotification(signedPayload)
     );
 
-    const payload = parsed.payload;
+    const raw = decoded as unknown as Record<string, unknown>;
+    const rawData = raw.data as
+      | (Record<string, unknown> & {
+          signedTransactionInfo?: unknown;
+          signedRenewalInfo?: unknown;
+        })
+      | undefined;
 
-    const notificationUUID = payload.notificationUUID;
-    const notificationType = payload.notificationType;
+    let data: DecodedNotificationData | undefined;
+    if (rawData) {
+      const { signedTransactionInfo, signedRenewalInfo, ...rest } = rawData;
+      data = { ...rest } as DecodedNotificationData;
+
+      // The inner tokens are separately signed, so each is verified in its own
+      // right. The raw strings are then replaced by their decoded form under
+      // names that say they have been checked, so no caller can act on an
+      // unverified token by mistake — while storage still gets the original
+      // bytes, which are the source of truth.
+      if (typeof signedTransactionInfo === "string") {
+        data.transactionInfo = await verifyTransaction(signedTransactionInfo);
+        data.transactionInfoJws = signedTransactionInfo;
+      }
+      if (typeof signedRenewalInfo === "string") {
+        data.renewalInfo = await verifyRenewalInfo(signedRenewalInfo);
+        data.renewalInfoJws = signedRenewalInfo;
+      }
+    }
+
+    const notificationUUID = raw.notificationUUID;
+    const notificationType = raw.notificationType;
     if (typeof notificationUUID !== "string" || notificationUUID.length === 0) {
       throw new IapVerificationError(
         "INVALID_JWS_FORMAT",
@@ -159,46 +254,7 @@ export function createVerifier(options: CreateVerifierOptions): Verifier {
       );
     }
 
-    const rawData = payload.data as
-      | (Record<string, unknown> & {
-          signedTransactionInfo?: unknown;
-          signedRenewalInfo?: unknown;
-        })
-      | undefined;
-
-    let data: DecodedNotificationData | undefined;
-    if (rawData) {
-      checkAppIdentifiers(rawData, environment, config);
-
-      // The inner tokens are separately signed, so each is verified in its own
-      // right rather than trusted because the envelope verified.
-      const { signedTransactionInfo, signedRenewalInfo, ...rest } = rawData;
-      data = { ...rest } as DecodedNotificationData;
-
-      if (typeof signedTransactionInfo === "string") {
-        data.transactionInfo = await verifyTransaction(signedTransactionInfo);
-        // Kept alongside the decoded form, under a name that says it has been
-        // verified. Storage needs the original bytes: they are the source of
-        // truth every derived column can be rebuilt from.
-        data.transactionInfoJws = signedTransactionInfo;
-      }
-      if (typeof signedRenewalInfo === "string") {
-        data.renewalInfo = await verifyRenewalInfo(signedRenewalInfo);
-        data.renewalInfoJws = signedRenewalInfo;
-      }
-    }
-
-    return {
-      ...payload,
-      notificationUUID,
-      notificationType,
-      data,
-      // A notification with no signedDate has already been rejected unless it
-      // skipped verification, in which case the receive time is the best
-      // ordering cursor available.
-      signedDate:
-        typeof payload.signedDate === "number" ? payload.signedDate : clock(),
-    } as DecodedNotification;
+    return { ...raw, notificationUUID, notificationType, data } as DecodedNotification;
   }
 
   return { verifyTransaction, verifyRenewalInfo, verifyNotification };

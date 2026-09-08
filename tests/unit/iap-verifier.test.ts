@@ -102,30 +102,69 @@ describe("verifyTransaction", () => {
     });
   });
 
-  test("rejects a production transaction with the wrong appAppleId", async () => {
+  test("identifies the app by bundleId on a transaction, not by appAppleId", async () => {
+    // Apple's own contract: verifyAndDecodeTransaction checks bundleId and
+    // environment, and leaves appAppleId to notifications. A transaction
+    // already carries the bundleId, which identifies the app on its own, so
+    // appAppleId adds nothing there.
     const { chain, verifier } = await verifierFor();
-    const token = await signJws(chain, transactionPayload({ appAppleId: 999 }));
-    await expect(verifier.verifyTransaction(token)).rejects.toMatchObject({
+
+    const wrongAppleId = await signJws(chain, transactionPayload({ appAppleId: 999 }));
+    await expect(verifier.verifyTransaction(wrongAppleId)).resolves.toMatchObject({
+      bundleId: BUNDLE_ID,
+    });
+
+    const noAppleId = transactionPayload();
+    delete (noAppleId as Record<string, unknown>).appAppleId;
+    await expect(
+      verifier.verifyTransaction(await signJws(chain, noAppleId))
+    ).resolves.toBeDefined();
+
+    // The check that does the work still bites.
+    const wrongBundle = await signJws(
+      chain,
+      transactionPayload({ bundleId: "com.someone.else" })
+    );
+    await expect(verifier.verifyTransaction(wrongBundle)).rejects.toMatchObject({
       code: "INVALID_APP_IDENTIFIER",
     });
   });
 
-  test("rejects a production transaction with no appAppleId at all", async () => {
+  test("still enforces appAppleId on a production notification", async () => {
+    // Where Apple does check it.
     const { chain, verifier } = await verifierFor();
-    const payload = transactionPayload();
-    delete (payload as Record<string, unknown>).appAppleId;
-    await expect(
-      verifier.verifyTransaction(await signJws(chain, payload))
-    ).rejects.toMatchObject({ code: "INVALID_APP_IDENTIFIER" });
+    const inner = await signJws(chain, transactionPayload());
+    const token = await signJws(chain, {
+      notificationType: "TEST",
+      notificationUUID: "aaaaaaaa-0000-4000-8000-000000000001",
+      version: "2.0",
+      signedDate: SIGNED_DATE,
+      data: {
+        appAppleId: 999,
+        bundleId: BUNDLE_ID,
+        environment: "Production",
+        signedTransactionInfo: inner,
+      },
+    });
+    await expect(verifier.verifyNotification(token)).rejects.toMatchObject({
+      code: "INVALID_APP_IDENTIFIER",
+    });
   });
 
-  test("rejects a transaction with no signedDate, since certificates could not be dated", async () => {
+  test("dates a transaction with no signedDate against now, rather than refusing it", async () => {
+    // Apple's extractSignedDate falls back to the current time when the field
+    // is absent, so certificate validity is checked against now instead of the
+    // signing instant. Apple always sends it, so this is a fallback rather
+    // than a path anything relies on — but it means such a token is accepted,
+    // and the ingestion layer supplies its own clock value for the
+    // newest-wins cursor.
     const { chain, verifier } = await verifierFor();
     const payload = transactionPayload();
     delete (payload as Record<string, unknown>).signedDate;
-    await expect(
-      verifier.verifyTransaction(await signJws(chain, payload))
-    ).rejects.toMatchObject({ code: "INVALID_JWS_FORMAT" });
+
+    const decoded = await verifier.verifyTransaction(await signJws(chain, payload));
+    expect(decoded.signedDate).toBeUndefined();
+    expect(decoded.bundleId).toBe(BUNDLE_ID);
   });
 });
 

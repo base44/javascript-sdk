@@ -71,7 +71,7 @@ describe("package exports", () => {
     // locally off a stale build and fails on a clean checkout.
     for (const file of ["src/index.ts", "src/client.ts", "src/client.types.ts"]) {
       expect(readFileSync(file, "utf8"), `${file} reaches Apple's library`).not.toMatch(
-        /app-store-server-library|apple-verifier/
+        /app-store-server-library/
       );
     }
 
@@ -83,7 +83,7 @@ describe("package exports", () => {
           "@apple/app-store-server-library"
         )
       );
-    expect(importers).toEqual(["apple-verifier.ts"]);
+    expect(importers).toEqual(["verifier.ts"]);
   });
 
   test("the built main entry carries none of it either, when a build is present", () => {
@@ -163,17 +163,11 @@ describe("entry-point isolation", () => {
       "src/iap/runtime/base64.ts",
       "src/iap/runtime/webcrypto.ts",
       "src/iap/runtime/clock.ts",
-      "src/iap/verify/asn1.ts",
-      "src/iap/verify/x509.ts",
-      "src/iap/verify/ecdsa.ts",
-      "src/iap/verify/chain.ts",
-      "src/iap/verify/jws.ts",
-      "src/iap/verify/verifier.ts",
       "src/iap/verify/payload-checks.ts",
       "src/iap/verify/apple-roots.ts",
     ];
-    // Deliberately NOT in that list: src/iap/verify/apple-verifier.ts. It is
-    // the Node-compatibility path by design — it wraps Apple's library, which
+    // Deliberately NOT in that list: src/iap/verify/verifier.ts. It is the
+    // Node-compatibility path by design — it wraps Apple's library, which
     // needs `Buffer` and `node:crypto`. Its own guard is below.
     for (const file of files) {
       // Comments are stripped first: several of these files explain in prose
@@ -191,12 +185,6 @@ describe("entry-point isolation", () => {
 
   test("only the runtime accessor file reaches for a global, so there is one place to audit", () => {
     const verifyFiles = [
-      "src/iap/verify/asn1.ts",
-      "src/iap/verify/x509.ts",
-      "src/iap/verify/ecdsa.ts",
-      "src/iap/verify/chain.ts",
-      "src/iap/verify/jws.ts",
-      "src/iap/verify/verifier.ts",
     ];
     for (const file of verifyFiles) {
       const source = stripComments(readFileSync(file, "utf8"));

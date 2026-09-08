@@ -11,7 +11,6 @@ import type { Base44Client } from "../client.types.js";
 import { appAccountTokenFor } from "./account-token.js";
 import { resolveConfig } from "./config.js";
 import { createVerifier } from "./verify/verifier.js";
-import { createAppleVerifier } from "./verify/apple-verifier.js";
 import type { AppleRoot } from "./verify/apple-roots.js";
 import { systemClock, type Clock } from "./runtime/clock.js";
 import { createEmitter } from "./events/emitter.js";
@@ -136,12 +135,7 @@ export function createIapClient(options: CreateIapClientOptions): IapModule {
   const config = resolveConfig(options.config);
   const clock = options.internal?.clock ?? systemClock;
 
-  // Both implementations satisfy the same interface, so nothing downstream
-  // knows or cares which one ran.
-  const verifier =
-    config.verifier === "apple"
-      ? createAppleVerifier({ config, roots: options.internal?.roots })
-      : createVerifier({ config, roots: options.internal?.roots, clock });
+  const verifier = createVerifier({ config, roots: options.internal?.roots });
 
   const store = createEntitiesStore({
     // Reached lazily: the service-role accessor throws when the client has no

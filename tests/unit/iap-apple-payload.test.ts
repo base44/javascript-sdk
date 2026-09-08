@@ -1,8 +1,5 @@
 import { describe, expect, test } from "vitest";
 import { createVerifier } from "../../src/iap/verify/verifier.ts";
-import { createAppleVerifier } from "../../src/iap/verify/apple-verifier.ts";
-import { parseJws } from "../../src/iap/verify/jws.ts";
-import { verifyChain } from "../../src/iap/verify/chain.ts";
 import {
   CAPTURED_BUNDLE_ID,
   CAPTURED_TEST_NOTIFICATION,
@@ -22,34 +19,10 @@ const CONFIG = {
 const SIGNED_DATE = 1788870417666;
 
 describe("a real Apple sandbox notification", () => {
-  test("its chain terminates at the pinned Apple Root CA G3", async () => {
-    const parsed = parseJws(CAPTURED_TEST_NOTIFICATION);
-    // No `roots` override — this is the production trust anchor.
-    const chain = await verifyChain(parsed.chain, { at: SIGNED_DATE });
-
-    expect(chain.root.name).toBe("Apple Root CA - G3");
-
-    // Apple's real chain, as measured from this payload rather than assumed:
-    // a P-384 root and a P-384 intermediate, then a P-256 leaf. Every link is
-    // signed ecdsa-with-SHA384.
-    //
-    // So the cross-curve step is intermediate -> leaf: a P-384 key signing a
-    // P-256 certificate. That is why the digest has to come from each
-    // certificate's own signatureAlgorithm and never from the subject key's
-    // curve — reading SHA-256 off the leaf's P-256 key here fails verification
-    // on Apple's real chain.
-    expect(chain.root.der.length).toBe(583);
-    expect(chain.intermediate.publicKey.curve).toBe("P-384");
-    expect(chain.intermediate.signatureAlgorithm.hash).toBe("SHA-384");
-    expect(chain.leaf.publicKey.curve).toBe("P-256");
-    expect(chain.leaf.signatureAlgorithm.hash).toBe("SHA-384");
-  });
-
-  test.each([
-    ["builtin", () => createVerifier({ config: CONFIG })],
-    ["apple", () => createAppleVerifier({ config: CONFIG })],
-  ])("the %s verifier accepts it and decodes the same values", async (_name, build) => {
-    const decoded = await build().verifyNotification(CAPTURED_TEST_NOTIFICATION);
+  test("it verifies against Apple's real trust chain and decodes correctly", async () => {
+    const decoded = await createVerifier({ config: CONFIG }).verifyNotification(
+      CAPTURED_TEST_NOTIFICATION
+    );
 
     expect(decoded.notificationType).toBe("TEST");
     expect(decoded.notificationUUID).toBe("63e18bac-9d46-4766-b1ec-b511e4758173");
@@ -61,42 +34,30 @@ describe("a real Apple sandbox notification", () => {
     expect(decoded.data?.transactionInfo).toBeUndefined();
   });
 
-  test("both verifiers produce identical output for it", async () => {
-    const [builtin, apple] = await Promise.all([
-      createVerifier({ config: CONFIG }).verifyNotification(CAPTURED_TEST_NOTIFICATION),
-      createAppleVerifier({ config: CONFIG }).verifyNotification(
-        CAPTURED_TEST_NOTIFICATION
-      ),
-    ]);
-    expect(apple).toEqual(builtin);
-  });
-
-  test.each([
-    ["builtin", () => createVerifier({ config: { ...CONFIG, testMode: false } })],
-    ["apple", () => createAppleVerifier({ config: { ...CONFIG, testMode: false } })],
-  ])("the %s verifier refuses it when test mode is off", async (_name, build) => {
+  test("it is refused when test mode is off", async () => {
     await expect(
-      build().verifyNotification(CAPTURED_TEST_NOTIFICATION)
+      createVerifier({ config: { ...CONFIG, testMode: false } }).verifyNotification(
+        CAPTURED_TEST_NOTIFICATION
+      )
     ).rejects.toMatchObject({ code: "INVALID_ENVIRONMENT" });
   });
 
-  test.each([
-    ["builtin", () => createVerifier({ config: { ...CONFIG, bundleId: "com.someone.else" } })],
-    ["apple", () => createAppleVerifier({ config: { ...CONFIG, bundleId: "com.someone.else" } })],
-  ])("the %s verifier refuses it for the wrong app", async (_name, build) => {
+  test("it is refused for the wrong app", async () => {
+    // The exact failure a mismatched bundleId produces: a 401 from the webhook.
     await expect(
-      build().verifyNotification(CAPTURED_TEST_NOTIFICATION)
+      createVerifier({
+        config: { ...CONFIG, bundleId: "com.someone.else" },
+      }).verifyNotification(CAPTURED_TEST_NOTIFICATION)
     ).rejects.toMatchObject({ code: "INVALID_APP_IDENTIFIER" });
   });
 
-  test.each([
-    ["builtin", () => createVerifier({ config: CONFIG })],
-    ["apple", () => createAppleVerifier({ config: CONFIG })],
-  ])("the %s verifier rejects it once a byte is changed", async (_name, build) => {
+  test("it is rejected once a single signature byte is changed", async () => {
     const [header, payload, signature] = CAPTURED_TEST_NOTIFICATION.split(".");
     const flipped = signature.slice(0, -2) + (signature.endsWith("AA") ? "BB" : "AA");
     await expect(
-      build().verifyNotification(`${header}.${payload}.${flipped}`)
+      createVerifier({ config: CONFIG }).verifyNotification(
+        `${header}.${payload}.${flipped}`
+      )
     ).rejects.toBeDefined();
   });
 });
