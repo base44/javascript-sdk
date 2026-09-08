@@ -1,5 +1,5 @@
+import { mockHttp } from "../mocks/http";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import nock from "nock";
 import { Base44Error, createClient } from "../../src/index.ts";
 
 describe("App module", () => {
@@ -8,21 +8,22 @@ describe("App module", () => {
   const token = "user-token-456";
   const publicSettingsPath = `/api/apps/public/prod/public-settings/by-id/${appId}`;
   let base44: ReturnType<typeof createClient>;
-  let scope: nock.Scope;
 
   beforeEach(() => {
     base44 = createClient({ serverUrl, appId, token });
-    scope = nock(serverUrl);
   });
 
   afterEach(() => {
-    nock.cleanAll();
+    base44.cleanup();
   });
 
   test("getPublicSettings returns the app id and its access policy", async () => {
-    scope
-      .get(publicSettingsPath)
-      .reply(200, { id: appId, public_settings: "public_without_login" });
+    mockHttp({
+      method: "get",
+      url: serverUrl + publicSettingsPath,
+      status: 200,
+      response: { id: appId, public_settings: "public_without_login" },
+    });
 
     const settings = await base44.app.getPublicSettings();
 
@@ -30,31 +31,32 @@ describe("App module", () => {
       id: appId,
       public_settings: "public_without_login",
     });
-    expect(scope.isDone()).toBe(true);
   });
 
   test("getPublicSettings authenticates with the client's token, so callers never handle it", async () => {
-    scope
-      .get(publicSettingsPath)
-      .matchHeader("Authorization", `Bearer ${token}`)
-      .reply(200, { id: appId, public_settings: "private_with_login" });
+    mockHttp({
+      method: "get",
+      url: serverUrl + publicSettingsPath,
+      headers: [["Authorization", `Bearer ${token}`]],
+      status: 200,
+      response: { id: appId, public_settings: "private_with_login" },
+    });
 
     await base44.app.getPublicSettings();
-
-    expect(scope.isDone()).toBe(true);
   });
 
   test("getPublicSettings sends no Authorization header for an anonymous client", async () => {
     const anonymous = createClient({ serverUrl, appId });
 
-    scope
-      .get(publicSettingsPath)
-      .matchHeader("Authorization", (value) => value === undefined)
-      .reply(200, { id: appId, public_settings: "public_without_login" });
+    mockHttp({
+      method: "get",
+      url: serverUrl + publicSettingsPath,
+      headers: [["Authorization", (value) => value === undefined]],
+      status: 200,
+      response: { id: appId, public_settings: "public_without_login" },
+    });
 
     await anonymous.app.getPublicSettings();
-
-    expect(scope.isDone()).toBe(true);
   });
 
   test.each([
@@ -63,9 +65,12 @@ describe("App module", () => {
   ])(
     "getPublicSettings surfaces a 403 %s as a Base44Error carrying the reason",
     async (reason) => {
-      scope
-        .get(publicSettingsPath)
-        .reply(403, { extra_data: { app_id: appId, reason } });
+      mockHttp({
+        method: "get",
+        url: serverUrl + publicSettingsPath,
+        status: 403,
+        response: { extra_data: { app_id: appId, reason } },
+      });
 
       const error = await base44.app
         .getPublicSettings()
@@ -74,6 +79,6 @@ describe("App module", () => {
       expect(error).toBeInstanceOf(Base44Error);
       expect(error.status).toBe(403);
       expect(error.data.extra_data.reason).toBe(reason);
-    }
+    },
   );
 });

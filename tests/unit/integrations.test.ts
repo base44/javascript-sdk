@@ -1,75 +1,84 @@
-import { describe, test, expect, beforeEach, afterEach } from 'vitest';
-import nock from 'nock';
-import { createClient } from '../../src/index.ts';
+import { mockHttp } from "../mocks/http";
+import { describe, test, expect, beforeEach, afterEach } from "vitest";
+import { createClient } from "../../src/index.ts";
 
-describe('Core Integrations - InvokeLLM', () => {
+describe("Core Integrations - InvokeLLM", () => {
   let base44: ReturnType<typeof createClient>;
-  let scope: nock.Scope;
-  const appId = 'test-app-id';
-  const serverUrl = 'https://base44.app';
+  const appId = "test-app-id";
+  const serverUrl = "https://base44.app";
 
   beforeEach(() => {
     base44 = createClient({
       serverUrl,
       appId,
     });
-
-    scope = nock(serverUrl);
   });
 
   afterEach(() => {
-    nock.cleanAll();
+    base44.cleanup();
   });
 
-  test('InvokeLLM should pass model parameter to the API', async () => {
+  test("InvokeLLM should pass model parameter to the API", async () => {
     const params = {
-      prompt: 'Explain quantum computing',
-      model: 'gpt_5',
+      prompt: "Explain quantum computing",
+      model: "gpt_5",
     };
 
-    scope
-      .post(`/api/apps/${appId}/integration-endpoints/Core/InvokeLLM`, params)
-      .reply(200, 'Quantum computing uses qubits...');
+    mockHttp({
+      method: "post",
+      url:
+        serverUrl + `/api/apps/${appId}/integration-endpoints/Core/InvokeLLM`,
+      body: params,
+      status: 200,
+      response: "Quantum computing uses qubits...",
+    });
 
     const result = await base44.integrations.Core.InvokeLLM(params);
-    expect(result).toBe('Quantum computing uses qubits...');
-    expect(scope.isDone()).toBe(true);
+    expect(result).toBe("Quantum computing uses qubits...");
   });
 
-  test('InvokeLLM should work without model parameter', async () => {
+  test("InvokeLLM should work without model parameter", async () => {
     const params = {
-      prompt: 'Explain quantum computing',
+      prompt: "Explain quantum computing",
     };
 
-    scope
-      .post(`/api/apps/${appId}/integration-endpoints/Core/InvokeLLM`, params)
-      .reply(200, 'Quantum computing uses qubits...');
+    mockHttp({
+      method: "post",
+      url:
+        serverUrl + `/api/apps/${appId}/integration-endpoints/Core/InvokeLLM`,
+      body: params,
+      status: 200,
+      response: "Quantum computing uses qubits...",
+    });
 
     const result = await base44.integrations.Core.InvokeLLM(params);
-    expect(result).toBe('Quantum computing uses qubits...');
-    expect(scope.isDone()).toBe(true);
+    expect(result).toBe("Quantum computing uses qubits...");
   });
 
-  test('InvokeLLM should pass model alongside other optional parameters', async () => {
+  test("InvokeLLM should pass model alongside other optional parameters", async () => {
     const params = {
-      prompt: 'Analyze this text',
-      model: 'claude_sonnet_4_6' as const,
+      prompt: "Analyze this text",
+      model: "claude_sonnet_4_6" as const,
       response_json_schema: {
-        type: 'object',
+        type: "object",
         properties: {
-          sentiment: { type: 'string' },
+          sentiment: { type: "string" },
         },
       },
     };
 
-    const mockResponse = { sentiment: 'positive' };
+    const mockResponse = { sentiment: "positive" };
 
-    scope
-      .post(`/api/apps/${appId}/integration-endpoints/Core/InvokeLLM`, params)
-      .reply(200, mockResponse);
+    mockHttp({
+      method: "post",
+      url:
+        serverUrl + `/api/apps/${appId}/integration-endpoints/Core/InvokeLLM`,
+      body: params,
+      status: 200,
+      response: mockResponse,
+    });
 
     const result = await base44.integrations.Core.InvokeLLM(params);
     expect(result).toEqual(mockResponse);
-    expect(scope.isDone()).toBe(true);
   });
 });

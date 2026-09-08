@@ -8,7 +8,8 @@ import {
 import { getSharedInstance } from "../../src/utils/sharedInstance.ts";
 import { resetAnalyticsSessionContext } from "../../src/modules/analytics.ts";
 import { InternalAuthModule, User } from "../../src/modules/auth.types.ts";
-import { AxiosInstance } from "axios";
+import { http, HttpResponse } from "msw";
+import { server } from "../mocks/server";
 
 describe("Analytics Module", () => {
   let base44: ReturnType<typeof createClient>;
@@ -22,22 +23,10 @@ describe("Analytics Module", () => {
   const serverUrl = "https://api.base44.com";
 
   beforeEach(() => {
-    vi.mock("../../src/utils/axios-client.ts", () => ({
-      createAxiosClient: vi.fn().mockImplementation(
-        () =>
-          ({
-            // `setToken` and `logout` write through to these, so the mock needs
-            // them present per instance.
-            defaults: { headers: { common: {} as Record<string, string> } },
-            request: vi.fn().mockResolvedValue({
-              status: 200,
-              data: {
-                message: "success",
-              },
-            }),
-          } as unknown as AxiosInstance)
-      ),
-    }));
+    server.use(
+      http.post(`${serverUrl}/api/apps/${appId}/analytics/track/batch`, () => HttpResponse.json({message: "success"})),
+      http.get(`${serverUrl}/api/apps/${appId}/entities/User/me`, () => HttpResponse.json({id: "test-user-id"})),
+    );
     sharedState = getSharedInstance("analytics", () => ({
       requestsQueue: [],
       isProcessing: false,
@@ -66,9 +55,16 @@ describe("Analytics Module", () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Let real intercepted requests and the processor finish before resetting shared state.
+    await vi.waitFor(() => expect(sharedState?.isProcessing).toBe(false), {timeout: 5000});
+    vi.useRealTimers();
+    vi.restoreAllMocks();
     vi.clearAllMocks();
     base44.cleanup();
+    // cleanup flips the shared flag but does not cancel a processor throttle timer.
+    // Drain that existing timer before another test starts a new processor.
+    await new Promise((resolve) => setTimeout(resolve, 1100));
     vi.unstubAllGlobals();
     sharedState = null;
   });
@@ -218,7 +214,6 @@ describe("Analytics Module", () => {
   });
 
   test("should track multiple events", async () => {
-    vi.useFakeTimers();
 
     for (let i = 0; i < 5; i++) {
       base44.analytics.track({ eventName: `test-event ${i}` });
@@ -226,16 +221,12 @@ describe("Analytics Module", () => {
 
     expect(sharedState?.isProcessing).toBe(true);
     expect(sharedState?.requestsQueue.length).toBe(4);
-    await vi.advanceTimersByTimeAsync(1000);
-    expect(sharedState?.requestsQueue.length).toBe(2);
+    await vi.waitFor(() => expect(sharedState?.requestsQueue.length).toBe(2), {timeout: 2500});
     // add another event while processing to mix things up
     base44.analytics.track({ eventName: `test-event 5` });
 
-    await vi.advanceTimersByTimeAsync(1000);
-    expect(sharedState?.requestsQueue.length).toBe(1);
-    await vi.advanceTimersByTimeAsync(1000);
-    expect(sharedState?.requestsQueue.length).toBe(0);
-    await vi.advanceTimersByTimeAsync(1000);
-    expect(sharedState?.isProcessing).toBe(false);
+    await vi.waitFor(() => expect(sharedState?.requestsQueue.length).toBe(1), {timeout: 2500});
+    await vi.waitFor(() => expect(sharedState?.requestsQueue.length).toBe(0), {timeout: 2500});
+    await vi.waitFor(() => expect(sharedState?.isProcessing).toBe(false), {timeout: 2500});
   });
 });

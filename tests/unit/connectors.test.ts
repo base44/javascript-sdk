@@ -1,5 +1,7 @@
+import { mockHttp } from "../mocks/http";
 import { describe, test, expect, beforeEach, afterEach } from "vitest";
-import nock from "nock";
+import { http, HttpResponse } from "msw";
+import { server } from "../mocks/server";
 import { createClient } from "../../src/index.ts";
 import type { AppUserConnectorConnectionResponse } from "../../src/modules/connectors.types.ts";
 
@@ -8,94 +10,79 @@ describe("Connectors module – getConnection", () => {
   const serverUrl = "https://base44.app";
   const serviceToken = "service-token-123";
   let base44: ReturnType<typeof createClient>;
-  let scope: nock.Scope;
+  const tokensBase = `${serverUrl}/api/apps/${appId}/external-auth/tokens`;
 
   beforeEach(() => {
-    base44 = createClient({
-      serverUrl,
-      appId,
-      serviceToken,
-    });
-    scope = nock(serverUrl);
+    base44 = createClient({ serverUrl, appId, serviceToken });
   });
 
   afterEach(() => {
-    nock.cleanAll();
+    base44.cleanup();
   });
 
   test("extracts accessToken and connectionConfig from API response", async () => {
-    const apiResponse = {
-      access_token: "oauth-token-abc123",
-      integration_type: "jira",
-      connection_config: { subdomain: "my-company" },
-    };
-
-    scope
-      .get(`/api/apps/${appId}/external-auth/tokens/jira`)
-      .reply(200, apiResponse);
-
-    const connection = await base44.asServiceRole.connectors.getConnection(
-      "jira"
+    server.use(
+      http.get(`${tokensBase}/jira`, () =>
+        HttpResponse.json({
+          access_token: "oauth-token-abc123",
+          integration_type: "jira",
+          connection_config: { subdomain: "my-company" },
+        }),
+      ),
     );
+
+    const connection =
+      await base44.asServiceRole.connectors.getConnection("jira");
 
     expect(connection).toBeDefined();
     expect(connection.accessToken).toBe("oauth-token-abc123");
-    expect(connection.connectionConfig).toEqual({
-      subdomain: "my-company",
-    });
-    expect(scope.isDone()).toBe(true);
+    expect(connection.connectionConfig).toEqual({ subdomain: "my-company" });
   });
 
   test("returns connectionConfig as null when API omits connection_config", async () => {
-    const apiResponse = {
-      access_token: "token-only",
-      integration_type: "slack",
-    };
-
-    scope
-      .get(`/api/apps/${appId}/external-auth/tokens/slack`)
-      .reply(200, apiResponse);
-
-    const connection = await base44.asServiceRole.connectors.getConnection(
-      "slack"
+    server.use(
+      http.get(`${tokensBase}/slack`, () =>
+        HttpResponse.json({
+          access_token: "token-only",
+          integration_type: "slack",
+        }),
+      ),
     );
+
+    const connection =
+      await base44.asServiceRole.connectors.getConnection("slack");
 
     expect(connection.accessToken).toBe("token-only");
     expect(connection.connectionConfig).toBeNull();
-    expect(scope.isDone()).toBe(true);
   });
 
   test("returns connectionConfig as null when API sends null connection_config", async () => {
-    const apiResponse = {
-      access_token: "token-only",
-      integration_type: "github",
-      connection_config: null,
-    };
-
-    scope
-      .get(`/api/apps/${appId}/external-auth/tokens/github`)
-      .reply(200, apiResponse);
-
-    const connection = await base44.asServiceRole.connectors.getConnection(
-      "github"
+    server.use(
+      http.get(`${tokensBase}/github`, () =>
+        HttpResponse.json({
+          access_token: "token-only",
+          integration_type: "github",
+          connection_config: null,
+        }),
+      ),
     );
+
+    const connection =
+      await base44.asServiceRole.connectors.getConnection("github");
 
     expect(connection.accessToken).toBe("token-only");
     expect(connection.connectionConfig).toBeNull();
-    expect(scope.isDone()).toBe(true);
   });
 
   test("throws when integrationType is empty string", async () => {
     await expect(
-      base44.asServiceRole.connectors.getConnection("")
+      base44.asServiceRole.connectors.getConnection(""),
     ).rejects.toThrow("Integration type is required and must be a string");
   });
 
   test("throws when integrationType is not a string", async () => {
     await expect(
-      base44.asServiceRole.connectors.getConnection(
-        null as unknown as string
-      )
+      base44.asServiceRole.connectors.getConnection(null as unknown as string),
     ).rejects.toThrow("Integration type is required and must be a string");
   });
 });
@@ -105,7 +92,6 @@ describe("Connectors module – getWorkspaceConnection", () => {
   const serverUrl = "https://base44.app";
   const serviceToken = "service-token-123";
   let base44: ReturnType<typeof createClient>;
-  let scope: nock.Scope;
 
   beforeEach(() => {
     base44 = createClient({
@@ -113,11 +99,10 @@ describe("Connectors module – getWorkspaceConnection", () => {
       appId,
       serviceToken,
     });
-    scope = nock(serverUrl);
   });
 
   afterEach(() => {
-    nock.cleanAll();
+    base44.cleanup();
   });
 
   test("extracts accessToken and connectionConfig from connectors endpoint", async () => {
@@ -127,20 +112,24 @@ describe("Connectors module – getWorkspaceConnection", () => {
       connection_config: { subdomain: "xy12345.us-east-1" },
     };
 
-    scope
-      .get(`/api/apps/${appId}/external-auth/tokens/connectors/connector-abc`)
-      .reply(200, apiResponse);
+    mockHttp({
+      method: "get",
+      url:
+        serverUrl +
+        `/api/apps/${appId}/external-auth/tokens/connectors/connector-abc`,
+      status: 200,
+      response: apiResponse,
+    });
 
     const connection =
       await base44.asServiceRole.connectors.getWorkspaceConnection(
-        "connector-abc"
+        "connector-abc",
       );
 
     expect(connection.accessToken).toBe("builder-oauth-token-xyz789");
     expect(connection.connectionConfig).toEqual({
       subdomain: "xy12345.us-east-1",
     });
-    expect(scope.isDone()).toBe(true);
   });
 
   test("returns connectionConfig as null when API omits connection_config", async () => {
@@ -149,29 +138,32 @@ describe("Connectors module – getWorkspaceConnection", () => {
       integration_type: "databricks",
     };
 
-    scope
-      .get(`/api/apps/${appId}/external-auth/tokens/connectors/conn-2`)
-      .reply(200, apiResponse);
+    mockHttp({
+      method: "get",
+      url:
+        serverUrl + `/api/apps/${appId}/external-auth/tokens/connectors/conn-2`,
+      status: 200,
+      response: apiResponse,
+    });
 
     const connection =
       await base44.asServiceRole.connectors.getWorkspaceConnection("conn-2");
 
     expect(connection.accessToken).toBe("token-only");
     expect(connection.connectionConfig).toBeNull();
-    expect(scope.isDone()).toBe(true);
   });
 
   test("throws when connectorId is empty string", async () => {
     await expect(
-      base44.asServiceRole.connectors.getWorkspaceConnection("")
+      base44.asServiceRole.connectors.getWorkspaceConnection(""),
     ).rejects.toThrow("Connector ID is required and must be a string");
   });
 
   test("throws when connectorId is not a string", async () => {
     await expect(
       base44.asServiceRole.connectors.getWorkspaceConnection(
-        null as unknown as string
-      )
+        null as unknown as string,
+      ),
     ).rejects.toThrow("Connector ID is required and must be a string");
   });
 });
@@ -181,7 +173,6 @@ describe("Connectors module – getCurrentAppUserConnection", () => {
   const serverUrl = "https://base44.app";
   const serviceToken = "service-token-123";
   let base44: ReturnType<typeof createClient>;
-  let scope: nock.Scope;
 
   beforeEach(() => {
     base44 = createClient({
@@ -189,11 +180,10 @@ describe("Connectors module – getCurrentAppUserConnection", () => {
       appId,
       serviceToken,
     });
-    scope = nock(serverUrl);
   });
 
   afterEach(() => {
-    nock.cleanAll();
+    base44.cleanup();
   });
 
   test("extracts accessToken and connectionConfig from API response", async () => {
@@ -203,13 +193,18 @@ describe("Connectors module – getCurrentAppUserConnection", () => {
       connection_config: { subdomain: "my-company" },
     };
 
-    scope
-      .get(`/api/apps/${appId}/app-user-auth/connectors/connector-1/token`)
-      .reply(200, apiResponse);
+    mockHttp({
+      method: "get",
+      url:
+        serverUrl +
+        `/api/apps/${appId}/app-user-auth/connectors/connector-1/token`,
+      status: 200,
+      response: apiResponse,
+    });
 
     const connection: AppUserConnectorConnectionResponse =
       await base44.asServiceRole.connectors.getCurrentAppUserConnection(
-        "connector-1"
+        "connector-1",
       );
 
     expect(connection).toBeDefined();
@@ -217,7 +212,6 @@ describe("Connectors module – getCurrentAppUserConnection", () => {
     expect(connection.connectionConfig).toEqual({
       subdomain: "my-company",
     });
-    expect(scope.isDone()).toBe(true);
   });
 
   test("returns connectionConfig as null when API omits connection_config", async () => {
@@ -226,18 +220,22 @@ describe("Connectors module – getCurrentAppUserConnection", () => {
       integration_type: "slack",
     };
 
-    scope
-      .get(`/api/apps/${appId}/app-user-auth/connectors/connector-2/token`)
-      .reply(200, apiResponse);
+    mockHttp({
+      method: "get",
+      url:
+        serverUrl +
+        `/api/apps/${appId}/app-user-auth/connectors/connector-2/token`,
+      status: 200,
+      response: apiResponse,
+    });
 
     const connection: AppUserConnectorConnectionResponse =
       await base44.asServiceRole.connectors.getCurrentAppUserConnection(
-        "connector-2"
+        "connector-2",
       );
 
     expect(connection.accessToken).toBe("user-token-only");
     expect(connection.connectionConfig).toBeNull();
-    expect(scope.isDone()).toBe(true);
   });
 
   test("returns connectionConfig as null when API sends null connection_config", async () => {
@@ -247,31 +245,35 @@ describe("Connectors module – getCurrentAppUserConnection", () => {
       connection_config: null,
     };
 
-    scope
-      .get(`/api/apps/${appId}/app-user-auth/connectors/connector-3/token`)
-      .reply(200, apiResponse);
+    mockHttp({
+      method: "get",
+      url:
+        serverUrl +
+        `/api/apps/${appId}/app-user-auth/connectors/connector-3/token`,
+      status: 200,
+      response: apiResponse,
+    });
 
     const connection: AppUserConnectorConnectionResponse =
       await base44.asServiceRole.connectors.getCurrentAppUserConnection(
-        "connector-3"
+        "connector-3",
       );
 
     expect(connection.accessToken).toBe("user-token-only");
     expect(connection.connectionConfig).toBeNull();
-    expect(scope.isDone()).toBe(true);
   });
 
   test("throws when connectorId is empty string", async () => {
     await expect(
-      base44.asServiceRole.connectors.getCurrentAppUserConnection("")
+      base44.asServiceRole.connectors.getCurrentAppUserConnection(""),
     ).rejects.toThrow("Connector ID is required and must be a string");
   });
 
   test("throws when connectorId is not a string", async () => {
     await expect(
       base44.asServiceRole.connectors.getCurrentAppUserConnection(
-        null as unknown as string
-      )
+        null as unknown as string,
+      ),
     ).rejects.toThrow("Connector ID is required and must be a string");
   });
 });

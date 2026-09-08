@@ -1,28 +1,35 @@
-// Load environment variables from .env file
-import dotenv from 'dotenv';
-import './utils/circular-json-handler.js';
-import { beforeAll, afterAll, test } from 'vitest';
+import { beforeAll, afterAll, afterEach, expect } from "vitest";
+import { server } from "./mocks/server.ts";
+import { verifyHttpExpectations } from "./mocks/http.ts";
 
-try {
-  dotenv.config({ path: './tests/.env' });
-} catch (err) {
-  console.warn('dotenv package not found or .env file missing, skipping environment loading');
-}
-
-// Load circular JSON reference handler to prevent errors in Jest
-try {
-  console.log('Loaded circular JSON reference handler');
-} catch (err) {
-  console.warn('Failed to load circular JSON handler:', err.message);
-}
-
-// Global beforeAll and afterAll hooks
+const unexpected = [];
 beforeAll(() => {
-  console.log('Starting Base44 SDK tests...');
-  // Add any global setup here
+  server.listen({
+    onUnhandledRequest(request, print) {
+      unexpected.push(`${request.method} ${request.url}`);
+      print.error(); // Never allow a unit test to reach the real network.
+    },
+  });
 });
-
-afterAll(() => {
-  console.log('Completed Base44 SDK tests');
-  // Add any global teardown here
-}); 
+afterEach(() => {
+  const failures = [];
+  try {
+    // A method swallowing network errors must still fail on unexpected traffic.
+    try {
+      expect(unexpected.splice(0), "Unhandled HTTP requests").toEqual([]);
+    } catch (error) {
+      failures.push(error);
+    }
+    // This also drains expectations when the unexpected-request check failed.
+    try {
+      verifyHttpExpectations();
+    } catch (error) {
+      failures.push(error);
+    }
+  } finally {
+    server.resetHandlers();
+  }
+  if (failures.length)
+    throw new AggregateError(failures, "HTTP mock contract failed");
+});
+afterAll(() => server.close());
