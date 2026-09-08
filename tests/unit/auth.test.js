@@ -1,7 +1,7 @@
-import { mockHttp } from "../mocks/http";
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import { createClient as newClient } from "../../src/index.ts";
 import { getSharedInstance } from "../../src/utils/sharedInstance.ts";
+import { platform } from "../mocks/platform";
 
 const clients = [];
 const createClient = (...args) => {
@@ -17,6 +17,7 @@ describe("Auth Module", () => {
   const appBaseUrl = "https://api.base44.com";
 
   beforeEach(() => {
+    platform.reset();
     // Mock window.addEventListener and document for analytics module
     if (typeof window !== "undefined") {
       if (!window.addEventListener) {
@@ -56,13 +57,7 @@ describe("Auth Module", () => {
         role: "user",
       };
 
-      // Mock the API response
-      mockHttp({
-        method: "get",
-        url: serverUrl + `/api/apps/${appId}/entities/User/me`,
-        status: 200,
-        response: mockUser,
-      });
+      platform.given.auth.user(mockUser);
 
       // Call the API
       const result = await base44.auth.me();
@@ -73,29 +68,17 @@ describe("Auth Module", () => {
       expect(result.email).toBe("test@example.com");
     });
 
-    test("should handle authentication errors", async () => {
-      // Mock the API error response
-      mockHttp({
-        method: "get",
-        url: serverUrl + `/api/apps/${appId}/entities/User/me`,
-        status: 401,
-        response: { detail: "Unauthorized" },
-      });
+    test("preserves authentication error status", async () => {
+      platform.given.faults.auth.unauthorizedMe();
 
       // Call the API and expect an error
-      await expect(base44.auth.me()).rejects.toThrow();
+      await expect(base44.auth.me()).rejects.toMatchObject({ status: 401 });
     });
 
     test("shares one in-flight request between concurrent callers", async () => {
       const mockUser = { id: "user-123", email: "test@example.com" };
 
-      // A single interceptor: a second GET would hit disableNetConnect and throw.
-      mockHttp({
-        method: "get",
-        url: serverUrl + `/api/apps/${appId}/entities/User/me`,
-        status: 200,
-        response: mockUser,
-      });
+      platform.given.auth.user(mockUser);
 
       const [first, second] = await Promise.all([
         base44.auth.me(),
@@ -104,21 +87,14 @@ describe("Auth Module", () => {
 
       expect(first).toEqual(mockUser);
       expect(second).toEqual(mockUser);
+      expect(platform.requests.count("auth.me")).toBe(1);
     });
 
     test("does not reuse a resolved user across separate calls", async () => {
-      mockHttp({
-        method: "get",
-        url: serverUrl + `/api/apps/${appId}/entities/User/me`,
-        status: 200,
-        response: { id: "user-1" },
-      });
-      mockHttp({
-        method: "get",
-        url: serverUrl + `/api/apps/${appId}/entities/User/me`,
-        status: 200,
-        response: { id: "user-2" },
-      });
+      platform.given.auth.meSequence([
+        { user: { id: "user-1" } },
+        { user: { id: "user-2" } },
+      ]);
 
       const first = await base44.auth.me();
       const second = await base44.auth.me();
@@ -130,37 +106,23 @@ describe("Auth Module", () => {
 
     test("does not retain a rejected request", async () => {
       const mockUser = { id: "user-123" };
-      mockHttp({
-        method: "get",
-        url: serverUrl + `/api/apps/${appId}/entities/User/me`,
-        status: 401,
-        response: { detail: "Unauthorized" },
-      });
-      mockHttp({
-        method: "get",
-        url: serverUrl + `/api/apps/${appId}/entities/User/me`,
-        status: 200,
-        response: mockUser,
-      });
+      platform.given.auth.meSequence([
+        { unauthorized: true },
+        { user: mockUser },
+      ]);
 
       await expect(base44.auth.me()).rejects.toThrow();
       await expect(base44.auth.me()).resolves.toEqual(mockUser);
     });
 
     test("setToken() drops an in-flight request from the previous identity", async () => {
-      mockHttp({
-        method: "get",
-        url: serverUrl + `/api/apps/${appId}/entities/User/me`,
-        delayMs: 50,
-        status: 200,
-        response: { id: "anonymous" },
-      });
-      mockHttp({
-        method: "get",
-        url: serverUrl + `/api/apps/${appId}/entities/User/me`,
-        status: 200,
-        response: { id: "logged-in" },
-      });
+      platform.given.auth.meSequence(
+        [
+          { user: { id: "anonymous" } },
+          { user: { id: "logged-in" } },
+        ],
+        50,
+      );
 
       const beforeLogin = base44.auth.me();
       base44.auth.setToken("new-access-token", false);
@@ -173,23 +135,13 @@ describe("Auth Module", () => {
     });
 
     test("a superseded request does not retire the current one", async () => {
-      mockHttp({
-        method: "get",
-        url: serverUrl + `/api/apps/${appId}/entities/User/me`,
-        delayMs: 50,
-        status: 200,
-        response: { id: "anonymous" },
-      });
-      // One interceptor for the post-login identity: if the settling anonymous
-      // request retires it, the third caller issues a second GET and this test
-      // hits disableNetConnect.
-      mockHttp({
-        method: "get",
-        url: serverUrl + `/api/apps/${appId}/entities/User/me`,
-        delayMs: 50,
-        status: 200,
-        response: { id: "logged-in" },
-      });
+      platform.given.auth.meSequence(
+        [
+          { user: { id: "anonymous" } },
+          { user: { id: "logged-in" } },
+        ],
+        50,
+      );
 
       const beforeLogin = base44.auth.me();
       base44.auth.setToken("new-access-token", false);
@@ -202,6 +154,7 @@ describe("Auth Module", () => {
 
       expect(await afterLogin).toEqual({ id: "logged-in" });
       expect(await joined).toEqual({ id: "logged-in" });
+      expect(platform.requests.count("auth.me")).toBe(2);
     });
 
     test("setToken() clears the analytics session context", () => {
@@ -230,13 +183,11 @@ describe("Auth Module", () => {
         role: "user",
       };
 
-      // Mock the API response
-      mockHttp({
-        method: "put",
-        url: serverUrl + `/api/apps/${appId}/entities/User/me`,
-        body: updateData,
-        status: 200,
-        response: updatedUser,
+      platform.given.auth.user({
+        id: "user-123",
+        name: "Original Name",
+        email: "original@example.com",
+        role: "user",
       });
 
       // Call the API
@@ -246,6 +197,7 @@ describe("Auth Module", () => {
       expect(result).toEqual(updatedUser);
       expect(result.name).toBe("Updated Name");
       expect(result.email).toBe("updated@example.com");
+      expect(platform.requests.last("auth.updateMe").body).toEqual(updateData);
     });
 
     test("should handle validation errors", async () => {
@@ -253,17 +205,15 @@ describe("Auth Module", () => {
         email: "invalid-email",
       };
 
-      // Mock the API error response
-      mockHttp({
-        method: "put",
-        url: serverUrl + `/api/apps/${appId}/entities/User/me`,
-        body: invalidData,
-        status: 400,
-        response: { detail: "Invalid email format" },
-      });
+      platform.given.auth.user({ id: "user-123", email: "valid@example.com" });
+      platform.given.faults.auth.rejectedUpdate();
 
       // Call the API and expect an error
-      await expect(base44.auth.updateMe(invalidData)).rejects.toThrow();
+      await expect(base44.auth.updateMe(invalidData)).rejects.toMatchObject({
+        status: 400,
+        message: "Invalid email format",
+      });
+      expect(platform.requests.last("auth.updateMe").body).toEqual(invalidData);
     });
   });
 
@@ -380,32 +330,25 @@ describe("Auth Module", () => {
       // Set a token first
       base44.auth.setToken("test-token", false);
 
-      // Mock the API response for me() call
-      mockHttp({
-        method: "get",
-        url: serverUrl + `/api/apps/${appId}/entities/User/me`,
-        headers: [["Authorization", "Bearer test-token"]],
-        status: 200,
-        response: { id: "user-123", email: "test@example.com" },
+      platform.given.auth.user({
+        id: "user-123",
+        email: "test@example.com",
       });
 
       // Verify token is set by making a request
       await base44.auth.me();
+      expect(platform.requests.last("auth.me").headers.authorization).toBe(
+        "Bearer test-token",
+      );
 
       // Call logout
       base44.auth.logout();
 
-      // Mock another me() call to verify no Authorization header is sent
-      mockHttp({
-        method: "get",
-        url: serverUrl + `/api/apps/${appId}/entities/User/me`,
-        headers: [["Authorization", (val) => !val]],
-        status: 401,
-        response: { detail: "Unauthorized" },
-      });
+      platform.given.faults.auth.unauthorizedMe();
 
       // Verify no Authorization header is sent after logout (should throw 401)
       await expect(base44.auth.me()).rejects.toThrow();
+      expect(platform.requests.last("auth.me").headers.authorization).toBeUndefined();
     });
 
     test("should remove token from localStorage in browser environment", async () => {
@@ -521,17 +464,16 @@ describe("Auth Module", () => {
 
       base44.auth.setToken(token, false);
 
-      // Mock the API response for me() call
-      mockHttp({
-        method: "get",
-        url: serverUrl + `/api/apps/${appId}/entities/User/me`,
-        headers: [["Authorization", `Bearer ${token}`]],
-        status: 200,
-        response: { id: "user-123", email: "test@example.com" },
+      platform.given.auth.user({
+        id: "user-123",
+        email: "test@example.com",
       });
 
       // Verify token is set by making a request
       await base44.auth.me();
+      expect(platform.requests.last("auth.me").headers.authorization).toBe(
+        `Bearer ${token}`,
+      );
     });
 
     test("should save token to localStorage when requested", () => {
@@ -586,17 +528,11 @@ describe("Auth Module", () => {
     test("should handle empty token gracefully", async () => {
       base44.auth.setToken("", false);
 
-      // Mock the API response for me() call
-      mockHttp({
-        method: "get",
-        url: serverUrl + `/api/apps/${appId}/entities/User/me`,
-        headers: [["Authorization", (val) => !val]],
-        status: 401,
-        response: { detail: "Unauthorized" },
-      });
+      platform.given.faults.auth.unauthorizedMe();
 
       // Verify no Authorization header is sent (should throw 401)
       await expect(base44.auth.me()).rejects.toThrow();
+      expect(platform.requests.last("auth.me").headers.authorization).toBeUndefined();
     });
 
     test("should handle localStorage errors gracefully", () => {
@@ -645,13 +581,11 @@ describe("Auth Module", () => {
         },
       };
 
-      // Mock the API response
-      mockHttp({
-        method: "post",
-        url: serverUrl + `/api/apps/${appId}/auth/login`,
-        body: loginData,
-        status: 200,
-        response: mockResponse,
+      platform.given.auth.login({
+        email: loginData.email,
+        password: loginData.password,
+        accessToken: mockResponse.access_token,
+        user: mockResponse.user,
       });
 
       // Call the API
@@ -663,17 +597,13 @@ describe("Auth Module", () => {
       // Verify the response
       expect(result.access_token).toBe("test-access-token");
       expect(result.user.email).toBe("test@example.com");
+      expect(platform.requests.last("auth.login").body).toEqual(loginData);
 
       // Verify token was set in axios headers by making a subsequent request
-      mockHttp({
-        method: "get",
-        url: serverUrl + `/api/apps/${appId}/entities/User/me`,
-        headers: [["Authorization", "Bearer test-access-token"]],
-        status: 200,
-        response: { id: "user-123", email: "test@example.com" },
-      });
-
       await base44.auth.me();
+      expect(platform.requests.last("auth.me").headers.authorization).toBe(
+        "Bearer test-access-token",
+      );
     });
 
     test("should login with turnstile token when provided", async () => {
@@ -691,13 +621,11 @@ describe("Auth Module", () => {
         },
       };
 
-      // Mock the API response
-      mockHttp({
-        method: "post",
-        url: serverUrl + `/api/apps/${appId}/auth/login`,
-        body: loginData,
-        status: 200,
-        response: mockResponse,
+      platform.given.auth.login({
+        email: loginData.email,
+        password: loginData.password,
+        accessToken: mockResponse.access_token,
+        user: mockResponse.user,
       });
 
       // Call the API
@@ -709,33 +637,22 @@ describe("Auth Module", () => {
 
       // Verify the response
       expect(result.access_token).toBe("test-access-token");
+      expect(platform.requests.last("auth.login").body).toEqual(loginData);
 
       // Verify token was set in axios headers by making a subsequent request
-      mockHttp({
-        method: "get",
-        url: serverUrl + `/api/apps/${appId}/entities/User/me`,
-        headers: [["Authorization", "Bearer test-access-token"]],
-        status: 200,
-        response: { id: "user-123", email: "test@example.com" },
-      });
-
       await base44.auth.me();
+      expect(platform.requests.last("auth.me").headers.authorization).toBe(
+        "Bearer test-access-token",
+      );
     });
 
-    test("should handle authentication errors and logout", async () => {
+    test("preserves the platform invalid-credentials response", async () => {
       const loginData = {
         email: "test@example.com",
         password: "wrongpassword",
       };
 
-      // Mock the API error response
-      mockHttp({
-        method: "post",
-        url: serverUrl + `/api/apps/${appId}/auth/login`,
-        body: loginData,
-        status: 401,
-        response: { detail: "Invalid credentials" },
-      });
+      platform.given.faults.auth.invalidCredentials(loginData.email);
 
       // Set a token first to test logout
       base44.auth.setToken("existing-token", false);
@@ -743,7 +660,11 @@ describe("Auth Module", () => {
       // Call the API and expect an error
       await expect(
         base44.auth.loginViaEmailPassword(loginData.email, loginData.password),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({
+        status: 400,
+        message: "Invalid credentials",
+      });
+      expect(platform.requests.last("auth.login").body).toEqual(loginData);
     });
 
     test("should handle network errors", async () => {
@@ -752,18 +673,13 @@ describe("Auth Module", () => {
         password: "password123",
       };
 
-      // Mock network error
-      mockHttp({
-        method: "post",
-        url: serverUrl + `/api/apps/${appId}/auth/login`,
-        body: loginData,
-        networkError: true,
-      });
+      platform.given.faults.auth.networkUnavailableLogin(loginData.email);
 
       // Call the API and expect an error
       await expect(
         base44.auth.loginViaEmailPassword(loginData.email, loginData.password),
       ).rejects.toThrow();
+      expect(platform.requests.last("auth.login").body).toEqual(loginData);
     });
   });
 
@@ -774,13 +690,7 @@ describe("Auth Module", () => {
         email: "test@example.com",
       };
 
-      // Mock the API response
-      mockHttp({
-        method: "get",
-        url: serverUrl + `/api/apps/${appId}/entities/User/me`,
-        status: 200,
-        response: mockUser,
-      });
+      platform.given.auth.user(mockUser);
 
       // Call the API
       const result = await base44.auth.isAuthenticated();
@@ -790,13 +700,7 @@ describe("Auth Module", () => {
     });
 
     test("should return false when token is invalid", async () => {
-      // Mock the API error response
-      mockHttp({
-        method: "get",
-        url: serverUrl + `/api/apps/${appId}/entities/User/me`,
-        status: 401,
-        response: { detail: "Unauthorized" },
-      });
+      platform.given.faults.auth.unauthorizedMe();
 
       // Call the API
       const result = await base44.auth.isAuthenticated();
@@ -806,12 +710,7 @@ describe("Auth Module", () => {
     });
 
     test("should return false on network errors", async () => {
-      // Mock network error
-      mockHttp({
-        method: "get",
-        url: serverUrl + `/api/apps/${appId}/entities/User/me`,
-        networkError: true,
-      });
+      platform.given.faults.auth.networkUnavailableMe();
 
       // Call the API
       const result = await base44.auth.isAuthenticated();

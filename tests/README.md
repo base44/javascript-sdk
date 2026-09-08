@@ -1,58 +1,56 @@
 # SDK HTTP tests
 
-`npm test` runs TypeScript API tests and the hermetic unit suite. `npm run test:coverage` reports unit coverage. Tests exercise the actual SDK HTTP clients through MSW v2; no API credentials or `tests/.env` are loaded. Unexpected traffic fails the test even when the SDK catches the network error. Never change the unit server to `warn` or `bypass` to make a test pass.
+`npm test` runs the API type tests and hermetic unit suite. HTTP behavior tests call the real SDK Axios/fetch clients through one stateful MSW v2 mock Base44 platform. Tests never register handlers or author HTTP response bodies. Unexpected or unconfigured traffic fails teardown even when the SDK catches the request error.
 
-## Add an HTTP contract
+## Write a platform-backed test
 
-Use `mockHttp` for finite request expectations. It registers native MSW handlers, captures requests, and checks bodies, headers, query parameters and call counts in teardown. This preserves request assertions on error paths: throwing directly in an MSW resolver becomes a 500 response, which an error-handling test may accidentally accept.
+Arrange domain state with `platform.given`, act only through the SDK, then assert the returned behavior and any meaningful wire detail through `platform.requests`:
 
 ```ts
-import { mockHttp } from '../mocks/http';
+import { platform } from "./mocks/platform";
 
-mockHttp({
-  method: 'post',
-  url: 'https://api.base44.com/api/apps/test-app/entities/Todo',
-  body: { title: 'Write a test' },
-  headers: [['authorization', 'Bearer test-token']],
-  status: 201,
-  response: { id: 'todo-1', title: 'Write a test' },
+platform.given.entities.records("Todo", [
+  { id: "1", title: "Existing", completed: false },
+]);
+
+const created = await client.entities.Todo.create({
+  title: "Write a test",
+  completed: false,
 });
-const todo = await client.entities.Todo.create({ title: 'Write a test' });
-expect(todo.id).toBe('todo-1');
+
+expect(await client.entities.Todo.get(created.id)).toEqual(created);
+expect(await client.entities.Todo.list()).toContainEqual(created);
+expect(platform.requests.last("entities.create").body).toEqual({
+  title: "Write a test",
+  completed: false,
+});
 ```
 
-Each expectation defaults to one call; set `times` for repeated requests. Register the same method/URL several times for ordered responses. URL matching is exact, including escaped operation IDs; query checks are explicit. `networkError: true` simulates a transport failure; `delayMs` tests concurrent request behavior.
+Use named fault fixtures such as `platform.given.faults.functions.notFound("missing")` for error cases. Common domain results belong in reusable fixtures; unique function or integration results may be supplied as domain outcomes, but tests must not choose HTTP statuses, headers, wire envelopes, or MSW resolvers.
 
-For multipart or binary payloads, use `inspect: async (request) => { ... }`. Parse `await request.formData()`, then assert field values, repeated keys, file names/MIME types and file bytes. These assertions are captured and rethrown in teardown, independently of the HTTP response. `body` predicates can capture JSON requests for assertions in the test. `mockHttp` is intentionally a small test fixture, not a simulation of backend business logic.
+Global setup resets records, identities, deterministic identifiers, request journals and faults before and after every test. Initial handlers remain installed and `server.resetHandlers()` restores that same centralized set. Do not use concurrent tests against this singleton state.
 
-For streams, dynamic state or other specialized behavior, use MSW directly:
+## Extend the mock platform
 
-```ts
-import { http, HttpResponse } from 'msw';
-import { server } from '../mocks/server';
+1. Confirm the SDK request and the matching backend contract. Record the exact backend revision; distinguish current apper behavior from a deliberate legacy SDK compatibility case.
+2. Add state and a domain-oriented given fixture under `tests/mocks/platform/`.
+3. Add or extend the module handler there. The handler owns status codes, response shapes, validation, mutations and error serialization.
+4. Journal normalized requests with `recordRequest`. Multipart journal entries preserve repeated fields, filenames, MIME types, sizes and bytes.
+5. Add tests that prove behavior across SDK calls (for example create → get/list) and reset isolation. Use journal assertions only for meaningful wire contracts such as auth selection, query encoding or multipart fidelity.
 
-let received: unknown;
-server.use(http.post('https://example.test/api/example', async ({ request }) => {
-  received = await request.json();
-  return HttpResponse.json({ ok: true });
-}));
-await clientOperation();
-expect(received).toEqual({ expected: 'payload' });
-```
-
-Keep assertions outside direct resolvers. Return explicit status codes/error bodies; do not add permissive fallback handlers. Cleanup clients with `client.cleanup()` after each test, and reset any browser globals/timers installed by the test. Global setup always removes per-test handlers and verifies expected/unexpected traffic. Tests using timers must drain pending SDK work before teardown.
+Never import `msw`, `mocks/server`, or the retired `mockHttp` helper from a behavior test. Never assert inside a resolver: MSW turns resolver exceptions into HTTP 500 responses. The architecture guard enforces these boundaries.
 
 ## Coverage locations
 
-- `entities.test.ts`: list/filter/get/create/update/delete/deleteMany/bulkCreate/updateMany, including advanced query syntax.
-- `functions.test.ts`: JSON, multipart objects, caller-supplied FormData (including repeated keys and binary files), raw fetch and user/service-role headers.
-- `auth.test.js`, `auth-registration.test.ts`, `sso.test.ts`: current user, login, concurrent identity transitions, registration, password reset and SSO token transport.
-- `agents.test.ts`, `actors.test.ts`: agent conversations/messages and actor connection-token HTTP contracts. WebSocket constructors remain separate non-HTTP test doubles.
-- `integrations.test.js`, `integrations.test.ts`, `custom-integrations.test.ts`, `connectors*.test.ts`: integration payloads/errors, tokens, scoped connections and metered proxy calls.
-- `fetch-with-auth.test.ts`, `analytics.test.ts`, `app.test.ts`, `client.test.js`: fetch auth/path behavior, analytics traffic, public settings and request-derived headers.
+- `entities.test.ts`: query/list/get and stateful create/update/delete/bulk/update-many behavior.
+- `functions.test.ts`: JSON, multipart objects, direct FormData with repeated keys and binary bytes, raw fetch and user/service-role headers.
+- `auth.test.js`, `auth-registration.test.ts`, `sso.test.ts`: current user, login and identity transitions, registration, recovery and legacy SSO compatibility.
+- `agents.test.ts`, `actors.test.ts`: stateful conversations/messages and actor connection-token HTTP behavior. WebSockets remain a separate non-HTTP double.
+- `integrations*.test.*`, `custom-integrations.test.ts`, `connectors*.test.ts`: domain outcomes, custom upstream envelopes, scoped tokens and proxy calls.
+- `fetch-with-auth.test.ts`, `analytics.test.ts`, `app.test.ts`, `client.test.js`: fetch auth/path behavior, analytics batches, public settings and request-derived headers.
 
-The fixtures are grounded in current SDK wire contracts, not a claim that every real backend route has been independently validated. Live E2E tests remain a separate check.
+The centralized contracts are based on pinned backend source plus explicitly labeled SDK compatibility behavior. They do not prove the currently deployed production version. Live E2E remains separate.
 
 ## Explicit live E2E tests
 
-`BASE44_RUN_E2E=true npm run test:e2e` uses `vitest.e2e.config.ts`, loads `tests/.env`, and bypasses MSW entirely. Supply a dedicated disposable test application via `BASE44_SERVER_URL`, `BASE44_APP_ID`, and `BASE44_AUTH_TOKEN`. These tests can create/delete platform data. They are excluded from `npm test` and unit coverage. Running `npm run test:e2e` without opt-in fails before tests or network calls begin.
+`BASE44_RUN_E2E=true npm run test:e2e` uses `vitest.e2e.config.ts`, loads `tests/.env`, and bypasses MSW. Supply a disposable test app via `BASE44_SERVER_URL`, `BASE44_APP_ID`, and `BASE44_AUTH_TOKEN`. These tests can mutate real data and are excluded from `npm test` and unit coverage. Running without the opt-in fails before network calls begin.

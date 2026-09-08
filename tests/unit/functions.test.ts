@@ -1,7 +1,5 @@
-import { mockHttp } from "../mocks/http";
-import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
-import { http, HttpResponse } from "msw";
-import { server } from "../mocks/server";
+import { describe, test, expect, beforeEach, afterEach } from "vitest";
+import { platform, type MultipartBody } from "../mocks/platform";
 import { createClient } from "../../src/index.ts";
 
 // Module augmentation: register function names in FunctionNameRegistry
@@ -38,17 +36,9 @@ describe("Functions Module", () => {
       priority: "high",
     };
 
-    // Mock the API response
-    mockHttp({
-      method: "post",
-      url: serverUrl + `/api/apps/${appId}/functions/${functionName}`,
-      body: functionData,
-      headers: [["Content-Type", "application/json"]],
-      status: 200,
-      response: {
-        success: true,
-        messageId: "msg-456",
-      },
+    platform.given.functions.result(functionName, {
+      success: true,
+      messageId: "msg-456",
     });
 
     // Call the function
@@ -57,22 +47,17 @@ describe("Functions Module", () => {
     // Verify the response
     expect(result.data.success).toBe(true);
     expect(result.data.messageId).toBe("msg-456");
+    expect(platform.requests.last("functions.invoke").body).toEqual(
+      functionData,
+    );
   });
 
   test("should handle function with empty object parameters", async () => {
     const functionName = "getStatus";
 
-    // Mock the API response
-    mockHttp({
-      method: "post",
-      url: serverUrl + `/api/apps/${appId}/functions/${functionName}`,
-      body: {},
-      headers: [["Content-Type", "application/json"]],
-      status: 200,
-      response: {
-        status: "healthy",
-        timestamp: "2024-01-01T00:00:00Z",
-      },
+    platform.given.functions.result(functionName, {
+      status: "healthy",
+      timestamp: "2024-01-01T00:00:00Z",
     });
 
     // Call the function
@@ -80,6 +65,7 @@ describe("Functions Module", () => {
 
     // Verify the response
     expect(result.data.status).toBe("healthy");
+    expect(platform.requests.last("functions.invoke").body).toEqual({});
   });
 
   test("should handle function with complex nested objects", async () => {
@@ -101,17 +87,9 @@ describe("Functions Module", () => {
       },
     };
 
-    // Mock the API response
-    mockHttp({
-      method: "post",
-      url: serverUrl + `/api/apps/${appId}/functions/${functionName}`,
-      body: functionData,
-      headers: [["Content-Type", "application/json"]],
-      status: 200,
-      response: {
-        processed: true,
-        userId: "123",
-      },
+    platform.given.functions.result(functionName, {
+      processed: true,
+      userId: "123",
     });
 
     // Call the function
@@ -119,6 +97,9 @@ describe("Functions Module", () => {
 
     // Verify the response
     expect(result.data.processed).toBe(true);
+    expect(platform.requests.last("functions.invoke").body).toEqual(
+      functionData,
+    );
   });
 
   test("should handle file uploads with FormData", async () => {
@@ -130,28 +111,10 @@ describe("Functions Module", () => {
       category: "documents",
     };
 
-    // Mock the API response
-    mockHttp({
-      method: "post",
-      url: serverUrl + `/api/apps/${appId}/functions/${functionName}`,
-      headers: [["Content-Type", /^multipart\/form-data/]],
-      inspect: async (request) => {
-        const form = await request.formData();
-        const file = form.get("file") as File;
-        expect(file.name).toBe("test.txt");
-        expect(file.type).toBe("text/plain");
-        expect(await file.text()).toBe("test content");
-      },
-      respond: () => {
-        return [
-          200,
-          {
-            fileId: "file-789",
-            filename: "test.txt",
-            size: 12,
-          },
-        ];
-      },
+    platform.given.functions.result(functionName, {
+      fileId: "file-789",
+      filename: "test.txt",
+      size: 12,
     });
 
     // Call the function
@@ -160,6 +123,17 @@ describe("Functions Module", () => {
     // Verify the response
     expect(result.data.fileId).toBe("file-789");
     expect(result.data.filename).toBe("test.txt");
+    const body = platform.requests.last("functions.invoke")
+      .body as MultipartBody;
+    expect(body.entries).toContainEqual({
+      name: "file",
+      file: {
+        name: "test.txt",
+        type: "text/plain",
+        size: 12,
+        bytes: [...new TextEncoder().encode("test content")],
+      },
+    });
   });
 
   test("should handle mixed data with files and regular data", async () => {
@@ -177,28 +151,10 @@ describe("Functions Module", () => {
       priority: "high",
     };
 
-    // Mock the API response
-    mockHttp({
-      method: "post",
-      url: serverUrl + `/api/apps/${appId}/functions/${functionName}`,
-      headers: [["Content-Type", /^multipart\/form-data/]],
-      inspect: async (request) => {
-        const form = await request.formData();
-        const file = form.get("file") as File;
-        expect(file.name).toBe("document.pdf");
-        expect(file.type).toBe("application/pdf");
-        expect(await file.text()).toBe("document content");
-        expect(JSON.parse(form.get("metadata") as string)).toEqual(
-          functionData.metadata,
-        );
-        expect(form.get("priority")).toBe("high");
-      },
-      status: 200,
-      response: {
-        documentId: "doc-123",
-        processed: true,
-        extractedText: "document content",
-      },
+    platform.given.functions.result(functionName, {
+      documentId: "doc-123",
+      processed: true,
+      extractedText: "document content",
     });
 
     // Call the function
@@ -207,6 +163,23 @@ describe("Functions Module", () => {
     // Verify the response
     expect(result.data.documentId).toBe("doc-123");
     expect(result.data.processed).toBe(true);
+    const body = platform.requests.last("functions.invoke")
+      .body as MultipartBody;
+    expect(body.entries).toEqual(
+      expect.arrayContaining([
+        {
+          name: "file",
+          file: {
+            name: "document.pdf",
+            type: "application/pdf",
+            size: 16,
+            bytes: [...new TextEncoder().encode("document content")],
+          },
+        },
+        { name: "metadata", value: JSON.stringify(functionData.metadata) },
+        { name: "priority", value: "high" },
+      ]),
+    );
   });
 
   test("should handle FormData input directly", async () => {
@@ -216,23 +189,9 @@ describe("Functions Module", () => {
     formData.append("email", "john@example.com");
     formData.append("message", "Hello there");
 
-    // Mock the API response
-    mockHttp({
-      method: "post",
-      url: serverUrl + `/api/apps/${appId}/functions/${functionName}`,
-      headers: [["Content-Type", /^multipart\/form-data/]],
-      inspect: async (request) => {
-        expect(Object.fromEntries(await request.formData())).toEqual({
-          name: "John Doe",
-          email: "john@example.com",
-          message: "Hello there",
-        });
-      },
-      status: 200,
-      response: {
-        formId: "form-456",
-        submitted: true,
-      },
+    platform.given.functions.result(functionName, {
+      formId: "form-456",
+      submitted: true,
     });
 
     // Call the function
@@ -241,6 +200,14 @@ describe("Functions Module", () => {
     // Verify the response
     expect(result.data.formId).toBe("form-456");
     expect(result.data.submitted).toBe(true);
+    expect(
+      (platform.requests.last("functions.invoke").body as MultipartBody)
+        .entries,
+    ).toEqual([
+      { name: "name", value: "John Doe" },
+      { name: "email", value: "john@example.com" },
+      { name: "message", value: "Hello there" },
+    ]);
   });
 
   test("direct FormData preserves repeated keys, binary files and empty values", async () => {
@@ -254,26 +221,28 @@ describe("Functions Module", () => {
         type: "application/octet-stream",
       }),
     );
-    mockHttp({
-      method: "post",
-      url: `${serverUrl}/api/apps/${appId}/functions/upload`,
-      response: { ok: true },
-      inspect: async (request) => {
-        const actual = await request.formData();
-        expect(actual.getAll("tag")).toEqual(["one", "two"]);
-        expect(actual.get("empty")).toBe("");
-        const file = actual.get("file") as File;
-        expect(file.name).toBe("bytes.bin");
-        expect(file.type).toBe("application/octet-stream");
-        expect([...new Uint8Array(await file.arrayBuffer())]).toEqual([
-          0, 255, 10,
-        ]);
-      },
-    });
+    platform.given.functions.result("upload", { ok: true });
     expect((await base44.functions.invoke("upload", form)).data).toEqual({
       ok: true,
     });
     expect(form.getAll("tag")).toEqual(["one", "two"]);
+    expect(
+      (platform.requests.last("functions.invoke").body as MultipartBody)
+        .entries,
+    ).toEqual([
+      { name: "tag", value: "one" },
+      { name: "tag", value: "two" },
+      { name: "empty", value: "" },
+      {
+        name: "file",
+        file: {
+          name: "bytes.bin",
+          type: "application/octet-stream",
+          size: 3,
+          bytes: [0, 255, 10],
+        },
+      },
+    ]);
   });
 
   test("should throw error for string input instead of object", async () => {
@@ -294,23 +263,16 @@ describe("Functions Module", () => {
       input: "test data",
     };
 
-    // Mock the API response
-    mockHttp({
-      method: "post",
-      url: serverUrl + `/api/apps/${appId}/functions/${functionName}`,
-      body: functionData,
-      headers: [["Content-Type", "application/json"]],
-      status: 200,
-      response: {
-        processed: true,
-      },
-    });
+    platform.given.functions.result(functionName, { processed: true });
 
     // Call the function
     const result = await base44.functions.invoke(functionName, functionData);
 
     // Verify the response
     expect(result.data.processed).toBe(true);
+    expect(platform.requests.last("functions.invoke").body).toEqual(
+      functionData,
+    );
   });
 
   test("should handle API errors gracefully", async () => {
@@ -319,23 +281,15 @@ describe("Functions Module", () => {
       param: "value",
     };
 
-    // Mock the API error response
-    mockHttp({
-      method: "post",
-      url: serverUrl + `/api/apps/${appId}/functions/${functionName}`,
-      body: functionData,
-      headers: [["Content-Type", "application/json"]],
-      status: 500,
-      response: {
-        error: "Internal server error",
-        code: "INTERNAL_ERROR",
-      },
-    });
+    platform.given.faults.functions.internalError(functionName);
 
     // Call the function and expect it to throw
     await expect(
       base44.functions.invoke(functionName, functionData),
     ).rejects.toThrow();
+    expect(platform.requests.last("functions.invoke").body).toEqual(
+      functionData,
+    );
   });
 
   test("should handle 404 errors for non-existent functions", async () => {
@@ -344,23 +298,15 @@ describe("Functions Module", () => {
       param: "value",
     };
 
-    // Mock the API 404 response
-    mockHttp({
-      method: "post",
-      url: serverUrl + `/api/apps/${appId}/functions/${functionName}`,
-      body: functionData,
-      headers: [["Content-Type", "application/json"]],
-      status: 404,
-      response: {
-        error: "Function not found",
-        code: "FUNCTION_NOT_FOUND",
-      },
-    });
+    platform.given.faults.functions.notFound(functionName);
 
     // Call the function and expect it to throw
     await expect(
       base44.functions.invoke(functionName, functionData),
     ).rejects.toThrow();
+    expect(platform.requests.last("functions.invoke").body).toEqual(
+      functionData,
+    );
   });
 
   test("should handle null and undefined values in data", async () => {
@@ -372,17 +318,9 @@ describe("Functions Module", () => {
       emptyString: "",
     };
 
-    // Mock the API response
-    mockHttp({
-      method: "post",
-      url: serverUrl + `/api/apps/${appId}/functions/${functionName}`,
-      body: functionData,
-      headers: [["Content-Type", "application/json"]],
-      status: 200,
-      response: {
-        received: true,
-        values: functionData,
-      },
+    platform.given.functions.result(functionName, {
+      received: true,
+      values: functionData,
     });
 
     // Call the function
@@ -390,6 +328,11 @@ describe("Functions Module", () => {
 
     // Verify the response
     expect(result.data.received).toBe(true);
+    expect(platform.requests.last("functions.invoke").body).toEqual({
+      stringValue: "test",
+      nullValue: null,
+      emptyString: "",
+    });
   });
 
   test("should handle array values in data", async () => {
@@ -400,17 +343,9 @@ describe("Functions Module", () => {
       mixed: [1, "two", { three: 3 }],
     };
 
-    // Mock the API response
-    mockHttp({
-      method: "post",
-      url: serverUrl + `/api/apps/${appId}/functions/${functionName}`,
-      body: functionData,
-      headers: [["Content-Type", "application/json"]],
-      status: 200,
-      response: {
-        processed: true,
-        count: 3,
-      },
+    platform.given.functions.result(functionName, {
+      processed: true,
+      count: 3,
     });
 
     // Call the function
@@ -419,6 +354,9 @@ describe("Functions Module", () => {
     // Verify the response
     expect(result.data.processed).toBe(true);
     expect(result.data.count).toBe(3);
+    expect(platform.requests.last("functions.invoke").body).toEqual(
+      functionData,
+    );
   });
 
   test("should create FormData correctly when files are present", async () => {
@@ -430,20 +368,17 @@ describe("Functions Module", () => {
       category: "documents",
     };
 
-    // Mock the API response
-    mockHttp({
-      method: "post",
-      url: serverUrl + `/api/apps/${appId}/functions/${functionName}`,
-      headers: [["Content-Type", /^multipart\/form-data/]],
-      status: 200,
-      response: { success: true },
-    });
+    platform.given.functions.result(functionName, { success: true });
 
     // Call the function
     const result = await base44.functions.invoke(functionName, functionData);
 
     // Verify the response
     expect(result.data.success).toBe(true);
+    expect(
+      (platform.requests.last("functions.invoke").body as MultipartBody)
+        .entries,
+    ).toContainEqual({ name: "description", value: "Test file upload" });
   });
 
   test("should create FormData correctly when FormData is passed directly", async () => {
@@ -452,20 +387,20 @@ describe("Functions Module", () => {
     formData.append("name", "John Doe");
     formData.append("email", "john@example.com");
 
-    // Mock the API response
-    mockHttp({
-      method: "post",
-      url: serverUrl + `/api/apps/${appId}/functions/${functionName}`,
-      headers: [["Content-Type", /^multipart\/form-data/]],
-      status: 200,
-      response: { success: true },
-    });
+    platform.given.functions.result(functionName, { success: true });
 
     // Call the function
     const result = await base44.functions.invoke(functionName, formData);
 
     // Verify the response
     expect(result.data.success).toBe(true);
+    expect(
+      (platform.requests.last("functions.invoke").body as MultipartBody)
+        .entries,
+    ).toEqual([
+      { name: "name", value: "John Doe" },
+      { name: "email", value: "john@example.com" },
+    ]);
   });
 
   test("should send user token as Authorization header when invoking functions", async () => {
@@ -482,20 +417,9 @@ describe("Functions Module", () => {
       token: userToken,
     });
 
-    // Mock the API response, verifying the Authorization header
-    mockHttp({
-      method: "post",
-      url: serverUrl + `/api/apps/${appId}/functions/${functionName}`,
-      body: functionData,
-      headers: [
-        ["Content-Type", "application/json"],
-        ["Authorization", `Bearer ${userToken}`],
-      ],
-      status: 200,
-      response: {
-        success: true,
-        authenticated: true,
-      },
+    platform.given.functions.result(functionName, {
+      success: true,
+      authenticated: true,
     });
 
     // Call the function
@@ -507,20 +431,20 @@ describe("Functions Module", () => {
     // Verify the response
     expect(result.data.success).toBe(true);
     expect(result.data.authenticated).toBe(true);
+    expect(
+      platform.requests.last("functions.invoke").headers.authorization,
+    ).toBe(`Bearer ${userToken}`);
+    authenticatedBase44.cleanup();
   });
 
   test("should fetch function endpoint directly", async () => {
-    let capturedUrl: string | null = null;
-    server.use(
-      http.get(`${serverUrl}/api/functions/my_function`, ({ request }) => {
-        capturedUrl = request.url;
-        return new HttpResponse("ok", { status: 200 });
-      }),
-    );
+    platform.given.functions.raw("my_function");
 
     await base44.functions.fetch("/my_function", { method: "GET" });
 
-    expect(capturedUrl).toBe(`${serverUrl}/api/functions/my_function`);
+    expect(platform.requests.last("functions.fetch").url).toBe(
+      `${serverUrl}/api/functions/my_function`,
+    );
   });
 
   test("should include Authorization header when using functions.fetch", async () => {
@@ -531,58 +455,48 @@ describe("Functions Module", () => {
       token: userToken,
     });
 
-    let capturedAuth: string | null = null;
-    server.use(
-      http.post(`${serverUrl}/api/functions/streaming_demo`, ({ request }) => {
-        capturedAuth = request.headers.get("Authorization");
-        return new HttpResponse("ok", { status: 200 });
-      }),
-    );
+    platform.given.functions.raw("streaming_demo");
 
     await authenticatedBase44.functions.fetch("streaming_demo", {
       method: "POST",
       body: JSON.stringify({ mode: "text" }),
     });
 
-    expect(capturedAuth).toBe(`Bearer ${userToken}`);
+    const request = platform.requests.last("functions.fetch");
+    expect(request.headers.authorization).toBe(`Bearer ${userToken}`);
+    expect(request.body).toBe(JSON.stringify({ mode: "text" }));
 
     authenticatedBase44.cleanup();
   });
 
   test("should normalize path with and without leading slash", async () => {
-    const calledUrls: string[] = [];
-    server.use(
-      http.get(`${serverUrl}/api/functions/my_function`, ({ request }) => {
-        calledUrls.push(request.url);
-        return new HttpResponse("ok", { status: 200 });
-      }),
-    );
+    platform.given.functions.raw("my_function");
 
     await base44.functions.fetch("/my_function");
     await base44.functions.fetch("my_function");
 
-    expect(calledUrls).toHaveLength(2);
-    expect(calledUrls[0]).toBe(`${serverUrl}/api/functions/my_function`);
-    expect(calledUrls[1]).toBe(`${serverUrl}/api/functions/my_function`);
+    const calledUrls = platform.requests
+      .all("functions.fetch")
+      .map((request) => request.url);
+    expect(calledUrls).toEqual([
+      `${serverUrl}/api/functions/my_function`,
+      `${serverUrl}/api/functions/my_function`,
+    ]);
   });
 
   test("should include service role Authorization header when using asServiceRole.functions.fetch", async () => {
     const serviceToken = "service-role-token";
     const serviceRoleBase44 = createClient({ serverUrl, appId, serviceToken });
 
-    let capturedAuth: string | null = null;
-    server.use(
-      http.get(`${serverUrl}/api/functions/service_function`, ({ request }) => {
-        capturedAuth = request.headers.get("Authorization");
-        return new HttpResponse("ok", { status: 200 });
-      }),
-    );
+    platform.given.functions.raw("service_function");
 
     await serviceRoleBase44.asServiceRole.functions.fetch("/service_function", {
       method: "GET",
     });
 
-    expect(capturedAuth).toBe(`Bearer ${serviceToken}`);
+    expect(
+      platform.requests.last("functions.fetch").headers.authorization,
+    ).toBe(`Bearer ${serviceToken}`);
 
     serviceRoleBase44.cleanup();
   });

@@ -1,279 +1,97 @@
-import { mockHttp } from "../mocks/http";
 import { describe, test, expect, beforeEach, afterEach } from "vitest";
-import { http, HttpResponse } from "msw";
-import { server } from "../mocks/server";
 import { createClient } from "../../src/index.ts";
-import type { AppUserConnectorConnectionResponse } from "../../src/modules/connectors.types.ts";
+import { platform } from "../mocks/platform/index.ts";
 
 describe("Connectors module – getConnection", () => {
-  const appId = "test-app-id";
-  const serverUrl = "https://base44.app";
-  const serviceToken = "service-token-123";
   let base44: ReturnType<typeof createClient>;
-  const tokensBase = `${serverUrl}/api/apps/${appId}/external-auth/tokens`;
-
   beforeEach(() => {
-    base44 = createClient({ serverUrl, appId, serviceToken });
+    base44 = createClient({ serverUrl: "https://base44.app", appId: "test-app-id", serviceToken: "service-token-123" });
+  });
+  afterEach(() => base44.cleanup());
+
+  test("extracts accessToken and connectionConfig", async () => {
+    platform.given.connectors.connection("jira", "oauth-token-abc123", { subdomain: "my-company" });
+    const connection = await base44.asServiceRole.connectors.getConnection("jira");
+    expect(connection).toEqual({ accessToken: "oauth-token-abc123", connectionConfig: { subdomain: "my-company" } });
+    expect(platform.requests.last("connectors.getConnection")).toMatchObject({
+      method: "GET",
+      headers: { authorization: "Bearer service-token-123" },
+    });
   });
 
-  afterEach(() => {
-    base44.cleanup();
+  test.each([
+    ["slack", undefined],
+    ["github", null],
+  ])("returns null config when backend config for %s is %s", async (type, config) => {
+    platform.given.connectors.connection(type, "token-only", config);
+    await expect(base44.asServiceRole.connectors.getConnection(type)).resolves.toEqual({
+      accessToken: "token-only", connectionConfig: null,
+    });
   });
 
-  test("extracts accessToken and connectionConfig from API response", async () => {
-    server.use(
-      http.get(`${tokensBase}/jira`, () =>
-        HttpResponse.json({
-          access_token: "oauth-token-abc123",
-          integration_type: "jira",
-          connection_config: { subdomain: "my-company" },
-        }),
-      ),
+  test.each(["", null])("rejects invalid integration type %s", async (type) => {
+    await expect(base44.asServiceRole.connectors.getConnection(type as unknown as string)).rejects.toThrow(
+      "Integration type is required and must be a string",
     );
-
-    const connection =
-      await base44.asServiceRole.connectors.getConnection("jira");
-
-    expect(connection).toBeDefined();
-    expect(connection.accessToken).toBe("oauth-token-abc123");
-    expect(connection.connectionConfig).toEqual({ subdomain: "my-company" });
-  });
-
-  test("returns connectionConfig as null when API omits connection_config", async () => {
-    server.use(
-      http.get(`${tokensBase}/slack`, () =>
-        HttpResponse.json({
-          access_token: "token-only",
-          integration_type: "slack",
-        }),
-      ),
-    );
-
-    const connection =
-      await base44.asServiceRole.connectors.getConnection("slack");
-
-    expect(connection.accessToken).toBe("token-only");
-    expect(connection.connectionConfig).toBeNull();
-  });
-
-  test("returns connectionConfig as null when API sends null connection_config", async () => {
-    server.use(
-      http.get(`${tokensBase}/github`, () =>
-        HttpResponse.json({
-          access_token: "token-only",
-          integration_type: "github",
-          connection_config: null,
-        }),
-      ),
-    );
-
-    const connection =
-      await base44.asServiceRole.connectors.getConnection("github");
-
-    expect(connection.accessToken).toBe("token-only");
-    expect(connection.connectionConfig).toBeNull();
-  });
-
-  test("throws when integrationType is empty string", async () => {
-    await expect(
-      base44.asServiceRole.connectors.getConnection(""),
-    ).rejects.toThrow("Integration type is required and must be a string");
-  });
-
-  test("throws when integrationType is not a string", async () => {
-    await expect(
-      base44.asServiceRole.connectors.getConnection(null as unknown as string),
-    ).rejects.toThrow("Integration type is required and must be a string");
+    expect(platform.requests.count("connectors.getConnection")).toBe(0);
   });
 });
 
 describe("Connectors module – getWorkspaceConnection", () => {
-  const appId = "test-app-id";
-  const serverUrl = "https://base44.app";
-  const serviceToken = "service-token-123";
   let base44: ReturnType<typeof createClient>;
-
   beforeEach(() => {
-    base44 = createClient({
-      serverUrl,
-      appId,
-      serviceToken,
+    base44 = createClient({ serverUrl: "https://base44.app", appId: "test-app-id", serviceToken: "service-token-123" });
+  });
+  afterEach(() => base44.cleanup());
+
+  test("extracts accessToken and connectionConfig", async () => {
+    platform.given.connectors.workspaceConnection("connector-abc", "snowflake", "builder-oauth-token-xyz789", { subdomain: "xy12345.us-east-1" });
+    await expect(base44.asServiceRole.connectors.getWorkspaceConnection("connector-abc")).resolves.toEqual({
+      accessToken: "builder-oauth-token-xyz789", connectionConfig: { subdomain: "xy12345.us-east-1" },
     });
   });
 
-  afterEach(() => {
-    base44.cleanup();
-  });
-
-  test("extracts accessToken and connectionConfig from connectors endpoint", async () => {
-    const apiResponse = {
-      access_token: "builder-oauth-token-xyz789",
-      integration_type: "snowflake",
-      connection_config: { subdomain: "xy12345.us-east-1" },
-    };
-
-    mockHttp({
-      method: "get",
-      url:
-        serverUrl +
-        `/api/apps/${appId}/external-auth/tokens/connectors/connector-abc`,
-      status: 200,
-      response: apiResponse,
-    });
-
-    const connection =
-      await base44.asServiceRole.connectors.getWorkspaceConnection(
-        "connector-abc",
-      );
-
-    expect(connection.accessToken).toBe("builder-oauth-token-xyz789");
-    expect(connection.connectionConfig).toEqual({
-      subdomain: "xy12345.us-east-1",
+  test("returns null when connection_config is omitted", async () => {
+    platform.given.connectors.workspaceConnection("conn-2", "databricks", "token-only");
+    await expect(base44.asServiceRole.connectors.getWorkspaceConnection("conn-2")).resolves.toEqual({
+      accessToken: "token-only", connectionConfig: null,
     });
   });
 
-  test("returns connectionConfig as null when API omits connection_config", async () => {
-    const apiResponse = {
-      access_token: "token-only",
-      integration_type: "databricks",
-    };
-
-    mockHttp({
-      method: "get",
-      url:
-        serverUrl + `/api/apps/${appId}/external-auth/tokens/connectors/conn-2`,
-      status: 200,
-      response: apiResponse,
-    });
-
-    const connection =
-      await base44.asServiceRole.connectors.getWorkspaceConnection("conn-2");
-
-    expect(connection.accessToken).toBe("token-only");
-    expect(connection.connectionConfig).toBeNull();
-  });
-
-  test("throws when connectorId is empty string", async () => {
-    await expect(
-      base44.asServiceRole.connectors.getWorkspaceConnection(""),
-    ).rejects.toThrow("Connector ID is required and must be a string");
-  });
-
-  test("throws when connectorId is not a string", async () => {
-    await expect(
-      base44.asServiceRole.connectors.getWorkspaceConnection(
-        null as unknown as string,
-      ),
-    ).rejects.toThrow("Connector ID is required and must be a string");
+  test.each(["", null])("rejects invalid connector ID %s", async (id) => {
+    await expect(base44.asServiceRole.connectors.getWorkspaceConnection(id as unknown as string)).rejects.toThrow(
+      "Connector ID is required and must be a string",
+    );
   });
 });
 
 describe("Connectors module – getCurrentAppUserConnection", () => {
-  const appId = "test-app-id";
-  const serverUrl = "https://base44.app";
-  const serviceToken = "service-token-123";
   let base44: ReturnType<typeof createClient>;
-
   beforeEach(() => {
-    base44 = createClient({
-      serverUrl,
-      appId,
-      serviceToken,
+    base44 = createClient({ serverUrl: "https://base44.app", appId: "test-app-id", serviceToken: "service-token-123" });
+  });
+  afterEach(() => base44.cleanup());
+
+  test("extracts accessToken and connectionConfig", async () => {
+    platform.given.connectors.appUserConnection("connector-1", "jira", "user-oauth-token-abc123", { subdomain: "my-company" });
+    await expect(base44.asServiceRole.connectors.getCurrentAppUserConnection("connector-1")).resolves.toEqual({
+      accessToken: "user-oauth-token-abc123", connectionConfig: { subdomain: "my-company" },
     });
   });
 
-  afterEach(() => {
-    base44.cleanup();
-  });
-
-  test("extracts accessToken and connectionConfig from API response", async () => {
-    const apiResponse = {
-      access_token: "user-oauth-token-abc123",
-      integration_type: "jira",
-      connection_config: { subdomain: "my-company" },
-    };
-
-    mockHttp({
-      method: "get",
-      url:
-        serverUrl +
-        `/api/apps/${appId}/app-user-auth/connectors/connector-1/token`,
-      status: 200,
-      response: apiResponse,
-    });
-
-    const connection: AppUserConnectorConnectionResponse =
-      await base44.asServiceRole.connectors.getCurrentAppUserConnection(
-        "connector-1",
-      );
-
-    expect(connection).toBeDefined();
-    expect(connection.accessToken).toBe("user-oauth-token-abc123");
-    expect(connection.connectionConfig).toEqual({
-      subdomain: "my-company",
+  test.each([
+    ["connector-2", "slack", undefined],
+    ["connector-3", "github", null],
+  ])("returns null config for %s", async (id, type, config) => {
+    platform.given.connectors.appUserConnection(id, type, "user-token-only", config);
+    await expect(base44.asServiceRole.connectors.getCurrentAppUserConnection(id)).resolves.toEqual({
+      accessToken: "user-token-only", connectionConfig: null,
     });
   });
 
-  test("returns connectionConfig as null when API omits connection_config", async () => {
-    const apiResponse = {
-      access_token: "user-token-only",
-      integration_type: "slack",
-    };
-
-    mockHttp({
-      method: "get",
-      url:
-        serverUrl +
-        `/api/apps/${appId}/app-user-auth/connectors/connector-2/token`,
-      status: 200,
-      response: apiResponse,
-    });
-
-    const connection: AppUserConnectorConnectionResponse =
-      await base44.asServiceRole.connectors.getCurrentAppUserConnection(
-        "connector-2",
-      );
-
-    expect(connection.accessToken).toBe("user-token-only");
-    expect(connection.connectionConfig).toBeNull();
-  });
-
-  test("returns connectionConfig as null when API sends null connection_config", async () => {
-    const apiResponse = {
-      access_token: "user-token-only",
-      integration_type: "github",
-      connection_config: null,
-    };
-
-    mockHttp({
-      method: "get",
-      url:
-        serverUrl +
-        `/api/apps/${appId}/app-user-auth/connectors/connector-3/token`,
-      status: 200,
-      response: apiResponse,
-    });
-
-    const connection: AppUserConnectorConnectionResponse =
-      await base44.asServiceRole.connectors.getCurrentAppUserConnection(
-        "connector-3",
-      );
-
-    expect(connection.accessToken).toBe("user-token-only");
-    expect(connection.connectionConfig).toBeNull();
-  });
-
-  test("throws when connectorId is empty string", async () => {
-    await expect(
-      base44.asServiceRole.connectors.getCurrentAppUserConnection(""),
-    ).rejects.toThrow("Connector ID is required and must be a string");
-  });
-
-  test("throws when connectorId is not a string", async () => {
-    await expect(
-      base44.asServiceRole.connectors.getCurrentAppUserConnection(
-        null as unknown as string,
-      ),
-    ).rejects.toThrow("Connector ID is required and must be a string");
+  test.each(["", null])("rejects invalid connector ID %s", async (id) => {
+    await expect(base44.asServiceRole.connectors.getCurrentAppUserConnection(id as unknown as string)).rejects.toThrow(
+      "Connector ID is required and must be a string",
+    );
   });
 });

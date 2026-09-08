@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { http, HttpResponse } from "msw";
-import { server } from "../mocks/server";
 import { createClient, createClientFromRequest as fromRequest } from "../../src/index.ts";
+import { platform } from "../mocks/platform";
 
 const appId = "test-app-id";
 const origin = "https://my-app.base44.app";
@@ -40,7 +39,6 @@ function stubBrowser(storage = makeLocalStorage()) {
 // Node has no browser-relative fetch base. This injected platform adapter resolves
 // the URL, then uses real fetch intercepted by MSW; it never fabricates a response.
 const transportCalls: Array<[string, RequestInit]> = [];
-let requests: Request[] = [];
 const clients: Array<ReturnType<typeof createClient>> = [];
 const createClientFromRequest = (request: Request) => {
   const client = fromRequest(request);
@@ -60,11 +58,8 @@ const createTestClient = (token?: string) => {
 };
 beforeEach(() => {
   transportCalls.length = 0;
-  requests = [];
-  server.use(http.all(`${origin}/api/*`, ({request}) => {
-    requests.push(request.clone());
-    return HttpResponse.json({});
-  }));
+  for (const path of ["/api/orders", "/api/public", "/api/items"])
+    platform.given.generic.route(path);
 });
 afterEach(() => {
   for (const client of clients.splice(0)) client.cleanup();
@@ -72,9 +67,10 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 const lastCall = () => {
+  const requests = platform.requests.all("generic.request");
   expect(requests).toHaveLength(1);
   const [url, init] = transportCalls[0]!;
-  return {url, init, headers: requests[0]!.headers};
+  return { url, init, request: requests[0]!, headers: new Headers(requests[0]!.headers) };
 };
 
 describe("fetchWithAuth", () => {
@@ -127,7 +123,7 @@ describe("fetchWithAuth", () => {
     await base44.fetchWithAuth("/api/public");
 
     expect(lastCall().headers.get("Authorization")).toBeNull();
-    expect(requests).toHaveLength(1);
+    expect(platform.requests.count("generic.request")).toBe(1);
   });
 
   test("forwards init options and keeps a caller-set Authorization header", async () => {
@@ -146,7 +142,7 @@ describe("fetchWithAuth", () => {
     const { init, headers } = lastCall();
     expect(init.method).toBe("POST");
     expect(init.body).toBe(JSON.stringify({ productId: "abc" }));
-    expect(await requests[0]!.json()).toEqual({productId: "abc"});
+    expect(lastCall().request.body).toEqual({ productId: "abc" });
     expect(headers.get("Content-Type")).toBe("application/json");
     expect(headers.get("Authorization")).toBe("Bearer caller-token");
   });
@@ -179,7 +175,7 @@ describe("fetchWithAuth", () => {
       /only sends requests to your app's own origin/
     );
     expect(transportCalls).toHaveLength(0);
-    expect(requests).toHaveLength(0);
+    expect(platform.requests.count("generic.request")).toBe(0);
   });
 
   test("rejects an empty path", async () => {
@@ -188,7 +184,7 @@ describe("fetchWithAuth", () => {
 
     await expect(base44.fetchWithAuth("")).rejects.toThrow(/requires a path/);
     expect(transportCalls).toHaveLength(0);
-    expect(requests).toHaveLength(0);
+    expect(platform.requests.count("generic.request")).toBe(0);
   });
 
   test("works with no document, as in a server route", async () => {
@@ -209,7 +205,7 @@ describe("fetchWithAuth", () => {
       base44.fetchWithAuth("https://evil.example/steal")
     ).rejects.toThrow(/only sends requests to your app's own origin/);
     expect(transportCalls).toHaveLength(0);
-    expect(requests).toHaveLength(0);
+    expect(platform.requests.count("generic.request")).toBe(0);
   });
 });
 
@@ -327,7 +323,7 @@ describe("fetchWithAuth from a server route", () => {
     await base44.fetchWithAuth("/api/items", { fetch: transport });
 
     expect(transportCalls).toHaveLength(1);
-    expect(requests).toHaveLength(1);
+    expect(platform.requests.count("generic.request")).toBe(1);
     expect(lastCall().init).not.toHaveProperty("fetch");
   });
 
@@ -338,7 +334,7 @@ describe("fetchWithAuth from a server route", () => {
       base44.fetchWithAuth("https://evil.example/steal", { fetch: transport })
     ).rejects.toThrow(/only sends requests to your app's own origin/);
     expect(transportCalls).toHaveLength(0);
-    expect(requests).toHaveLength(0);
+    expect(platform.requests.count("generic.request")).toBe(0);
   });
 });
 

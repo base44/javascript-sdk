@@ -1,5 +1,5 @@
-import { mockHttp } from "../mocks/http";
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
+import { platform } from "../mocks/platform";
 
 // Mock ReconnectingWebSocket (partysocket's `WebSocket` export) with a
 // controllable fake. It records the async URL provider so tests can drive
@@ -599,27 +599,11 @@ describe("Actors Module — client wiring", () => {
   });
 
   test("mints via POST /connection-token with app, auth, and version headers", async () => {
-    mockHttp({
-      method: "post",
-      url: serverUrl + `/api/apps/${appId}/actors/PongGame/connection-token`,
-      ...{
-        reqheaders: {
-          "x-app-id": appId,
-          authorization: "Bearer tok",
-          "base44-functions-version": "draft",
-        },
-      },
-      body: {
-        room: "r1",
-        connection_id: "c1",
-      },
-      status: 200,
-      response: {
-        websocket_url: "wss://actors.example/v1/actors/scr_1/rooms/r1?_pk=c1",
-        token: "jwt.min.ted",
-        expires_at: "2026-01-01T00:00:00Z",
-        mode: "preview",
-      },
+    platform.given.actors.available("PongGame", {
+      websocketUrl: "wss://actors.example/v1/actors/scr_1/rooms/r1?_pk=c1",
+      token: "jwt.min.ted",
+      expiresAt: "2026-01-01T00:00:00Z",
+      mode: "preview",
     });
 
     const base44 = createClient({
@@ -632,18 +616,19 @@ describe("Actors Module — client wiring", () => {
     await expect(sockets[0].urlProvider()).resolves.toBe(
       "wss://actors.example/v1/actors/scr_1/rooms/r1?_pk=c1&token=jwt.min.ted",
     );
+    expect(platform.requests.last("actors.mintConnectionToken")).toMatchObject({
+      headers: {
+        "x-app-id": appId,
+        authorization: "Bearer tok",
+        "base44-functions-version": "draft",
+      },
+      body: { room: "r1", connection_id: "c1" },
+    });
     base44.cleanup();
   });
 
   test("a 409 mint reply falls back to the legacy proxy URL without calling onError", async () => {
-    mockHttp({
-      method: "post",
-      url: serverUrl + `/api/apps/${appId}/actors/PongGame/connection-token`,
-      status: 409,
-      response: {
-        message: "Actor must be migrated before connecting directly",
-      },
-    });
+    platform.given.actors.fault("PongGame", "legacy-conflict");
 
     const onError = vi.fn();
     const base44 = createClient({
@@ -664,16 +649,7 @@ describe("Actors Module — client wiring", () => {
   test("a 405 mint reply (backend without the endpoint) falls back to the proxy", async () => {
     // What a pre-direct backend actually answers: its actor deploy routes
     // match the path via `{handler_name:path}` but not the POST method.
-    mockHttp({
-      method: "post",
-      url: serverUrl + `/api/apps/${appId}/actors/PongGame/connection-token`,
-      status: 405,
-      response: {
-        error_type: "HTTPException",
-        message: "Method Not Allowed",
-        detail: "Method Not Allowed",
-      },
-    });
+    platform.given.actors.fault("PongGame", "endpoint-unsupported");
 
     const onError = vi.fn();
     const base44 = createClient({
@@ -691,12 +667,7 @@ describe("Actors Module — client wiring", () => {
   });
 
   test("a non-fallback mint failure reaches the client's onError as a Base44Error", async () => {
-    mockHttp({
-      method: "post",
-      url: serverUrl + `/api/apps/${appId}/actors/PongGame/connection-token`,
-      status: 500,
-      response: { message: "mint exploded" },
-    });
+    platform.given.actors.fault("PongGame", "mint-failed");
 
     const onError = vi.fn();
     const base44 = createClient({
@@ -725,43 +696,25 @@ describe("Actors Module — client wiring", () => {
     vi.stubGlobal("document", undefined);
     vi.stubGlobal("localStorage", undefined);
 
-    mockHttp({
-      method: "post",
-      url: `${serverUrl}/api/apps/${appId}/analytics/track/batch`,
-      status: 200,
-      response: {},
-      inspect: async (request) => {
-        expect((await request.json()).events[0].event_name).toBe(
-          "__initialization_event__",
-        );
-      },
-    });
-    const seen: unknown[] = [];
-    mockHttp({
-      method: "post",
-      url: serverUrl + `/api/apps/${appId}/actors/PongGame/connection-token`,
-      times: 2,
-      respond: function (request) {
-        seen.push(request.headers.get("x-base44-anonymous-id"));
-        return [
-          200,
-          {
-            websocket_url:
-              "wss://actors.example/v1/actors/scr_1/rooms/r1?_pk=c1",
-            token: "jwt.min.ted",
-          },
-        ];
-      },
+    platform.given.actors.available("PongGame", {
+      websocketUrl: "wss://actors.example/v1/actors/scr_1/rooms/r1?_pk=c1",
+      token: "jwt.min.ted",
+      expiresAt: "2026-01-01T00:00:00Z",
+      mode: "preview",
     });
 
     const base44 = createClient({ serverUrl, appId });
     base44.actors.PongGame("r1").connect({ id: "c1" });
     await sockets[0].urlProvider();
     await sockets[0].urlProvider(); // a reconnect mints again
+    const seen = platform.requests
+      .all("actors.mintConnectionToken")
+      .map((request) => request.headers["x-base44-anonymous-id"]);
     expect(seen).toHaveLength(2);
     expect(typeof seen[0]).toBe("string");
     expect(seen[0]).toBeTruthy();
     expect(seen[0]).toBe(seen[1]); // stable across reconnects, not a fresh id per call
+    expect((platform.requests.last("analytics.trackBatch").body as any).events[0].event_name).toBe("__initialization_event__");
     base44.cleanup();
   });
 
@@ -773,18 +726,11 @@ describe("Actors Module — client wiring", () => {
     vi.stubGlobal("document", undefined);
     vi.stubGlobal("localStorage", undefined);
 
-    mockHttp({
-      method: "post",
-      url: serverUrl + `/api/apps/${appId}/actors/PongGame/connection-token`,
-      ...{
-        reqheaders: { authorization: "Bearer tok" },
-        badheaders: ["x-base44-anonymous-id"],
-      },
-      status: 200,
-      response: {
-        websocket_url: "wss://actors.example/v1/actors/scr_1/rooms/r1?_pk=c1",
-        token: "jwt.min.ted",
-      },
+    platform.given.actors.available("PongGame", {
+      websocketUrl: "wss://actors.example/v1/actors/scr_1/rooms/r1?_pk=c1",
+      token: "jwt.min.ted",
+      expiresAt: "2026-01-01T00:00:00Z",
+      mode: "preview",
     });
 
     const base44 = createClient({ serverUrl, appId, token: "tok" });
@@ -792,6 +738,9 @@ describe("Actors Module — client wiring", () => {
     await expect(sockets[0].urlProvider()).resolves.toContain(
       "token=jwt.min.ted",
     );
+    const request = platform.requests.last("actors.mintConnectionToken");
+    expect(request.headers.authorization).toBe("Bearer tok");
+    expect(request.headers["x-base44-anonymous-id"]).toBeUndefined();
     base44.cleanup();
   });
 

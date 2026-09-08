@@ -8,8 +8,7 @@ import {
 import { getSharedInstance } from "../../src/utils/sharedInstance.ts";
 import { resetAnalyticsSessionContext } from "../../src/modules/analytics.ts";
 import { InternalAuthModule, User } from "../../src/modules/auth.types.ts";
-import { http, HttpResponse } from "msw";
-import { server } from "../mocks/server";
+import { platform } from "../mocks/platform";
 
 describe("Analytics Module", () => {
   let base44: ReturnType<typeof createClient>;
@@ -23,10 +22,7 @@ describe("Analytics Module", () => {
   const serverUrl = "https://api.base44.com";
 
   beforeEach(() => {
-    server.use(
-      http.post(`${serverUrl}/api/apps/${appId}/analytics/track/batch`, () => HttpResponse.json({message: "success"})),
-      http.get(`${serverUrl}/api/apps/${appId}/entities/User/me`, () => HttpResponse.json({id: "test-user-id"})),
-    );
+    platform.given.auth.user({ id: "test-user-id" });
     sharedState = getSharedInstance("analytics", () => ({
       requestsQueue: [],
       isProcessing: false,
@@ -228,5 +224,13 @@ describe("Analytics Module", () => {
     await vi.waitFor(() => expect(sharedState?.requestsQueue.length).toBe(1), {timeout: 2500});
     await vi.waitFor(() => expect(sharedState?.requestsQueue.length).toBe(0), {timeout: 2500});
     await vi.waitFor(() => expect(sharedState?.isProcessing).toBe(false), {timeout: 2500});
+
+    const batches = platform.requests
+      .all("analytics.trackBatch")
+      .map((request) => request.body as { events: { event_name: string }[] });
+    expect(batches.length).toBeGreaterThan(0);
+    expect(batches.every((batch) => batch.events.length <= 2)).toBe(true);
+    expect(batches.flatMap((batch) => batch.events.map((event) => event.event_name)))
+      .toEqual(Array.from({ length: 6 }, (_, index) => `test-event ${index}`));
   });
 });

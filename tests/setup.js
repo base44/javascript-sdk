@@ -1,33 +1,37 @@
-import { beforeAll, afterAll, afterEach, expect } from "vitest";
+import { beforeAll, beforeEach, afterAll, afterEach, expect } from "vitest";
 import { server } from "./mocks/server.ts";
-import { verifyHttpExpectations } from "./mocks/http.ts";
+import { platform } from "./mocks/platform/index.ts";
 
 const unexpected = [];
 beforeAll(() => {
   server.listen({
     onUnhandledRequest(request, print) {
       unexpected.push(`${request.method} ${request.url}`);
-      print.error(); // Never allow a unit test to reach the real network.
+      print.error();
+      // A custom callback otherwise defaults to passthrough after printing.
+      // Throwing makes MSW synthesize an intercepted 500 instead of touching
+      // the network; teardown still fails even when the SDK swallows it.
+      throw new Error(`Unhandled HTTP request: ${request.method} ${request.url}`);
     },
   });
 });
+beforeEach(() => platform.reset());
 afterEach(() => {
   const failures = [];
   try {
     // A method swallowing network errors must still fail on unexpected traffic.
     try {
       expect(unexpected.splice(0), "Unhandled HTTP requests").toEqual([]);
-    } catch (error) {
-      failures.push(error);
-    }
-    // This also drains expectations when the unexpected-request check failed.
-    try {
-      verifyHttpExpectations();
+      expect(
+        platform.requests.all("platform.unconfigured"),
+        "Requests not modeled by the mock platform",
+      ).toEqual([]);
     } catch (error) {
       failures.push(error);
     }
   } finally {
     server.resetHandlers();
+    platform.reset();
   }
   if (failures.length)
     throw new AggregateError(failures, "HTTP mock contract failed");

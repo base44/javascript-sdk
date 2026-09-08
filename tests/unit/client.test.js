@@ -1,9 +1,9 @@
-import { mockHttp } from "../mocks/http";
 import {
   createClient as newClient,
   createClientFromRequest as newClientFromRequest,
 } from "../../src/index.ts";
 import { describe, test, expect, beforeEach, afterEach } from "vitest";
+import { platform } from "../mocks/platform";
 
 const clients = [];
 const createClient = (...args) => {
@@ -16,6 +16,7 @@ const createClientFromRequest = (...args) => {
   clients.push(client);
   return client;
 };
+beforeEach(() => platform.reset());
 afterEach(() => {
   for (const client of clients.splice(0)) client.cleanup();
 });
@@ -354,27 +355,16 @@ describe("Service Role Authorization Headers", () => {
       serviceToken: serviceToken,
     });
 
-    // Mock user entities request (should use user token)
-    mockHttp({
-      method: "get",
-      url: serverUrl + `/api/apps/${appId}/entities/Todo`,
-      headers: [["Authorization", `Bearer ${userToken}`]],
-      status: 200,
-      response: { items: [], total: 0 },
-    });
-
-    // Mock service role entities request (should use service token)
-    mockHttp({
-      method: "get",
-      url: serverUrl + `/api/apps/${appId}/entities/Todo`,
-      headers: [["Authorization", `Bearer ${serviceToken}`]],
-      status: 200,
-      response: { items: [], total: 0 },
-    });
+    platform.given.entities.records("Todo", []);
 
     // Make requests
     await client.entities.Todo.list();
     await client.asServiceRole.entities.Todo.list();
+    const requests = platform.requests.all("entities.list");
+    expect(requests.map((request) => request.headers.authorization)).toEqual([
+      `Bearer ${userToken}`,
+      `Bearer ${serviceToken}`,
+    ]);
   });
 
   test("should use service token for service role entities operations", async () => {
@@ -386,14 +376,9 @@ describe("Service Role Authorization Headers", () => {
       serviceToken: serviceToken,
     });
 
-    // Mock service role entities request
-    mockHttp({
-      method: "get",
-      url: serverUrl + `/api/apps/${appId}/entities/User/123`,
-      headers: [["Authorization", `Bearer ${serviceToken}`]],
-      status: 200,
-      response: { id: "123", name: "Test User" },
-    });
+    platform.given.entities.records("User", [
+      { id: "123", name: "Test User" },
+    ]);
 
     // Make request
     const result = await client.asServiceRole.entities.User.get("123");
@@ -401,6 +386,9 @@ describe("Service Role Authorization Headers", () => {
     // Verify response
     expect(result.id).toBe("123");
     expect(result.name).toBe("Test User");
+    expect(platform.requests.last("entities.get").headers.authorization).toBe(
+      `Bearer ${serviceToken}`,
+    );
   });
 
   test("should use service token for service role integrations operations", async () => {
@@ -412,15 +400,7 @@ describe("Service Role Authorization Headers", () => {
       serviceToken: serviceToken,
     });
 
-    // Mock service role integrations request
-    mockHttp({
-      method: "post",
-      url:
-        serverUrl + `/api/apps/${appId}/integration-endpoints/Core/SendEmail`,
-      headers: [["Authorization", `Bearer ${serviceToken}`]],
-      status: 200,
-      response: { success: true, messageId: "123" },
-    });
+    platform.given.integrations.emailDelivered("123");
 
     // Make request
     const result = await client.asServiceRole.integrations.Core.SendEmail({
@@ -432,6 +412,9 @@ describe("Service Role Authorization Headers", () => {
     // Verify response
     expect(result.success).toBe(true);
     expect(result.messageId).toBe("123");
+    expect(platform.requests.last("integrations.invoke").headers.authorization).toBe(
+      `Bearer ${serviceToken}`,
+    );
   });
 
   test("should use service token for service role functions operations", async () => {
@@ -443,14 +426,8 @@ describe("Service Role Authorization Headers", () => {
       serviceToken: serviceToken,
     });
 
-    // Mock service role functions request
-    mockHttp({
-      method: "post",
-      url: serverUrl + `/api/apps/${appId}/functions/testFunction`,
-      body: { param: "test" },
-      headers: [["Authorization", `Bearer ${serviceToken}`]],
-      status: 200,
-      response: { result: "function executed" },
+    platform.given.functions.result("testFunction", {
+      result: "function executed",
     });
 
     // Make request
@@ -460,6 +437,10 @@ describe("Service Role Authorization Headers", () => {
 
     // Verify response
     expect(result.data.result).toBe("function executed");
+    expect(platform.requests.last("functions.invoke")).toMatchObject({
+      body: { param: "test" },
+      headers: { authorization: `Bearer ${serviceToken}` },
+    });
   });
 
   test("should use user token for regular operations when both tokens are present", async () => {
@@ -473,24 +454,10 @@ describe("Service Role Authorization Headers", () => {
       serviceToken: serviceToken,
     });
 
-    // Mock regular user entities request (should use user token)
-    mockHttp({
-      method: "get",
-      url: serverUrl + `/api/apps/${appId}/entities/Task`,
-      headers: [["Authorization", `Bearer ${userToken}`]],
-      status: 200,
-      response: { items: [{ id: "task1", title: "User Task" }], total: 1 },
-    });
-
-    // Mock regular integrations request (should use user token)
-    mockHttp({
-      method: "post",
-      url:
-        serverUrl + `/api/apps/${appId}/integration-endpoints/Core/SendEmail`,
-      headers: [["Authorization", `Bearer ${userToken}`]],
-      status: 200,
-      response: { success: true, messageId: "email123" },
-    });
+    platform.given.entities.records("Task", [
+      { id: "task1", title: "User Task" },
+    ]);
+    platform.given.integrations.emailDelivered("email123");
 
     // Make requests using regular client (not service role)
     const taskResult = await client.entities.Task.list();
@@ -501,9 +468,15 @@ describe("Service Role Authorization Headers", () => {
     });
 
     // Verify responses
-    expect(taskResult.items[0].title).toBe("User Task");
+    expect(taskResult[0].title).toBe("User Task");
     expect(emailResult.success).toBe(true);
     expect(emailResult.messageId).toBe("email123");
+    expect(platform.requests.last("entities.list").headers.authorization).toBe(
+      `Bearer ${userToken}`,
+    );
+    expect(platform.requests.last("integrations.invoke").headers.authorization).toBe(
+      `Bearer ${userToken}`,
+    );
   });
 
   test("should work without authorization header when no tokens are provided", async () => {
@@ -512,20 +485,16 @@ describe("Service Role Authorization Headers", () => {
       appId,
     });
 
-    // Mock request without authorization header
-    mockHttp({
-      method: "get",
-      url: serverUrl + `/api/apps/${appId}/entities/PublicData`,
-      headers: [["Authorization", (val) => !val]],
-      status: 200,
-      response: { items: [{ id: "public1", data: "public" }], total: 1 },
-    });
+    platform.given.entities.records("PublicData", [
+      { id: "public1", data: "public" },
+    ]);
 
     // Make request
     const result = await client.entities.PublicData.list();
 
     // Verify response
-    expect(result.items[0].data).toBe("public");
+    expect(result[0].data).toBe("public");
+    expect(platform.requests.last("entities.list").headers.authorization).toBeUndefined();
   });
 
   test("should propagate Base44-State header in API requests when created from request", async () => {
@@ -547,22 +516,14 @@ describe("Service Role Authorization Headers", () => {
 
     const client = createClientFromRequest(mockRequest);
 
-    // Mock entities request and verify Base44-State header is present
-    mockHttp({
-      method: "get",
-      url: serverUrl + `/api/apps/${appId}/entities/Todo`,
-      headers: [
-        ["Base44-State", clientIp],
-        ["Authorization", "Bearer user-token-123"],
-      ],
-      status: 200,
-      response: { items: [], total: 0 },
-    });
+    platform.given.entities.records("Todo", []);
 
     // Make request
     await client.entities.Todo.list();
-
-    // Verify all mocks were called (including header match)
+    expect(platform.requests.last("entities.list").headers).toMatchObject({
+      authorization: "Bearer user-token-123",
+      "base44-state": clientIp,
+    });
   });
 
   test("should propagate X-Data-Env header on user-scoped API requests when created from request", async () => {
@@ -582,20 +543,13 @@ describe("Service Role Authorization Headers", () => {
 
     const client = createClientFromRequest(mockRequest);
 
-    // The user-scoped client (not asServiceRole) must still carry the data env
-    // so test-mode function callbacks hit test data, not production.
-    mockHttp({
-      method: "get",
-      url: serverUrl + `/api/apps/${appId}/entities/Todo`,
-      headers: [
-        ["X-Data-Env", "dev"],
-        ["Authorization", "Bearer user-token-123"],
-      ],
-      status: 200,
-      response: { items: [], total: 0 },
-    });
+    platform.given.entities.records("Todo", []);
 
     await client.entities.Todo.list();
+    expect(platform.requests.last("entities.list").headers).toMatchObject({
+      authorization: "Bearer user-token-123",
+      "x-data-env": "dev",
+    });
   });
 
   test("should not forward an X-Data-Env value outside the dev/prod set", async () => {
@@ -615,18 +569,12 @@ describe("Service Role Authorization Headers", () => {
 
     const client = createClientFromRequest(mockRequest);
 
-    mockHttp({
-      method: "get",
-      url: serverUrl + `/api/apps/${appId}/entities/Todo`,
-      headers: [
-        ["X-Data-Env", (val) => !val],
-        ["Authorization", "Bearer user-token-123"],
-      ],
-      status: 200,
-      response: { items: [], total: 0 },
-    });
+    platform.given.entities.records("Todo", []);
 
     await client.entities.Todo.list();
+    const headers = platform.requests.last("entities.list").headers;
+    expect(headers.authorization).toBe("Bearer user-token-123");
+    expect(headers["x-data-env"]).toBeUndefined();
   });
 
   test("should not include X-Data-Env header when not present in original request", async () => {
@@ -645,18 +593,12 @@ describe("Service Role Authorization Headers", () => {
 
     const client = createClientFromRequest(mockRequest);
 
-    mockHttp({
-      method: "get",
-      url: serverUrl + `/api/apps/${appId}/entities/Todo`,
-      headers: [
-        ["X-Data-Env", (val) => !val],
-        ["Authorization", "Bearer user-token-123"],
-      ],
-      status: 200,
-      response: { items: [], total: 0 },
-    });
+    platform.given.entities.records("Todo", []);
 
     await client.entities.Todo.list();
+    const headers = platform.requests.last("entities.list").headers;
+    expect(headers.authorization).toBe("Bearer user-token-123");
+    expect(headers["x-data-env"]).toBeUndefined();
   });
 
   test("should not include Base44-State header when not present in original request", async () => {
@@ -675,20 +617,13 @@ describe("Service Role Authorization Headers", () => {
 
     const client = createClientFromRequest(mockRequest);
 
-    // Mock entities request and verify Base44-State header is NOT present
-    mockHttp({
-      method: "get",
-      url: serverUrl + `/api/apps/${appId}/entities/Todo`,
-      headers: [
-        ["Base44-State", (val) => !val],
-        ["Authorization", "Bearer user-token-123"],
-      ],
-      status: 200,
-      response: { items: [], total: 0 },
-    });
+    platform.given.entities.records("Todo", []);
 
     // Make request
     await client.entities.Todo.list();
+    const headers = platform.requests.last("entities.list").headers;
+    expect(headers.authorization).toBe("Bearer user-token-123");
+    expect(headers["base44-state"]).toBeUndefined();
   });
 
   test("should propagate Base44-State header in service role API requests", async () => {
@@ -710,24 +645,18 @@ describe("Service Role Authorization Headers", () => {
 
     const client = createClientFromRequest(mockRequest);
 
-    // Mock service role entities request and verify Base44-State header is present
-    mockHttp({
-      method: "get",
-      url: serverUrl + `/api/apps/${appId}/entities/User/123`,
-      headers: [
-        ["Base44-State", clientIp],
-        ["Authorization", "Bearer service-token-123"],
-      ],
-      status: 200,
-      response: { id: "123", name: "Test User" },
-    });
+    platform.given.entities.records("User", [
+      { id: "123", name: "Test User" },
+    ]);
 
     // Make request using service role
     const result = await client.asServiceRole.entities.User.get("123");
 
     // Verify response
     expect(result.id).toBe("123");
-
-    // Verify all mocks were called (including header match)
+    expect(platform.requests.last("entities.get").headers).toMatchObject({
+      authorization: "Bearer service-token-123",
+      "base44-state": clientIp,
+    });
   });
 });

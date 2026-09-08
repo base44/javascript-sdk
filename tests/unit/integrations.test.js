@@ -1,6 +1,6 @@
-import { mockHttp } from "../mocks/http";
 import { describe, test, expect, beforeEach, afterEach } from "vitest";
 import { createClient } from "../../src/index.ts";
+import { platform } from "../mocks/platform/index.ts";
 
 describe("Integrations Module", () => {
   let base44;
@@ -8,124 +8,67 @@ describe("Integrations Module", () => {
   const serverUrl = "https://base44.app";
 
   beforeEach(() => {
-    // Create a new client for each test
-    base44 = createClient({
-      serverUrl,
-      appId,
+    base44 = createClient({ serverUrl, appId });
+  });
+  afterEach(() => base44.cleanup());
+
+  test("Core integration sends named parameters to the endpoint", async () => {
+    platform.given.integrations.emailDelivered("123456");
+    const email = { to: "test@example.com", subject: "Test Email", body: "This is a test email" };
+    const result = await base44.integrations.Core.SendEmail(email);
+    expect(result).toEqual({ success: true, messageId: "123456" });
+    expect(platform.requests.last("integrations.invoke")).toMatchObject({
+      method: "POST", body: email,
+      url: `${serverUrl}/api/apps/${appId}/integration-endpoints/Core/SendEmail`,
     });
   });
 
-  afterEach(() => {
-    base44.cleanup();
-  });
-
-  test("Core integration should send requests to the correct endpoint", async () => {
-    const emailParams = {
-      to: "test@example.com",
-      subject: "Test Email",
-      body: "This is a test email",
-    };
-
-    // Mock the API response
-    mockHttp({
-      method: "post",
-      url:
-        serverUrl + `/api/apps/${appId}/integration-endpoints/Core/SendEmail`,
-      body: emailParams,
-      status: 200,
-      response: { success: true, messageId: "123456" },
+  test("Legacy custom package integration sends requests to its installable endpoint", async () => {
+    // Kept for the SDK's backwards-compatible dynamic package API. Current Apper
+    // no longer exposes installable-package integrations.
+    platform.given.integrations.packageSucceeds("CustomPackage", "CustomEndpoint", { result: "custom result" });
+    const params = { param1: "value1", param2: "value2" };
+    const result = await base44.integrations.CustomPackage.CustomEndpoint(params);
+    expect(result).toEqual({ success: true, result: "custom result" });
+    expect(platform.requests.last("integrations.invoke")).toMatchObject({
+      method: "POST", body: params,
+      url: `${serverUrl}/api/apps/${appId}/integration-endpoints/installable/CustomPackage/integration-endpoints/CustomEndpoint`,
     });
-
-    // Call the API
-    const result = await base44.integrations.Core.SendEmail(emailParams);
-
-    // Verify the response
-    expect(result.success).toBe(true);
-    expect(result.messageId).toBe("123456");
   });
 
-  test("Custom package integration should send requests to the correct endpoint", async () => {
-    const customParams = {
-      param1: "value1",
-      param2: "value2",
-    };
-
-    // Mock the API response
-    mockHttp({
-      method: "post",
-      url:
-        serverUrl +
-        `/api/apps/${appId}/integration-endpoints/installable/CustomPackage/integration-endpoints/CustomEndpoint`,
-      body: customParams,
-      status: 200,
-      response: { success: true, result: "custom result" },
+  test("Integration serializes file uploads as multipart data", async () => {
+    platform.given.integrations.fileUploaded("file123");
+    const file = new File(["file content"], "test.txt", { type: "text/plain" });
+    const result = await base44.integrations.Core.UploadFile({ file, metadata: { type: "document" } });
+    expect(result).toEqual({ success: true, fileId: "file123" });
+    expect(platform.requests.last("integrations.invoke")).toMatchObject({
+      method: "POST",
+      body: {
+        type: "multipart",
+        entries: expect.arrayContaining([
+          { name: "file", file: { name: "test.txt", type: "text/plain", size: 12, bytes: [...new TextEncoder().encode("file content")] } },
+          { name: "metadata", value: '{"type":"document"}' },
+        ]),
+      },
     });
-
-    // Call the API
-    const result =
-      await base44.integrations.CustomPackage.CustomEndpoint(customParams);
-
-    // Verify the response
-    expect(result.success).toBe(true);
-    expect(result.result).toBe("custom result");
   });
 
-  test("Integration should handle file uploads correctly", async () => {
-    // Mock a file
-    const mockFile = new Blob(["file content"], { type: "text/plain" });
-    mockFile.name = "test.txt";
-
-    const uploadParams = {
-      file: mockFile,
-      metadata: { type: "document" },
-    };
-
-    mockHttp({
-      method: "post",
-      url:
-        serverUrl + `/api/apps/${appId}/integration-endpoints/Core/UploadFile`,
-      status: 200,
-      response: { success: true, fileId: "file123" },
-    });
-
-    // Call the API
-    const result = await base44.integrations.Core.UploadFile(uploadParams);
-
-    // Verify the response
-    expect(result.success).toBe(true);
-    expect(result.fileId).toBe("file123");
-  });
-
-  test("Integration should throw error with string parameters", async () => {
-    // Expect error when trying to call with a string instead of object
-    await expect(async () => {
-      await base44.integrations.Core.SendEmail("invalid string parameter");
-    }).rejects.toThrow(
+  test("Integration rejects string parameters before making a request", async () => {
+    await expect(base44.integrations.Core.SendEmail("invalid string parameter")).rejects.toThrow(
       "Integration SendEmail must receive an object with named parameters",
     );
+    expect(platform.requests.count("integrations.invoke")).toBe(0);
   });
 
-  test("Integration should handle API errors correctly", async () => {
-    const params = { invalid: "params" };
-
-    // Mock an API error response
-    mockHttp({
-      method: "post",
-      url:
-        serverUrl + `/api/apps/${appId}/integration-endpoints/Core/SendEmail`,
-      body: params,
-      status: 400,
-      response: { detail: "Invalid parameters", code: "INVALID_PARAMS" },
+  test("Integration maps a named invalid-parameters platform fault", async () => {
+    platform.given.integrations.emailDelivered("after-retry");
+    platform.given.faults.integrations.invalidParameters("Core", "SendEmail");
+    await expect(base44.integrations.Core.SendEmail({ invalid: "params" })).rejects.toMatchObject({
+      status: 400, name: "Base44Error", message: "Invalid parameters", code: "INVALID_PARAMS",
     });
-
-    // Call the API and expect an error
-    await expect(
-      base44.integrations.Core.SendEmail(params),
-    ).rejects.toMatchObject({
-      status: 400,
-      name: "Base44Error",
-      message: "Invalid parameters",
-      code: "INVALID_PARAMS",
+    await expect(base44.integrations.Core.SendEmail({ to: "valid@example.com" })).resolves.toEqual({
+      success: true,
+      messageId: "after-retry",
     });
   });
 });
