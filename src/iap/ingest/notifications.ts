@@ -344,11 +344,18 @@ export async function handleSignedPayload(
     // Commit. Until this lands the row still reads as unapplied, so a retry
     // redoes the work — every write above is guarded and idempotent, so that
     // is safe.
+    //
+    // `attempts` is only incremented when the row already existed, i.e. this
+    // delivery is a retry of one that claimed the row and then failed. The
+    // insert above already counts the first attempt, so incrementing here
+    // unconditionally would leave every first-time notification reading 2.
     await context.store.patchWhere(
       NOTIFICATION_DESCRIPTOR,
       notification.notificationUUID,
       {},
-      { set: { outcome: plan.outcome }, increment: { attempts: 1 } }
+      existing
+        ? { set: { outcome: plan.outcome }, increment: { attempts: 1 } }
+        : { set: { outcome: plan.outcome } }
     );
   } catch (error) {
     // Every store failure is a 503, without exception. A pointless retry costs

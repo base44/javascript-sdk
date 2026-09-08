@@ -296,6 +296,17 @@ describe("what gets stored", () => {
 });
 
 describe("duplicates and ordering", () => {
+  test("counts a first delivery as one attempt, not two", async () => {
+    const harness = await createHarness();
+    const result = await post(
+      harness,
+      await notification(harness, { notificationType: "ONE_TIME_CHARGE" })
+    );
+
+    expect(result.outcome).toBe("applied");
+    expect(harness.fake.rows("IapNotification")[0].attempts).toBe(1);
+  });
+
   test("recognises a repeat delivery and does not apply it twice", async () => {
     const harness = await createHarness();
     const payload = await notification(harness, {
