@@ -80,6 +80,12 @@ describe("Auth Module", () => {
 
     test("binds principals to bearer tokens and app scope without sharing login across clients", async () => {
       const otherAppId = "other-app-id";
+      const anonymousSameApp = createClient({ serverUrl, appId });
+      const invalidSameApp = createClient({
+        serverUrl,
+        appId,
+        token: "unknown-token",
+      });
       const anonymousOther = createClient({ serverUrl, appId: otherAppId });
       const wrongScope = createClient({
         serverUrl,
@@ -106,6 +112,18 @@ describe("Auth Module", () => {
         appAAccount.password,
       );
       await expect(base44.auth.me()).resolves.toEqual(appAAccount.user);
+      await expect(anonymousSameApp.auth.me()).rejects.toMatchObject({
+        status: 401,
+      });
+      expect(
+        platform.requests.last("auth.me").headers.authorization,
+      ).toBeUndefined();
+      await expect(invalidSameApp.auth.me()).rejects.toMatchObject({
+        status: 401,
+      });
+      expect(platform.requests.last("auth.me").headers.authorization).toBe(
+        "Bearer unknown-token",
+      );
       await expect(anonymousOther.auth.me()).rejects.toMatchObject({
         status: 401,
       });
