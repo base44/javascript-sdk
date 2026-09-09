@@ -14,6 +14,7 @@ export interface LoginAccount {
 interface Principal {
   appId: string;
   user: User;
+  kind: "user" | "service";
 }
 interface ResetToken {
   email: string;
@@ -50,15 +51,19 @@ function resetTokenStore(appId: string) {
   return appTokens;
 }
 
-function bearerToken(request: Request) {
-  const authorization = request.headers.get("authorization");
+function bearerToken(request: Request, headerName = "authorization") {
+  const authorization = request.headers.get(headerName);
   return authorization?.startsWith("Bearer ")
     ? authorization.slice("Bearer ".length)
     : undefined;
 }
 
-function principalFor(appId: string, request: Request) {
-  const token = bearerToken(request);
+export function principalFor(
+  appId: string,
+  request: Request,
+  headerName = "authorization",
+) {
+  const token = bearerToken(request, headerName);
   if (!token) return undefined;
   const principal = principals.get(token);
   return principal?.appId === appId ? { token, principal } : undefined;
@@ -84,11 +89,19 @@ export function authFixturesFor(appId: string) {
     account(account: LoginAccount) {
       const stored = structuredClone(account);
       accountStore(appId).set(account.email, stored);
-      principals.set(account.accessToken, { appId, user: stored.user });
+      principals.set(account.accessToken, {
+        appId,
+        user: stored.user,
+        kind: "user",
+      });
     },
     principal(token: string, user: User) {
       const stored = structuredClone(user);
-      principals.set(token, { appId, user: stored });
+      principals.set(token, { appId, user: stored, kind: "user" });
+    },
+    servicePrincipal(token: string, user: User) {
+      const stored = structuredClone(user);
+      principals.set(token, { appId, user: stored, kind: "service" });
     },
     meLatency(token: string, delayMs: number) {
       meLatencies.set(scoped(appId, token), delayMs);
@@ -197,7 +210,11 @@ export const authHandlers = [
         { detail: "Invalid credentials" },
         { status: 400 },
       );
-    principals.set(account.accessToken, { appId, user: account.user });
+    principals.set(account.accessToken, {
+      appId,
+      user: account.user,
+      kind: "user",
+    });
     return HttpResponse.json({
       access_token: account.accessToken,
       country_code: account.countryCode ?? null,

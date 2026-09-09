@@ -33,6 +33,19 @@ function nextId(appId: string) {
   return String(id);
 }
 
+function compareValues(left: unknown, right: unknown) {
+  if (typeof left === "number" && typeof right === "number")
+    return left - right;
+  if (left === right) return 0;
+  if (left == null) return -1;
+  if (right == null) return 1;
+  if (typeof left === "boolean" && typeof right === "boolean")
+    return Number(left) - Number(right);
+  const leftText = String(left);
+  const rightText = String(right);
+  return leftText < rightText ? -1 : leftText > rightText ? 1 : 0;
+}
+
 function select(records: PlatformRecord[], request: Request) {
   const search = new URL(request.url).searchParams;
   const query = search.get("q");
@@ -44,9 +57,7 @@ function select(records: PlatformRecord[], request: Request) {
     const descending = sort.startsWith("-");
     const field = descending ? sort.slice(1) : sort;
     selected.sort((left, right) => {
-      const comparison = String(left[field]).localeCompare(
-        String(right[field]),
-      );
+      const comparison = compareValues(left[field], right[field]);
       return descending ? -comparison : comparison;
     });
   }

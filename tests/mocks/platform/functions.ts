@@ -60,7 +60,7 @@ export const functionHandlers = [
         query: recorded.query,
         headers: recorded.headers,
       });
-      return HttpResponse.json(result);
+      return HttpResponse.json(result as any);
     },
   ),
   // The SDK also exposes this legacy, non-app-scoped alias. It is not present

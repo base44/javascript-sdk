@@ -400,7 +400,7 @@ describe("Service Role Authorization Headers", () => {
       serviceToken: serviceToken,
     });
 
-    platform.given.integrations.emailDelivered("123");
+    platform.given.app(appId).integrations.emailDelivered("123");
 
     // Make request
     const result = await client.asServiceRole.integrations.Core.SendEmail({
@@ -455,7 +455,7 @@ describe("Service Role Authorization Headers", () => {
     platform.given
       .app(appId)
       .entities.records("Task", [{ id: "task1", title: "User Task" }]);
-    platform.given.integrations.emailDelivered("email123");
+    platform.given.app(appId).integrations.emailDelivered("email123");
 
     // Make requests using regular client (not service role)
     const taskResult = await client.entities.Task.list();

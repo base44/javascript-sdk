@@ -26,6 +26,12 @@ export interface PlatformConversation extends PlatformRecord {
   messages: PlatformRecord[];
 }
 
+export interface StoredConversation {
+  appId: string;
+  owner: { kind: "user" | "visitor"; id: string };
+  record: PlatformConversation;
+}
+
 export interface PlatformRegistration {
   id: string;
   message: string;
@@ -74,12 +80,26 @@ export type FunctionBehavior = (
 export type PlatformFault =
   | {
       kind: "integration-invalid-parameters";
+      appId: string;
       packageName: string;
       endpointName: string;
     }
-  | { kind: "custom-upstream-unavailable"; slug: string; operationId: string }
-  | { kind: "connector-credits-exhausted"; integrationType: string }
-  | { kind: "metered-connector-token-refused"; integrationType: string }
+  | {
+      kind: "custom-upstream-unavailable";
+      workspaceId: string;
+      slug: string;
+      operationId: string;
+    }
+  | {
+      kind: "connector-credits-exhausted";
+      appId: string;
+      integrationType: string;
+    }
+  | {
+      kind: "metered-connector-token-refused";
+      appId: string;
+      integrationType: string;
+    }
   | { kind: "auth-registration-rejected"; appId: string; email: string }
   | { kind: "function-internal-error"; appId: string; functionName: string }
   | { kind: "function-not-found"; appId: string; functionName: string }
@@ -91,13 +111,18 @@ export type PlatformFault =
 
 interface PlatformState {
   entities: Map<string, Map<string, PlatformRecord[]>>;
-  conversations: PlatformConversation[];
-  integrationEndpoints: Map<string, IntegrationEndpoint>;
-  customIntegrations: Map<string, Map<string, CustomIntegrationOperation>>;
-  connectorTokens: Map<string, ConnectorToken>;
-  workspaceConnectorTokens: Map<string, ConnectorToken>;
-  appUserConnectorTokens: Map<string, ConnectorToken>;
-  connectorProxyOutcomes: Map<string, ConnectorProxyOutcome>;
+  conversations: Map<string, StoredConversation>;
+  integrationEndpoints: Map<string, Map<string, IntegrationEndpoint>>;
+  appWorkspaces: Map<string, string>;
+  customIntegrations: Map<
+    string,
+    Map<string, Map<string, CustomIntegrationOperation>>
+  >;
+  connectorTokens: Map<string, Map<string, ConnectorToken>>;
+  workspaceConnectorTokens: Map<string, Map<string, ConnectorToken>>;
+  appUserConnectorTokens: Map<string, Map<string, Map<string, ConnectorToken>>>;
+  appUserConnectorRedirects: Map<string, Map<string, Map<string, string>>>;
+  connectorProxyOutcomes: Map<string, Map<string, ConnectorProxyOutcome>>;
   registrations: Map<string, PlatformRegistration>;
   passwordResetRequestMessages: Map<string, string>;
   functionBehaviors: Map<string, Map<string, FunctionBehavior>>;
@@ -111,12 +136,14 @@ interface PlatformState {
 
 export const state: PlatformState = {
   entities: new Map(),
-  conversations: [],
+  conversations: new Map(),
   integrationEndpoints: new Map(),
+  appWorkspaces: new Map(),
   customIntegrations: new Map(),
   connectorTokens: new Map(),
   workspaceConnectorTokens: new Map(),
   appUserConnectorTokens: new Map(),
+  appUserConnectorRedirects: new Map(),
   connectorProxyOutcomes: new Map(),
   registrations: new Map(),
   passwordResetRequestMessages: new Map(),
@@ -131,12 +158,14 @@ export const state: PlatformState = {
 
 export function resetPlatformState() {
   state.entities.clear();
-  state.conversations = [];
+  state.conversations.clear();
   state.integrationEndpoints.clear();
+  state.appWorkspaces.clear();
   state.customIntegrations.clear();
   state.connectorTokens.clear();
   state.workspaceConnectorTokens.clear();
   state.appUserConnectorTokens.clear();
+  state.appUserConnectorRedirects.clear();
   state.connectorProxyOutcomes.clear();
   state.registrations.clear();
   state.passwordResetRequestMessages.clear();

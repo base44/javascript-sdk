@@ -64,6 +64,50 @@ describe("Entities Module", () => {
     ).resolves.toEqual([{ id: "1", title: "Projected" }]);
   });
 
+  test("list() sorts numeric fields numerically in both directions", async () => {
+    platform.given.app(appId).entities.records("Todo", [
+      { id: "1", title: "Ten", completed: false, view_count: 10 },
+      { id: "2", title: "Two", completed: false, view_count: 2 },
+      { id: "3", title: "Thirty", completed: false, view_count: 30 },
+    ]);
+
+    await expect(
+      base44.entities.Todo.list("view_count"),
+    ).resolves.toMatchObject([
+      { view_count: 2 },
+      { view_count: 10 },
+      { view_count: 30 },
+    ]);
+    await expect(
+      base44.entities.Todo.list("-view_count"),
+    ).resolves.toMatchObject([
+      { view_count: 30 },
+      { view_count: 10 },
+      { view_count: 2 },
+    ]);
+  });
+
+  test("list() applies pagination after numeric sorting", async () => {
+    platform.given.app(appId).entities.records("Todo", [
+      { id: "1", title: "Ten", completed: false, view_count: 10 },
+      { id: "2", title: "Two", completed: false, view_count: 2 },
+      { id: "3", title: "Thirty", completed: false, view_count: 30 },
+      { id: "4", title: "Twenty", completed: false, view_count: 20 },
+    ]);
+
+    await expect(
+      base44.entities.Todo.list("view_count", 2, 1),
+    ).resolves.toMatchObject([
+      { id: "1", view_count: 10 },
+      { id: "4", view_count: 20 },
+    ]);
+    expect(platform.requests.last("entities.list").query).toMatchObject({
+      limit: "2",
+      skip: "1",
+      sort: "view_count",
+    });
+  });
+
   test("filter() sends the query and returns matching domain state", async () => {
     platform.given.app(appId).entities.records("Todo", [
       { id: "1", title: "Task 1", completed: false },
@@ -152,11 +196,20 @@ describe("Entities Module", () => {
       title: "Only A",
       completed: false,
     });
+    const createdB = await otherClient.entities.Todo.create({
+      title: "Only B",
+      completed: true,
+    });
     expect(createdA.id).toBe("8");
+    expect(createdB.id).toBe("8");
     await expect(base44.entities.Todo.list()).resolves.toHaveLength(2);
     await expect(otherClient.entities.Todo.list()).resolves.toEqual([
       { id: "7", title: "App B", completed: true },
+      createdB,
     ]);
+    await expect(base44.entities.Todo.list()).resolves.not.toContainEqual(
+      createdB,
+    );
     otherClient.cleanup();
   });
 

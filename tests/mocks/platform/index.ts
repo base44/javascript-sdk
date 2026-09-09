@@ -9,18 +9,18 @@ import {
   resetAuthState,
 } from "./auth";
 import {
-  connectorFaultFixtures,
-  connectorFixtures,
+  connectorFaultFixturesFor,
+  connectorFixturesFor,
   connectorHandlers,
 } from "./connectors";
 import { entityHandlers } from "./entities";
 import { functionHandlers } from "./functions";
 import { genericFixtures, genericHandlers, resetGenericState } from "./generic";
 import {
-  customIntegrationFaultFixtures,
-  customIntegrationFixtures,
-  integrationFaultFixtures,
-  integrationFixtures,
+  customIntegrationFaultFixturesFor,
+  customIntegrationFixturesFor,
+  integrationFaultFixturesFor,
+  integrationFixturesFor,
   integrationHandlers,
 } from "./integrations";
 import { resetSsoState, ssoFixtures, ssoHandlers } from "./sso";
@@ -86,7 +86,35 @@ function multipart(body: unknown) {
 function forApp(appId: string) {
   const auth = authFixturesFor(appId);
   const authFaults = authFaultFixturesFor(appId);
+  const integrations = integrationFixturesFor(appId);
+  const customIntegrations = customIntegrationFixturesFor(appId);
+  const connectors = connectorFixturesFor(appId);
   return {
+    workspace(workspaceId: string) {
+      state.appWorkspaces.set(appId, workspaceId);
+    },
+    agents: {
+      conversationsForUser(
+        userId: string,
+        conversations: PlatformConversation[],
+      ) {
+        arrangeConversations(
+          appId,
+          { kind: "user", id: userId },
+          conversations,
+        );
+      },
+      conversationsForVisitor(
+        visitorId: string,
+        conversations: PlatformConversation[],
+      ) {
+        arrangeConversations(
+          appId,
+          { kind: "visitor", id: visitorId },
+          conversations,
+        );
+      },
+    },
     entities: {
       records(entityName: string, records: PlatformRecord[]) {
         let appEntities = state.entities.get(appId);
@@ -187,6 +215,9 @@ function forApp(appId: string) {
         }));
       },
     },
+    integrations,
+    customIntegrations,
+    connectors,
     faults: {
       auth: {
         ...authFaults,
@@ -221,8 +252,31 @@ function forApp(appId: string) {
           });
         },
       },
+      integrations: integrationFaultFixturesFor(appId),
+      customIntegrations: customIntegrationFaultFixturesFor(appId),
+      connectors: connectorFaultFixturesFor(appId),
     },
   };
+}
+
+function arrangeConversations(
+  appId: string,
+  owner: { kind: "user" | "visitor"; id: string },
+  conversations: PlatformConversation[],
+) {
+  for (const conversation of conversations)
+    state.conversations.set(conversation.id, {
+      appId,
+      owner: clone(owner),
+      record: clone(conversation),
+    });
+  const numericIds = conversations
+    .map((conversation) => Number(conversation.id.match(/\d+$/)?.[0]))
+    .filter(Number.isFinite);
+  state.nextConversationId = Math.max(
+    state.nextConversationId,
+    ...numericIds.map((id) => id + 1),
+  );
 }
 
 const appGiven = Object.assign(forApp, appFixtures);
@@ -231,34 +285,15 @@ export const platform = {
   reset,
   given: {
     app: appGiven,
-    agents: {
-      conversations(conversations: PlatformConversation[]) {
-        state.conversations = clone(conversations);
-        const numericIds = conversations
-          .map((conversation) => Number(conversation.id.match(/\d+$/)?.[0]))
-          .filter(Number.isFinite);
-        state.nextConversationId = Math.max(
-          state.nextConversationId,
-          ...numericIds.map((id) => id + 1),
-        );
-      },
-    },
     functions: {
       legacyEndpoint(functionPath: string) {
         state.legacyFunctions.add(functionPath.replace(/^\//, ""));
       },
     },
-    integrations: integrationFixtures,
-    customIntegrations: customIntegrationFixtures,
-    connectors: connectorFixtures,
     actors: actorFixtures,
     sso: ssoFixtures,
     generic: genericFixtures,
-    faults: {
-      integrations: integrationFaultFixtures,
-      customIntegrations: customIntegrationFaultFixtures,
-      connectors: connectorFaultFixtures,
-    },
+    faults: {},
   },
   requests: {
     all(route?: string): RecordedRequest[] {

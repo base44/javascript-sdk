@@ -11,33 +11,62 @@ function takeFault(predicate: (fault: PlatformFault) => boolean) {
   return true;
 }
 
-export const integrationFixtures = {
-  packageSucceeds(packageName: string, endpointName: string, result: Record<string, unknown> = {}) {
-    state.integrationEndpoints.set(endpointKey(packageName, endpointName), {
-      response: { success: true, ...result },
-    });
-  },
-  emailDelivered(messageId = "123456") {
-    this.packageSucceeds("Core", "SendEmail", { messageId });
-  },
-  fileUploaded(fileId = "file123") {
-    this.packageSucceeds("Core", "UploadFile", { fileId });
-  },
-  llmResponds(response: unknown) {
-    state.integrationEndpoints.set(endpointKey("Core", "InvokeLLM"), { response });
-  },
-};
+function integrationStore(appId: string) {
+  let endpoints = state.integrationEndpoints.get(appId);
+  if (!endpoints) {
+    endpoints = new Map();
+    state.integrationEndpoints.set(appId, endpoints);
+  }
+  return endpoints;
+}
 
-export const integrationFaultFixtures = {
-  invalidParameters(packageName: string, endpointName: string) {
-    state.faults.push({ kind: "integration-invalid-parameters", packageName, endpointName });
-  },
-};
+export function integrationFixturesFor(appId: string) {
+  return {
+    packageSucceeds(
+      packageName: string,
+      endpointName: string,
+      result: Record<string, unknown> = {},
+    ) {
+      integrationStore(appId).set(endpointKey(packageName, endpointName), {
+        response: { success: true, ...result },
+      });
+    },
+    emailDelivered(messageId = "123456") {
+      this.packageSucceeds("Core", "SendEmail", { messageId });
+    },
+    fileUploaded(fileId = "file123") {
+      this.packageSucceeds("Core", "UploadFile", { fileId });
+    },
+    llmResponds(response: unknown) {
+      integrationStore(appId).set(endpointKey("Core", "InvokeLLM"), {
+        response,
+      });
+    },
+  };
+}
 
-function invokeIntegration(packageName: string, endpointName: string) {
+export function integrationFaultFixturesFor(appId: string) {
+  return {
+    invalidParameters(packageName: string, endpointName: string) {
+      state.faults.push({
+        kind: "integration-invalid-parameters",
+        appId,
+        packageName,
+        endpointName,
+      });
+    },
+  };
+}
+
+function invokeIntegration(
+  appId: string,
+  packageName: string,
+  endpointName: string,
+) {
   const fault = takeFault(
     (item) =>
       item.kind === "integration-invalid-parameters" &&
+      item.appId === appId &&
       item.packageName === packageName &&
       item.endpointName === endpointName,
   );
@@ -46,46 +75,92 @@ function invokeIntegration(packageName: string, endpointName: string) {
       { detail: "Invalid parameters", code: "INVALID_PARAMS" },
       { status: 400 },
     );
-  const endpoint = state.integrationEndpoints.get(endpointKey(packageName, endpointName));
+  const endpoint = integrationStore(appId).get(
+    endpointKey(packageName, endpointName),
+  );
   if (!endpoint)
     return HttpResponse.json(
-      { detail: `Integration endpoint '${packageName}.${endpointName}' not found`, code: "NOT_FOUND" },
+      {
+        detail: `Integration endpoint '${packageName}.${endpointName}' not found`,
+        code: "NOT_FOUND",
+      },
       { status: 404 },
     );
-  return HttpResponse.json(endpoint.response);
+  return HttpResponse.json(endpoint.response as any);
 }
 
 function parseCustomRoute(request: Request) {
   const match = new URL(request.url).pathname.match(
-    /^\/api\/apps\/[^/]+\/integrations\/custom\/([^/]+)\/(.+)$/,
+    /^\/api\/apps\/([^/]+)\/integrations\/custom\/([^/]+)\/(.+)$/,
   );
   if (!match) return undefined;
-  return { slug: decodeURIComponent(match[1]), operationId: decodeURIComponent(match[2]) };
+  return {
+    appId: decodeURIComponent(match[1]),
+    slug: decodeURIComponent(match[2]),
+    operationId: decodeURIComponent(match[3]),
+  };
 }
 
-export const customIntegrationFixtures = {
-  operation(slug: string, operationId: string, data: unknown, statusCode = 200) {
-    let operations = state.customIntegrations.get(slug);
-    if (!operations) {
-      operations = new Map();
-      state.customIntegrations.set(slug, operations);
-    }
-    operations.set(operationId, { data, statusCode });
-  },
-};
+function workspaceOperations(workspaceId: string, slug: string) {
+  let integrations = state.customIntegrations.get(workspaceId);
+  if (!integrations) {
+    integrations = new Map();
+    state.customIntegrations.set(workspaceId, integrations);
+  }
+  let operations = integrations.get(slug);
+  if (!operations) {
+    operations = new Map();
+    integrations.set(slug, operations);
+  }
+  return operations;
+}
 
-export const customIntegrationFaultFixtures = {
-  upstreamUnavailable(slug: string, operationId: string) {
-    state.faults.push({ kind: "custom-upstream-unavailable", slug, operationId });
-  },
-};
+function workspaceFor(appId: string) {
+  const workspaceId = state.appWorkspaces.get(appId);
+  if (!workspaceId)
+    throw new Error(`Arrange a workspace for app '${appId}' first`);
+  return workspaceId;
+}
+
+export function customIntegrationFixturesFor(appId: string) {
+  return {
+    operation(
+      slug: string,
+      operationId: string,
+      data: unknown,
+      statusCode = 200,
+    ) {
+      workspaceOperations(workspaceFor(appId), slug).set(operationId, {
+        data,
+        statusCode,
+      });
+    },
+  };
+}
+
+export function customIntegrationFaultFixturesFor(appId: string) {
+  return {
+    upstreamUnavailable(slug: string, operationId: string) {
+      state.faults.push({
+        kind: "custom-upstream-unavailable",
+        workspaceId: workspaceFor(appId),
+        slug,
+        operationId,
+      });
+    },
+  };
+}
 
 export const integrationHandlers = [
   http.post(
     "*/api/apps/:appId/integration-endpoints/Core/:endpointName",
     async ({ params, request }) => {
       await recordRequest("integrations.invoke", request);
-      return invokeIntegration("Core", String(params.endpointName));
+      return invokeIntegration(
+        String(params.appId),
+        "Core",
+        String(params.endpointName),
+      );
     },
   ),
   http.post(
@@ -94,43 +169,61 @@ export const integrationHandlers = [
     "*/api/apps/:appId/integration-endpoints/installable/:packageName/integration-endpoints/:endpointName",
     async ({ params, request }) => {
       await recordRequest("integrations.invoke", request);
-      return invokeIntegration(String(params.packageName), String(params.endpointName));
+      return invokeIntegration(
+        String(params.appId),
+        String(params.packageName),
+        String(params.endpointName),
+      );
     },
   ),
-  http.post(/^https?:\/\/[^/]+\/api\/apps\/[^/]+\/integrations\/custom\/.+$/, async ({ request }) => {
-    await recordRequest("customIntegrations.call", request);
-    const route = parseCustomRoute(request);
-    if (!route)
-      return HttpResponse.json({ detail: "Custom integration route not found" }, { status: 404 });
-    const { slug, operationId } = route;
-    const upstreamFault = takeFault(
-      (item) =>
-        item.kind === "custom-upstream-unavailable" &&
-        item.slug === slug &&
-        item.operationId === operationId,
-    );
-    if (upstreamFault)
+  http.post(
+    /^https?:\/\/[^/]+\/api\/apps\/[^/]+\/integrations\/custom\/.+$/,
+    async ({ request }) => {
+      await recordRequest("customIntegrations.call", request);
+      const route = parseCustomRoute(request);
+      if (!route)
+        return HttpResponse.json(
+          { detail: "Custom integration route not found" },
+          { status: 404 },
+        );
+      const { appId, slug, operationId } = route;
+      const workspaceId = state.appWorkspaces.get(appId);
+      if (!workspaceId)
+        return HttpResponse.json(
+          { detail: `Custom integration '${slug}' not found in workspace` },
+          { status: 404 },
+        );
+      const upstreamFault = takeFault(
+        (item) =>
+          item.kind === "custom-upstream-unavailable" &&
+          item.workspaceId === workspaceId &&
+          item.slug === slug &&
+          item.operationId === operationId,
+      );
+      if (upstreamFault)
+        return HttpResponse.json(
+          { detail: "Failed to connect to external API: Connection refused" },
+          { status: 502 },
+        );
+      const operations = state.customIntegrations.get(workspaceId)?.get(slug);
+      if (!operations)
+        return HttpResponse.json(
+          { detail: `Custom integration '${slug}' not found in workspace` },
+          { status: 404 },
+        );
+      const operation = operations.get(operationId);
+      if (!operation)
+        return HttpResponse.json(
+          {
+            detail: `Operation '${operationId}' not found in integration '${slug}'`,
+          },
+          { status: 404 },
+        );
       return HttpResponse.json({
-        success: false,
-        status_code: 502,
-        data: { detail: "Failed to connect to external API: Connection refused" },
+        success: true,
+        status_code: operation.statusCode,
+        data: operation.data,
       });
-    const operations = state.customIntegrations.get(slug);
-    if (!operations)
-      return HttpResponse.json(
-        { detail: `Custom integration '${slug}' not found in workspace` },
-        { status: 404 },
-      );
-    const operation = operations.get(operationId);
-    if (!operation)
-      return HttpResponse.json(
-        { detail: `Operation '${operationId}' not found in integration '${slug}'` },
-        { status: 404 },
-      );
-    return HttpResponse.json({
-      success: true,
-      status_code: operation.statusCode,
-      data: operation.data,
-    });
-  }),
+    },
+  ),
 ];

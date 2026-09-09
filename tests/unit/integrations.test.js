@@ -13,12 +13,17 @@ describe("Integrations Module", () => {
   afterEach(() => base44.cleanup());
 
   test("Core integration sends named parameters to the endpoint", async () => {
-    platform.given.integrations.emailDelivered("123456");
-    const email = { to: "test@example.com", subject: "Test Email", body: "This is a test email" };
+    platform.given.app(appId).integrations.emailDelivered("123456");
+    const email = {
+      to: "test@example.com",
+      subject: "Test Email",
+      body: "This is a test email",
+    };
     const result = await base44.integrations.Core.SendEmail(email);
     expect(result).toEqual({ success: true, messageId: "123456" });
     expect(platform.requests.last("integrations.invoke")).toMatchObject({
-      method: "POST", body: email,
+      method: "POST",
+      body: email,
       url: `${serverUrl}/api/apps/${appId}/integration-endpoints/Core/SendEmail`,
     });
   });
@@ -26,27 +31,44 @@ describe("Integrations Module", () => {
   test("Legacy custom package integration sends requests to its installable endpoint", async () => {
     // Kept for the SDK's backwards-compatible dynamic package API. Current Apper
     // no longer exposes installable-package integrations.
-    platform.given.integrations.packageSucceeds("CustomPackage", "CustomEndpoint", { result: "custom result" });
+    platform.given
+      .app(appId)
+      .integrations.packageSucceeds("CustomPackage", "CustomEndpoint", {
+        result: "custom result",
+      });
     const params = { param1: "value1", param2: "value2" };
-    const result = await base44.integrations.CustomPackage.CustomEndpoint(params);
+    const result =
+      await base44.integrations.CustomPackage.CustomEndpoint(params);
     expect(result).toEqual({ success: true, result: "custom result" });
     expect(platform.requests.last("integrations.invoke")).toMatchObject({
-      method: "POST", body: params,
+      method: "POST",
+      body: params,
       url: `${serverUrl}/api/apps/${appId}/integration-endpoints/installable/CustomPackage/integration-endpoints/CustomEndpoint`,
     });
   });
 
   test("Integration serializes file uploads as multipart data", async () => {
-    platform.given.integrations.fileUploaded("file123");
+    platform.given.app(appId).integrations.fileUploaded("file123");
     const file = new File(["file content"], "test.txt", { type: "text/plain" });
-    const result = await base44.integrations.Core.UploadFile({ file, metadata: { type: "document" } });
+    const result = await base44.integrations.Core.UploadFile({
+      file,
+      metadata: { type: "document" },
+    });
     expect(result).toEqual({ success: true, fileId: "file123" });
     expect(platform.requests.last("integrations.invoke")).toMatchObject({
       method: "POST",
       body: {
         type: "multipart",
         entries: expect.arrayContaining([
-          { name: "file", file: { name: "test.txt", type: "text/plain", size: 12, bytes: [...new TextEncoder().encode("file content")] } },
+          {
+            name: "file",
+            file: {
+              name: "test.txt",
+              type: "text/plain",
+              size: 12,
+              bytes: [...new TextEncoder().encode("file content")],
+            },
+          },
           { name: "metadata", value: '{"type":"document"}' },
         ]),
       },
@@ -54,21 +76,51 @@ describe("Integrations Module", () => {
   });
 
   test("Integration rejects string parameters before making a request", async () => {
-    await expect(base44.integrations.Core.SendEmail("invalid string parameter")).rejects.toThrow(
+    await expect(
+      base44.integrations.Core.SendEmail("invalid string parameter"),
+    ).rejects.toThrow(
       "Integration SendEmail must receive an object with named parameters",
     );
     expect(platform.requests.count("integrations.invoke")).toBe(0);
   });
 
   test("Integration maps a named invalid-parameters platform fault", async () => {
-    platform.given.integrations.emailDelivered("after-retry");
-    platform.given.faults.integrations.invalidParameters("Core", "SendEmail");
-    await expect(base44.integrations.Core.SendEmail({ invalid: "params" })).rejects.toMatchObject({
-      status: 400, name: "Base44Error", message: "Invalid parameters", code: "INVALID_PARAMS",
+    platform.given.app(appId).integrations.emailDelivered("after-retry");
+    platform.given
+      .app(appId)
+      .faults.integrations.invalidParameters("Core", "SendEmail");
+    await expect(
+      base44.integrations.Core.SendEmail({ invalid: "params" }),
+    ).rejects.toMatchObject({
+      status: 400,
+      name: "Base44Error",
+      message: "Invalid parameters",
+      code: "INVALID_PARAMS",
     });
-    await expect(base44.integrations.Core.SendEmail({ to: "valid@example.com" })).resolves.toEqual({
+    await expect(
+      base44.integrations.Core.SendEmail({ to: "valid@example.com" }),
+    ).resolves.toEqual({
       success: true,
       messageId: "after-retry",
     });
+  });
+
+  test("Core integration behavior is isolated by application", async () => {
+    const otherAppId = "other-integration-app";
+    const otherClient = createClient({ serverUrl, appId: otherAppId });
+    platform.given.app(appId).integrations.emailDelivered("app-a-message");
+    platform.given.app(otherAppId).integrations.emailDelivered("app-b-message");
+
+    await expect(
+      base44.integrations.Core.SendEmail({ to: "a@example.com" }),
+    ).resolves.toMatchObject({
+      messageId: "app-a-message",
+    });
+    await expect(
+      otherClient.integrations.Core.SendEmail({ to: "b@example.com" }),
+    ).resolves.toMatchObject({
+      messageId: "app-b-message",
+    });
+    otherClient.cleanup();
   });
 });
