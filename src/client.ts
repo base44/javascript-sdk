@@ -23,6 +23,8 @@ import type {
   CreateClientOptions,
 } from "./client.types.js";
 import { createAnalyticsModule } from "./modules/analytics.js";
+import { createExperimentsModule } from "./modules/experiments.js";
+import { createExposureTracker } from "./modules/experiment-exposures.js";
 import {
   createActorsModule,
   resolveActorsHost,
@@ -166,6 +168,15 @@ export function createClient(config: CreateClientConfig): Base44Client {
     headers,
   });
 
+  const experiments = createExperimentsModule({
+    getAuth: () => userAuthModule,
+    trackExposure: createExposureTracker({
+      axiosClient,
+      appId,
+      enabled: analytics?.enabled ?? true,
+    }).track,
+  });
+
   const userAuthModule = createAuthModule(
     axiosClient,
     functionsAxiosClient,
@@ -174,6 +185,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
       appBaseUrl: normalizedAppBaseUrl,
       serverUrl,
       token,
+      onAuthStateChange: experiments.onAuthStateChange,
     }
   );
 
@@ -228,6 +240,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     integrations: createIntegrationsModule(axiosClient, appId),
     connectors: createUserConnectorsModule(axiosClient, appId),
     auth: userAuthModule,
+    experiments: experiments.module,
     functions: createFunctionsModule(functionsAxiosClient, appId, {
       getAuthHeaders: () => {
         const headers: Record<string, string> = {};
@@ -261,6 +274,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     actors: actorsModule.module,
     cleanup: () => {
       userModules.analytics.cleanup();
+      experiments.cleanup();
       actorsModule.closeAll();
       if (socket) {
         socket.disconnect();

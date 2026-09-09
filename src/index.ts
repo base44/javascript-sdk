@@ -36,6 +36,11 @@ export * from "./types.js";
 
 // Module types
 export type {
+  ExperimentsModule,
+  ExperimentsSnapshot,
+} from "./modules/experiments.types.js";
+
+export type {
   DeleteManyResult,
   DeleteResult,
   EntitiesModule,

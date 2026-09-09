@@ -65,6 +65,11 @@ export interface AnalyticsModuleArgs {
   enabled: boolean;
 }
 
+/** @internal */
+export function isAnalyticsEnabled(enabled: boolean): boolean {
+  return enabled && analyticsSharedState.config.enabled && !isReactNative;
+}
+
 export const createAnalyticsModule = ({
   axiosClient,
   serverUrl,
@@ -79,7 +84,7 @@ export const createAnalyticsModule = ({
   // so the per-callsite `typeof window` guards below aren't enough to keep it
   // from touching `document` (e.g. `document.referrer` on init). Node/SSR is
   // still handled by those `window` guards, so this doesn't affect it.
-  if (!enabled || !analyticsSharedState.config?.enabled || isReactNative) {
+  if (!isAnalyticsEnabled(enabled)) {
     return {
       track: () => {},
       cleanup: () => {},

@@ -1,6 +1,7 @@
 import { AxiosInstance } from "axios";
 import {
   AuthModuleOptions,
+  AuthState,
   InternalAuthModule,
   User,
   VerifyOtpParams,
@@ -104,7 +105,9 @@ export function createAuthModule(
   // requests would leave the app rendering a stale identity after logout or a
   // session swap.
   let pendingMe: Promise<User> | null = null;
+  let identityGeneration = 0;
   const clearPendingMe = () => {
+    identityGeneration += 1;
     pendingMe = null;
   };
 
@@ -112,6 +115,13 @@ export function createAuthModule(
   // to the identity transitions below (`setToken`, `logout`) instead of to the
   // header a caller may have set on the instance directly.
   let hasAccessToken = Boolean(options.token);
+  const notifyAuthState = (state: AuthState) => {
+    try {
+      options.onAuthStateChange?.(state);
+    } catch {
+      // Optional observers must not interrupt authentication or logout redirects.
+    }
+  };
 
   return {
     hasToken() {
@@ -120,9 +130,27 @@ export function createAuthModule(
 
     // Get current user information
     async me() {
+      const generation = identityGeneration;
       const request: Promise<User> =
         pendingMe ??
-        axios.get<any, User>(`/apps/${appId}/entities/User/me`).finally(() => {
+        axios.get<any, User>(`/apps/${appId}/entities/User/me`).then(
+          (user) => {
+            if (generation === identityGeneration) {
+              notifyAuthState({ status: "authenticated", userId: user.id });
+            }
+            return user;
+          },
+          (error: unknown) => {
+            if (generation === identityGeneration) {
+              const authError = error as { status?: number; response?: { status?: number } };
+              const status = authError?.status ?? authError?.response?.status;
+              notifyAuthState({
+                status: status === 401 || status === 403 ? "anonymous" : "error",
+              });
+            }
+            throw error;
+          }
+        ).finally(() => {
           // Only retire this request if it is still the shared one. An identity
           // change mid-flight clears `pendingMe` and the next caller starts a
           // fresh request; an unconditional clear here would retire that newer
@@ -199,6 +227,7 @@ export function createAuthModule(
       clearPendingMe();
       resetAnalyticsSessionContext();
       hasAccessToken = false;
+      notifyAuthState({ status: "anonymous" });
 
       // Only do the rest if in a browser environment
       if (typeof window !== "undefined") {
@@ -237,6 +266,7 @@ export function createAuthModule(
       functionsAxiosClient.defaults.headers.common[
         "Authorization"
       ] = `Bearer ${token}`;
+      notifyAuthState({ status: "pending" });
 
       // Save token to localStorage if requested
       if (
