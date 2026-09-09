@@ -1,4 +1,4 @@
-import type { SendEmailParams } from "../../src/index.js";
+import type { SendEmailParams, EmailAttachment } from "../../src/index.js";
 
 // body-only (existing callers must still compile — backward compat)
 const bodyOnly = {
@@ -45,6 +45,26 @@ const withFromName = {
   from_name: "My App",
 } satisfies SendEmailParams;
 
+// attachments: inline base64
+const inlineAttachment = {
+  filename: "receipt.pdf",
+  content: "JVBERi0x",
+} satisfies EmailAttachment;
+
+// attachments: storage reference
+const storedAttachment = {
+  filename: "logo.png",
+  file_url: "https://storage.example.com/logo.png",
+} satisfies EmailAttachment;
+
+// with attachments on a full params object
+const withAttachments = {
+  to: "user@example.com",
+  subject: "Invoice",
+  body: "<p>See attached.</p>",
+  attachments: [inlineAttachment, storedAttachment],
+} satisfies SendEmailParams;
+
 // omitting all three content fields must be a compile error
 // @ts-expect-error At least one of body/html/text is required.
 const missingContent: SendEmailParams = { to: "user@example.com", subject: "Hello" };
@@ -55,4 +75,7 @@ void textOnly;
 void htmlAndText;
 void bodyAndText;
 void withFromName;
+void inlineAttachment;
+void storedAttachment;
+void withAttachments;
 void missingContent;

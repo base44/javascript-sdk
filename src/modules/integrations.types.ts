@@ -92,6 +92,20 @@ type RequireAtLeastOne<T, Keys extends keyof T = keyof T> =
   Pick<T, Exclude<keyof T, Keys>> &
   { [K in Keys]-?: Required<Pick<T, K>> & Partial<Pick<T, Exclude<Keys, K>>> }[Keys];
 
+/**
+ * A file to attach to a `SendEmail` call.
+ *
+ * Provide exactly one content source per attachment:
+ * - `content` — base64-encoded bytes generated at runtime (e.g. a PDF built in the function).
+ * - `file_url` — a URL returned by `UploadFile` or `UploadPrivateFile` for a file already in storage.
+ *
+ * Allowed extensions: `pdf`, `png`, `jpg`/`jpeg`, `gif`, `webp`, `csv`, `txt`, `md`, `ics`, `xlsx`, `docx`.
+ * Limits: up to **5 attachments**, **5 MB each**, **10 MB total**.
+ */
+export type EmailAttachment =
+  | { /** Attachment filename, including extension. */ filename: string; /** Base64-encoded file content. */ content: string; file_url?: never }
+  | { /** Attachment filename, including extension. */ filename: string; /** URL from `UploadFile` or `UploadPrivateFile`. */ file_url: string; content?: never };
+
 interface SendEmailParamsBase {
   /** Recipient email address. */
   to: string;
@@ -111,6 +125,13 @@ interface SendEmailParamsBase {
   text?: string;
   /** The name of the sender. If omitted, the app's name will be used. */
   from_name?: string;
+  /**
+   * Files to attach to the email. Up to 5 attachments, 5 MB each, 10 MB total.
+   *
+   * Each item must have a `filename` and exactly one content source:
+   * `content` (inline base64) or `file_url` (storage reference).
+   */
+  attachments?: EmailAttachment[];
 }
 
 /**
