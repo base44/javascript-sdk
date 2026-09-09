@@ -16,6 +16,11 @@ describe("Auth Module", () => {
   const serverUrl = "https://api.base44.com";
   const appBaseUrl = "https://api.base44.com";
 
+  function authenticate(user, token = "test-access-token") {
+    platform.given.app(appId).auth.principal(token, user);
+    base44.auth.setToken(token, false);
+  }
+
   beforeEach(() => {
     platform.reset();
     // Mock window.addEventListener and document for analytics module
@@ -57,7 +62,7 @@ describe("Auth Module", () => {
         role: "user",
       };
 
-      platform.given.auth.user(mockUser);
+      authenticate(mockUser);
 
       // Call the API
       const result = await base44.auth.me();
@@ -69,16 +74,55 @@ describe("Auth Module", () => {
     });
 
     test("preserves authentication error status", async () => {
-      platform.given.faults.auth.unauthorizedMe();
-
       // Call the API and expect an error
       await expect(base44.auth.me()).rejects.toMatchObject({ status: 401 });
+    });
+
+    test("binds principals to bearer tokens and app scope without sharing login across clients", async () => {
+      const otherAppId = "other-app-id";
+      const anonymousOther = createClient({ serverUrl, appId: otherAppId });
+      const wrongScope = createClient({
+        serverUrl,
+        appId: otherAppId,
+        token: "app-a-token",
+      });
+      const appAAccount = {
+        email: "a@example.test",
+        password: "password-a",
+        accessToken: "app-a-token",
+        user: { id: "user-a", app_id: appId, email: "a@example.test" },
+      };
+      const appBAccount = {
+        email: "b@example.test",
+        password: "password-b",
+        accessToken: "app-b-token",
+        user: { id: "user-b", app_id: otherAppId, email: "b@example.test" },
+      };
+      platform.given.app(appId).auth.account(appAAccount);
+      platform.given.app(otherAppId).auth.account(appBAccount);
+
+      await base44.auth.loginViaEmailPassword(
+        appAAccount.email,
+        appAAccount.password,
+      );
+      await expect(base44.auth.me()).resolves.toEqual(appAAccount.user);
+      await expect(anonymousOther.auth.me()).rejects.toMatchObject({
+        status: 401,
+      });
+      await expect(wrongScope.auth.me()).rejects.toMatchObject({ status: 401 });
+
+      await anonymousOther.auth.loginViaEmailPassword(
+        appBAccount.email,
+        appBAccount.password,
+      );
+      await expect(anonymousOther.auth.me()).resolves.toEqual(appBAccount.user);
+      await expect(base44.auth.me()).resolves.toEqual(appAAccount.user);
     });
 
     test("shares one in-flight request between concurrent callers", async () => {
       const mockUser = { id: "user-123", email: "test@example.com" };
 
-      platform.given.auth.user(mockUser);
+      authenticate(mockUser);
 
       const [first, second] = await Promise.all([
         base44.auth.me(),
@@ -91,12 +135,12 @@ describe("Auth Module", () => {
     });
 
     test("does not reuse a resolved user across separate calls", async () => {
-      platform.given.auth.meSequence([
-        { user: { id: "user-1" } },
-        { user: { id: "user-2" } },
-      ]);
+      authenticate({ id: "user-1" });
 
       const first = await base44.auth.me();
+      platform.given
+        .app(appId)
+        .auth.principal("test-access-token", { id: "user-2" });
       const second = await base44.auth.me();
 
       // Sharing is limited to the in-flight window; identity is never cached.
@@ -106,23 +150,23 @@ describe("Auth Module", () => {
 
     test("does not retain a rejected request", async () => {
       const mockUser = { id: "user-123" };
-      platform.given.auth.meSequence([
-        { unauthorized: true },
-        { user: mockUser },
-      ]);
+      base44.auth.setToken("recovering-token", false);
 
       await expect(base44.auth.me()).rejects.toThrow();
+      platform.given.app(appId).auth.principal("recovering-token", mockUser);
       await expect(base44.auth.me()).resolves.toEqual(mockUser);
     });
 
     test("setToken() drops an in-flight request from the previous identity", async () => {
-      platform.given.auth.meSequence(
-        [
-          { user: { id: "anonymous" } },
-          { user: { id: "logged-in" } },
-        ],
-        50,
-      );
+      platform.given
+        .app(appId)
+        .auth.principal("old-access-token", { id: "anonymous" });
+      platform.given
+        .app(appId)
+        .auth.principal("new-access-token", { id: "logged-in" });
+      platform.given.app(appId).auth.meLatency("old-access-token", 50);
+      platform.given.app(appId).auth.meLatency("new-access-token", 50);
+      base44.auth.setToken("old-access-token", false);
 
       const beforeLogin = base44.auth.me();
       base44.auth.setToken("new-access-token", false);
@@ -135,13 +179,15 @@ describe("Auth Module", () => {
     });
 
     test("a superseded request does not retire the current one", async () => {
-      platform.given.auth.meSequence(
-        [
-          { user: { id: "anonymous" } },
-          { user: { id: "logged-in" } },
-        ],
-        50,
-      );
+      platform.given
+        .app(appId)
+        .auth.principal("old-access-token", { id: "anonymous" });
+      platform.given
+        .app(appId)
+        .auth.principal("new-access-token", { id: "logged-in" });
+      platform.given.app(appId).auth.meLatency("old-access-token", 50);
+      platform.given.app(appId).auth.meLatency("new-access-token", 50);
+      base44.auth.setToken("old-access-token", false);
 
       const beforeLogin = base44.auth.me();
       base44.auth.setToken("new-access-token", false);
@@ -171,6 +217,29 @@ describe("Auth Module", () => {
   });
 
   describe("updateMe()", () => {
+    test("rejects missing and invalid tokens without manufacturing a user", async () => {
+      const invalidClient = createClient({
+        serverUrl,
+        appId,
+        token: "invalid-token",
+      });
+      await expect(
+        base44.auth.updateMe({ name: "Anonymous" }),
+      ).rejects.toMatchObject({
+        status: 401,
+        message: "Unauthorized",
+      });
+      await expect(
+        invalidClient.auth.updateMe({ name: "Invalid" }),
+      ).rejects.toMatchObject({
+        status: 401,
+        message: "Unauthorized",
+      });
+      expect(
+        platform.requests.all("auth.updateMe").map((request) => request.body),
+      ).toEqual([{ name: "Anonymous" }, { name: "Invalid" }]);
+    });
+
     test("should update current user data", async () => {
       const updateData = {
         name: "Updated Name",
@@ -183,7 +252,7 @@ describe("Auth Module", () => {
         role: "user",
       };
 
-      platform.given.auth.user({
+      authenticate({
         id: "user-123",
         name: "Original Name",
         email: "original@example.com",
@@ -205,8 +274,8 @@ describe("Auth Module", () => {
         email: "invalid-email",
       };
 
-      platform.given.auth.user({ id: "user-123", email: "valid@example.com" });
-      platform.given.faults.auth.rejectedUpdate();
+      authenticate({ id: "user-123", email: "valid@example.com" });
+      platform.given.app(appId).faults.auth.rejectedUpdate("test-access-token");
 
       // Call the API and expect an error
       await expect(base44.auth.updateMe(invalidData)).rejects.toMatchObject({
@@ -327,13 +396,13 @@ describe("Auth Module", () => {
 
   describe("logout()", () => {
     test("should remove token from axios headers", async () => {
-      // Set a token first
-      base44.auth.setToken("test-token", false);
-
-      platform.given.auth.user({
-        id: "user-123",
-        email: "test@example.com",
-      });
+      authenticate(
+        {
+          id: "user-123",
+          email: "test@example.com",
+        },
+        "test-token",
+      );
 
       // Verify token is set by making a request
       await base44.auth.me();
@@ -344,11 +413,11 @@ describe("Auth Module", () => {
       // Call logout
       base44.auth.logout();
 
-      platform.given.faults.auth.unauthorizedMe();
-
       // Verify no Authorization header is sent after logout (should throw 401)
       await expect(base44.auth.me()).rejects.toThrow();
-      expect(platform.requests.last("auth.me").headers.authorization).toBeUndefined();
+      expect(
+        platform.requests.last("auth.me").headers.authorization,
+      ).toBeUndefined();
     });
 
     test("should remove token from localStorage in browser environment", async () => {
@@ -464,7 +533,7 @@ describe("Auth Module", () => {
 
       base44.auth.setToken(token, false);
 
-      platform.given.auth.user({
+      platform.given.app(appId).auth.principal(token, {
         id: "user-123",
         email: "test@example.com",
       });
@@ -528,11 +597,11 @@ describe("Auth Module", () => {
     test("should handle empty token gracefully", async () => {
       base44.auth.setToken("", false);
 
-      platform.given.faults.auth.unauthorizedMe();
-
       // Verify no Authorization header is sent (should throw 401)
       await expect(base44.auth.me()).rejects.toThrow();
-      expect(platform.requests.last("auth.me").headers.authorization).toBeUndefined();
+      expect(
+        platform.requests.last("auth.me").headers.authorization,
+      ).toBeUndefined();
     });
 
     test("should handle localStorage errors gracefully", () => {
@@ -581,7 +650,7 @@ describe("Auth Module", () => {
         },
       };
 
-      platform.given.auth.login({
+      platform.given.app(appId).auth.account({
         email: loginData.email,
         password: loginData.password,
         accessToken: mockResponse.access_token,
@@ -621,7 +690,7 @@ describe("Auth Module", () => {
         },
       };
 
-      platform.given.auth.login({
+      platform.given.app(appId).auth.account({
         email: loginData.email,
         password: loginData.password,
         accessToken: mockResponse.access_token,
@@ -652,7 +721,7 @@ describe("Auth Module", () => {
         password: "wrongpassword",
       };
 
-      platform.given.faults.auth.invalidCredentials(loginData.email);
+      platform.given.app(appId).faults.auth.invalidCredentials(loginData.email);
 
       // Set a token first to test logout
       base44.auth.setToken("existing-token", false);
@@ -673,7 +742,9 @@ describe("Auth Module", () => {
         password: "password123",
       };
 
-      platform.given.faults.auth.networkUnavailableLogin(loginData.email);
+      platform.given
+        .app(appId)
+        .faults.auth.networkUnavailableLogin(loginData.email);
 
       // Call the API and expect an error
       await expect(
@@ -690,7 +761,7 @@ describe("Auth Module", () => {
         email: "test@example.com",
       };
 
-      platform.given.auth.user(mockUser);
+      authenticate(mockUser);
 
       // Call the API
       const result = await base44.auth.isAuthenticated();
@@ -700,8 +771,6 @@ describe("Auth Module", () => {
     });
 
     test("should return false when token is invalid", async () => {
-      platform.given.faults.auth.unauthorizedMe();
-
       // Call the API
       const result = await base44.auth.isAuthenticated();
 
@@ -710,7 +779,13 @@ describe("Auth Module", () => {
     });
 
     test("should return false on network errors", async () => {
-      platform.given.faults.auth.networkUnavailableMe();
+      base44.auth.setToken("network-token", false);
+      platform.given
+        .app(appId)
+        .auth.principal("network-token", { id: "user-123" });
+      platform.given
+        .app(appId)
+        .faults.auth.networkUnavailableMe("network-token");
 
       // Call the API
       const result = await base44.auth.isAuthenticated();

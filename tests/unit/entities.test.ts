@@ -18,19 +18,20 @@ declare module "../../src/modules/entities.types.ts" {
 
 describe("Entities Module", () => {
   let base44: ReturnType<typeof createClient>;
+  const appId = "test-app-id";
 
   beforeEach(() => {
     platform.reset();
     base44 = createClient({
       serverUrl: "https://api.base44.com",
-      appId: "test-app-id",
+      appId,
     });
   });
 
   afterEach(() => base44.cleanup());
 
   test("list() fetches arranged entities with the correct parameters", async () => {
-    platform.given.entities.records("Todo", [
+    platform.given.app(appId).entities.records("Todo", [
       { id: "1", title: "Task 1", completed: false },
       { id: "2", title: "Task 2", completed: true },
     ]);
@@ -52,9 +53,11 @@ describe("Entities Module", () => {
   });
 
   test("list() retains id when a field projection omits it", async () => {
-    platform.given.entities.records("Todo", [
-      { id: "1", title: "Projected", completed: false },
-    ]);
+    platform.given
+      .app(appId)
+      .entities.records("Todo", [
+        { id: "1", title: "Projected", completed: false },
+      ]);
 
     await expect(
       base44.entities.Todo.list(undefined, undefined, undefined, ["title"]),
@@ -62,7 +65,7 @@ describe("Entities Module", () => {
   });
 
   test("filter() sends the query and returns matching domain state", async () => {
-    platform.given.entities.records("Todo", [
+    platform.given.app(appId).entities.records("Todo", [
       { id: "1", title: "Task 1", completed: false },
       { id: "2", title: "Task 2", completed: true },
     ]);
@@ -70,13 +73,15 @@ describe("Entities Module", () => {
     const result = await base44.entities.Todo.filter({ completed: true });
 
     expect(result).toEqual([{ id: "2", title: "Task 2", completed: true }]);
-    expect(JSON.parse(platform.requests.last("entities.list").query.q)).toEqual({
-      completed: true,
-    });
+    expect(JSON.parse(platform.requests.last("entities.list").query.q)).toEqual(
+      {
+        completed: true,
+      },
+    );
   });
 
   test("filter() supports typed advanced query syntax", async () => {
-    platform.given.entities.records("Todo", [
+    platform.given.app(appId).entities.records("Todo", [
       { id: "1", title: "Task 1", completed: false, description: "notes" },
       { id: "2", title: "Task 2", completed: true, description: null },
     ]);
@@ -90,13 +95,17 @@ describe("Entities Module", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe("2");
-    expect(JSON.parse(platform.requests.last("entities.list").query.q)).toEqual(query);
+    expect(JSON.parse(platform.requests.last("entities.list").query.q)).toEqual(
+      query,
+    );
   });
 
   test("get() fetches one arranged entity", async () => {
-    platform.given.entities.records("Todo", [
-      { id: "123", title: "Get milk", completed: false },
-    ]);
+    platform.given
+      .app(appId)
+      .entities.records("Todo", [
+        { id: "123", title: "Get milk", completed: false },
+      ]);
 
     await expect(base44.entities.Todo.get("123")).resolves.toEqual({
       id: "123",
@@ -106,7 +115,7 @@ describe("Entities Module", () => {
   });
 
   test("create() persists so subsequent get() and list() observe the record", async () => {
-    platform.given.entities.records("Todo", []);
+    platform.given.app(appId).entities.records("Todo", []);
 
     const created = await base44.entities.Todo.create({
       title: "New task",
@@ -114,7 +123,9 @@ describe("Entities Module", () => {
     });
 
     expect(created).toEqual({ id: "1", title: "New task", completed: false });
-    await expect(base44.entities.Todo.get(created.id)).resolves.toEqual(created);
+    await expect(base44.entities.Todo.get(created.id)).resolves.toEqual(
+      created,
+    );
     await expect(base44.entities.Todo.list()).resolves.toContainEqual(created);
     expect(platform.requests.last("entities.create").body).toEqual({
       title: "New task",
@@ -122,17 +133,50 @@ describe("Entities Module", () => {
     });
   });
 
-  test("update() changes the stored entity", async () => {
-    platform.given.entities.records("Todo", [
-      { id: "123", title: "Old task", completed: false },
+  test("isolates entity state and generated identifiers by application", async () => {
+    const otherAppId = "other-entity-app";
+    const otherClient = createClient({
+      serverUrl: "https://api.base44.com",
+      appId: otherAppId,
+    });
+    platform.given
+      .app(appId)
+      .entities.records("Todo", [
+        { id: "7", title: "App A", completed: false },
+      ]);
+    platform.given
+      .app(otherAppId)
+      .entities.records("Todo", [{ id: "7", title: "App B", completed: true }]);
+
+    const createdA = await base44.entities.Todo.create({
+      title: "Only A",
+      completed: false,
+    });
+    expect(createdA.id).toBe("8");
+    await expect(base44.entities.Todo.list()).resolves.toHaveLength(2);
+    await expect(otherClient.entities.Todo.list()).resolves.toEqual([
+      { id: "7", title: "App B", completed: true },
     ]);
+    otherClient.cleanup();
+  });
+
+  test("update() changes the stored entity", async () => {
+    platform.given
+      .app(appId)
+      .entities.records("Todo", [
+        { id: "123", title: "Old task", completed: false },
+      ]);
 
     const updated = await base44.entities.Todo.update("123", {
       title: "Updated task",
       completed: true,
     });
 
-    expect(updated).toEqual({ id: "123", title: "Updated task", completed: true });
+    expect(updated).toEqual({
+      id: "123",
+      title: "Updated task",
+      completed: true,
+    });
     await expect(base44.entities.Todo.get("123")).resolves.toEqual(updated);
     expect(platform.requests.last("entities.update").body).toEqual({
       title: "Updated task",
@@ -141,16 +185,20 @@ describe("Entities Module", () => {
   });
 
   test("delete() removes the stored entity and returns DeleteResult", async () => {
-    platform.given.entities.records("Todo", [
-      { id: "123", title: "Delete me", completed: false },
-    ]);
+    platform.given
+      .app(appId)
+      .entities.records("Todo", [
+        { id: "123", title: "Delete me", completed: false },
+      ]);
 
-    await expect(base44.entities.Todo.delete("123")).resolves.toEqual({ success: true });
+    await expect(base44.entities.Todo.delete("123")).resolves.toEqual({
+      success: true,
+    });
     await expect(base44.entities.Todo.list()).resolves.toEqual([]);
   });
 
   test("updateMany() applies update operators to matching records", async () => {
-    platform.given.entities.records("Todo", [
+    platform.given.app(appId).entities.records("Todo", [
       { id: "1", title: "One", completed: false },
       { id: "2", title: "Two", completed: false },
       { id: "3", title: "Three", completed: false },
@@ -163,7 +211,9 @@ describe("Entities Module", () => {
     );
 
     expect(result).toEqual({ success: true, updated: 3, has_more: false });
-    expect(await base44.entities.Todo.filter({ completed: true })).toHaveLength(4);
+    expect(await base44.entities.Todo.filter({ completed: true })).toHaveLength(
+      4,
+    );
     expect(platform.requests.last("entities.updateMany").body).toEqual({
       query: { completed: false },
       data: { $set: { completed: true } },
@@ -171,7 +221,7 @@ describe("Entities Module", () => {
   });
 
   test("updateMany() reports has_more at the platform batch limit", async () => {
-    platform.given.entities.records(
+    platform.given.app(appId).entities.records(
       "Todo",
       Array.from({ length: 501 }, (_, index) => ({
         id: String(index + 1),
@@ -192,7 +242,7 @@ describe("Entities Module", () => {
   });
 
   test("bulkUpdate() updates records without dropping existing fields", async () => {
-    platform.given.entities.records("Todo", [
+    platform.given.app(appId).entities.records("Todo", [
       { id: "1", title: "Task 1", completed: false },
       { id: "2", title: "Task 2", completed: false },
     ]);
@@ -211,9 +261,11 @@ describe("Entities Module", () => {
   });
 
   test("reset() isolates platform state and request history", async () => {
-    platform.given.entities.records("Todo", [
-      { id: "1", title: "Transient", completed: false },
-    ]);
+    platform.given
+      .app(appId)
+      .entities.records("Todo", [
+        { id: "1", title: "Transient", completed: false },
+      ]);
     await base44.entities.Todo.list();
 
     platform.reset();

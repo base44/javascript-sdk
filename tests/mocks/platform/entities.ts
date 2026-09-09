@@ -13,25 +13,40 @@ function matches(record: PlatformRecord, query: Record<string, any>): boolean {
   });
 }
 
-function collection(entityName: string) {
-  let records = state.entities.get(entityName);
+function collection(appId: string, entityName: string) {
+  let appEntities = state.entities.get(appId);
+  if (!appEntities) {
+    appEntities = new Map();
+    state.entities.set(appId, appEntities);
+  }
+  let records = appEntities.get(entityName);
   if (!records) {
     records = [];
-    state.entities.set(entityName, records);
+    appEntities.set(entityName, records);
   }
   return records;
+}
+
+function nextId(appId: string) {
+  const id = state.nextEntityIds.get(appId) ?? 1;
+  state.nextEntityIds.set(appId, id + 1);
+  return String(id);
 }
 
 function select(records: PlatformRecord[], request: Request) {
   const search = new URL(request.url).searchParams;
   const query = search.get("q");
-  let selected = query ? records.filter((item) => matches(item, JSON.parse(query))) : [...records];
+  let selected = query
+    ? records.filter((item) => matches(item, JSON.parse(query)))
+    : [...records];
   const sort = search.get("sort");
   if (sort) {
     const descending = sort.startsWith("-");
     const field = descending ? sort.slice(1) : sort;
     selected.sort((left, right) => {
-      const comparison = String(left[field]).localeCompare(String(right[field]));
+      const comparison = String(left[field]).localeCompare(
+        String(right[field]),
+      );
       return descending ? -comparison : comparison;
     });
   }
@@ -49,72 +64,118 @@ function select(records: PlatformRecord[], request: Request) {
 }
 
 export const entityHandlers = [
-  http.get("*/api/apps/:appId/entities/:entityName", async ({ params, request }) => {
-    await recordRequest("entities.list", request);
-    return HttpResponse.json(select(collection(String(params.entityName)), request));
-  }),
-  http.post("*/api/apps/:appId/entities/:entityName", async ({ params, request }) => {
-    await recordRequest("entities.create", request);
-    const input = (await request.clone().json()) as Record<string, any>;
-    const created = { id: String(state.nextEntityId++), ...input };
-    collection(String(params.entityName)).push(created);
-    return HttpResponse.json(created, { status: 201 });
-  }),
-  http.get("*/api/apps/:appId/entities/:entityName/:id", async ({ params, request }) => {
-    await recordRequest("entities.get", request);
-    const found = collection(String(params.entityName)).find(
-      (item) => item.id === params.id,
-    );
-    return found
-      ? HttpResponse.json(found)
-      : HttpResponse.json({ detail: "Entity not found", code: "NOT_FOUND" }, { status: 404 });
-  }),
-  http.put("*/api/apps/:appId/entities/:entityName/bulk", async ({ params, request }) => {
-    await recordRequest("entities.bulkUpdate", request);
-    const updates = (await request.clone().json()) as PlatformRecord[];
-    const records = collection(String(params.entityName));
-    const changed = updates.map((update) => {
-      const index = records.findIndex((item) => item.id === update.id);
-      if (index < 0) return update;
-      records[index] = { ...records[index], ...update };
-      return records[index];
-    });
-    return HttpResponse.json(changed);
-  }),
-  http.put("*/api/apps/:appId/entities/:entityName/:id", async ({ params, request }) => {
-    await recordRequest("entities.update", request);
-    const updates = (await request.clone().json()) as Record<string, any>;
-    const records = collection(String(params.entityName));
-    const index = records.findIndex((item) => item.id === params.id);
-    if (index < 0)
-      return HttpResponse.json({ detail: "Entity not found", code: "NOT_FOUND" }, { status: 404 });
-    records[index] = { ...records[index], ...updates };
-    return HttpResponse.json(records[index]);
-  }),
-  http.delete("*/api/apps/:appId/entities/:entityName/:id", async ({ params, request }) => {
-    await recordRequest("entities.delete", request);
-    const records = collection(String(params.entityName));
-    const index = records.findIndex((item) => item.id === params.id);
-    if (index >= 0) records.splice(index, 1);
-    return HttpResponse.json({ success: index >= 0 });
-  }),
-  http.patch("*/api/apps/:appId/entities/:entityName/update-many", async ({ params, request }) => {
-    await recordRequest("entities.updateMany", request);
-    const { query, data } = (await request.clone().json()) as {
-      query: Record<string, any>;
-      data: { $set?: Record<string, any>; $inc?: Record<string, number> };
-    };
-    const matching = collection(String(params.entityName)).filter((item) => matches(item, query));
-    const selected = matching.slice(0, 500);
-    for (const item of selected) {
-      Object.assign(item, data.$set ?? {});
-      for (const [field, amount] of Object.entries(data.$inc ?? {}))
-        item[field] = Number(item[field] ?? 0) + amount;
-    }
-    return HttpResponse.json({
-      success: true,
-      updated: selected.length,
-      has_more: matching.length > selected.length,
-    });
-  }),
+  http.get(
+    "*/api/apps/:appId/entities/:entityName",
+    async ({ params, request }) => {
+      await recordRequest("entities.list", request);
+      return HttpResponse.json(
+        select(
+          collection(String(params.appId), String(params.entityName)),
+          request,
+        ),
+      );
+    },
+  ),
+  http.post(
+    "*/api/apps/:appId/entities/:entityName",
+    async ({ params, request }) => {
+      await recordRequest("entities.create", request);
+      const input = (await request.clone().json()) as Record<string, any>;
+      const appId = String(params.appId);
+      const created = { id: nextId(appId), ...input };
+      collection(appId, String(params.entityName)).push(created);
+      return HttpResponse.json(created, { status: 201 });
+    },
+  ),
+  http.get(
+    "*/api/apps/:appId/entities/:entityName/:id",
+    async ({ params, request }) => {
+      await recordRequest("entities.get", request);
+      const found = collection(
+        String(params.appId),
+        String(params.entityName),
+      ).find((item) => item.id === params.id);
+      return found
+        ? HttpResponse.json(found)
+        : HttpResponse.json(
+            { detail: "Entity not found", code: "NOT_FOUND" },
+            { status: 404 },
+          );
+    },
+  ),
+  http.put(
+    "*/api/apps/:appId/entities/:entityName/bulk",
+    async ({ params, request }) => {
+      await recordRequest("entities.bulkUpdate", request);
+      const updates = (await request.clone().json()) as PlatformRecord[];
+      const records = collection(
+        String(params.appId),
+        String(params.entityName),
+      );
+      const changed = updates.map((update) => {
+        const index = records.findIndex((item) => item.id === update.id);
+        if (index < 0) return update;
+        records[index] = { ...records[index], ...update };
+        return records[index];
+      });
+      return HttpResponse.json(changed);
+    },
+  ),
+  http.put(
+    "*/api/apps/:appId/entities/:entityName/:id",
+    async ({ params, request }) => {
+      await recordRequest("entities.update", request);
+      const updates = (await request.clone().json()) as Record<string, any>;
+      const records = collection(
+        String(params.appId),
+        String(params.entityName),
+      );
+      const index = records.findIndex((item) => item.id === params.id);
+      if (index < 0)
+        return HttpResponse.json(
+          { detail: "Entity not found", code: "NOT_FOUND" },
+          { status: 404 },
+        );
+      records[index] = { ...records[index], ...updates };
+      return HttpResponse.json(records[index]);
+    },
+  ),
+  http.delete(
+    "*/api/apps/:appId/entities/:entityName/:id",
+    async ({ params, request }) => {
+      await recordRequest("entities.delete", request);
+      const records = collection(
+        String(params.appId),
+        String(params.entityName),
+      );
+      const index = records.findIndex((item) => item.id === params.id);
+      if (index >= 0) records.splice(index, 1);
+      return HttpResponse.json({ success: index >= 0 });
+    },
+  ),
+  http.patch(
+    "*/api/apps/:appId/entities/:entityName/update-many",
+    async ({ params, request }) => {
+      await recordRequest("entities.updateMany", request);
+      const { query, data } = (await request.clone().json()) as {
+        query: Record<string, any>;
+        data: { $set?: Record<string, any>; $inc?: Record<string, number> };
+      };
+      const matching = collection(
+        String(params.appId),
+        String(params.entityName),
+      ).filter((item) => matches(item, query));
+      const selected = matching.slice(0, 500);
+      for (const item of selected) {
+        Object.assign(item, data.$set ?? {});
+        for (const [field, amount] of Object.entries(data.$inc ?? {}))
+          item[field] = Number(item[field] ?? 0) + amount;
+      }
+      return HttpResponse.json({
+        success: true,
+        updated: selected.length,
+        has_more: matching.length > selected.length,
+      });
+    },
+  ),
 ];

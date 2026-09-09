@@ -9,9 +9,9 @@ Arrange domain state with `platform.given`, act only through the SDK, then asser
 ```ts
 import { platform } from "./mocks/platform";
 
-platform.given.entities.records("Todo", [
-  { id: "1", title: "Existing", completed: false },
-]);
+platform.given
+  .app("test-app-id")
+  .entities.records("Todo", [{ id: "1", title: "Existing", completed: false }]);
 
 const created = await client.entities.Todo.create({
   title: "Write a test",
@@ -26,7 +26,7 @@ expect(platform.requests.last("entities.create").body).toEqual({
 });
 ```
 
-Use named fault fixtures such as `platform.given.faults.functions.notFound("missing")` for error cases. Common domain results belong in reusable fixtures; unique function or integration results may be supplied as domain outcomes, but tests must not choose HTTP statuses, headers, wire envelopes, or MSW resolvers.
+Use app-scoped named fault fixtures such as `platform.given.app("test-app-id").faults.functions.notFound("missing")` for error cases. Register reusable domain behavior (for example `functions.notificationDelivery`) rather than supplying endpoint results. Tests must not choose HTTP statuses, headers, wire envelopes, or MSW resolvers.
 
 Global setup resets records, identities, deterministic identifiers, request journals and faults before and after every test. Initial handlers remain installed and `server.resetHandlers()` restores that same centralized set. Do not use concurrent tests against this singleton state.
 

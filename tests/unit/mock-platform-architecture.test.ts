@@ -13,6 +13,7 @@ describe("mock platform architecture", () => {
       ["from ", '"msw"'].join(""),
       ["from ", "'msw'"].join(""),
       ["mocks/", "server"].join(""),
+      ["given.functions", ".result("].join(""),
     ];
     const violations = readdirSync(unitDirectory)
       .filter((name) => /\.test\.[jt]s$/.test(name))

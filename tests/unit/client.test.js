@@ -355,7 +355,7 @@ describe("Service Role Authorization Headers", () => {
       serviceToken: serviceToken,
     });
 
-    platform.given.entities.records("Todo", []);
+    platform.given.app(appId).entities.records("Todo", []);
 
     // Make requests
     await client.entities.Todo.list();
@@ -376,9 +376,9 @@ describe("Service Role Authorization Headers", () => {
       serviceToken: serviceToken,
     });
 
-    platform.given.entities.records("User", [
-      { id: "123", name: "Test User" },
-    ]);
+    platform.given
+      .app(appId)
+      .entities.records("User", [{ id: "123", name: "Test User" }]);
 
     // Make request
     const result = await client.asServiceRole.entities.User.get("123");
@@ -412,9 +412,9 @@ describe("Service Role Authorization Headers", () => {
     // Verify response
     expect(result.success).toBe(true);
     expect(result.messageId).toBe("123");
-    expect(platform.requests.last("integrations.invoke").headers.authorization).toBe(
-      `Bearer ${serviceToken}`,
-    );
+    expect(
+      platform.requests.last("integrations.invoke").headers.authorization,
+    ).toBe(`Bearer ${serviceToken}`);
   });
 
   test("should use service token for service role functions operations", async () => {
@@ -426,9 +426,7 @@ describe("Service Role Authorization Headers", () => {
       serviceToken: serviceToken,
     });
 
-    platform.given.functions.result("testFunction", {
-      result: "function executed",
-    });
+    platform.given.app(appId).functions.serviceExecution("testFunction");
 
     // Make request
     const result = await client.asServiceRole.functions.invoke("testFunction", {
@@ -454,9 +452,9 @@ describe("Service Role Authorization Headers", () => {
       serviceToken: serviceToken,
     });
 
-    platform.given.entities.records("Task", [
-      { id: "task1", title: "User Task" },
-    ]);
+    platform.given
+      .app(appId)
+      .entities.records("Task", [{ id: "task1", title: "User Task" }]);
     platform.given.integrations.emailDelivered("email123");
 
     // Make requests using regular client (not service role)
@@ -474,9 +472,9 @@ describe("Service Role Authorization Headers", () => {
     expect(platform.requests.last("entities.list").headers.authorization).toBe(
       `Bearer ${userToken}`,
     );
-    expect(platform.requests.last("integrations.invoke").headers.authorization).toBe(
-      `Bearer ${userToken}`,
-    );
+    expect(
+      platform.requests.last("integrations.invoke").headers.authorization,
+    ).toBe(`Bearer ${userToken}`);
   });
 
   test("should work without authorization header when no tokens are provided", async () => {
@@ -485,16 +483,18 @@ describe("Service Role Authorization Headers", () => {
       appId,
     });
 
-    platform.given.entities.records("PublicData", [
-      { id: "public1", data: "public" },
-    ]);
+    platform.given
+      .app(appId)
+      .entities.records("PublicData", [{ id: "public1", data: "public" }]);
 
     // Make request
     const result = await client.entities.PublicData.list();
 
     // Verify response
     expect(result[0].data).toBe("public");
-    expect(platform.requests.last("entities.list").headers.authorization).toBeUndefined();
+    expect(
+      platform.requests.last("entities.list").headers.authorization,
+    ).toBeUndefined();
   });
 
   test("should propagate Base44-State header in API requests when created from request", async () => {
@@ -516,7 +516,7 @@ describe("Service Role Authorization Headers", () => {
 
     const client = createClientFromRequest(mockRequest);
 
-    platform.given.entities.records("Todo", []);
+    platform.given.app(appId).entities.records("Todo", []);
 
     // Make request
     await client.entities.Todo.list();
@@ -543,7 +543,7 @@ describe("Service Role Authorization Headers", () => {
 
     const client = createClientFromRequest(mockRequest);
 
-    platform.given.entities.records("Todo", []);
+    platform.given.app(appId).entities.records("Todo", []);
 
     await client.entities.Todo.list();
     expect(platform.requests.last("entities.list").headers).toMatchObject({
@@ -569,7 +569,7 @@ describe("Service Role Authorization Headers", () => {
 
     const client = createClientFromRequest(mockRequest);
 
-    platform.given.entities.records("Todo", []);
+    platform.given.app(appId).entities.records("Todo", []);
 
     await client.entities.Todo.list();
     const headers = platform.requests.last("entities.list").headers;
@@ -593,7 +593,7 @@ describe("Service Role Authorization Headers", () => {
 
     const client = createClientFromRequest(mockRequest);
 
-    platform.given.entities.records("Todo", []);
+    platform.given.app(appId).entities.records("Todo", []);
 
     await client.entities.Todo.list();
     const headers = platform.requests.last("entities.list").headers;
@@ -617,7 +617,7 @@ describe("Service Role Authorization Headers", () => {
 
     const client = createClientFromRequest(mockRequest);
 
-    platform.given.entities.records("Todo", []);
+    platform.given.app(appId).entities.records("Todo", []);
 
     // Make request
     await client.entities.Todo.list();
@@ -645,9 +645,9 @@ describe("Service Role Authorization Headers", () => {
 
     const client = createClientFromRequest(mockRequest);
 
-    platform.given.entities.records("User", [
-      { id: "123", name: "Test User" },
-    ]);
+    platform.given
+      .app(appId)
+      .entities.records("User", [{ id: "123", name: "Test User" }]);
 
     // Make request using service role
     const result = await client.asServiceRole.entities.User.get("123");

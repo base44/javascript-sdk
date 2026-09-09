@@ -59,19 +59,38 @@ export interface ConnectorProxyOutcome {
   creditsCharged?: number;
 }
 
+export interface FunctionInvocation {
+  appId: string;
+  functionName: string;
+  body: unknown;
+  query: Record<string, string>;
+  headers: Record<string, string>;
+}
+
+export type FunctionBehavior = (
+  invocation: FunctionInvocation,
+) => unknown | Promise<unknown>;
+
 export type PlatformFault =
-  | { kind: "integration-invalid-parameters"; packageName: string; endpointName: string }
+  | {
+      kind: "integration-invalid-parameters";
+      packageName: string;
+      endpointName: string;
+    }
   | { kind: "custom-upstream-unavailable"; slug: string; operationId: string }
   | { kind: "connector-credits-exhausted"; integrationType: string }
   | { kind: "metered-connector-token-refused"; integrationType: string }
-  | { kind: "auth-registration-rejected"; email: string }
-  | { kind: "auth-reset-token-expired"; resetToken: string }
-  | { kind: "function-internal-error"; functionName: string }
-  | { kind: "function-not-found"; functionName: string }
-  | { kind: "function-network-unavailable"; functionName: string };
+  | { kind: "auth-registration-rejected"; appId: string; email: string }
+  | { kind: "function-internal-error"; appId: string; functionName: string }
+  | { kind: "function-not-found"; appId: string; functionName: string }
+  | {
+      kind: "function-network-unavailable";
+      appId: string;
+      functionName: string;
+    };
 
 interface PlatformState {
-  entities: Map<string, PlatformRecord[]>;
+  entities: Map<string, Map<string, PlatformRecord[]>>;
   conversations: PlatformConversation[];
   integrationEndpoints: Map<string, IntegrationEndpoint>;
   customIntegrations: Map<string, Map<string, CustomIntegrationOperation>>;
@@ -81,11 +100,10 @@ interface PlatformState {
   connectorProxyOutcomes: Map<string, ConnectorProxyOutcome>;
   registrations: Map<string, PlatformRegistration>;
   passwordResetRequestMessages: Map<string, string>;
-  passwordResetUsers: Map<string, PlatformRecord>;
-  functionResults: Map<string, unknown>;
-  rawFunctions: Map<string, string>;
+  functionBehaviors: Map<string, Map<string, FunctionBehavior>>;
+  legacyFunctions: Set<string>;
   faults: PlatformFault[];
-  nextEntityId: number;
+  nextEntityIds: Map<string, number>;
   nextConversationId: number;
   nextMessageId: number;
   requests: RecordedRequest[];
@@ -102,11 +120,10 @@ export const state: PlatformState = {
   connectorProxyOutcomes: new Map(),
   registrations: new Map(),
   passwordResetRequestMessages: new Map(),
-  passwordResetUsers: new Map(),
-  functionResults: new Map(),
-  rawFunctions: new Map(),
+  functionBehaviors: new Map(),
+  legacyFunctions: new Set(),
   faults: [],
-  nextEntityId: 1,
+  nextEntityIds: new Map(),
   nextConversationId: 1,
   nextMessageId: 1,
   requests: [],
@@ -123,17 +140,19 @@ export function resetPlatformState() {
   state.connectorProxyOutcomes.clear();
   state.registrations.clear();
   state.passwordResetRequestMessages.clear();
-  state.passwordResetUsers.clear();
-  state.functionResults.clear();
-  state.rawFunctions.clear();
+  state.functionBehaviors.clear();
+  state.legacyFunctions.clear();
   state.faults = [];
-  state.nextEntityId = 1;
+  state.nextEntityIds.clear();
   state.nextConversationId = 1;
   state.nextMessageId = 1;
   state.requests = [];
 }
 
-export async function recordRequest(route: string, request: Request) {
+export async function recordRequest(
+  route: string,
+  request: Request,
+): Promise<RecordedRequest> {
   const url = new URL(request.url);
   let body: unknown;
   if (request.body) {
@@ -163,12 +182,14 @@ export async function recordRequest(route: string, request: Request) {
       body = await request.clone().text();
     }
   }
-  state.requests.push({
+  const recorded = {
     route,
     method: request.method,
     url: request.url,
     query: Object.fromEntries(url.searchParams),
     headers: Object.fromEntries(request.headers),
     body,
-  });
+  } satisfies RecordedRequest;
+  state.requests.push(recorded);
+  return recorded;
 }

@@ -36,10 +36,7 @@ describe("Functions Module", () => {
       priority: "high",
     };
 
-    platform.given.functions.result(functionName, {
-      success: true,
-      messageId: "msg-456",
-    });
+    platform.given.app(appId).functions.notificationDelivery("msg-456");
 
     // Call the function
     const result = await base44.functions.invoke(functionName, functionData);
@@ -50,15 +47,16 @@ describe("Functions Module", () => {
     expect(platform.requests.last("functions.invoke").body).toEqual(
       functionData,
     );
+    expect(platform.requests.last("functions.invoke").headers).toMatchObject({
+      "content-type": "application/json",
+      "x-app-id": appId,
+    });
   });
 
   test("should handle function with empty object parameters", async () => {
     const functionName = "getStatus";
 
-    platform.given.functions.result(functionName, {
-      status: "healthy",
-      timestamp: "2024-01-01T00:00:00Z",
-    });
+    platform.given.app(appId).functions.serviceHealth("2024-01-01T00:00:00Z");
 
     // Call the function
     const result = await base44.functions.invoke(functionName, {});
@@ -87,10 +85,7 @@ describe("Functions Module", () => {
       },
     };
 
-    platform.given.functions.result(functionName, {
-      processed: true,
-      userId: "123",
-    });
+    platform.given.app(appId).functions.userProcessor();
 
     // Call the function
     const result = await base44.functions.invoke(functionName, functionData);
@@ -111,11 +106,7 @@ describe("Functions Module", () => {
       category: "documents",
     };
 
-    platform.given.functions.result(functionName, {
-      fileId: "file-789",
-      filename: "test.txt",
-      size: 12,
-    });
+    platform.given.app(appId).functions.fileStore(functionName, "file-789");
 
     // Call the function
     const result = await base44.functions.invoke(functionName, functionData);
@@ -151,11 +142,9 @@ describe("Functions Module", () => {
       priority: "high",
     };
 
-    platform.given.functions.result(functionName, {
-      documentId: "doc-123",
-      processed: true,
-      extractedText: "document content",
-    });
+    platform.given
+      .app(appId)
+      .functions.documentProcessor("doc-123", "document content");
 
     // Call the function
     const result = await base44.functions.invoke(functionName, functionData);
@@ -189,10 +178,9 @@ describe("Functions Module", () => {
     formData.append("email", "john@example.com");
     formData.append("message", "Hello there");
 
-    platform.given.functions.result(functionName, {
-      formId: "form-456",
-      submitted: true,
-    });
+    platform.given
+      .app(appId)
+      .functions.formSubmissions(functionName, "form-456");
 
     // Call the function
     const result = await base44.functions.invoke(functionName, formData);
@@ -221,9 +209,10 @@ describe("Functions Module", () => {
         type: "application/octet-stream",
       }),
     );
-    platform.given.functions.result("upload", { ok: true });
+    platform.given.app(appId).functions.uploadAcceptance("upload");
     expect((await base44.functions.invoke("upload", form)).data).toEqual({
       ok: true,
+      success: true,
     });
     expect(form.getAll("tag")).toEqual(["one", "two"]);
     expect(
@@ -243,6 +232,9 @@ describe("Functions Module", () => {
         },
       },
     ]);
+    expect(
+      platform.requests.last("functions.invoke").headers["content-type"],
+    ).toMatch(/^multipart\/form-data; boundary=/);
   });
 
   test("should throw error for string input instead of object", async () => {
@@ -263,7 +255,7 @@ describe("Functions Module", () => {
       input: "test data",
     };
 
-    platform.given.functions.result(functionName, { processed: true });
+    platform.given.app(appId).functions.userProcessor(functionName);
 
     // Call the function
     const result = await base44.functions.invoke(functionName, functionData);
@@ -281,15 +273,25 @@ describe("Functions Module", () => {
       param: "value",
     };
 
-    platform.given.faults.functions.internalError(functionName);
+    platform.given.app(appId).faults.functions.internalError(functionName);
+    platform.given.app(appId).functions.userProcessor(functionName);
 
     // Call the function and expect it to throw
     await expect(
       base44.functions.invoke(functionName, functionData),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({
+      message: "Request failed with status code 500",
+      response: {
+        status: 500,
+        data: { error: "Internal server error", code: "INTERNAL_ERROR" },
+      },
+    });
     expect(platform.requests.last("functions.invoke").body).toEqual(
       functionData,
     );
+    await expect(
+      base44.functions.invoke(functionName, functionData),
+    ).resolves.toMatchObject({ data: { processed: true } });
   });
 
   test("should handle 404 errors for non-existent functions", async () => {
@@ -298,12 +300,18 @@ describe("Functions Module", () => {
       param: "value",
     };
 
-    platform.given.faults.functions.notFound(functionName);
+    platform.given.app(appId).faults.functions.notFound(functionName);
 
     // Call the function and expect it to throw
     await expect(
       base44.functions.invoke(functionName, functionData),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({
+      message: "Request failed with status code 404",
+      response: {
+        status: 404,
+        data: { error: "Function not found", code: "FUNCTION_NOT_FOUND" },
+      },
+    });
     expect(platform.requests.last("functions.invoke").body).toEqual(
       functionData,
     );
@@ -318,10 +326,7 @@ describe("Functions Module", () => {
       emptyString: "",
     };
 
-    platform.given.functions.result(functionName, {
-      received: true,
-      values: functionData,
-    });
+    platform.given.app(appId).functions.inputReceipt(functionName);
 
     // Call the function
     const result = await base44.functions.invoke(functionName, functionData);
@@ -343,10 +348,7 @@ describe("Functions Module", () => {
       mixed: [1, "two", { three: 3 }],
     };
 
-    platform.given.functions.result(functionName, {
-      processed: true,
-      count: 3,
-    });
+    platform.given.app(appId).functions.arrayProcessor(functionName);
 
     // Call the function
     const result = await base44.functions.invoke(functionName, functionData);
@@ -368,7 +370,7 @@ describe("Functions Module", () => {
       category: "documents",
     };
 
-    platform.given.functions.result(functionName, { success: true });
+    platform.given.app(appId).functions.uploadAcceptance(functionName);
 
     // Call the function
     const result = await base44.functions.invoke(functionName, functionData);
@@ -387,7 +389,7 @@ describe("Functions Module", () => {
     formData.append("name", "John Doe");
     formData.append("email", "john@example.com");
 
-    platform.given.functions.result(functionName, { success: true });
+    platform.given.app(appId).functions.uploadAcceptance(functionName);
 
     // Call the function
     const result = await base44.functions.invoke(functionName, formData);
@@ -417,10 +419,7 @@ describe("Functions Module", () => {
       token: userToken,
     });
 
-    platform.given.functions.result(functionName, {
-      success: true,
-      authenticated: true,
-    });
+    platform.given.app(appId).functions.authenticatedProbe(functionName);
 
     // Call the function
     const result = await authenticatedBase44.functions.invoke(
@@ -437,8 +436,38 @@ describe("Functions Module", () => {
     authenticatedBase44.cleanup();
   });
 
+  test("dispatches the same function name to app-scoped registered behavior", async () => {
+    const otherAppId = "other-function-app";
+    const thirdAppId = "unconfigured-function-app";
+    const otherClient = createClient({ serverUrl, appId: otherAppId });
+    const unconfiguredClient = createClient({ serverUrl, appId: thirdAppId });
+    platform.given.app(appId).functions.serviceHealth("app-a-time");
+    platform.given.app(otherAppId).functions.serviceHealth("app-b-time");
+
+    await expect(
+      base44.functions.invoke("getStatus", {}),
+    ).resolves.toMatchObject({
+      data: { status: "healthy", timestamp: "app-a-time" },
+    });
+    await expect(
+      otherClient.functions.invoke("getStatus", {}),
+    ).resolves.toMatchObject({
+      data: { status: "healthy", timestamp: "app-b-time" },
+    });
+    await expect(
+      unconfiguredClient.functions.invoke("getStatus", {}),
+    ).rejects.toMatchObject({
+      response: {
+        status: 404,
+        data: { error: "Function not found", code: "FUNCTION_NOT_FOUND" },
+      },
+    });
+    otherClient.cleanup();
+    unconfiguredClient.cleanup();
+  });
+
   test("should fetch function endpoint directly", async () => {
-    platform.given.functions.raw("my_function");
+    platform.given.functions.legacyEndpoint("my_function");
 
     await base44.functions.fetch("/my_function", { method: "GET" });
 
@@ -455,7 +484,7 @@ describe("Functions Module", () => {
       token: userToken,
     });
 
-    platform.given.functions.raw("streaming_demo");
+    platform.given.functions.legacyEndpoint("streaming_demo");
 
     await authenticatedBase44.functions.fetch("streaming_demo", {
       method: "POST",
@@ -470,7 +499,7 @@ describe("Functions Module", () => {
   });
 
   test("should normalize path with and without leading slash", async () => {
-    platform.given.functions.raw("my_function");
+    platform.given.functions.legacyEndpoint("my_function");
 
     await base44.functions.fetch("/my_function");
     await base44.functions.fetch("my_function");
@@ -488,7 +517,7 @@ describe("Functions Module", () => {
     const serviceToken = "service-role-token";
     const serviceRoleBase44 = createClient({ serverUrl, appId, serviceToken });
 
-    platform.given.functions.raw("service_function");
+    platform.given.functions.legacyEndpoint("service_function");
 
     await serviceRoleBase44.asServiceRole.functions.fetch("/service_function", {
       method: "GET",

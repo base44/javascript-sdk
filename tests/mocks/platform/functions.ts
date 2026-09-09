@@ -12,12 +12,14 @@ export const functionHandlers = [
   http.post(
     "*/api/apps/:appId/functions/:functionName",
     async ({ params, request }) => {
-      await recordRequest("functions.invoke", request);
+      const recorded = await recordRequest("functions.invoke", request);
+      const appId = String(params.appId);
       const functionName = String(params.functionName);
       if (
         takeFault(
           (fault) =>
             fault.kind === "function-network-unavailable" &&
+            fault.appId === appId &&
             fault.functionName === functionName,
         )
       ) {
@@ -27,6 +29,7 @@ export const functionHandlers = [
         takeFault(
           (fault) =>
             fault.kind === "function-internal-error" &&
+            fault.appId === appId &&
             fault.functionName === functionName,
         )
       ) {
@@ -39,16 +42,25 @@ export const functionHandlers = [
         takeFault(
           (fault) =>
             fault.kind === "function-not-found" &&
+            fault.appId === appId &&
             fault.functionName === functionName,
         ) ||
-        !state.functionResults.has(functionName)
+        !state.functionBehaviors.get(appId)?.has(functionName)
       ) {
         return HttpResponse.json(
           { error: "Function not found", code: "FUNCTION_NOT_FOUND" },
           { status: 404 },
         );
       }
-      return HttpResponse.json(state.functionResults.get(functionName));
+      const behavior = state.functionBehaviors.get(appId)!.get(functionName)!;
+      const result = await behavior({
+        appId,
+        functionName,
+        body: recorded.body,
+        query: recorded.query,
+        headers: recorded.headers,
+      });
+      return HttpResponse.json(result);
     },
   ),
   // The SDK also exposes this legacy, non-app-scoped alias. It is not present
@@ -62,12 +74,12 @@ export const functionHandlers = [
         new URL(request.url).pathname.indexOf(marker) + marker.length,
       ),
     );
-    if (!state.rawFunctions.has(path)) {
+    if (!state.legacyFunctions.has(path)) {
       return HttpResponse.json(
         { detail: "Function not found" },
         { status: 404 },
       );
     }
-    return new HttpResponse(state.rawFunctions.get(path), { status: 200 });
+    return new HttpResponse("ok", { status: 200 });
   }),
 ];

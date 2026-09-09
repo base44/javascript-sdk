@@ -17,7 +17,7 @@ describe("Auth registration and password recovery HTTP contracts", () => {
       turnstile_token: "challenge",
       referral_code: "referral",
     };
-    platform.given.auth.registration(payload.email, {
+    platform.given.app(appId).auth.registration(payload.email, {
       id: "new-user-id",
       message: "Verification required",
       otpExpiresInMinutes: 10,
@@ -36,7 +36,7 @@ describe("Auth registration and password recovery HTTP contracts", () => {
       email: "existing@example.test",
       password: "test-only-password",
     };
-    platform.given.faults.auth.registrationRejected(payload.email);
+    platform.given.app(appId).faults.auth.registrationRejected(payload.email);
     await expect(client.auth.register(payload)).rejects.toMatchObject({
       status: 400,
       message: "Registration rejected",
@@ -44,20 +44,30 @@ describe("Auth registration and password recovery HTTP contracts", () => {
     expect(platform.requests.last("auth.register").body).toEqual(payload);
   });
   test("password reset request sends only the email", async () => {
-    platform.given.auth.passwordResetRequest("reset@example.test");
+    platform.given.app(appId).auth.passwordResetRequest("reset@example.test");
     expect(
       await client.auth.resetPasswordRequest("reset@example.test"),
     ).toEqual({ message: "Request accepted" });
-    expect(
-      platform.requests.last("auth.resetPasswordRequest").body,
-    ).toEqual({ email: "reset@example.test" });
-  });
-  test("password reset maps SDK camelCase to wire snake_case", async () => {
-    platform.given.auth.passwordReset("test-reset-token", {
-      id: "reset-user-id",
+    expect(platform.requests.last("auth.resetPasswordRequest").body).toEqual({
       email: "reset@example.test",
-      name: "Reset User",
     });
+  });
+  test("password reset changes credentials, consumes the token, and supports subsequent SDK login", async () => {
+    const account = {
+      email: "reset@example.test",
+      password: "old-password",
+      accessToken: "reset-user-access-token",
+      user: {
+        id: "reset-user-id",
+        app_id: appId,
+        email: "reset@example.test",
+        name: "Reset User",
+      },
+    };
+    platform.given.app(appId).auth.account(account);
+    platform.given
+      .app(appId)
+      .auth.resetToken("test-reset-token", account.email);
     expect(
       await client.auth.resetPassword({
         resetToken: "test-reset-token",
@@ -65,6 +75,7 @@ describe("Auth registration and password recovery HTTP contracts", () => {
       }),
     ).toEqual({
       id: "reset-user-id",
+      app_id: appId,
       email: "reset@example.test",
       name: "Reset User",
     });
@@ -72,9 +83,25 @@ describe("Auth registration and password recovery HTTP contracts", () => {
       reset_token: "test-reset-token",
       new_password: "test-new-password",
     });
+    await expect(
+      client.auth.loginViaEmailPassword(account.email, "old-password"),
+    ).rejects.toMatchObject({ status: 400, message: "Invalid credentials" });
+    await expect(
+      client.auth.loginViaEmailPassword(account.email, "test-new-password"),
+    ).resolves.toMatchObject({
+      access_token: account.accessToken,
+      user: account.user,
+    });
+    await expect(client.auth.me()).resolves.toEqual(account.user);
+    await expect(
+      client.auth.resetPassword({
+        resetToken: "test-reset-token",
+        newPassword: "another-password",
+      }),
+    ).rejects.toMatchObject({ status: 400, message: "Reset token invalid" });
   });
   test("invalid reset token retains the error status and message", async () => {
-    platform.given.faults.auth.resetTokenExpired("expired");
+    platform.given.app(appId).faults.auth.resetTokenExpired("expired");
     await expect(
       client.auth.resetPassword({
         resetToken: "expired",
@@ -85,5 +112,32 @@ describe("Auth registration and password recovery HTTP contracts", () => {
       reset_token: "expired",
       new_password: "test-new-password",
     });
+    await expect(
+      client.auth.resetPassword({
+        resetToken: "unknown",
+        newPassword: "test-new-password",
+      }),
+    ).rejects.toMatchObject({ status: 400, message: "Reset token invalid" });
+  });
+
+  test("does not accept a reset token issued for another app", async () => {
+    const otherAppId = "other-reset-app";
+    const otherClient = createClient({ serverUrl, appId: otherAppId });
+    platform.given.app(appId).auth.account({
+      email: "scoped@example.test",
+      password: "old-password",
+      accessToken: "scoped-access-token",
+      user: { id: "scoped-user", app_id: appId, email: "scoped@example.test" },
+    });
+    platform.given
+      .app(appId)
+      .auth.resetToken("app-a-reset-token", "scoped@example.test");
+    await expect(
+      otherClient.auth.resetPassword({
+        resetToken: "app-a-reset-token",
+        newPassword: "new-password",
+      }),
+    ).rejects.toMatchObject({ status: 400, message: "Reset token invalid" });
+    otherClient.cleanup();
   });
 });
