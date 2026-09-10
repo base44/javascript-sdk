@@ -304,6 +304,7 @@ export function createAuthModule(
 
         if (access_token) {
           this.setToken(access_token);
+          if (typeof user?.id === "string") notifyAuthState({ status: "authenticated", userId: user.id });
         }
 
         return {

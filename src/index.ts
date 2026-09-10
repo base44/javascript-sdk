@@ -33,6 +33,8 @@ export type {
 };
 
 export * from "./types.js";
+export { evaluateExperiments } from "./modules/experiments-evaluator.js";
+export type { ExperimentsConfig, ExperimentsContext, ExperimentsIdentity } from "./modules/experiments-config.types.js";
 
 // Module types
 export type {

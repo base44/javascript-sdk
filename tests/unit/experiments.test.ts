@@ -25,8 +25,8 @@ function setup(hasToken = false) {
   });
   const settle = (index: number, state: AuthState) => {
     bridge.onAuthStateChange(state);
-    if (state.status === "authenticated") requests[index].resolve({ id: state.userId } as User);
-    else requests[index].reject(new Error("lookup failed"));
+    if (state.status === "authenticated") requests[index]?.resolve({ id: state.userId } as User);
+    else requests[index]?.reject(new Error("lookup failed"));
   };
   return { ...bridge, runtime, requests, settle, me, trackExposure };
 }
@@ -77,7 +77,7 @@ describe("browser experiments", () => {
     expect(b.runtime.userId).toBe("user-1");
     expect(observed).toEqual([false]);
     expect(b.module.isEnabled("checkout")).toBe(true);
-    expect(b.me).toHaveBeenCalledOnce();
+    expect(b.me).not.toHaveBeenCalled();
   });
 
   test("snapshots are stable and immutable and observation alone does not expose", async () => {
@@ -108,20 +108,20 @@ describe("browser experiments", () => {
     b.onAuthStateChange({ status: "anonymous" });
     expect(b.runtime.userId).toBeNull();
     expect(b.module.isEnabled("checkout")).toBe(false);
-    b.requests[0].resolve({ id: "stale-user" } as User);
   });
 
-  test("failed identity lookup returns fallbacks and explicit ready retries", async () => {
+  test("failed common identity lookup returns fallbacks without starting its own retry", async () => {
     const b = setup(true);
     const ready = b.module.ready();
     b.settle(0, { status: "error" });
     expect(await ready).toEqual({ flags: {}, isLoading: false });
     expect(b.module.isEnabled("checkout", true)).toBe(true);
-    expect(b.me).toHaveBeenCalledOnce();
+    expect(b.me).not.toHaveBeenCalled();
     expect(b.trackExposure).not.toHaveBeenCalled();
+    expect(await b.module.ready()).toEqual({ flags: {}, isLoading: false });
+    b.onAuthStateChange({ status: "pending" });
     const retry = b.module.ready();
-    await vi.waitFor(() => expect(b.me).toHaveBeenCalledTimes(2));
-    b.settle(1, { status: "authenticated", userId: "user-1" });
+    b.settle(0, { status: "authenticated", userId: "user-1" });
     expect((await retry).flags.checkout).toBe(true);
   });
 
@@ -163,6 +163,5 @@ describe("browser experiments", () => {
     if (action === "logout") b.onAuthStateChange({ status: "anonymous" });
     else b.cleanup();
     expect((await ready).isLoading).toBe(false);
-    b.requests[0].resolve({ id: "obsolete-user" } as User);
   });
 });

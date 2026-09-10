@@ -22,10 +22,11 @@ describe("experiment exposure transport", () => {
     vi.stubGlobal("document", {});
     client = axios.create();
     client.defaults.headers.common.Authorization = "Bearer user-1-token";
-    request = vi.spyOn(client, "request").mockResolvedValue({ data: { accepted: 1 } });
+    request = vi.spyOn(client, "request").mockResolvedValue({ accepted: 1 });
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
     vi.resetModules();
@@ -42,10 +43,11 @@ describe("experiment exposure transport", () => {
       headers: { Authorization: "Bearer user-1-token" },
       data: { events: [{
         event_name: "__experiment_exposure__",
+        event_id: expect.any(String),
         timestamp: expect.any(String),
         session_id: "runtime-visitor",
         page_url: "/checkout",
-        properties: assignment,
+        properties: { ...assignment, source: "browser" },
       }] },
     });
     const event = request.mock.calls[0][0].data.events[0];
@@ -106,20 +108,47 @@ describe("experiment exposure transport", () => {
     expect(getAnalyticsSessionId()).toBe(fallback);
   });
 
-  test("retries on a later read after a failed request without an unhandled rejection", async () => {
+  test("automatically retries the same event and credentials after a lost acknowledgement", async () => {
+    vi.useFakeTimers();
     request.mockRejectedValueOnce(new Error("offline"));
     const tracker = createExposureTracker({ axiosClient: client, appId, enabled: true });
     tracker.track(assignment, identity);
-    await Promise.resolve();
-    tracker.track(assignment, identity);
-
+    client.defaults.headers.common.Authorization = "Bearer replacement";
+    await vi.advanceTimersByTimeAsync(100);
+    await tracker.flush();
     expect(request).toHaveBeenCalledTimes(2);
+    expect(request.mock.calls[1][0]).toEqual(request.mock.calls[0][0]);
+    expect(request.mock.calls[0][0].data.events[0].event_id).toMatch(/^[0-9a-f-]{36}$/);
+    vi.useRealTimers();
+  });
+
+  test("backend flush rejects unaccepted batches and a later flush reuses the same event", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("window", undefined);
+    request.mockResolvedValue({ accepted: 0 });
+    const tracker = createExposureTracker({ axiosClient: client, appId, enabled: true, source: "backend", pageUrl: "/checkout" });
+    tracker.track(assignment, identity);
+    const failed = expect(tracker.flush()).rejects.toThrow("not accepted");
+    await vi.advanceTimersByTimeAsync(600);
+    await failed;
+    expect(request).toHaveBeenCalledTimes(3);
+    const initial = request.mock.calls[0][0];
+    expect(initial.data.events[0].properties.source).toBe("backend");
+    expect(initial.data.events[0].page_url).toBe("/checkout");
+    request.mockResolvedValue({ accepted: 1 });
+    await tracker.flush();
+    expect(request).toHaveBeenCalledTimes(4);
+    expect(request.mock.calls[3][0]).toEqual(initial);
+    tracker.track(assignment, identity);
+    await tracker.flush();
+    expect(request).toHaveBeenCalledTimes(4);
   });
 
   test.each(["user-1", null])("pins Authorization before defaults change for %s", async (userId) => {
     request.mockRestore();
-    const adapter = vi.fn(async (config) => ({ data: {}, status: 200, statusText: "OK", headers: {}, config }));
+    const adapter = vi.fn(async (config) => ({ data: { accepted: 1 }, status: 200, statusText: "OK", headers: {}, config }));
     client.defaults.adapter = adapter;
+    client.interceptors.response.use((response) => response.data);
     client.interceptors.request.use(async (config) => {
       await Promise.resolve();
       return config;

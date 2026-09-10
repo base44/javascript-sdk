@@ -8,6 +8,8 @@ import {
   type ExperimentsRuntime,
 } from "./experiments-runtime.types.js";
 import type { createExposureTracker } from "./experiment-exposures.js";
+import type { ExperimentsContext } from "./experiments-config.types.js";
+import { createExperimentsRuntime } from "./experiments-context.js";
 
 const EMPTY: ExperimentsSnapshot = Object.freeze({
   flags: Object.freeze({}),
@@ -18,19 +20,30 @@ const EMPTY: ExperimentsSnapshot = Object.freeze({
 export function createExperimentsModule({
   getAuth,
   trackExposure,
+  flushExposures = async () => {},
+  context,
 }: {
   getAuth: () => InternalAuthModule;
   trackExposure: ReturnType<typeof createExposureTracker>["track"];
+  flushExposures?: () => Promise<void>;
+  context?: ExperimentsContext;
 }) {
-  let runtime: ExperimentsRuntime | undefined;
-  let state: AuthState | undefined;
+  let runtime: ExperimentsRuntime | undefined = context ? createExperimentsRuntime(context) : undefined;
+  let state: AuthState | undefined = context
+    ? context.identity.status === "pending" ? { status: "pending" }
+      : context.identity.userId ? { status: "authenticated", userId: context.identity.userId }
+      : { status: "anonymous" }
+    : undefined;
   let snapshot = EMPTY;
   let active = false;
   let disposed = false;
-  let generation = 0;
-  let pending: Promise<void> | undefined;
   const listeners = new Set<() => void>();
   const readyWaiters = new Set<(value: ExperimentsSnapshot) => void>();
+  const initial = context?.serverSnapshot ?? (context ? {
+    flags: context.identity.status === "pending" ? {} : runtime!.flags,
+    isLoading: context.identity.status === "pending",
+  } : EMPTY);
+  const serverSnapshot: ExperimentsSnapshot = Object.freeze({ ...initial, flags: Object.freeze({ ...initial.flags }) });
 
   function settleReady() {
     if (snapshot.isLoading) return;
@@ -77,26 +90,10 @@ export function createExperimentsModule({
     publish();
   }
 
-  function resolveIdentity() {
-    if (!runtime || pending || disposed) return;
-    state = { status: "pending" };
-    applyIdentity();
-    const currentGeneration = generation;
-    pending = getAuth()
-      .me()
-      .then(
-        () => {},
-        () => {},
-      )
-      .finally(() => {
-        if (currentGeneration === generation) pending = undefined;
-      });
-  }
-
   function activate() {
     if (disposed) return;
     active = true;
-    runtime = getExperimentsRuntime();
+    if (!context) runtime = getExperimentsRuntime();
     if (!runtime) {
       publish();
       return;
@@ -106,20 +103,14 @@ export function createExperimentsModule({
         ? { status: "pending" }
         : { status: "anonymous" };
     applyIdentity();
-    if (state.status === "pending") resolveIdentity();
   }
 
   function onAuthStateChange(next: AuthState) {
     if (disposed) return;
     state = next;
-    if (next.status === "pending" || next.status === "anonymous") {
-      generation++;
-      pending = undefined;
-    }
     if (!active) return;
-    runtime = getExperimentsRuntime();
+    if (!context) runtime = getExperimentsRuntime();
     applyIdentity();
-    if (next.status === "pending") resolveIdentity();
   }
 
   const module: ExperimentsModule = {
@@ -137,6 +128,7 @@ export function createExperimentsModule({
       activate();
       return snapshot;
     },
+    getServerSnapshot: () => serverSnapshot,
     subscribe(listener) {
       activate();
       if (!disposed) listeners.add(listener);
@@ -146,26 +138,21 @@ export function createExperimentsModule({
     },
     async ready() {
       activate();
-      if (state?.status === "error") {
-        // Wait for auth.me() to release its shared, failed request before retrying.
-        await pending;
-        if (state?.status === "error") resolveIdentity();
-      }
       if (snapshot.isLoading)
         return new Promise<ExperimentsSnapshot>((resolve) =>
           readyWaiters.add(resolve),
         );
       return snapshot;
     },
+    flush: flushExposures,
   };
 
   return {
     module,
     onAuthStateChange,
+    visitorId: () => runtime?.visitorId,
     cleanup() {
       disposed = true;
-      generation++;
-      pending = undefined;
       runtime = undefined;
       snapshot = EMPTY;
       settleReady();

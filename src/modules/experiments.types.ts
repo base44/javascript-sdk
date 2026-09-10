@@ -7,7 +7,7 @@ export interface ExperimentsSnapshot {
 }
 
 /**
- * Reads feature flags evaluated by the Base44 browser runtime.
+ * Evaluates feature flags locally from platform-provided configuration and identity.
  *
  * - Reads flags and reports experiment exposures when a flag is used.
  * - Synchronizes assignments with this client's SDK login, token changes, and logout.
@@ -15,9 +15,10 @@ export interface ExperimentsSnapshot {
  *
  * Available as `base44.experiments` for anonymous and signed-in app visitors,
  * not in service role mode. Use one client for the app whose runtime is on the page.
- * The platform must inject the Experiments runtime before this module can evaluate
- * flags. Without it, including on servers and Workers, reads return their fallback;
- * this module does not provide server-side evaluation or hydration guarantees.
+ * Browsers read the platform bootstrap. Servers and Workers use the request-scoped
+ * context passed by createClientFromRequest(), or explicit createClient options.
+ * Missing context returns fallbacks. For authenticated first render, the platform's
+ * common auth bootstrap must supply a resolved identity before mounting the app.
  * Goal conversions use the existing {@link AnalyticsModule | analytics module}.
  * Visitor-keyed conversions share the injected runtime's visitor ID. When browser
  * storage is blocked, the platform must supply a unique per-page ID; attribution
@@ -25,17 +26,17 @@ export interface ExperimentsSnapshot {
  */
 export interface ExperimentsModule {
   /**
-   * Reads a flag and reports a best-effort exposure for its current assignment.
+   * Reads a flag and queues an acknowledged exposure for its current assignment.
    *
-   * The first use resolves identity through {@link AuthModule.me | auth.me()}
-   * when the client has a token. Reads return the fallback while identity is
-   * pending or could not be resolved. Await {@link ExperimentsModule.ready | ready()}
-   * or subscribe to updates before displaying authenticated variants.
+   * Never starts an authentication request. Reads return the fallback while the
+   * app's normal auth initialization is pending or failed. Supply trusted bootstrap
+   * identity or let the app's existing auth.me()/login flow resolve it.
    *
    * Call only where the feature is used: a read counts as exposure, not proof of
    * visibility. Preview overrides and flags without an assignment are not tracked.
    * Exposures respect the client's analytics setting, are deduplicated per client,
-   * experiment run, variant and identity, and retry only on a later read after failure.
+   * experiment run, variant and identity. Failed sends retry up to three attempts
+   * with the same event ID, timestamp and credentials. Await flush() on servers.
    *
    * @param flagKey - Feature flag key defined in your app.
    * @param fallback - Value for an unavailable flag or unresolved identity. Defaults to `false`.
@@ -51,7 +52,7 @@ export interface ExperimentsModule {
   /**
    * Returns the current flags and identity-loading state without tracking exposures.
    *
-   * Starts lazy identity resolution if needed. The returned object retains its
+   * Observes identity resolution without starting it. The returned object retains its
    * reference until its values change, for use with external-store subscriptions.
    * Use {@link ExperimentsModule.isEnabled | isEnabled()} at the feature boundary
    * to record exposure rather than displaying a variant directly from this snapshot.
@@ -63,6 +64,9 @@ export interface ExperimentsModule {
    * ```
    */
   getSnapshot(): ExperimentsSnapshot;
+
+  /** Immutable initial platform snapshot for matching server render and hydration. */
+  getServerSnapshot(): ExperimentsSnapshot;
 
   /**
    * Listens for flag or loading-state changes caused by this client's SDK auth flows.
@@ -83,10 +87,10 @@ export interface ExperimentsModule {
   subscribe(listener: () => void): () => void;
 
   /**
-   * Waits for the current identity lookup, including a token change during that lookup.
+   * Waits for the app's common auth initialization, including a token change.
    *
-   * Resolves with empty flags after an identity lookup failure; calling again retries
-   * the lookup. Missing runtimes resolve immediately. This does not wait for a future
+   * Resolves with empty flags after an identity lookup failure. Retrying authentication
+   * belongs to the normal auth flow. Missing runtimes resolve immediately. This does not wait for a future
    * runtime injection or for exposure delivery, and never records an exposure itself.
    *
    * @returns A snapshot after the current identity lookup settles.
@@ -97,4 +101,12 @@ export interface ExperimentsModule {
    * ```
    */
   ready(): Promise<ExperimentsSnapshot>;
+
+  /**
+   * Waits until queued exposures are acknowledged; rejects after bounded retries.
+   * Server/Worker handlers must await this before ending the request (or use waitUntil).
+   * Retries preserve event IDs but raw storage is not exactly-once. Calling again
+   * retries unacknowledged events with the same IDs. No new exposures are created.
+   */
+  flush(): Promise<void>;
 }

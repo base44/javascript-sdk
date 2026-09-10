@@ -43,9 +43,11 @@ describe("experiments with real SDK auth", () => {
     const ready = b.module.ready();
     const oldRequest = b.auth.me();
     b.auth.setToken("token-b", false);
+    const newRequest = b.auth.me();
     expect(b.get).toHaveBeenCalledTimes(2);
 
     b.requests[1].resolve({ id: "user-b" } as User);
+    await newRequest;
     expect(await ready).toEqual({ flags: { checkout: true }, isLoading: false });
     expect(b.runtime.userId).toBe("user-b");
 
@@ -71,17 +73,18 @@ describe("experiments with real SDK auth", () => {
     expect(b.get).toHaveBeenCalledOnce();
   });
 
-  test("ready retries a failed me request after its shared promise has been released", async () => {
+  test("ready observes the common auth flow retry without starting a lookup", async () => {
     const b = setup("valid-token");
     const ready = b.module.ready();
+    const first = b.auth.me().catch(() => {});
     b.requests[0].reject({ status: 503 });
+    await first;
     expect(await ready).toEqual({ flags: {}, isLoading: false });
 
-    const retry = b.module.ready();
-    await vi.waitFor(() => expect(b.get).toHaveBeenCalledTimes(2));
-    expect(b.module.getSnapshot()).toEqual({ flags: {}, isLoading: true });
+    const retry = b.auth.me();
     b.requests[1].resolve({ id: "recovered-user" } as User);
-    expect(await retry).toEqual({ flags: { checkout: true }, isLoading: false });
+    await retry;
+    expect(await b.module.ready()).toEqual({ flags: { checkout: true }, isLoading: false });
     expect(b.runtime.userId).toBe("recovered-user");
   });
 
@@ -92,12 +95,10 @@ describe("experiments with real SDK auth", () => {
     vi.spyOn(b.api, "post").mockResolvedValueOnce(response);
 
     await expect(b.auth.loginViaEmailPassword("user@example.test", "password")).resolves.toEqual(response);
-    expect(b.module.getSnapshot()).toEqual({ flags: {}, isLoading: true });
+    expect(b.module.getSnapshot()).toEqual({ flags: { checkout: true }, isLoading: false });
     expect(b.api.defaults.headers.common.Authorization).toBe("Bearer login-token");
-    const ready = b.module.ready();
-    b.requests[0].resolve(response.user as User);
-    expect(await ready).toEqual({ flags: { checkout: true }, isLoading: false });
+    expect(await b.module.ready()).toEqual({ flags: { checkout: true }, isLoading: false });
     expect(b.runtime.userId).toBe("logged-in");
-    expect(b.get).toHaveBeenCalledOnce();
+    expect(b.get).not.toHaveBeenCalled();
   });
 });

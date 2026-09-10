@@ -64,6 +64,7 @@ export interface AnalyticsModuleArgs {
   appId: string;
   userAuthModule: InternalAuthModule;
   enabled: boolean;
+  getVisitorId?: () => string | undefined;
 }
 
 /** @internal */
@@ -77,6 +78,7 @@ export const createAnalyticsModule = ({
   appId,
   userAuthModule,
   enabled,
+  getVisitorId,
 }: AnalyticsModuleArgs) => {
   // prevent overflow of events //
   const { maxQueueSize, throttleTime, batchSize } = analyticsSharedState.config;
@@ -126,7 +128,7 @@ export const createAnalyticsModule = ({
 
     const sessionContext_ = await getSessionContext(userAuthModule);
     const events = eventsData.map(
-      transformEventDataToApiRequestData(sessionContext_)
+      transformEventDataToApiRequestData({ ...sessionContext_, session_id: getVisitorId?.() ?? sessionContext_.session_id })
     );
 
     try {

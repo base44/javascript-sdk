@@ -25,6 +25,7 @@ import type {
 import { createAnalyticsModule } from "./modules/analytics.js";
 import { createExperimentsModule } from "./modules/experiments.js";
 import { createExposureTracker } from "./modules/experiment-exposures.js";
+import { EXPERIMENTS_CONTEXT_HEADER, getBrowserExperimentsContext, readExperimentsContext } from "./modules/experiments-context.js";
 import {
   createActorsModule,
   resolveActorsHost,
@@ -92,6 +93,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
 
   // Normalize appBaseUrl to always be a string (empty if not provided or invalid)
   const normalizedAppBaseUrl = typeof appBaseUrl === "string" ? appBaseUrl : "";
+  const experimentsContext = config.experiments ?? getBrowserExperimentsContext(appId);
 
   const socketConfig: RoomsSocketConfig = {
     serverUrl,
@@ -112,9 +114,14 @@ export function createClient(config: CreateClientConfig): Base44Client {
     return socket;
   };
 
+  const { [EXPERIMENTS_CONTEXT_HEADER]: inheritedExperimentsContext, ...requestHeaders } = optionalHeaders ?? {};
   const headers = {
-    ...optionalHeaders,
+    ...requestHeaders,
     "X-App-Id": String(appId),
+    ...(experimentsContext ? {
+      "Base44-Visitor-Id": experimentsContext.identity.visitorId,
+      "Base44-Experiment-Preview": JSON.stringify(experimentsContext.preview ?? {}),
+    } : {}),
   };
 
   const functionHeaders = functionsVersion
@@ -168,13 +175,18 @@ export function createClient(config: CreateClientConfig): Base44Client {
     headers,
   });
 
-  const experiments = createExperimentsModule({
-    getAuth: () => userAuthModule,
-    trackExposure: createExposureTracker({
+  const exposureTracker = createExposureTracker({
       axiosClient,
       appId,
       enabled: analytics?.enabled ?? true,
-    }).track,
+      source: typeof window === "undefined" ? "backend" : "browser",
+      pageUrl: experimentsContext?.pageUrl,
+  });
+  const experiments = createExperimentsModule({
+    getAuth: () => userAuthModule,
+    trackExposure: exposureTracker.track,
+    flushExposures: exposureTracker.flush,
+    context: experimentsContext,
   });
 
   const userAuthModule = createAuthModule(
@@ -198,6 +210,14 @@ export function createClient(config: CreateClientConfig): Base44Client {
     if (accessToken) {
       userAuthModule.setToken(accessToken);
     }
+  }
+  if (experimentsContext) {
+    const { userId, status } = experimentsContext.identity;
+    // The document's cookie identity may differ from this client's localStorage token.
+    const needsClientIdentity = typeof window !== "undefined" && userAuthModule.hasToken() &&
+      experimentsContext.config.experiments.some((experiment) => experiment.assign_by === "user");
+    experiments.onAuthStateChange(status === "pending" || needsClientIdentity ? { status: "pending" } :
+      userId ? { status: "authenticated", userId } : { status: "anonymous" });
   }
 
   const actorsModule = createActorsModule({
@@ -270,6 +290,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
       appId,
       userAuthModule,
       enabled: analytics?.enabled ?? true,
+      getVisitorId: experiments.visitorId,
     }),
     actors: actorsModule.module,
     cleanup: () => {
@@ -345,7 +366,10 @@ export function createClient(config: CreateClientConfig): Base44Client {
       appId: String(appId),
       serverUrl,
       functionsVersion,
-      platformHeaders: optionalHeaders,
+      platformHeaders: {
+        ...headers,
+        ...(inheritedExperimentsContext ? { [EXPERIMENTS_CONTEXT_HEADER]: inheritedExperimentsContext } : {}),
+      },
     }),
 
     /**
@@ -521,6 +545,9 @@ export function createClientFromRequest(request: Request): Base44Client {
 
   // Prepare additional headers to propagate
   const additionalHeaders: Record<string, string> = {};
+  const encodedExperiments = request.headers.get(EXPERIMENTS_CONTEXT_HEADER);
+  const experimentsContext = readExperimentsContext(encodedExperiments, appId);
+  if (experimentsContext && encodedExperiments) additionalHeaders[EXPERIMENTS_CONTEXT_HEADER] = encodedExperiments;
   if (stateHeader) {
     additionalHeaders["Base44-State"] = stateHeader;
   }
@@ -542,5 +569,6 @@ export function createClientFromRequest(request: Request): Base44Client {
     serviceToken: serviceRoleToken,
     functionsVersion: functionsVersion ?? undefined,
     headers: additionalHeaders,
+    experiments: experimentsContext ? { ...experimentsContext, pageUrl: request.url ? new URL(request.url).pathname : "/" } : undefined,
   });
 }
