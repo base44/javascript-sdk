@@ -204,7 +204,7 @@ function createEntityHandler<T = any>(
           // developer console so they know to fetch the full record on
           // demand (e.g. a follow-up entities.X.get(id) call) instead of
           // rendering the slimmed payload directly. Skip on delete events
-          // — the record no longer exists.
+          // because the record no longer exists.
           if (event.type !== "delete" && (event.data as any)?._oversize) {
             console.error(
               `[Base44 SDK] Realtime broadcast for ${entityName}#${event.id} was oversize and got slimmed for transport. ` +

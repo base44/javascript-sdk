@@ -6,14 +6,14 @@
  *   export class MyActor extends Actor { ... }
  *
  * At deploy time the bundler replaces this import with the compiled
- * Cloudflare Durable Object implementation — this file provides types only.
+ * Cloudflare Durable Object implementation. This file provides types only.
  */
 
 import type { Base44Client } from "./client";
 
 /**
  * A single client connection. `Send` is the message type this connection accepts
- * via {@link send} — the actor's *outgoing* (server→client) messages.
+ * via {@link send}, the actor's *outgoing* (server→client) messages.
  */
 export interface Conn<Send = unknown> {
   /** Unique per-connection id (one per socket/tab), the same value the client
@@ -37,9 +37,9 @@ export interface Storage {
  * Base class for an Actor.
  *
  * @typeParam Incoming - messages this actor *receives* from clients
- *   (`handleMessage`'s `msg`) — the schema's `toServer` section.
+ *   (`handleMessage`'s `msg`), the schema's `toServer` section.
  * @typeParam Outgoing - messages this actor *sends* to clients
- *   (`conn.send`/`broadcast`) — the schema's `toClient` section.
+ *   (`conn.send`/`broadcast`), the schema's `toClient` section.
  *
  * With a generated `schema.jsonc`, wire both from the registry so they can't drift
  * from the client's types:
@@ -56,7 +56,7 @@ export abstract class Actor<Incoming = unknown, Outgoing = unknown> {
 
   /**
    * Optional wake hook: runs once when the instance starts, before any
-   * connection is handled — safe to load persisted state here.
+   * connection is handled. It is safe to load persisted state here.
    */
   handleStart(): void | Promise<void> {}
 
@@ -84,7 +84,7 @@ export abstract class Actor<Incoming = unknown, Outgoing = unknown> {
   /**
    * Managed ticker (opt-in). Override {@link shouldTick} and the platform runs
    * {@link handleTick} on a timer of {@link tickIntervalMs} while it returns true,
-   * and stops (letting the Durable Object hibernate — no compute cost) when it
+   * and stops (letting the Durable Object hibernate at no compute cost) when it
    * returns false. The platform owns scheduling, rescheduling, self-heal, and
    * error-safety.
    *
@@ -111,7 +111,7 @@ export abstract class Actor<Incoming = unknown, Outgoing = unknown> {
   }
 
   /**
-   * Anonymous Base44 client scoped to this actor instance — no user or service
+   * Anonymous Base44 client scoped to this actor instance, with no user or service
    * auth, so entity access is RLS-gated (same as a logged-out visitor). Always
    * operates on production data: an actor runs server-side with no per-connection
    * identity, so a Test DB preview selected in the editor does not apply here.
