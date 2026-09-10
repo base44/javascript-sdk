@@ -177,13 +177,24 @@ describe('Auth Module', () => {
       expect(scope.isDone()).toBe(true);
     });
 
-    test('setToken() clears the analytics session context', () => {
-      const analyticsState = getSharedInstance('analytics', () => ({}));
-      analyticsState.sessionContext = { user_id: 'anonymous-user', session_id: 's1' };
+    test('setToken() clears the shared browser analytics session context', () => {
+      vi.stubGlobal('window', {
+        location: { origin: appBaseUrl, pathname: '/', search: '' },
+        localStorage: { getItem: () => null },
+      });
+      let browserClient;
+      try {
+        browserClient = createClient({ serverUrl, appId, appBaseUrl, analytics: { enabled: false } });
+        const analyticsState = getSharedInstance('analytics', () => ({}));
+        analyticsState.sessionContext = { user_id: 'anonymous-user', session_id: 's1' };
 
-      base44.auth.setToken('new-access-token', false);
+        browserClient.auth.setToken('new-access-token', false);
 
-      expect(analyticsState.sessionContext).toBeNull();
+        expect(analyticsState.sessionContext).toBeNull();
+      } finally {
+        browserClient?.cleanup();
+        vi.unstubAllGlobals();
+      }
     });
   });
 
@@ -967,4 +978,4 @@ describe('Auth Module', () => {
       global.window = originalWindow;
     });
   });
-}); 
+});
