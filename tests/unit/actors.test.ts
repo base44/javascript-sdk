@@ -599,10 +599,11 @@ describe("Actors Module — client wiring", () => {
   });
 
   test("mints via POST /connection-token with app, auth, and version headers", async () => {
-    platform.given.actors.available("PongGame", {
-      websocketUrl: "wss://actors.example/v1/actors/scr_1/rooms/r1?_pk=c1",
-      token: "jwt.min.ted",
-      expiresAt: "2026-01-01T00:00:00Z",
+    platform.given.app(appId).actors.deployed("PongGame", {
+      websocketHost: "wss://actors.example",
+      scriptId: "scr_1",
+      issuedToken: "jwt.min.ted",
+      tokenExpiresAt: "2026-01-01T00:00:00Z",
       mode: "preview",
     });
 
@@ -628,7 +629,7 @@ describe("Actors Module — client wiring", () => {
   });
 
   test("a 409 mint reply falls back to the legacy proxy URL without calling onError", async () => {
-    platform.given.actors.fault("PongGame", "legacy-conflict");
+    platform.given.app(appId).actors.fault("PongGame", "legacy-conflict");
 
     const onError = vi.fn();
     const base44 = createClient({
@@ -649,7 +650,7 @@ describe("Actors Module — client wiring", () => {
   test("a 405 mint reply (backend without the endpoint) falls back to the proxy", async () => {
     // What a pre-direct backend actually answers: its actor deploy routes
     // match the path via `{handler_name:path}` but not the POST method.
-    platform.given.actors.fault("PongGame", "endpoint-unsupported");
+    platform.given.app(appId).actors.fault("PongGame", "endpoint-unsupported");
 
     const onError = vi.fn();
     const base44 = createClient({
@@ -667,7 +668,7 @@ describe("Actors Module — client wiring", () => {
   });
 
   test("a non-fallback mint failure reaches the client's onError as a Base44Error", async () => {
-    platform.given.actors.fault("PongGame", "mint-failed");
+    platform.given.app(appId).actors.fault("PongGame", "mint-failed");
 
     const onError = vi.fn();
     const base44 = createClient({
@@ -696,10 +697,11 @@ describe("Actors Module — client wiring", () => {
     vi.stubGlobal("document", undefined);
     vi.stubGlobal("localStorage", undefined);
 
-    platform.given.actors.available("PongGame", {
-      websocketUrl: "wss://actors.example/v1/actors/scr_1/rooms/r1?_pk=c1",
-      token: "jwt.min.ted",
-      expiresAt: "2026-01-01T00:00:00Z",
+    platform.given.app(appId).actors.deployed("PongGame", {
+      websocketHost: "wss://actors.example",
+      scriptId: "scr_1",
+      issuedToken: "jwt.min.ted",
+      tokenExpiresAt: "2026-01-01T00:00:00Z",
       mode: "preview",
     });
 
@@ -714,7 +716,10 @@ describe("Actors Module — client wiring", () => {
     expect(typeof seen[0]).toBe("string");
     expect(seen[0]).toBeTruthy();
     expect(seen[0]).toBe(seen[1]); // stable across reconnects, not a fresh id per call
-    expect((platform.requests.last("analytics.trackBatch").body as any).events[0].event_name).toBe("__initialization_event__");
+    expect(
+      (platform.requests.last("analytics.trackBatch").body as any).events[0]
+        .event_name,
+    ).toBe("__initialization_event__");
     base44.cleanup();
   });
 
@@ -726,10 +731,11 @@ describe("Actors Module — client wiring", () => {
     vi.stubGlobal("document", undefined);
     vi.stubGlobal("localStorage", undefined);
 
-    platform.given.actors.available("PongGame", {
-      websocketUrl: "wss://actors.example/v1/actors/scr_1/rooms/r1?_pk=c1",
-      token: "jwt.min.ted",
-      expiresAt: "2026-01-01T00:00:00Z",
+    platform.given.app(appId).actors.deployed("PongGame", {
+      websocketHost: "wss://actors.example",
+      scriptId: "scr_1",
+      issuedToken: "jwt.min.ted",
+      tokenExpiresAt: "2026-01-01T00:00:00Z",
       mode: "preview",
     });
 

@@ -11,30 +11,22 @@ describe("Core Integrations - InvokeLLM", () => {
   afterEach(() => base44.cleanup());
 
   test("passes model parameter to the API", async () => {
-    platform.given
-      .app(appId)
-      .integrations.llmResponds("Quantum computing uses qubits...");
     const params = { prompt: "Explain quantum computing", model: "gpt_5" };
     await expect(base44.integrations.Core.InvokeLLM(params)).resolves.toBe(
-      "Quantum computing uses qubits...",
+      "Mock LLM text response",
     );
     expect(platform.requests.last("integrations.invoke").body).toEqual(params);
   });
 
   test("works without model parameter", async () => {
-    platform.given
-      .app(appId)
-      .integrations.llmResponds("Quantum computing uses qubits...");
     const params = { prompt: "Explain quantum computing" };
     await expect(base44.integrations.Core.InvokeLLM(params)).resolves.toBe(
-      "Quantum computing uses qubits...",
+      "Mock LLM text response",
     );
     expect(platform.requests.last("integrations.invoke").body).toEqual(params);
   });
 
   test("passes model alongside other optional parameters", async () => {
-    const response = { sentiment: "positive" };
-    platform.given.app(appId).integrations.llmResponds(response);
     const params = {
       prompt: "Analyze this text",
       model: "claude_sonnet_4_6" as const,
@@ -43,9 +35,10 @@ describe("Core Integrations - InvokeLLM", () => {
         properties: { sentiment: { type: "string" } },
       },
     };
-    await expect(base44.integrations.Core.InvokeLLM(params)).resolves.toEqual(
-      response,
-    );
+    await expect(base44.integrations.Core.InvokeLLM(params)).resolves.toEqual({
+      mock: true,
+      kind: "structured",
+    });
     expect(platform.requests.last("integrations.invoke").body).toEqual(params);
   });
 });

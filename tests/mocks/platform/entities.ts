@@ -34,11 +34,18 @@ function nextId(appId: string) {
 }
 
 function compareValues(left: unknown, right: unknown) {
+  const leftNullish = left == null;
+  const rightNullish = right == null;
+  if (leftNullish || rightNullish) {
+    // Apper groups Mongo missing and explicit-null values together. Their
+    // relative backend order is unspecified; returning zero preserves fixture
+    // insertion order and keeps this comparator anti-symmetric.
+    if (leftNullish && rightNullish) return 0;
+    return leftNullish ? -1 : 1;
+  }
   if (typeof left === "number" && typeof right === "number")
     return left - right;
   if (left === right) return 0;
-  if (left == null) return -1;
-  if (right == null) return 1;
   if (typeof left === "boolean" && typeof right === "boolean")
     return Number(left) - Number(right);
   const leftText = String(left);

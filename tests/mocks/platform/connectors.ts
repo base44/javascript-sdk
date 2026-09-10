@@ -2,7 +2,7 @@ import { http, HttpResponse } from "msw";
 import {
   recordRequest,
   state,
-  type ConnectorProxyOutcome,
+  type ConnectorProxyService,
   type ConnectorToken,
   type PlatformFault,
 } from "./state";
@@ -98,11 +98,30 @@ export function connectorFixturesFor(appId: string) {
     ) {
       appUserRedirectStore(appId, userId).set(connectorId, redirectUrl);
     },
-    proxyOutcome(integrationType: string, outcome: ConnectorProxyOutcome) {
-      appStore(state.connectorProxyOutcomes, appId).set(
-        integrationType,
-        structuredClone(outcome),
-      );
+    socialApi(
+      integrationType: string,
+      account: Record<string, unknown> = { id: "mock-account" },
+    ) {
+      appStore(state.connectorProxyServices, appId).set(integrationType, {
+        kind: "social",
+        account: structuredClone(account),
+        tweets: [],
+        nextTweetId: 1,
+      });
+    },
+    mapsApi(
+      integrationType: string,
+      staticMap: { bytes: number[]; contentType: string },
+    ) {
+      appStore(state.connectorProxyServices, appId).set(integrationType, {
+        kind: "maps",
+        staticMap: structuredClone(staticMap),
+      });
+    },
+    echoApi(integrationType: string) {
+      appStore(state.connectorProxyServices, appId).set(integrationType, {
+        kind: "echo",
+      });
     },
   };
 }
@@ -123,6 +142,113 @@ export function connectorFaultFixturesFor(appId: string) {
         integrationType,
       });
     },
+    upstreamRejected(integrationType: string) {
+      state.faults.push({
+        kind: "connector-upstream-rejected",
+        appId,
+        integrationType,
+      });
+    },
+    notSent(integrationType: string) {
+      state.faults.push({ kind: "connector-not-sent", appId, integrationType });
+    },
+    timedOut(integrationType: string) {
+      state.faults.push({
+        kind: "connector-timed-out",
+        appId,
+        integrationType,
+      });
+    },
+    sentUnconfirmed(integrationType: string) {
+      state.faults.push({
+        kind: "connector-sent-unconfirmed",
+        appId,
+        integrationType,
+      });
+    },
+  };
+}
+
+function proxyEnvelope(
+  service: ConnectorProxyService,
+  requestBody: Record<string, any>,
+) {
+  if (service.kind === "social") {
+    if (requestBody.method === "POST" && requestBody.path === "/2/tweets") {
+      if (typeof requestBody.body?.text !== "string")
+        return {
+          success: false,
+          phase: "responded",
+          status_code: 400,
+          data: { title: "Tweet text is required" },
+          headers: {},
+          credits_charged: 3,
+        };
+      const tweet = {
+        id: String(service.nextTweetId++),
+        text: requestBody.body?.text,
+      };
+      service.tweets.push(tweet);
+      return {
+        success: true,
+        phase: "responded",
+        status_code: 201,
+        data: { data: tweet },
+        headers: { "x-rate-limit-remaining": "42" },
+        credits_charged: 3,
+      };
+    }
+    if (requestBody.path === "/2/tweets/search/recent")
+      return {
+        success: true,
+        phase: "responded",
+        status_code: 200,
+        data: { data: structuredClone(service.tweets) },
+        headers: { "x-rate-limit-remaining": "42" },
+        credits_charged: 3,
+      };
+    if (requestBody.path === "/2/users/me" || requestBody.path === "/scope")
+      return {
+        success: true,
+        phase: "responded",
+        status_code: 200,
+        data: { data: structuredClone(service.account) },
+        headers: { "x-rate-limit-remaining": "42" },
+        credits_charged: 3,
+      };
+    return {
+      success: false,
+      phase: "responded",
+      status_code: 404,
+      data: { title: "Upstream resource not found" },
+      headers: {},
+      credits_charged: 3,
+    };
+  }
+  if (service.kind === "maps") {
+    const isStaticMap = String(requestBody.path).includes("staticmap");
+    return {
+      success: true,
+      phase: "responded",
+      status_code: 200,
+      data: isStaticMap ? null : { location: "Mock place" },
+      ...(isStaticMap
+        ? {
+            data_base64: btoa(String.fromCharCode(...service.staticMap.bytes)),
+            content_type: service.staticMap.contentType,
+          }
+        : {}),
+      headers: {},
+      credits_charged: 1,
+    };
+  }
+  return {
+    success: true,
+    phase: "responded",
+    status_code: 200,
+    data: { received: structuredClone(requestBody) },
+    headers: {},
+    credits_charged: 0,
   };
 }
 
@@ -221,7 +347,7 @@ export const connectorHandlers = [
   http.post(
     "*/api/apps/:appId/connectors/:integrationType/call",
     async ({ params, request }) => {
-      await recordRequest("connectors.callApi", request);
+      const recorded = await recordRequest("connectors.callApi", request);
       const appId = String(params.appId);
       const principal = principalFor(appId, request)?.principal;
       if (!principal) return unauthorized();
@@ -242,28 +368,61 @@ export const connectorHandlers = [
           },
           { status: 402 },
         );
-      const outcome = state.connectorProxyOutcomes
+      const upstreamRejected = takeFault(
+        (item) =>
+          item.kind === "connector-upstream-rejected" &&
+          item.appId === appId &&
+          item.integrationType === integrationType,
+      );
+      if (upstreamRejected)
+        return HttpResponse.json({
+          success: false,
+          phase: "responded",
+          status_code: 400,
+          data: { title: "Invalid Request" },
+          headers: {},
+          credits_charged: 3,
+        });
+      const uncertain = state.faults.findIndex(
+        (item) =>
+          [
+            "connector-not-sent",
+            "connector-timed-out",
+            "connector-sent-unconfirmed",
+          ].includes(item.kind) &&
+          "appId" in item &&
+          item.appId === appId &&
+          "integrationType" in item &&
+          item.integrationType === integrationType,
+      );
+      if (uncertain >= 0) {
+        const [fault] = state.faults.splice(uncertain, 1);
+        const phase =
+          fault.kind === "connector-not-sent"
+            ? "not_sent"
+            : fault.kind === "connector-timed-out"
+              ? "timed_out"
+              : "sent_unconfirmed";
+        return HttpResponse.json({
+          success: false,
+          phase,
+          status_code: null,
+          data: { error: "request outcome unknown" },
+          headers: {},
+          credits_charged: phase === "not_sent" ? 0 : 3,
+        });
+      }
+      const service = state.connectorProxyServices
         .get(appId)
         ?.get(integrationType);
-      if (!outcome)
+      if (!service)
         return HttpResponse.json(
           { detail: "Connector proxy not configured", code: "NOT_FOUND" },
           { status: 404 },
         );
-      return HttpResponse.json({
-        success: outcome.success,
-        phase: outcome.phase,
-        status_code: outcome.status,
-        data: outcome.data,
-        ...(outcome.dataBase64 === undefined
-          ? {}
-          : { data_base64: outcome.dataBase64 }),
-        ...(outcome.contentType === undefined
-          ? {}
-          : { content_type: outcome.contentType }),
-        headers: outcome.headers ?? {},
-        credits_charged: outcome.creditsCharged ?? 0,
-      });
+      return HttpResponse.json(
+        proxyEnvelope(service, recorded.body as Record<string, any>),
+      );
     },
   ),
   http.post(

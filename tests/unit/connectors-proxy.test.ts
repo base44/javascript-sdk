@@ -2,14 +2,6 @@ import { describe, test, expect, beforeEach, afterEach } from "vitest";
 import { createClient } from "../../src/index.ts";
 import { platform } from "../mocks/platform/index.ts";
 
-const responded = {
-  success: true,
-  phase: "responded" as const,
-  status: 201,
-  data: { data: { id: "1" } },
-  headers: { "x-rate-limit-remaining": "42" },
-  creditsCharged: 3,
-};
 const appId = "test-app-id";
 const serviceToken = "service-token-123";
 
@@ -25,7 +17,7 @@ describe("Connectors module – metered connector proxy", () => {
       appId,
       serviceToken,
     });
-    platform.given.app(appId).connectors.proxyOutcome("x", responded);
+    platform.given.app(appId).connectors.socialApi("x", { id: "account-a" });
   });
   afterEach(() => base44.cleanup());
 
@@ -69,9 +61,7 @@ describe("Connectors module – metered connector proxy", () => {
   });
 
   test("percent-encodes the integration type so it stays on the connectors route", async () => {
-    platform.given
-      .app(appId)
-      .connectors.proxyOutcome("../evil/route", responded);
+    platform.given.app(appId).connectors.echoApi("../evil/route");
     const result = await base44.asServiceRole.connectors.callApi(
       "../evil/route" as any,
       { path: "/x" },
@@ -83,7 +73,10 @@ describe("Connectors module – metered connector proxy", () => {
   });
 
   test("forwards a named host, and omits it entirely when unset", async () => {
-    platform.given.app(appId).connectors.proxyOutcome("googlemaps", responded);
+    platform.given.app(appId).connectors.mapsApi("googlemaps", {
+      bytes: [137, 80, 78, 71, 13, 10, 26, 10],
+      contentType: "image/png",
+    });
     await base44.asServiceRole.connectors.callApi("googlemaps", {
       host: "places",
       path: "/v1/places:searchText",
@@ -104,14 +97,9 @@ describe("Connectors module – metered connector proxy", () => {
   });
 
   test("maps a binary response to dataBase64 + contentType", async () => {
-    platform.given.app(appId).connectors.proxyOutcome("googlemaps", {
-      success: true,
-      phase: "responded",
-      status: 200,
-      data: null,
-      dataBase64: "iVBORw0KGgo=",
+    platform.given.app(appId).connectors.mapsApi("googlemaps", {
+      bytes: [137, 80, 78, 71, 13, 10, 26, 10],
       contentType: "image/png",
-      creditsCharged: 1,
     });
     const result = await base44.asServiceRole.connectors.callApi("googlemaps", {
       path: "/maps/api/staticmap",
@@ -151,17 +139,26 @@ describe("Connectors module – metered connector proxy", () => {
 
   test("maps the proxy envelope to camelCase", async () => {
     const result = await base44.asServiceRole.connectors.callApi("x", {
+      method: "POST",
       path: "/2/tweets",
+      body: { text: "hello" },
     });
     expect(result).toEqual({
       success: true,
       phase: "responded",
       status: 201,
-      data: { data: { id: "1" } },
+      data: { data: { id: "1", text: "hello" } },
       dataBase64: null,
       contentType: null,
       headers: { "x-rate-limit-remaining": "42" },
       creditsCharged: 3,
+    });
+    await expect(
+      base44.asServiceRole.connectors.callApi("x", {
+        path: "/2/tweets/search/recent",
+      }),
+    ).resolves.toMatchObject({
+      data: { data: [{ id: "1", text: "hello" }] },
     });
   });
 
@@ -171,11 +168,9 @@ describe("Connectors module – metered connector proxy", () => {
     platform.given.app(otherAppId).auth.servicePrincipal(otherServiceToken, {
       id: "other-service-principal",
     });
-    platform.given.app(otherAppId).connectors.proxyOutcome("x", {
-      ...responded,
-      status: 202,
-      data: { app: "other" },
-    });
+    platform.given
+      .app(otherAppId)
+      .connectors.socialApi("x", { id: "account-b" });
     const otherClient = createClient({
       serverUrl: "https://base44.app",
       appId: otherAppId,
@@ -184,21 +179,21 @@ describe("Connectors module – metered connector proxy", () => {
 
     await expect(
       base44.asServiceRole.connectors.callApi("x", { path: "/scope" }),
-    ).resolves.toMatchObject({ status: 201, data: { data: { id: "1" } } });
+    ).resolves.toMatchObject({
+      status: 200,
+      data: { data: { id: "account-a" } },
+    });
     await expect(
       otherClient.asServiceRole.connectors.callApi("x", { path: "/scope" }),
-    ).resolves.toMatchObject({ status: 202, data: { app: "other" } });
+    ).resolves.toMatchObject({
+      status: 200,
+      data: { data: { id: "account-b" } },
+    });
     otherClient.cleanup();
   });
 
   test("returns an upstream error instead of throwing", async () => {
-    platform.given.app(appId).connectors.proxyOutcome("x", {
-      success: false,
-      phase: "responded",
-      status: 400,
-      data: { title: "Invalid Request" },
-      creditsCharged: 3,
-    });
+    platform.given.app(appId).faults.connectors.upstreamRejected("x");
     const result = await base44.asServiceRole.connectors.callApi("x", {
       method: "POST",
       path: "/2/tweets",
@@ -213,13 +208,37 @@ describe("Connectors module – metered connector proxy", () => {
     });
   });
 
+  test("derives an upstream validation result from the submitted body", async () => {
+    await expect(
+      base44.asServiceRole.connectors.callApi("x", {
+        method: "POST",
+        path: "/2/tweets",
+        body: {},
+      }),
+    ).resolves.toMatchObject({
+      success: false,
+      phase: "responded",
+      status: 400,
+      data: { title: "Tweet text is required" },
+      creditsCharged: 3,
+    });
+  });
+
   test("rejects when Base44 itself refuses the call", async () => {
     platform.given.app(appId).faults.connectors.creditsExhausted("x");
     await expect(
-      base44.asServiceRole.connectors.callApi("x", { path: "/2/tweets" }),
+      base44.asServiceRole.connectors.callApi("x", {
+        method: "POST",
+        path: "/2/tweets",
+        body: { text: "after retry" },
+      }),
     ).rejects.toMatchObject({ status: 402 });
     await expect(
-      base44.asServiceRole.connectors.callApi("x", { path: "/2/tweets" }),
+      base44.asServiceRole.connectors.callApi("x", {
+        method: "POST",
+        path: "/2/tweets",
+        body: { text: "recovered" },
+      }),
     ).resolves.toMatchObject({
       success: true,
       status: 201,
@@ -255,17 +274,19 @@ describe("Connectors module – metered connector proxy", () => {
   test.each(["not_sent", "timed_out", "sent_unconfirmed"] as const)(
     "maps proxy phase %s when no upstream response is available",
     async (phase) => {
-      platform.given.app(appId).connectors.proxyOutcome("x", {
-        success: false,
-        phase,
-        status: null,
-        data: { error: "request outcome unknown" },
-        creditsCharged: phase === "not_sent" ? 0 : 3,
-      });
+      const faults = platform.given.app(appId).faults.connectors;
+      if (phase === "not_sent") faults.notSent("x");
+      if (phase === "timed_out") faults.timedOut("x");
+      if (phase === "sent_unconfirmed") faults.sentUnconfirmed("x");
       const result = await base44.asServiceRole.connectors.callApi("x", {
         path: "/2/tweets",
       });
-      expect(result).toMatchObject({ phase, status: null, success: false });
+      expect(result).toMatchObject({
+        phase,
+        status: null,
+        success: false,
+        creditsCharged: phase === "not_sent" ? 0 : 3,
+      });
     },
   );
 

@@ -11,7 +11,7 @@ describe("SSO module", () => {
   let base44: ReturnType<typeof createClient>;
 
   beforeEach(() => {
-    platform.given.sso.tokens(userId, {
+    platform.given.app(appId).sso.tokens(userId, {
       idToken: "header.payload.signature",
       accessToken: "access-token-123",
     });
@@ -21,12 +21,18 @@ describe("SSO module", () => {
   afterEach(() => base44.cleanup());
 
   test("getIdToken issues the app-scoped GET request and returns the raw token", async () => {
-    await expect(base44.asServiceRole.sso.getIdToken(userId)).resolves.toBe("header.payload.signature");
-    expect(platform.requests.last("sso.getIdToken").url).toContain(`/api/apps/${appId}/auth/sso/idtoken/${userId}`);
+    await expect(base44.asServiceRole.sso.getIdToken(userId)).resolves.toBe(
+      "header.payload.signature",
+    );
+    expect(platform.requests.last("sso.getIdToken").url).toContain(
+      `/api/apps/${appId}/auth/sso/idtoken/${userId}`,
+    );
   });
 
   test("getAccessToken issues the existing GET request and returns the raw token", async () => {
-    await expect(base44.asServiceRole.sso.getAccessToken(userId)).resolves.toBe("access-token-123");
+    await expect(base44.asServiceRole.sso.getAccessToken(userId)).resolves.toBe(
+      "access-token-123",
+    );
   });
 
   test("getIdToken uses the service-role client with on-behalf-of authentication", async () => {
@@ -37,8 +43,12 @@ describe("SSO module", () => {
   });
 
   test("getIdToken surfaces a 404 when no ID token is stored", async () => {
-    platform.given.sso.tokens("another-user", { accessToken: "only-access" });
-    await expect(base44.asServiceRole.sso.getIdToken("another-user")).rejects.toMatchObject({
+    platform.given
+      .app(appId)
+      .sso.tokens("another-user", { accessToken: "only-access" });
+    await expect(
+      base44.asServiceRole.sso.getIdToken("another-user"),
+    ).rejects.toMatchObject({
       name: "Base44Error",
       status: 404,
       code: "NOT_FOUND",

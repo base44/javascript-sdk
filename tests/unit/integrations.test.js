@@ -33,13 +33,11 @@ describe("Integrations Module", () => {
     // no longer exposes installable-package integrations.
     platform.given
       .app(appId)
-      .integrations.packageSucceeds("CustomPackage", "CustomEndpoint", {
-        result: "custom result",
-      });
+      .integrations.legacyEndpoint("CustomPackage", "CustomEndpoint");
     const params = { param1: "value1", param2: "value2" };
     const result =
       await base44.integrations.CustomPackage.CustomEndpoint(params);
-    expect(result).toEqual({ success: true, result: "custom result" });
+    expect(result).toEqual({ success: true, received: params });
     expect(platform.requests.last("integrations.invoke")).toMatchObject({
       method: "POST",
       body: params,

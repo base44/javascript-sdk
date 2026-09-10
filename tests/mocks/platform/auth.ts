@@ -106,9 +106,6 @@ export function authFixturesFor(appId: string) {
     meLatency(token: string, delayMs: number) {
       meLatencies.set(scoped(appId, token), delayMs);
     },
-    passwordResetRequest(email: string, message = "Request accepted") {
-      state.passwordResetRequestMessages.set(scoped(appId, email), message);
-    },
     resetToken(
       resetToken: string,
       email: string,
@@ -245,23 +242,18 @@ export const authHandlers = [
         { status: 404 },
       );
     return HttpResponse.json({
-      id: registration.id,
-      message: registration.message,
-      otp_expires_in_minutes: registration.otpExpiresInMinutes,
+      id: registration.userId,
+      message: "Verification required",
+      otp_expires_in_minutes: registration.otpTtlMinutes,
       country_code: registration.countryCode,
     });
   }),
   http.post(
     "*/api/apps/:appId/auth/reset-password-request",
-    async ({ params, request }) => {
+    async ({ request }) => {
       await recordRequest("auth.resetPasswordRequest", request);
-      const body = (await request.clone().json()) as { email: string };
-      return HttpResponse.json({
-        message:
-          state.passwordResetRequestMessages.get(
-            scoped(String(params.appId), body.email),
-          ) ?? "Request accepted",
-      });
+      await request.clone().json();
+      return HttpResponse.json({ message: "Request accepted" });
     },
   ),
   http.post(

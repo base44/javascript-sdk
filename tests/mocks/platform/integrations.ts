@@ -22,24 +22,21 @@ function integrationStore(appId: string) {
 
 export function integrationFixturesFor(appId: string) {
   return {
-    packageSucceeds(
-      packageName: string,
-      endpointName: string,
-      result: Record<string, unknown> = {},
-    ) {
+    legacyEndpoint(packageName: string, endpointName: string) {
       integrationStore(appId).set(endpointKey(packageName, endpointName), {
-        response: { success: true, ...result },
+        kind: "legacy-endpoint",
       });
     },
     emailDelivered(messageId = "123456") {
-      this.packageSucceeds("Core", "SendEmail", { messageId });
+      integrationStore(appId).set(endpointKey("Core", "SendEmail"), {
+        kind: "email-delivery",
+        nextId: messageId,
+      });
     },
     fileUploaded(fileId = "file123") {
-      this.packageSucceeds("Core", "UploadFile", { fileId });
-    },
-    llmResponds(response: unknown) {
-      integrationStore(appId).set(endpointKey("Core", "InvokeLLM"), {
-        response,
+      integrationStore(appId).set(endpointKey("Core", "UploadFile"), {
+        kind: "file-upload",
+        nextId: fileId,
       });
     },
   };
@@ -62,6 +59,7 @@ function invokeIntegration(
   appId: string,
   packageName: string,
   endpointName: string,
+  body: unknown,
 ) {
   const fault = takeFault(
     (item) =>
@@ -75,6 +73,14 @@ function invokeIntegration(
       { detail: "Invalid parameters", code: "INVALID_PARAMS" },
       { status: 400 },
     );
+  // This deterministic transport contract does not simulate model behavior.
+  // It only proves that the SDK forwards LLM options and returns JSON/text.
+  if (packageName === "Core" && endpointName === "InvokeLLM")
+    return HttpResponse.json(
+      (body as Record<string, unknown>)?.response_json_schema
+        ? { mock: true, kind: "structured" }
+        : "Mock LLM text response",
+    );
   const endpoint = integrationStore(appId).get(
     endpointKey(packageName, endpointName),
   );
@@ -86,7 +92,14 @@ function invokeIntegration(
       },
       { status: 404 },
     );
-  return HttpResponse.json(endpoint.response as any);
+  switch (endpoint.kind) {
+    case "email-delivery":
+      return HttpResponse.json({ success: true, messageId: endpoint.nextId });
+    case "file-upload":
+      return HttpResponse.json({ success: true, fileId: endpoint.nextId });
+    case "legacy-endpoint":
+      return HttpResponse.json({ success: true, received: body });
+  }
 }
 
 function parseCustomRoute(request: Request) {
@@ -124,18 +137,105 @@ function workspaceFor(appId: string) {
 
 export function customIntegrationFixturesFor(appId: string) {
   return {
-    operation(
+    githubRepository(
       slug: string,
-      operationId: string,
-      data: unknown,
-      statusCode = 200,
+      owner: string,
+      repository: string,
+      issues: Array<Record<string, unknown>>,
     ) {
+      workspaceOperations(workspaceFor(appId), slug).set(
+        "get:/repos/{owner}/{repo}/issues",
+        {
+          kind: "github-issues",
+          owner,
+          repository,
+          issues: structuredClone(issues),
+        },
+      );
+    },
+    githubUser(slug: string, user: Record<string, unknown>) {
+      const operations = workspaceOperations(workspaceFor(appId), slug);
+      operations.set("getAuthenticatedUser", {
+        kind: "github-user",
+        user: structuredClone(user),
+      });
+      operations.set("get:/users/{username}", {
+        kind: "github-user",
+        user: structuredClone(user),
+      });
+    },
+    operationAvailable(slug: string, operationId: string) {
       workspaceOperations(workspaceFor(appId), slug).set(operationId, {
-        data,
-        statusCode,
+        kind: "available",
+      });
+    },
+    inventory(slug: string) {
+      const items: Array<Record<string, unknown>> = [];
+      const operations = workspaceOperations(workspaceFor(appId), slug);
+      operations.set("bulkCreate", { kind: "inventory", items });
+      operations.set("listItems", { kind: "inventory", items });
+    },
+    requestInspector(slug: string) {
+      workspaceOperations(workspaceFor(appId), slug).set("getData", {
+        kind: "request-inspector",
+      });
+    },
+    apiKeyProtected(slug: string, apiKey: string) {
+      workspaceOperations(workspaceFor(appId), slug).set("secureEndpoint", {
+        kind: "api-key-protected",
+        apiKey,
+      });
+    },
+    workspaceIdentity(slug: string) {
+      workspaceOperations(workspaceFor(appId), slug).set("whoami", {
+        kind: "workspace-identity",
       });
     },
   };
+}
+
+function customOperationData(
+  workspaceId: string,
+  operationId: string,
+  operation: import("./state").CustomIntegrationOperation,
+  body: Record<string, any>,
+) {
+  switch (operation.kind) {
+    case "github-issues":
+      return {
+        issues:
+          body.path_params?.owner === operation.owner &&
+          body.path_params?.repo === operation.repository
+            ? structuredClone(operation.issues).filter(
+                (issue) =>
+                  !body.query_params?.state ||
+                  issue.state === body.query_params.state,
+              )
+            : [],
+      };
+    case "github-user":
+      return structuredClone(operation.user);
+    case "available":
+      return { available: true };
+    case "inventory": {
+      if (operationId === "bulkCreate") {
+        const incoming = Array.isArray(body.payload?.items)
+          ? body.payload.items
+          : [];
+        operation.items.push(...structuredClone(incoming));
+        return { created: incoming.length, total: operation.items.length };
+      }
+      return { items: structuredClone(operation.items) };
+    }
+    case "request-inspector":
+      return { receivedHeaders: structuredClone(body.headers ?? {}) };
+    case "api-key-protected":
+      return {
+        authenticated: body.headers?.["X-API-Key"] === operation.apiKey,
+      };
+    case "workspace-identity":
+      return { workspaceId };
+  }
 }
 
 export function customIntegrationFaultFixturesFor(appId: string) {
@@ -155,11 +255,12 @@ export const integrationHandlers = [
   http.post(
     "*/api/apps/:appId/integration-endpoints/Core/:endpointName",
     async ({ params, request }) => {
-      await recordRequest("integrations.invoke", request);
+      const recorded = await recordRequest("integrations.invoke", request);
       return invokeIntegration(
         String(params.appId),
         "Core",
         String(params.endpointName),
+        recorded.body,
       );
     },
   ),
@@ -168,18 +269,19 @@ export const integrationHandlers = [
     // integrations, but the SDK still promises this dynamic package route.
     "*/api/apps/:appId/integration-endpoints/installable/:packageName/integration-endpoints/:endpointName",
     async ({ params, request }) => {
-      await recordRequest("integrations.invoke", request);
+      const recorded = await recordRequest("integrations.invoke", request);
       return invokeIntegration(
         String(params.appId),
         String(params.packageName),
         String(params.endpointName),
+        recorded.body,
       );
     },
   ),
   http.post(
     /^https?:\/\/[^/]+\/api\/apps\/[^/]+\/integrations\/custom\/.+$/,
     async ({ request }) => {
-      await recordRequest("customIntegrations.call", request);
+      const recorded = await recordRequest("customIntegrations.call", request);
       const route = parseCustomRoute(request);
       if (!route)
         return HttpResponse.json(
@@ -221,8 +323,13 @@ export const integrationHandlers = [
         );
       return HttpResponse.json({
         success: true,
-        status_code: operation.statusCode,
-        data: operation.data,
+        status_code: 200,
+        data: customOperationData(
+          workspaceId,
+          operationId,
+          operation,
+          (recorded.body ?? {}) as Record<string, any>,
+        ),
       });
     },
   ),

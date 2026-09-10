@@ -33,20 +33,29 @@ export interface StoredConversation {
 }
 
 export interface PlatformRegistration {
-  id: string;
-  message: string;
-  otpExpiresInMinutes: number;
+  userId: string;
+  otpTtlMinutes: number;
   countryCode: string | null;
 }
 
 export interface IntegrationEndpoint {
-  response: unknown;
+  kind: "email-delivery" | "file-upload" | "legacy-endpoint";
+  nextId?: string;
 }
 
-export interface CustomIntegrationOperation {
-  data: unknown;
-  statusCode: number;
-}
+export type CustomIntegrationOperation =
+  | {
+      kind: "github-issues";
+      owner: string;
+      repository: string;
+      issues: Array<Record<string, unknown>>;
+    }
+  | { kind: "github-user"; user: Record<string, unknown> }
+  | { kind: "available" }
+  | { kind: "inventory"; items: Array<Record<string, unknown>> }
+  | { kind: "request-inspector" }
+  | { kind: "api-key-protected"; apiKey: string }
+  | { kind: "workspace-identity" };
 
 export interface ConnectorToken {
   accessToken: string;
@@ -54,16 +63,18 @@ export interface ConnectorToken {
   connectionConfig?: Record<string, unknown> | null;
 }
 
-export interface ConnectorProxyOutcome {
-  success: boolean;
-  phase: "responded" | "not_sent" | "timed_out" | "sent_unconfirmed";
-  status: number | null;
-  data: unknown;
-  dataBase64?: string | null;
-  contentType?: string | null;
-  headers?: Record<string, string>;
-  creditsCharged?: number;
-}
+export type ConnectorProxyService =
+  | {
+      kind: "social";
+      account: Record<string, unknown>;
+      tweets: Array<Record<string, unknown>>;
+      nextTweetId: number;
+    }
+  | {
+      kind: "maps";
+      staticMap: { bytes: number[]; contentType: string };
+    }
+  | { kind: "echo" };
 
 export interface FunctionInvocation {
   appId: string;
@@ -100,6 +111,15 @@ export type PlatformFault =
       appId: string;
       integrationType: string;
     }
+  | {
+      kind:
+        | "connector-upstream-rejected"
+        | "connector-not-sent"
+        | "connector-timed-out"
+        | "connector-sent-unconfirmed";
+      appId: string;
+      integrationType: string;
+    }
   | { kind: "auth-registration-rejected"; appId: string; email: string }
   | { kind: "function-internal-error"; appId: string; functionName: string }
   | { kind: "function-not-found"; appId: string; functionName: string }
@@ -122,9 +142,8 @@ interface PlatformState {
   workspaceConnectorTokens: Map<string, Map<string, ConnectorToken>>;
   appUserConnectorTokens: Map<string, Map<string, Map<string, ConnectorToken>>>;
   appUserConnectorRedirects: Map<string, Map<string, Map<string, string>>>;
-  connectorProxyOutcomes: Map<string, Map<string, ConnectorProxyOutcome>>;
+  connectorProxyServices: Map<string, Map<string, ConnectorProxyService>>;
   registrations: Map<string, PlatformRegistration>;
-  passwordResetRequestMessages: Map<string, string>;
   functionBehaviors: Map<string, Map<string, FunctionBehavior>>;
   legacyFunctions: Set<string>;
   faults: PlatformFault[];
@@ -144,9 +163,8 @@ export const state: PlatformState = {
   workspaceConnectorTokens: new Map(),
   appUserConnectorTokens: new Map(),
   appUserConnectorRedirects: new Map(),
-  connectorProxyOutcomes: new Map(),
+  connectorProxyServices: new Map(),
   registrations: new Map(),
-  passwordResetRequestMessages: new Map(),
   functionBehaviors: new Map(),
   legacyFunctions: new Set(),
   faults: [],
@@ -166,9 +184,8 @@ export function resetPlatformState() {
   state.workspaceConnectorTokens.clear();
   state.appUserConnectorTokens.clear();
   state.appUserConnectorRedirects.clear();
-  state.connectorProxyOutcomes.clear();
+  state.connectorProxyServices.clear();
   state.registrations.clear();
-  state.passwordResetRequestMessages.clear();
   state.functionBehaviors.clear();
   state.legacyFunctions.clear();
   state.faults = [];

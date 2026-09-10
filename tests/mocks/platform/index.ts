@@ -1,7 +1,7 @@
-import { actorFixtures, actorHandlers, resetActorState } from "./actors";
+import { actorFixturesFor, actorHandlers, resetActorState } from "./actors";
 import { agentHandlers } from "./agents";
 import { analyticsHandlers } from "./analytics";
-import { appFixtures, appHandlers, resetAppState } from "./app";
+import { appFixturesFor, appHandlers, resetAppState } from "./app";
 import {
   authFaultFixturesFor,
   authFixturesFor,
@@ -23,7 +23,7 @@ import {
   integrationFixturesFor,
   integrationHandlers,
 } from "./integrations";
-import { resetSsoState, ssoFixtures, ssoHandlers } from "./sso";
+import { resetSsoState, ssoFixturesFor, ssoHandlers } from "./sso";
 import {
   resetPlatformState,
   state,
@@ -89,10 +89,16 @@ function forApp(appId: string) {
   const integrations = integrationFixturesFor(appId);
   const customIntegrations = customIntegrationFixturesFor(appId);
   const connectors = connectorFixturesFor(appId);
+  const deployment = appFixturesFor(appId);
+  const actors = actorFixturesFor(appId);
+  const sso = ssoFixturesFor(appId);
   return {
     workspace(workspaceId: string) {
       state.appWorkspaces.set(appId, workspaceId);
     },
+    deployment,
+    actors,
+    sso,
     agents: {
       conversationsForUser(
         userId: string,
@@ -137,7 +143,7 @@ function forApp(appId: string) {
     },
     auth: {
       ...auth,
-      registration(email: string, registration: PlatformRegistration) {
+      registrationChallenge(email: string, registration: PlatformRegistration) {
         state.registrations.set(`${appId}\u0000${email}`, clone(registration));
       },
     },
@@ -279,19 +285,15 @@ function arrangeConversations(
   );
 }
 
-const appGiven = Object.assign(forApp, appFixtures);
-
 export const platform = {
   reset,
   given: {
-    app: appGiven,
+    app: forApp,
     functions: {
       legacyEndpoint(functionPath: string) {
         state.legacyFunctions.add(functionPath.replace(/^\//, ""));
       },
     },
-    actors: actorFixtures,
-    sso: ssoFixtures,
     generic: genericFixtures,
     faults: {},
   },

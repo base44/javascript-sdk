@@ -17,10 +17,9 @@ describe("Auth registration and password recovery HTTP contracts", () => {
       turnstile_token: "challenge",
       referral_code: "referral",
     };
-    platform.given.app(appId).auth.registration(payload.email, {
-      id: "new-user-id",
-      message: "Verification required",
-      otpExpiresInMinutes: 10,
+    platform.given.app(appId).auth.registrationChallenge(payload.email, {
+      userId: "new-user-id",
+      otpTtlMinutes: 10,
       countryCode: "US",
     });
     expect(await client.auth.register(payload)).toEqual({
@@ -44,7 +43,6 @@ describe("Auth registration and password recovery HTTP contracts", () => {
     expect(platform.requests.last("auth.register").body).toEqual(payload);
   });
   test("password reset request sends only the email", async () => {
-    platform.given.app(appId).auth.passwordResetRequest("reset@example.test");
     expect(
       await client.auth.resetPasswordRequest("reset@example.test"),
     ).toEqual({ message: "Request accepted" });

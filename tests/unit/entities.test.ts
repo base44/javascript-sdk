@@ -108,6 +108,34 @@ describe("Entities Module", () => {
     });
   });
 
+  test("list() groups missing and null values consistently around sorted pages", async () => {
+    platform.given.app(appId).entities.records("Todo", [
+      { id: "missing", title: "Missing" },
+      { id: "null", title: "Null", description: null },
+      { id: "zulu", title: "Zulu", description: "Zulu" },
+      { id: "alpha", title: "Alpha", description: "Alpha" },
+    ]);
+
+    await expect(base44.entities.Todo.list("description")).resolves.toEqual([
+      { id: "missing", title: "Missing" },
+      { id: "null", title: "Null", description: null },
+      { id: "alpha", title: "Alpha", description: "Alpha" },
+      { id: "zulu", title: "Zulu", description: "Zulu" },
+    ]);
+    await expect(base44.entities.Todo.list("-description")).resolves.toEqual([
+      { id: "zulu", title: "Zulu", description: "Zulu" },
+      { id: "alpha", title: "Alpha", description: "Alpha" },
+      { id: "missing", title: "Missing" },
+      { id: "null", title: "Null", description: null },
+    ]);
+    await expect(
+      base44.entities.Todo.list("description", 2, 1),
+    ).resolves.toEqual([
+      { id: "null", title: "Null", description: null },
+      { id: "alpha", title: "Alpha", description: "Alpha" },
+    ]);
+  });
+
   test("filter() sends the query and returns matching domain state", async () => {
     platform.given.app(appId).entities.records("Todo", [
       { id: "1", title: "Task 1", completed: false },
