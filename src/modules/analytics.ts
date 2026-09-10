@@ -11,6 +11,7 @@ import {
 import { getSharedInstance } from "../utils/sharedInstance.js";
 import type { InternalAuthModule } from "./auth.types";
 import { generateUuid, isReactNative } from "../utils/common.js";
+import { getExperimentsRuntime } from "./experiments-runtime.types.js";
 
 export const USER_HEARTBEAT_EVENT_NAME = "__user_heartbeat_event__";
 export const ANALYTICS_INITIALIZATION_EVENT_NAME = "__initialization_event__";
@@ -413,6 +414,8 @@ function getFallbackSessionId(): string {
 }
 
 export function getAnalyticsSessionId(): string {
+  const visitorId = getExperimentsRuntime()?.visitorId;
+  if (visitorId && visitorId !== "anon") return visitorId;
   if (typeof window === "undefined") {
     return getFallbackSessionId();
   }

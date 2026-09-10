@@ -19,8 +19,9 @@ export interface ExperimentsSnapshot {
  * flags. Without it, including on servers and Workers, reads return their fallback;
  * this module does not provide server-side evaluation or hydration guarantees.
  * Goal conversions use the existing {@link AnalyticsModule | analytics module}.
- * Visitor-keyed conversion attribution requires matching runtime and analytics
- * visitor IDs; blocked browser storage is not currently supported for attribution.
+ * Visitor-keyed conversions share the injected runtime's visitor ID. When browser
+ * storage is blocked, the platform must supply a unique per-page ID; attribution
+ * then lasts for that page only, not across reloads or tabs.
  */
 export interface ExperimentsModule {
   /**

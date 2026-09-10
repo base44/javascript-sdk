@@ -1,6 +1,8 @@
 import axios, { type AxiosInstance } from "axios";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createExposureTracker } from "../../src/modules/experiment-exposures.js";
+import { createAnalyticsModule, getAnalyticsSessionId, resetAnalyticsSessionContext } from "../../src/modules/analytics.js";
+import { createAuthModule } from "../../src/modules/auth.js";
 
 const assignment = { experiment_id: "experiment-1", run_version: 1, variant_key: "control" };
 const identity = { visitorId: "runtime-visitor", userId: "user-1" };
@@ -14,6 +16,8 @@ describe("experiment exposure transport", () => {
     vi.stubGlobal("window", {
       location: { pathname: "/checkout", search: "" },
       history: { replaceState: vi.fn() },
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
     });
     vi.stubGlobal("document", {});
     client = axios.create();
@@ -58,6 +62,48 @@ describe("experiment exposure transport", () => {
     tracker.track(assignment, { ...identity, visitorId: "visitor-2" });
 
     expect(request).toHaveBeenCalledTimes(5);
+  });
+
+  test.each(["getItem", "setItem"])("attributes goals to the exposure when storage %s fails", async (method) => {
+    vi.useFakeTimers();
+    const storage = { getItem: vi.fn(() => null as string | null), setItem: vi.fn() };
+    storage[method as keyof typeof storage].mockImplementation(() => { throw new Error("storage blocked"); });
+    vi.stubGlobal("localStorage", storage);
+    Object.assign(window, { __B44_EXPERIMENTS__: identity });
+    delete client.defaults.headers.common.Authorization;
+    resetAnalyticsSessionContext();
+    const userAuthModule = createAuthModule(client, axios.create(), appId, { serverUrl: "https://example.test", appBaseUrl: "https://example.test" });
+    const analytics = createAnalyticsModule({ axiosClient: client, appId, serverUrl: "https://example.test", userAuthModule, enabled: true });
+    try {
+      createExposureTracker({ axiosClient: client, appId, enabled: true }).track(assignment, { ...identity, userId: null });
+      analytics.track({ eventName: "purchase" });
+      await vi.advanceTimersByTimeAsync(1000);
+      storage.getItem.mockReturnValue("recovered-storage-visitor");
+      storage.setItem.mockImplementation(() => {});
+      analytics.track({ eventName: "purchase_after_storage_recovers" });
+      await vi.advanceTimersByTimeAsync(1000);
+
+      const events = request.mock.calls.flatMap(([config]) => config.data.events);
+      for (const eventName of ["__experiment_exposure__", "purchase", "purchase_after_storage_recovers"]) {
+        expect(events.find((event) => event.event_name === eventName)?.session_id).toBe(identity.visitorId);
+      }
+    } finally {
+      analytics.cleanup();
+      vi.useRealTimers();
+    }
+  });
+
+  test.each([undefined, "anon"])("keeps ordinary visitor IDs when runtime ID is %s", (visitorId) => {
+    Object.assign(window, { __B44_EXPERIMENTS__: visitorId ? { visitorId } : undefined });
+    const storage = { getItem: vi.fn(() => "stored-visitor"), setItem: vi.fn() };
+    vi.stubGlobal("localStorage", storage);
+    expect(getAnalyticsSessionId()).toBe("stored-visitor");
+
+    storage.getItem.mockImplementation(() => { throw new Error("storage blocked"); });
+    const fallback = getAnalyticsSessionId();
+    expect(fallback).toBeTruthy();
+    expect(fallback).not.toBe("anon");
+    expect(getAnalyticsSessionId()).toBe(fallback);
   });
 
   test("retries on a later read after a failed request without an unhandled rejection", async () => {
