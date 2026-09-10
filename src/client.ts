@@ -291,6 +291,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
       userAuthModule,
       enabled: analytics?.enabled ?? true,
       getVisitorId: experiments.visitorId,
+      experimentsContext,
     }),
     actors: actorsModule.module,
     cleanup: () => {

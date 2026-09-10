@@ -12,6 +12,7 @@ import { getSharedInstance } from "../utils/sharedInstance.js";
 import type { InternalAuthModule } from "./auth.types";
 import { generateUuid, isReactNative } from "../utils/common.js";
 import { getExperimentsRuntime } from "./experiments-runtime.types.js";
+import type { ExperimentsContext } from "./experiments-config.types.js";
 
 export const USER_HEARTBEAT_EVENT_NAME = "__user_heartbeat_event__";
 export const ANALYTICS_INITIALIZATION_EVENT_NAME = "__initialization_event__";
@@ -65,6 +66,7 @@ export interface AnalyticsModuleArgs {
   userAuthModule: InternalAuthModule;
   enabled: boolean;
   getVisitorId?: () => string | undefined;
+  experimentsContext?: ExperimentsContext;
 }
 
 /** @internal */
@@ -79,6 +81,7 @@ export const createAnalyticsModule = ({
   userAuthModule,
   enabled,
   getVisitorId,
+  experimentsContext,
 }: AnalyticsModuleArgs) => {
   // prevent overflow of events //
   const { maxQueueSize, throttleTime, batchSize } = analyticsSharedState.config;
@@ -152,9 +155,19 @@ export const createAnalyticsModule = ({
       return;
     }
     const intrinsicData = getEventIntrinsicData();
+    const preview = Object.fromEntries(
+      Object.entries(experimentsContext?.preview ?? {}).filter(([, value]) => typeof value === "boolean"),
+    );
+    const properties = { ...params.properties };
+    delete properties.__b44_experiment_preview;
+    if (Object.keys(preview).length) {
+      // Capture now: a queued event must retain its occurrence-time preview.
+      properties.__b44_experiment_preview = JSON.stringify(preview);
+    }
     analyticsSharedState.requestsQueue.push({
       ...params,
       ...intrinsicData,
+      properties: params.properties || Object.keys(properties).length ? properties : undefined,
     });
     startProcessing();
   };
