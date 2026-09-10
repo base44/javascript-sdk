@@ -225,7 +225,7 @@ export function createAuthModule(
       // Drop identity resolved under the previous session: a `me()` already in
       // flight would otherwise resolve into callers that run after the logout.
       clearPendingMe();
-      resetAnalyticsSessionContext();
+      resetAnalyticsSessionContext(axios);
       hasAccessToken = false;
       notifyAuthState({ status: "anonymous" });
 
@@ -258,7 +258,7 @@ export function createAuthModule(
       // Same reasoning as in `logout`: the identity changes here, so anything
       // resolved for the previous one must not be handed to later callers.
       clearPendingMe();
-      resetAnalyticsSessionContext();
+      resetAnalyticsSessionContext(axios);
       hasAccessToken = true;
 
       // handle token change for axios clients
