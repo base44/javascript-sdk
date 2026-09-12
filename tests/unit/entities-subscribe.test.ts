@@ -1,4 +1,5 @@
 import { describe, test, expect, vi } from "vitest";
+import axios from "axios";
 import { createEntitiesModule } from "../../src/modules/entities.ts";
 
 describe("Entities Module - subscribe()", () => {
@@ -23,22 +24,18 @@ describe("Entities Module - subscribe()", () => {
     };
   }
 
-  // Helper to create a mock axios instance
-  function createMockAxios() {
-    return {
-      get: vi.fn(),
-      post: vi.fn(),
-      put: vi.fn(),
-      delete: vi.fn(),
-    };
+  // Use a real HTTP client. Strict MSW teardown rejects any unexpected request,
+  // including a background refetch whose error is swallowed by the SDK.
+  function createSubscriptionHttpClient() {
+    return axios.create({ baseURL: "https://subscription.example.test" });
   }
 
   test("subscribe() should return an unsubscribe function", () => {
     const mockSocket = createMockSocket();
-    const mockAxios = createMockAxios();
+    const httpClient = createSubscriptionHttpClient();
 
     const entities = createEntitiesModule({
-      axios: mockAxios as any,
+      axios: httpClient,
       appId,
       getSocket: () => mockSocket as any,
     });
@@ -49,16 +46,16 @@ describe("Entities Module - subscribe()", () => {
     expect(typeof unsubscribe).toBe("function");
     expect(mockSocket.subscribeToRoom).toHaveBeenCalledWith(
       `entities:${appId}:Todo`,
-      expect.any(Object)
+      expect.any(Object),
     );
   });
 
   test("subscribe() should call callback when update_model event is received", () => {
     const mockSocket = createMockSocket();
-    const mockAxios = createMockAxios();
+    const httpClient = createSubscriptionHttpClient();
 
     const entities = createEntitiesModule({
-      axios: mockAxios as any,
+      axios: httpClient,
       appId,
       getSocket: () => mockSocket as any,
     });
@@ -90,10 +87,10 @@ describe("Entities Module - subscribe()", () => {
 
   test("subscribe() should handle update and delete events", () => {
     const mockSocket = createMockSocket();
-    const mockAxios = createMockAxios();
+    const httpClient = createSubscriptionHttpClient();
 
     const entities = createEntitiesModule({
-      axios: mockAxios as any,
+      axios: httpClient,
       appId,
       getSocket: () => mockSocket as any,
     });
@@ -113,7 +110,7 @@ describe("Entities Module - subscribe()", () => {
     });
 
     expect(callback).toHaveBeenLastCalledWith(
-      expect.objectContaining({ type: "update" })
+      expect.objectContaining({ type: "update" }),
     );
 
     // Test delete event
@@ -128,17 +125,17 @@ describe("Entities Module - subscribe()", () => {
     });
 
     expect(callback).toHaveBeenLastCalledWith(
-      expect.objectContaining({ type: "delete" })
+      expect.objectContaining({ type: "delete" }),
     );
     expect(callback).toHaveBeenCalledTimes(2);
   });
 
   test("subscribe() unsubscribe function should stop receiving events", () => {
     const mockSocket = createMockSocket();
-    const mockAxios = createMockAxios();
+    const httpClient = createSubscriptionHttpClient();
 
     const entities = createEntitiesModule({
-      axios: mockAxios as any,
+      axios: httpClient,
       appId,
       getSocket: () => mockSocket as any,
     });
@@ -179,10 +176,10 @@ describe("Entities Module - subscribe()", () => {
 
   test("subscribe() should not call callback for invalid JSON messages", () => {
     const mockSocket = createMockSocket();
-    const mockAxios = createMockAxios();
+    const httpClient = createSubscriptionHttpClient();
 
     const entities = createEntitiesModule({
-      axios: mockAxios as any,
+      axios: httpClient,
       appId,
       getSocket: () => mockSocket as any,
     });
@@ -201,7 +198,7 @@ describe("Entities Module - subscribe()", () => {
     expect(callback).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalledWith(
       "[Base44 SDK] Failed to parse realtime message:",
-      expect.any(Error)
+      expect.any(Error),
     );
 
     warnSpy.mockRestore();
@@ -210,9 +207,9 @@ describe("Entities Module - subscribe()", () => {
   describe("oversize broadcast handling", () => {
     test("logs a console.error and passes the stub through when data._oversize is true", () => {
       const mockSocket = createMockSocket();
-      const mockAxios = createMockAxios();
+      const httpClient = createSubscriptionHttpClient();
       const entities = createEntitiesModule({
-        axios: mockAxios as any,
+        axios: httpClient,
         appId,
         getSocket: () => mockSocket as any,
       });
@@ -233,10 +230,12 @@ describe("Entities Module - subscribe()", () => {
       });
 
       // No HTTP call — the SDK never auto-refetches.
-      expect(mockAxios.get).not.toHaveBeenCalled();
+      // The shared MSW setup asserts no unexpected network traffic.
       // Developer is notified via console.error.
       expect(errorSpy).toHaveBeenCalledWith(
-        expect.stringContaining("[Base44 SDK] Realtime broadcast for Todo#123 was oversize")
+        expect.stringContaining(
+          "[Base44 SDK] Realtime broadcast for Todo#123 was oversize",
+        ),
       );
       // Callback still fires with the slimmed payload — caller decides what to do.
       expect(callback).toHaveBeenCalledWith(
@@ -244,7 +243,7 @@ describe("Entities Module - subscribe()", () => {
           type: "update",
           id: "123",
           data: { id: "123", _oversize: true },
-        })
+        }),
       );
 
       errorSpy.mockRestore();
@@ -252,9 +251,9 @@ describe("Entities Module - subscribe()", () => {
 
     test("does NOT log on delete events even if _oversize is set", () => {
       const mockSocket = createMockSocket();
-      const mockAxios = createMockAxios();
+      const httpClient = createSubscriptionHttpClient();
       const entities = createEntitiesModule({
-        axios: mockAxios as any,
+        axios: httpClient,
         appId,
         getSocket: () => mockSocket as any,
       });
@@ -276,7 +275,7 @@ describe("Entities Module - subscribe()", () => {
 
       expect(errorSpy).not.toHaveBeenCalled();
       expect(callback).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "delete", id: "123" })
+        expect.objectContaining({ type: "delete", id: "123" }),
       );
 
       errorSpy.mockRestore();
@@ -284,9 +283,9 @@ describe("Entities Module - subscribe()", () => {
 
     test("does NOT log when data has no _oversize flag", () => {
       const mockSocket = createMockSocket();
-      const mockAxios = createMockAxios();
+      const httpClient = createSubscriptionHttpClient();
       const entities = createEntitiesModule({
-        axios: mockAxios as any,
+        axios: httpClient,
         appId,
         getSocket: () => mockSocket as any,
       });
@@ -310,7 +309,7 @@ describe("Entities Module - subscribe()", () => {
       expect(callback).toHaveBeenCalledWith(
         expect.objectContaining({
           data: { id: "123", title: "Normal Todo" },
-        })
+        }),
       );
 
       errorSpy.mockRestore();
@@ -319,10 +318,10 @@ describe("Entities Module - subscribe()", () => {
 
   test("subscribe() should catch and log errors thrown by callback", () => {
     const mockSocket = createMockSocket();
-    const mockAxios = createMockAxios();
+    const httpClient = createSubscriptionHttpClient();
 
     const entities = createEntitiesModule({
-      axios: mockAxios as any,
+      axios: httpClient,
       appId,
       getSocket: () => mockSocket as any,
     });
@@ -355,7 +354,7 @@ describe("Entities Module - subscribe()", () => {
     // The error should have been logged
     expect(errorSpy).toHaveBeenCalledWith(
       "[Base44 SDK] Subscription callback error:",
-      expect.any(Error)
+      expect.any(Error),
     );
 
     errorSpy.mockRestore();

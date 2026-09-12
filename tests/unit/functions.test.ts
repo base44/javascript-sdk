@@ -1,5 +1,5 @@
-import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
-import nock from "nock";
+import { describe, test, expect, beforeEach, afterEach } from "vitest";
+import { platform, type MultipartBody } from "../mocks/platform";
 import { createClient } from "../../src/index.ts";
 
 // Module augmentation: register function names in FunctionNameRegistry
@@ -13,8 +13,6 @@ declare module "../../src/modules/functions.types.ts" {
 
 describe("Functions Module", () => {
   let base44: ReturnType<typeof createClient>;
-  let scope;
-  let fetchMock: ReturnType<typeof vi.fn>;
   const appId = "test-app-id";
   const serverUrl = "https://api.base44.com";
 
@@ -24,28 +22,10 @@ describe("Functions Module", () => {
       serverUrl,
       appId,
     });
-
-    // Create a nock scope for mocking API calls
-    scope = nock(serverUrl);
-
-    // Enable request debugging for Nock
-    nock.disableNetConnect();
-    nock.emitter.on("no match", (req) => {
-      console.log(`Nock: No match for ${req.method} ${req.path}`);
-      console.log("Headers:", req.getHeaders());
-    });
-
-    fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
   });
 
   afterEach(() => {
-    // Clean up any pending mocks
-    nock.cleanAll();
-    nock.emitter.removeAllListeners("no match");
-    nock.enableNetConnect();
-    vi.unstubAllGlobals();
-    vi.clearAllMocks();
+    base44.cleanup();
   });
 
   test("should call a function with JSON data", async () => {
@@ -56,14 +36,7 @@ describe("Functions Module", () => {
       priority: "high",
     };
 
-    // Mock the API response
-    scope
-      .post(`/api/apps/${appId}/functions/${functionName}`, functionData)
-      .matchHeader("Content-Type", "application/json")
-      .reply(200, {
-        success: true,
-        messageId: "msg-456",
-      });
+    platform.given.app(appId).functions.notificationDelivery("msg-456");
 
     // Call the function
     const result = await base44.functions.invoke(functionName, functionData);
@@ -71,31 +44,26 @@ describe("Functions Module", () => {
     // Verify the response
     expect(result.data.success).toBe(true);
     expect(result.data.messageId).toBe("msg-456");
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    expect(platform.requests.last("functions.invoke").body).toEqual(
+      functionData,
+    );
+    expect(platform.requests.last("functions.invoke").headers).toMatchObject({
+      "content-type": "application/json",
+      "x-app-id": appId,
+    });
   });
 
   test("should handle function with empty object parameters", async () => {
     const functionName = "getStatus";
 
-    // Mock the API response
-    scope
-      .post(`/api/apps/${appId}/functions/${functionName}`, {})
-      .matchHeader("Content-Type", "application/json")
-      .reply(200, {
-        status: "healthy",
-        timestamp: "2024-01-01T00:00:00Z",
-      });
+    platform.given.app(appId).functions.serviceHealth("2024-01-01T00:00:00Z");
 
     // Call the function
     const result = await base44.functions.invoke(functionName, {});
 
     // Verify the response
     expect(result.data.status).toBe("healthy");
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    expect(platform.requests.last("functions.invoke").body).toEqual({});
   });
 
   test("should handle function with complex nested objects", async () => {
@@ -117,23 +85,16 @@ describe("Functions Module", () => {
       },
     };
 
-    // Mock the API response
-    scope
-      .post(`/api/apps/${appId}/functions/${functionName}`, functionData)
-      .matchHeader("Content-Type", "application/json")
-      .reply(200, {
-        processed: true,
-        userId: "123",
-      });
+    platform.given.app(appId).functions.userProcessor();
 
     // Call the function
     const result = await base44.functions.invoke(functionName, functionData);
 
     // Verify the response
     expect(result.data.processed).toBe(true);
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    expect(platform.requests.last("functions.invoke").body).toEqual(
+      functionData,
+    );
   });
 
   test("should handle file uploads with FormData", async () => {
@@ -145,21 +106,7 @@ describe("Functions Module", () => {
       category: "documents",
     };
 
-    // Mock the API response
-    // TODO: Add validation to the request body
-    scope
-      .post(`/api/apps/${appId}/functions/${functionName}`)
-      .matchHeader("Content-Type", /^multipart\/form-data/)
-      .reply(() => {
-        return [
-          200,
-          {
-            fileId: "file-789",
-            filename: "test.txt",
-            size: 12,
-          },
-        ];
-      });
+    platform.given.app(appId).functions.fileStore(functionName, "file-789");
 
     // Call the function
     const result = await base44.functions.invoke(functionName, functionData);
@@ -167,9 +114,17 @@ describe("Functions Module", () => {
     // Verify the response
     expect(result.data.fileId).toBe("file-789");
     expect(result.data.filename).toBe("test.txt");
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    const body = platform.requests.last("functions.invoke")
+      .body as MultipartBody;
+    expect(body.entries).toContainEqual({
+      name: "file",
+      file: {
+        name: "test.txt",
+        type: "text/plain",
+        size: 12,
+        bytes: [...new TextEncoder().encode("test content")],
+      },
+    });
   });
 
   test("should handle mixed data with files and regular data", async () => {
@@ -187,16 +142,9 @@ describe("Functions Module", () => {
       priority: "high",
     };
 
-    // Mock the API response
-    // TODO: Add validation to the request body
-    scope
-      .post(`/api/apps/${appId}/functions/${functionName}`)
-      .matchHeader("Content-Type", /^multipart\/form-data/)
-      .reply(200, {
-        documentId: "doc-123",
-        processed: true,
-        extractedText: "document content",
-      });
+    platform.given
+      .app(appId)
+      .functions.documentProcessor("doc-123", "document content");
 
     // Call the function
     const result = await base44.functions.invoke(functionName, functionData);
@@ -204,9 +152,23 @@ describe("Functions Module", () => {
     // Verify the response
     expect(result.data.documentId).toBe("doc-123");
     expect(result.data.processed).toBe(true);
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    const body = platform.requests.last("functions.invoke")
+      .body as MultipartBody;
+    expect(body.entries).toEqual(
+      expect.arrayContaining([
+        {
+          name: "file",
+          file: {
+            name: "document.pdf",
+            type: "application/pdf",
+            size: 16,
+            bytes: [...new TextEncoder().encode("document content")],
+          },
+        },
+        { name: "metadata", value: JSON.stringify(functionData.metadata) },
+        { name: "priority", value: "high" },
+      ]),
+    );
   });
 
   test("should handle FormData input directly", async () => {
@@ -216,15 +178,9 @@ describe("Functions Module", () => {
     formData.append("email", "john@example.com");
     formData.append("message", "Hello there");
 
-    // Mock the API response
-    // TODO: Add validation to the request body
-    scope
-      .post(`/api/apps/${appId}/functions/${functionName}`)
-      .matchHeader("Content-Type", /^multipart\/form-data/)
-      .reply(200, {
-        formId: "form-456",
-        submitted: true,
-      });
+    platform.given
+      .app(appId)
+      .functions.formSubmissions(functionName, "form-456");
 
     // Call the function
     const result = await base44.functions.invoke(functionName, formData);
@@ -232,9 +188,53 @@ describe("Functions Module", () => {
     // Verify the response
     expect(result.data.formId).toBe("form-456");
     expect(result.data.submitted).toBe(true);
+    expect(
+      (platform.requests.last("functions.invoke").body as MultipartBody)
+        .entries,
+    ).toEqual([
+      { name: "name", value: "John Doe" },
+      { name: "email", value: "john@example.com" },
+      { name: "message", value: "Hello there" },
+    ]);
+  });
 
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+  test("direct FormData preserves repeated keys, binary files and empty values", async () => {
+    const form = new FormData();
+    form.append("tag", "one");
+    form.append("tag", "two");
+    form.append("empty", "");
+    form.append(
+      "file",
+      new File([new Uint8Array([0, 255, 10])], "bytes.bin", {
+        type: "application/octet-stream",
+      }),
+    );
+    platform.given.app(appId).functions.uploadAcceptance("upload");
+    expect((await base44.functions.invoke("upload", form)).data).toEqual({
+      ok: true,
+      success: true,
+    });
+    expect(form.getAll("tag")).toEqual(["one", "two"]);
+    expect(
+      (platform.requests.last("functions.invoke").body as MultipartBody)
+        .entries,
+    ).toEqual([
+      { name: "tag", value: "one" },
+      { name: "tag", value: "two" },
+      { name: "empty", value: "" },
+      {
+        name: "file",
+        file: {
+          name: "bytes.bin",
+          type: "application/octet-stream",
+          size: 3,
+          bytes: [0, 255, 10],
+        },
+      },
+    ]);
+    expect(
+      platform.requests.last("functions.invoke").headers["content-type"],
+    ).toMatch(/^multipart\/form-data; boundary=/);
   });
 
   test("should throw error for string input instead of object", async () => {
@@ -243,9 +243,9 @@ describe("Functions Module", () => {
     // Call the function with string input (should throw)
     await expect(
       // @ts-expect-error
-      base44.functions.invoke(functionName, "invalid string input")
+      base44.functions.invoke(functionName, "invalid string input"),
     ).rejects.toThrow(
-      `Function ${functionName} must receive an object with named parameters, received: invalid string input`
+      `Function ${functionName} must receive an object with named parameters, received: invalid string input`,
     );
   });
 
@@ -255,22 +255,16 @@ describe("Functions Module", () => {
       input: "test data",
     };
 
-    // Mock the API response
-    scope
-      .post(`/api/apps/${appId}/functions/${functionName}`, functionData)
-      .matchHeader("Content-Type", "application/json")
-      .reply(200, {
-        processed: true,
-      });
+    platform.given.app(appId).functions.userProcessor(functionName);
 
     // Call the function
     const result = await base44.functions.invoke(functionName, functionData);
 
     // Verify the response
     expect(result.data.processed).toBe(true);
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    expect(platform.requests.last("functions.invoke").body).toEqual(
+      functionData,
+    );
   });
 
   test("should handle API errors gracefully", async () => {
@@ -279,22 +273,25 @@ describe("Functions Module", () => {
       param: "value",
     };
 
-    // Mock the API error response
-    scope
-      .post(`/api/apps/${appId}/functions/${functionName}`, functionData)
-      .matchHeader("Content-Type", "application/json")
-      .reply(500, {
-        error: "Internal server error",
-        code: "INTERNAL_ERROR",
-      });
+    platform.given.app(appId).faults.functions.internalError(functionName);
+    platform.given.app(appId).functions.userProcessor(functionName);
 
     // Call the function and expect it to throw
     await expect(
-      base44.functions.invoke(functionName, functionData)
-    ).rejects.toThrow();
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+      base44.functions.invoke(functionName, functionData),
+    ).rejects.toMatchObject({
+      message: "Request failed with status code 500",
+      response: {
+        status: 500,
+        data: { error: "Internal server error", code: "INTERNAL_ERROR" },
+      },
+    });
+    expect(platform.requests.last("functions.invoke").body).toEqual(
+      functionData,
+    );
+    await expect(
+      base44.functions.invoke(functionName, functionData),
+    ).resolves.toMatchObject({ data: { processed: true } });
   });
 
   test("should handle 404 errors for non-existent functions", async () => {
@@ -303,22 +300,21 @@ describe("Functions Module", () => {
       param: "value",
     };
 
-    // Mock the API 404 response
-    scope
-      .post(`/api/apps/${appId}/functions/${functionName}`, functionData)
-      .matchHeader("Content-Type", "application/json")
-      .reply(404, {
-        error: "Function not found",
-        code: "FUNCTION_NOT_FOUND",
-      });
+    platform.given.app(appId).faults.functions.notFound(functionName);
 
     // Call the function and expect it to throw
     await expect(
-      base44.functions.invoke(functionName, functionData)
-    ).rejects.toThrow();
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+      base44.functions.invoke(functionName, functionData),
+    ).rejects.toMatchObject({
+      message: "Request failed with status code 404",
+      response: {
+        status: 404,
+        data: { error: "Function not found", code: "FUNCTION_NOT_FOUND" },
+      },
+    });
+    expect(platform.requests.last("functions.invoke").body).toEqual(
+      functionData,
+    );
   });
 
   test("should handle null and undefined values in data", async () => {
@@ -330,23 +326,18 @@ describe("Functions Module", () => {
       emptyString: "",
     };
 
-    // Mock the API response
-    scope
-      .post(`/api/apps/${appId}/functions/${functionName}`, functionData)
-      .matchHeader("Content-Type", "application/json")
-      .reply(200, {
-        received: true,
-        values: functionData,
-      });
+    platform.given.app(appId).functions.inputReceipt(functionName);
 
     // Call the function
     const result = await base44.functions.invoke(functionName, functionData);
 
     // Verify the response
     expect(result.data.received).toBe(true);
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    expect(platform.requests.last("functions.invoke").body).toEqual({
+      stringValue: "test",
+      nullValue: null,
+      emptyString: "",
+    });
   });
 
   test("should handle array values in data", async () => {
@@ -357,14 +348,7 @@ describe("Functions Module", () => {
       mixed: [1, "two", { three: 3 }],
     };
 
-    // Mock the API response
-    scope
-      .post(`/api/apps/${appId}/functions/${functionName}`, functionData)
-      .matchHeader("Content-Type", "application/json")
-      .reply(200, {
-        processed: true,
-        count: 3,
-      });
+    platform.given.app(appId).functions.arrayProcessor(functionName);
 
     // Call the function
     const result = await base44.functions.invoke(functionName, functionData);
@@ -372,9 +356,9 @@ describe("Functions Module", () => {
     // Verify the response
     expect(result.data.processed).toBe(true);
     expect(result.data.count).toBe(3);
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    expect(platform.requests.last("functions.invoke").body).toEqual(
+      functionData,
+    );
   });
 
   test("should create FormData correctly when files are present", async () => {
@@ -386,20 +370,17 @@ describe("Functions Module", () => {
       category: "documents",
     };
 
-    // Mock the API response
-    scope
-      .post(`/api/apps/${appId}/functions/${functionName}`)
-      .matchHeader("Content-Type", /^multipart\/form-data/)
-      .reply(200, { success: true });
+    platform.given.app(appId).functions.uploadAcceptance(functionName);
 
     // Call the function
     const result = await base44.functions.invoke(functionName, functionData);
 
     // Verify the response
     expect(result.data.success).toBe(true);
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    expect(
+      (platform.requests.last("functions.invoke").body as MultipartBody)
+        .entries,
+    ).toContainEqual({ name: "description", value: "Test file upload" });
   });
 
   test("should create FormData correctly when FormData is passed directly", async () => {
@@ -408,20 +389,20 @@ describe("Functions Module", () => {
     formData.append("name", "John Doe");
     formData.append("email", "john@example.com");
 
-    // Mock the API response
-    scope
-      .post(`/api/apps/${appId}/functions/${functionName}`)
-      .matchHeader("Content-Type", /^multipart\/form-data/)
-      .reply(200, { success: true });
+    platform.given.app(appId).functions.uploadAcceptance(functionName);
 
     // Call the function
     const result = await base44.functions.invoke(functionName, formData);
 
     // Verify the response
     expect(result.data.success).toBe(true);
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    expect(
+      (platform.requests.last("functions.invoke").body as MultipartBody)
+        .entries,
+    ).toEqual([
+      { name: "name", value: "John Doe" },
+      { name: "email", value: "john@example.com" },
+    ]);
   });
 
   test("should send user token as Authorization header when invoking functions", async () => {
@@ -438,41 +419,62 @@ describe("Functions Module", () => {
       token: userToken,
     });
 
-    // Mock the API response, verifying the Authorization header
-    scope
-      .post(`/api/apps/${appId}/functions/${functionName}`, functionData)
-      .matchHeader("Content-Type", "application/json")
-      .matchHeader("Authorization", `Bearer ${userToken}`)
-      .reply(200, {
-        success: true,
-        authenticated: true,
-      });
+    platform.given.app(appId).functions.authenticatedProbe(functionName);
 
     // Call the function
-    const result = await authenticatedBase44.functions.invoke(functionName, functionData);
+    const result = await authenticatedBase44.functions.invoke(
+      functionName,
+      functionData,
+    );
 
     // Verify the response
     expect(result.data.success).toBe(true);
     expect(result.data.authenticated).toBe(true);
+    expect(
+      platform.requests.last("functions.invoke").headers.authorization,
+    ).toBe(`Bearer ${userToken}`);
+    authenticatedBase44.cleanup();
+  });
 
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+  test("dispatches the same function name to app-scoped registered behavior", async () => {
+    const otherAppId = "other-function-app";
+    const thirdAppId = "unconfigured-function-app";
+    const otherClient = createClient({ serverUrl, appId: otherAppId });
+    const unconfiguredClient = createClient({ serverUrl, appId: thirdAppId });
+    platform.given.app(appId).functions.serviceHealth("app-a-time");
+    platform.given.app(otherAppId).functions.serviceHealth("app-b-time");
+
+    await expect(
+      base44.functions.invoke("getStatus", {}),
+    ).resolves.toMatchObject({
+      data: { status: "healthy", timestamp: "app-a-time" },
+    });
+    await expect(
+      otherClient.functions.invoke("getStatus", {}),
+    ).resolves.toMatchObject({
+      data: { status: "healthy", timestamp: "app-b-time" },
+    });
+    await expect(
+      unconfiguredClient.functions.invoke("getStatus", {}),
+    ).rejects.toMatchObject({
+      response: {
+        status: 404,
+        data: { error: "Function not found", code: "FUNCTION_NOT_FOUND" },
+      },
+    });
+    otherClient.cleanup();
+    unconfiguredClient.cleanup();
   });
 
   test("should fetch function endpoint directly", async () => {
-    fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200 }));
+    platform.given.functions.legacyEndpoint("my_function");
 
-    await base44.functions.fetch("/my_function", {
-      method: "GET",
-    });
+    await base44.functions.fetch("/my_function", { method: "GET" });
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith(
+    expect(platform.requests.last("functions.fetch").url).toBe(
       `${serverUrl}/api/functions/my_function`,
-      expect.any(Object)
     );
   });
-
 
   test("should include Authorization header when using functions.fetch", async () => {
     const userToken = "user-streaming-token";
@@ -481,51 +483,50 @@ describe("Functions Module", () => {
       appId,
       token: userToken,
     });
-    fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200 }));
+
+    platform.given.functions.legacyEndpoint("streaming_demo");
 
     await authenticatedBase44.functions.fetch("streaming_demo", {
       method: "POST",
       body: JSON.stringify({ mode: "text" }),
     });
 
-    const requestInit = fetchMock.mock.calls[0][1];
-    const headers = new Headers(requestInit.headers);
-    expect(headers.get("Authorization")).toBe(`Bearer ${userToken}`);
+    const request = platform.requests.last("functions.fetch");
+    expect(request.headers.authorization).toBe(`Bearer ${userToken}`);
+    expect(request.body).toBe(JSON.stringify({ mode: "text" }));
+
+    authenticatedBase44.cleanup();
   });
 
   test("should normalize path with and without leading slash", async () => {
-    // Test with leading slash
-    fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200 }));
-    await base44.functions.fetch("/my_function");
-    expect(fetchMock).toHaveBeenCalledWith(
-      `${serverUrl}/api/functions/my_function`,
-      expect.any(Object)
-    );
+    platform.given.functions.legacyEndpoint("my_function");
 
-    // Test without leading slash
-    fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200 }));
+    await base44.functions.fetch("/my_function");
     await base44.functions.fetch("my_function");
-    expect(fetchMock).toHaveBeenCalledWith(
+
+    const calledUrls = platform.requests
+      .all("functions.fetch")
+      .map((request) => request.url);
+    expect(calledUrls).toEqual([
       `${serverUrl}/api/functions/my_function`,
-      expect.any(Object)
-    );
+      `${serverUrl}/api/functions/my_function`,
+    ]);
   });
 
   test("should include service role Authorization header when using asServiceRole.functions.fetch", async () => {
     const serviceToken = "service-role-token";
-    const serviceRoleBase44 = createClient({
-      serverUrl,
-      appId,
-      serviceToken,
-    });
-    fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200 }));
+    const serviceRoleBase44 = createClient({ serverUrl, appId, serviceToken });
+
+    platform.given.functions.legacyEndpoint("service_function");
 
     await serviceRoleBase44.asServiceRole.functions.fetch("/service_function", {
       method: "GET",
     });
 
-    const requestInit = fetchMock.mock.calls[0][1];
-    const headers = new Headers(requestInit.headers);
-    expect(headers.get("Authorization")).toBe(`Bearer ${serviceToken}`);
+    expect(
+      platform.requests.last("functions.fetch").headers.authorization,
+    ).toBe(`Bearer ${serviceToken}`);
+
+    serviceRoleBase44.cleanup();
   });
 });

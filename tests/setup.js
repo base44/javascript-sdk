@@ -1,28 +1,39 @@
-// Load environment variables from .env file
-import dotenv from 'dotenv';
-import './utils/circular-json-handler.js';
-import { beforeAll, afterAll, test } from 'vitest';
+import { beforeAll, beforeEach, afterAll, afterEach, expect } from "vitest";
+import { server } from "./mocks/server.ts";
+import { platform } from "./mocks/platform/index.ts";
 
-try {
-  dotenv.config({ path: './tests/.env' });
-} catch (err) {
-  console.warn('dotenv package not found or .env file missing, skipping environment loading');
-}
-
-// Load circular JSON reference handler to prevent errors in Jest
-try {
-  console.log('Loaded circular JSON reference handler');
-} catch (err) {
-  console.warn('Failed to load circular JSON handler:', err.message);
-}
-
-// Global beforeAll and afterAll hooks
+const unexpected = [];
 beforeAll(() => {
-  console.log('Starting Base44 SDK tests...');
-  // Add any global setup here
+  server.listen({
+    onUnhandledRequest(request, print) {
+      unexpected.push(`${request.method} ${request.url}`);
+      print.error();
+      // A custom callback otherwise defaults to passthrough after printing.
+      // Throwing makes MSW synthesize an intercepted 500 instead of touching
+      // the network; teardown still fails even when the SDK swallows it.
+      throw new Error(`Unhandled HTTP request: ${request.method} ${request.url}`);
+    },
+  });
 });
-
-afterAll(() => {
-  console.log('Completed Base44 SDK tests');
-  // Add any global teardown here
-}); 
+beforeEach(() => platform.reset());
+afterEach(() => {
+  const failures = [];
+  try {
+    // A method swallowing network errors must still fail on unexpected traffic.
+    try {
+      expect(unexpected.splice(0), "Unhandled HTTP requests").toEqual([]);
+      expect(
+        platform.requests.all("platform.unconfigured"),
+        "Requests not modeled by the mock platform",
+      ).toEqual([]);
+    } catch (error) {
+      failures.push(error);
+    }
+  } finally {
+    server.resetHandlers();
+    platform.reset();
+  }
+  if (failures.length)
+    throw new AggregateError(failures, "HTTP mock contract failed");
+});
+afterAll(() => server.close());

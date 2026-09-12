@@ -1,360 +1,246 @@
-import { describe, test, expect, beforeEach, afterEach } from 'vitest';
-import nock from 'nock';
-import { createClient } from '../../src/index.ts';
+import { describe, test, expect, beforeEach, afterEach } from "vitest";
+import { createClient } from "../../src/index.ts";
+import { platform } from "../mocks/platform/index.ts";
 
-describe('Custom Integrations Module', () => {
+describe("Custom Integrations Module", () => {
   let base44: ReturnType<typeof createClient>;
-  let scope: nock.Scope;
-  const appId = 'test-app-id';
-  const serverUrl = 'https://base44.app';
-
+  const appId = "test-app-id";
   beforeEach(() => {
-    // Create a new client for each test
-    base44 = createClient({
-      serverUrl,
-      appId,
-    });
-
-    // Create a nock scope for mocking API calls
-    scope = nock(serverUrl);
+    platform.given.app(appId).workspace("workspace-a");
+    base44 = createClient({ serverUrl: "https://base44.app", appId });
   });
+  afterEach(() => base44.cleanup());
 
-  afterEach(() => {
-    // Clean up any pending mocks
-    nock.cleanAll();
-  });
-
-  test('custom.call() should convert camelCase params to snake_case for backend', async () => {
-    const slug = 'github';
-    const operationId = 'get:/repos/{owner}/{repo}/issues';
-    
-    // SDK call uses camelCase (JS convention)
-    const sdkParams = {
-      payload: { title: 'Test Issue' },
-      pathParams: { owner: 'testuser', repo: 'testrepo' },
-      queryParams: { state: 'open' },
-    };
-
-    // Backend expects snake_case (Python convention)
-    const expectedBody = {
-      payload: { title: 'Test Issue' },
-      path_params: { owner: 'testuser', repo: 'testrepo' },
-      query_params: { state: 'open' },
-    };
-
-    const mockResponse = {
-      success: true,
-      status_code: 200,
-      data: { issues: [{ id: 1, title: 'Test Issue' }] },
-    };
-
-    // Mock expects snake_case body (curly braces in operationId must be URL-encoded for nock matching)
-    const encodedOperationId = operationId.replace(/{/g, '%7B').replace(/}/g, '%7D');
-    scope
-      .post(`/api/apps/${appId}/integrations/custom/${slug}/${encodedOperationId}`, expectedBody)
-      .reply(200, mockResponse);
-
-    // SDK call uses camelCase
-    const result = await base44.integrations.custom.call(slug, operationId, sdkParams);
-
-    // Verify the response
-    expect(result.success).toBe(true);
-    expect(result.status_code).toBe(200);
-    expect(result.data.issues).toHaveLength(1);
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
-  });
-
-  test('custom.call() should work with empty params', async () => {
-    const slug = 'github';
-    const operationId = 'getAuthenticatedUser';
-
-    const mockResponse = {
-      success: true,
-      status_code: 200,
-      data: { login: 'testuser', id: 123 },
-    };
-
-    // Mock the API response
-    scope
-      .post(`/api/apps/${appId}/integrations/custom/${slug}/${operationId}`, {})
-      .reply(200, mockResponse);
-
-    // Call without params
-    const result = await base44.integrations.custom.call(slug, operationId);
-
-    // Verify the response
-    expect(result.success).toBe(true);
-    expect(result.data.login).toBe('testuser');
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
-  });
-
-  test('custom.call() should handle 404 error for non-existent integration', async () => {
-    const slug = 'nonexistent';
-    const operationId = 'someEndpoint';
-
-    // Mock a 404 error response
-    scope
-      .post(`/api/apps/${appId}/integrations/custom/${slug}/${operationId}`, {})
-      .reply(404, {
-        detail: `Custom integration '${slug}' not found in workspace`,
-      });
-
-    // Call the API and expect an error
-    await expect(base44.integrations.custom.call(slug, operationId)).rejects.toMatchObject({
-      status: 404,
-      name: 'Base44Error',
-    });
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
-  });
-
-  test('custom.call() should handle 404 error for non-existent operation', async () => {
-    const slug = 'github';
-    const operationId = 'nonExistentOperation';
-
-    // Mock a 404 error response
-    scope
-      .post(`/api/apps/${appId}/integrations/custom/${slug}/${operationId}`, {})
-      .reply(404, {
-        detail: `Operation '${operationId}' not found in integration '${slug}'`,
-      });
-
-    // Call the API and expect an error
-    await expect(base44.integrations.custom.call(slug, operationId)).rejects.toMatchObject({
-      status: 404,
-      name: 'Base44Error',
-    });
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
-  });
-
-  test('custom.call() should handle 502 error from external API', async () => {
-    const slug = 'github';
-    const operationId = 'get:/repos/{owner}/{repo}/issues';
-
-    // Mock a 502 error response (external API failure) - curly braces in operationId must be URL-encoded
-    const encodedOperationId = operationId.replace(/{/g, '%7B').replace(/}/g, '%7D');
-    scope
-      .post(`/api/apps/${appId}/integrations/custom/${slug}/${encodedOperationId}`, {})
-      .reply(502, {
-        detail: 'Failed to connect to external API: Connection refused',
-      });
-
-    // Call the API and expect an error
-    await expect(base44.integrations.custom.call(slug, operationId)).rejects.toMatchObject({
-      status: 502,
-      name: 'Base44Error',
-    });
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
-  });
-
-  test('custom.call() should throw error when slug is missing', async () => {
-    // @ts-expect-error Testing invalid input
-    await expect(base44.integrations.custom.call()).rejects.toThrow(
-      'Integration slug is required and cannot be empty'
-    );
-  });
-
-  test('custom.call() should throw error when operationId is missing', async () => {
-    // @ts-expect-error Testing invalid input
-    await expect(base44.integrations.custom.call('github')).rejects.toThrow(
-      'Operation ID is required and cannot be empty'
-    );
-  });
-
-  test('custom.call() should throw error when slug is empty string', async () => {
-    await expect(base44.integrations.custom.call('', 'get:/repos/{owner}/{repo}/issues')).rejects.toThrow(
-      'Integration slug is required and cannot be empty'
-    );
-  });
-
-  test('custom.call() should throw error when slug is whitespace only', async () => {
-    await expect(base44.integrations.custom.call('   ', 'get:/repos/{owner}/{repo}/issues')).rejects.toThrow(
-      'Integration slug is required and cannot be empty'
-    );
-  });
-
-  test('custom.call() should throw error when operationId is empty string', async () => {
-    await expect(base44.integrations.custom.call('github', '')).rejects.toThrow(
-      'Operation ID is required and cannot be empty'
-    );
-  });
-
-  test('custom.call() should throw error when operationId is whitespace only', async () => {
-    await expect(base44.integrations.custom.call('github', '  \t\n  ')).rejects.toThrow(
-      'Operation ID is required and cannot be empty'
-    );
-  });
-
-  test('custom.call() should handle large payloads', async () => {
-    const slug = 'myapi';
-    const operationId = 'bulkCreate';
-    
-    // Create a large payload with many items
-    const largeArray = Array.from({ length: 1000 }, (_, i) => ({
-      id: i,
-      name: `Item ${i}`,
-      description: 'A'.repeat(100),
-      metadata: { key: `value_${i}` },
-    }));
-    
-    const sdkParams = {
-      payload: { items: largeArray },
-    };
-
-    const mockResponse = {
-      success: true,
-      status_code: 200,
-      data: { created: 1000 },
-    };
-
-    // Mock the API response
-    scope
-      .post(`/api/apps/${appId}/integrations/custom/${slug}/${operationId}`, sdkParams)
-      .reply(200, mockResponse);
-
-    // Call the API with large payload
-    const result = await base44.integrations.custom.call(slug, operationId, sdkParams);
-
-    // Verify the response
-    expect(result.success).toBe(true);
-    expect(result.data.created).toBe(1000);
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
-  });
-
-  test('custom.call() should include custom headers in request', async () => {
-    const slug = 'myapi';
-    const operationId = 'getData';
-    const sdkParams = {
-      headers: { 'X-Custom-Header': 'custom-value' },
-    };
-
-    const mockResponse = {
-      success: true,
-      status_code: 200,
-      data: { result: 'ok' },
-    };
-
-    // Mock the API response
-    scope
-      .post(`/api/apps/${appId}/integrations/custom/${slug}/${operationId}`, sdkParams)
-      .reply(200, mockResponse);
-
-    // Call the API
-    const result = await base44.integrations.custom.call(slug, operationId, sdkParams);
-
-    // Verify the response
-    expect(result.success).toBe(true);
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
-  });
-
-  test('custom.call() should pass through multiple headers', async () => {
-    const slug = 'myapi';
-    const operationId = 'secureEndpoint';
-    const sdkParams = {
-      headers: {
-        'X-API-Key': 'secret-key-123',
-        'X-Request-ID': 'req-456',
-        'Accept-Language': 'en-US',
-        'X-Custom-Auth': 'Bearer token123',
+  test("converts camelCase params to snake_case for the backend", async () => {
+    const operationId = "get:/repos/{owner}/{repo}/issues";
+    platform.given
+      .app(appId)
+      .customIntegrations.githubRepository("github", "testuser", "testrepo", [
+        { id: 1, title: "Test Issue", state: "open" },
+        { id: 2, title: "Closed Issue", state: "closed" },
+      ]);
+    const result = await base44.integrations.custom.call(
+      "github",
+      operationId,
+      {
+        payload: { title: "Test Issue" },
+        pathParams: { owner: "testuser", repo: "testrepo" },
+        queryParams: { state: "open" },
       },
-    };
+    );
+    expect(result).toMatchObject({ success: true, status_code: 200 });
+    expect(result.data.issues).toHaveLength(1);
+    expect(result.data.issues[0]).toMatchObject({ id: 1, state: "open" });
+    expect(platform.requests.last("customIntegrations.call").body).toEqual({
+      payload: { title: "Test Issue" },
+      path_params: { owner: "testuser", repo: "testrepo" },
+      query_params: { state: "open" },
+    });
+  });
 
-    const mockResponse = {
+  test("works with empty params", async () => {
+    platform.given.app(appId).customIntegrations.githubUser("github", {
+      login: "testuser",
+      id: 123,
+    });
+    const result = await base44.integrations.custom.call(
+      "github",
+      "getAuthenticatedUser",
+    );
+    expect(result.data.login).toBe("testuser");
+    expect(platform.requests.last("customIntegrations.call").body).toEqual({});
+  });
+
+  test("maps missing integration to a 404 Base44Error", async () => {
+    await expect(
+      base44.integrations.custom.call("nonexistent", "someEndpoint"),
+    ).rejects.toMatchObject({
+      status: 404,
+      name: "Base44Error",
+      message: "Custom integration 'nonexistent' not found in workspace",
+    });
+  });
+
+  test("maps missing operation to a 404 Base44Error", async () => {
+    platform.given
+      .app(appId)
+      .customIntegrations.operationAvailable("github", "existingOperation");
+    await expect(
+      base44.integrations.custom.call("github", "nonExistentOperation"),
+    ).rejects.toMatchObject({
+      status: 404,
+      name: "Base44Error",
+      message:
+        "Operation 'nonExistentOperation' not found in integration 'github'",
+    });
+  });
+
+  test("rejects a Base44 connection failure while preserving later recovery", async () => {
+    const operationId = "get:/repos/{owner}/{repo}/issues";
+    platform.given
+      .app(appId)
+      .customIntegrations.githubRepository(
+        "github",
+        "testuser",
+        "testrepo",
+        [],
+      );
+    platform.given
+      .app(appId)
+      .faults.customIntegrations.upstreamUnavailable("github", operationId);
+    await expect(
+      base44.integrations.custom.call("github", operationId),
+    ).rejects.toMatchObject({
+      status: 502,
+      message: "Failed to connect to external API: Connection refused",
+    });
+    await expect(
+      base44.integrations.custom.call("github", operationId),
+    ).resolves.toEqual({
       success: true,
       status_code: 200,
-      data: { authenticated: true },
+      data: { issues: [] },
+    });
+  });
+
+  test.each([
+    [undefined, undefined, "Integration slug is required and cannot be empty"],
+    ["github", undefined, "Operation ID is required and cannot be empty"],
+    ["", "get", "Integration slug is required and cannot be empty"],
+    ["   ", "get", "Integration slug is required and cannot be empty"],
+    ["github", "", "Operation ID is required and cannot be empty"],
+    ["github", "  \t\n  ", "Operation ID is required and cannot be empty"],
+  ])(
+    "validates slug and operation ID (%s, %s)",
+    async (slug, operationId, message) => {
+      await expect(
+        // @ts-expect-error Deliberately exercising invalid runtime input.
+        base44.integrations.custom.call(slug, operationId),
+      ).rejects.toThrow(message);
+      expect(platform.requests.count("customIntegrations.call")).toBe(0);
+    },
+  );
+
+  test("handles large payloads without dropping data", async () => {
+    const items = Array.from({ length: 1000 }, (_, id) => ({
+      id,
+      name: `Item ${id}`,
+      description: "A".repeat(100),
+      metadata: { key: `value_${id}` },
+    }));
+    platform.given.app(appId).customIntegrations.inventory("myapi");
+    const result = await base44.integrations.custom.call(
+      "myapi",
+      "bulkCreate",
+      { payload: { items } },
+    );
+    expect(result.data.created).toBe(1000);
+    await expect(
+      base44.integrations.custom.call("myapi", "listItems"),
+    ).resolves.toMatchObject({
+      data: { items },
+    });
+    expect(platform.requests.all("customIntegrations.call")[0].body).toEqual({
+      payload: { items },
+    });
+  });
+
+  test("includes custom headers in the backend request body", async () => {
+    const headers = { "X-Custom-Header": "custom-value" };
+    platform.given.app(appId).customIntegrations.requestInspector("myapi");
+    await base44.integrations.custom.call("myapi", "getData", { headers });
+    expect(platform.requests.last("customIntegrations.call").body).toEqual({
+      headers,
+    });
+  });
+
+  test("passes through multiple headers", async () => {
+    const headers = {
+      "X-API-Key": "secret-key-123",
+      "X-Request-ID": "req-456",
+      "Accept-Language": "en-US",
+      "X-Custom-Auth": "Bearer token123",
     };
-
-    // Mock the API response - verify all headers are passed in the body
-    scope
-      .post(`/api/apps/${appId}/integrations/custom/${slug}/${operationId}`, sdkParams)
-      .reply(200, mockResponse);
-
-    // Call the API
-    const result = await base44.integrations.custom.call(slug, operationId, sdkParams);
-
-    // Verify the response
-    expect(result.success).toBe(true);
+    platform.given
+      .app(appId)
+      .customIntegrations.apiKeyProtected("myapi", "secret-key-123");
+    const result = await base44.integrations.custom.call(
+      "myapi",
+      "secureEndpoint",
+      { headers },
+    );
     expect(result.data.authenticated).toBe(true);
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    expect(platform.requests.last("customIntegrations.call").body).toEqual({
+      headers,
+    });
   });
 
-  test('custom.call() should only include defined params in body', async () => {
-    const slug = 'github';
-    const operationId = 'get:/users/{username}';
-    
-    // SDK call with only pathParams
-    const sdkParams = {
-      pathParams: { username: 'octocat' },
-    };
-
-    // Expected body should only have path_params, not empty payload/query_params/headers
-    const expectedBody = {
-      path_params: { username: 'octocat' },
-    };
-
-    const mockResponse = {
-      success: true,
-      status_code: 200,
-      data: { login: 'octocat' },
-    };
-
-    // Curly braces in operationId must be URL-encoded for nock matching
-    const encodedOperationId = operationId.replace(/{/g, '%7B').replace(/}/g, '%7D');
-    scope
-      .post(`/api/apps/${appId}/integrations/custom/${slug}/${encodedOperationId}`, expectedBody)
-      .reply(200, mockResponse);
-
-    const result = await base44.integrations.custom.call(slug, operationId, sdkParams);
-
-    expect(result.success).toBe(true);
-    expect(scope.isDone()).toBe(true);
+  test("only includes defined params in body", async () => {
+    const operationId = "get:/users/{username}";
+    platform.given.app(appId).customIntegrations.githubUser("github", {
+      login: "octocat",
+    });
+    await base44.integrations.custom.call("github", operationId, {
+      pathParams: { username: "octocat" },
+    });
+    expect(platform.requests.last("customIntegrations.call").body).toEqual({
+      path_params: { username: "octocat" },
+    });
   });
 
-  test('custom property should not interfere with other integration packages', async () => {
-    // Test that Core still works
-    const coreParams = {
-      to: 'test@example.com',
-      subject: 'Test',
-      body: 'Test body',
-    };
+  test("custom property does not interfere with other integration packages", async () => {
+    platform.given.app(appId).integrations.emailDelivered();
+    // Legacy SDK compatibility; current Apper has removed this route.
+    platform.given
+      .app(appId)
+      .integrations.legacyEndpoint("SomePackage", "SomeEndpoint");
+    await expect(
+      base44.integrations.Core.SendEmail({
+        to: "test@example.com",
+        subject: "Test",
+        body: "Test body",
+      }),
+    ).resolves.toMatchObject({ success: true });
+    await expect(
+      base44.integrations.SomePackage.SomeEndpoint({ param: "value" }),
+    ).resolves.toMatchObject({ success: true });
+    expect(platform.requests.count("integrations.invoke")).toBe(2);
+  });
 
-    scope
-      .post(`/api/apps/${appId}/integration-endpoints/Core/SendEmail`, coreParams)
-      .reply(200, { success: true });
+  test("custom operations isolate by workspace and share only across associated apps", async () => {
+    const isolatedAppId = "isolated-custom-app";
+    const sharedAppId = "shared-custom-app";
+    platform.given.app(isolatedAppId).workspace("workspace-b");
+    platform.given.app(sharedAppId).workspace("workspace-a");
+    platform.given.app(appId).customIntegrations.workspaceIdentity("github");
+    platform.given
+      .app(isolatedAppId)
+      .customIntegrations.workspaceIdentity("github");
+    const isolated = createClient({
+      serverUrl: "https://base44.app",
+      appId: isolatedAppId,
+    });
+    const shared = createClient({
+      serverUrl: "https://base44.app",
+      appId: sharedAppId,
+    });
 
-    const coreResult = await base44.integrations.Core.SendEmail(coreParams);
-    expect(coreResult.success).toBe(true);
-
-    // Test that custom packages still work
-    const customPackageParams = { param: 'value' };
-
-    scope
-      .post(
-        `/api/apps/${appId}/integration-endpoints/installable/SomePackage/integration-endpoints/SomeEndpoint`,
-        customPackageParams
-      )
-      .reply(200, { success: true });
-
-    const packageResult = await base44.integrations.SomePackage.SomeEndpoint(customPackageParams);
-    expect(packageResult.success).toBe(true);
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    await expect(
+      base44.integrations.custom.call("github", "whoami"),
+    ).resolves.toMatchObject({
+      data: { workspaceId: "workspace-a" },
+    });
+    await expect(
+      isolated.integrations.custom.call("github", "whoami"),
+    ).resolves.toMatchObject({
+      data: { workspaceId: "workspace-b" },
+    });
+    await expect(
+      shared.integrations.custom.call("github", "whoami"),
+    ).resolves.toMatchObject({
+      data: { workspaceId: "workspace-a" },
+    });
+    isolated.cleanup();
+    shared.cleanup();
   });
 });

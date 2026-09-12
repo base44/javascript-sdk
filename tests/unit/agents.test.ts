@@ -1,101 +1,239 @@
 import { describe, test, expect, beforeEach, afterEach } from "vitest";
-import nock from "nock";
 import { createClient } from "../../src/index.ts";
+import { platform } from "../mocks/platform";
 
 describe("Agents Module", () => {
   let base44: ReturnType<typeof createClient>;
-  let scope: nock.Scope;
-  const appId = "test-app-id";
   const serverUrl = "https://api.base44.com";
+  const appId = "test-app-id";
+  const userToken = "agent-user-token";
+  const userId = "agent-user";
 
   beforeEach(() => {
-    base44 = createClient({ serverUrl, appId });
-    scope = nock(serverUrl);
-    nock.disableNetConnect();
+    platform.reset();
+    platform.given.app(appId).auth.principal(userToken, { id: userId });
+    base44 = createClient({ serverUrl, appId, token: userToken });
   });
 
-  afterEach(() => {
-    nock.cleanAll();
-    nock.enableNetConnect();
+  afterEach(() => base44.cleanup());
+
+  test("getConversations() returns arranged conversations", async () => {
+    const conversations = [
+      { id: "conv-1", agent_name: "support", messages: [] },
+      { id: "conv-2", agent_name: "sales", messages: [] },
+    ];
+    platform.given
+      .app(appId)
+      .agents.conversationsForUser(userId, conversations);
+
+    await expect(base44.agents.getConversations()).resolves.toEqual(
+      conversations,
+    );
+    expect(platform.requests.count("agents.listConversations")).toBe(1);
   });
 
-  describe("getConversations", () => {
-    test("should fetch all conversations", async () => {
-      const mockConversations = [
+  test("getConversation() returns one arranged conversation", async () => {
+    const conversation = { id: "conv-1", agent_name: "support", messages: [] };
+    platform.given
+      .app(appId)
+      .agents.conversationsForUser(userId, [conversation]);
+
+    await expect(base44.agents.getConversation("conv-1")).resolves.toEqual(
+      conversation,
+    );
+  });
+
+  test("createConversation() persists so list and get observe it", async () => {
+    const created = await base44.agents.createConversation({
+      agent_name: "support",
+    });
+
+    expect(created).toEqual({
+      id: "conv-1",
+      agent_name: "support",
+      messages: [],
+    });
+    await expect(base44.agents.getConversation(created.id)).resolves.toEqual(
+      created,
+    );
+    await expect(base44.agents.getConversations()).resolves.toContainEqual(
+      created,
+    );
+    expect(platform.requests.last("agents.createConversation").body).toEqual({
+      agent_name: "support",
+    });
+  });
+
+  test("addMessage() posts to v2 and updates conversation state", async () => {
+    const conversation = { id: "conv-1", agent_name: "support", messages: [] };
+    platform.given
+      .app(appId)
+      .agents.conversationsForUser(userId, [conversation]);
+
+    const message = await base44.agents.addMessage(conversation, {
+      role: "user",
+      content: "Hi",
+    });
+
+    expect(message).toEqual({ id: "msg-1", role: "user", content: "Hi" });
+    await expect(
+      base44.agents.getConversation("conv-1"),
+    ).resolves.toMatchObject({
+      messages: [message],
+    });
+    expect(platform.requests.last("agents.addMessage").body).toEqual({
+      role: "user",
+      content: "Hi",
+    });
+  });
+
+  test("getWhatsAppConnectURL omits the token when unauthenticated", () => {
+    const anonymous = createClient({ serverUrl, appId });
+    expect(anonymous.agents.getWhatsAppConnectURL("support")).toBe(
+      `${serverUrl}/api/apps/${appId}/agents/support/whatsapp`,
+    );
+    anonymous.cleanup();
+  });
+
+  test("getWhatsAppConnectURL includes the token when authenticated", () => {
+    const authed = createClient({ serverUrl, appId, token: "test-token" });
+    expect(authed.agents.getWhatsAppConnectURL("support")).toBe(
+      `${serverUrl}/api/apps/${appId}/agents/support/whatsapp?token=test-token`,
+    );
+    authed.cleanup();
+  });
+
+  test("getWhatsAppConnectURL encodes the agent name", () => {
+    expect(base44.agents.getWhatsAppConnectURL("my agent")).toBe(
+      `${serverUrl}/api/apps/${appId}/agents/my%20agent/whatsapp?token=${userToken}`,
+    );
+  });
+
+  test("getTelegramConnectURL omits the token when unauthenticated", () => {
+    const anonymous = createClient({ serverUrl, appId });
+    expect(anonymous.agents.getTelegramConnectURL("support")).toBe(
+      `${serverUrl}/api/apps/${appId}/agents/support/telegram`,
+    );
+    anonymous.cleanup();
+  });
+
+  test("getTelegramConnectURL includes the token when authenticated", () => {
+    const authed = createClient({ serverUrl, appId, token: "test-token" });
+    expect(authed.agents.getTelegramConnectURL("support")).toBe(
+      `${serverUrl}/api/apps/${appId}/agents/support/telegram?token=test-token`,
+    );
+    authed.cleanup();
+  });
+
+  test("getTelegramConnectURL encodes the agent name", () => {
+    expect(base44.agents.getTelegramConnectURL("my agent")).toBe(
+      `${serverUrl}/api/apps/${appId}/agents/my%20agent/telegram?token=${userToken}`,
+    );
+  });
+
+  test("isolates conversations by application and user principal", async () => {
+    const otherAppId = "other-agent-app";
+    const otherToken = "other-agent-token";
+    const otherClient = createClient({
+      serverUrl,
+      appId: otherAppId,
+      token: otherToken,
+    });
+    const sameAppOtherToken = "same-app-other-token";
+    const sameAppOther = createClient({
+      serverUrl,
+      appId,
+      token: sameAppOtherToken,
+    });
+    platform.given
+      .app(otherAppId)
+      .auth.principal(otherToken, { id: "other-user" });
+    platform.given
+      .app(appId)
+      .auth.principal(sameAppOtherToken, { id: "same-app-other" });
+    const conversation = { id: "conv-1", agent_name: "support", messages: [] };
+    platform.given
+      .app(appId)
+      .agents.conversationsForUser(userId, [conversation]);
+
+    await expect(base44.agents.getConversations()).resolves.toEqual([
+      conversation,
+    ]);
+    await expect(otherClient.agents.getConversations()).resolves.toEqual([]);
+    await expect(sameAppOther.agents.getConversations()).resolves.toEqual([]);
+    await expect(
+      otherClient.agents.getConversation("conv-1"),
+    ).rejects.toMatchObject({
+      status: 403,
+      message: "Access denied: conversation belongs to another app",
+    });
+    await expect(
+      sameAppOther.agents.addMessage(conversation, {
+        role: "user",
+        content: "leak",
+      }),
+    ).rejects.toMatchObject({
+      status: 403,
+      message: "Access denied: conversation belongs to another user",
+    });
+    await expect(base44.agents.getConversation("conv-1")).resolves.toEqual(
+      conversation,
+    );
+    otherClient.cleanup();
+    sameAppOther.cleanup();
+  });
+
+  test("requires a user or visitor identity to create conversations", async () => {
+    const anonymous = createClient({ serverUrl, appId });
+    await expect(anonymous.agents.getConversations()).resolves.toEqual([]);
+    await expect(
+      anonymous.agents.createConversation({ agent_name: "support" }),
+    ).rejects.toMatchObject({
+      status: 401,
+      message: "User must be authenticated to create a conversation",
+    });
+    anonymous.cleanup();
+  });
+
+  test("isolates anonymous visitor conversations", async () => {
+    const visitorA = createClient({
+      serverUrl,
+      appId,
+      headers: { "X-Base44-Anonymous-Id": "visitor-a" },
+    });
+    const visitorB = createClient({
+      serverUrl,
+      appId,
+      headers: { "X-Base44-Anonymous-Id": "visitor-b" },
+    });
+    platform.given
+      .app(appId)
+      .agents.conversationsForVisitor("visitor-a", [
+        { id: "conv-visitor", agent_name: "guide", messages: [] },
+      ]);
+    await expect(visitorA.agents.getConversations()).resolves.toHaveLength(1);
+    await expect(visitorB.agents.getConversations()).resolves.toEqual([]);
+    await expect(
+      visitorB.agents.getConversation("conv-visitor"),
+    ).rejects.toMatchObject({
+      status: 403,
+      message: "Access denied: conversation belongs to another visitor",
+    });
+    visitorA.cleanup();
+    visitorB.cleanup();
+  });
+
+  test("reset() isolates conversations and request history", async () => {
+    platform.given
+      .app(appId)
+      .agents.conversationsForUser(userId, [
         { id: "conv-1", agent_name: "support", messages: [] },
-        { id: "conv-2", agent_name: "sales", messages: [] },
-      ];
-      scope.get(`/api/apps/${appId}/agents/conversations`).reply(200, mockConversations);
+      ]);
+    await base44.agents.getConversations();
 
-      const result = await base44.agents.getConversations();
-      expect(result).toEqual(mockConversations);
-    });
-  });
+    platform.reset();
 
-  describe("getConversation", () => {
-    test("should fetch a specific conversation", async () => {
-      const mockConversation = { id: "conv-1", agent_name: "support", messages: [] };
-      scope.get(`/api/apps/${appId}/agents/conversations/conv-1`).reply(200, mockConversation);
-
-      const result = await base44.agents.getConversation("conv-1");
-      expect(result).toEqual(mockConversation);
-    });
-  });
-
-  describe("createConversation", () => {
-    test("should create a conversation", async () => {
-      const created = { id: "conv-new", agent_name: "support", messages: [] };
-      scope.post(`/api/apps/${appId}/agents/conversations`).reply(200, created);
-
-      const result = await base44.agents.createConversation({ agent_name: "support" });
-      expect(result).toEqual(created);
-    });
-  });
-
-  describe("addMessage", () => {
-    test("should post to v2 endpoint", async () => {
-      const conversation = { id: "conv-1", agent_name: "support", messages: [] } as any;
-      const response = { id: "msg-1", role: "assistant", content: "Hello!" };
-      scope.post(`/api/apps/${appId}/agents/conversations/v2/conv-1/messages`).reply(200, response);
-
-      const result = await base44.agents.addMessage(conversation, { role: "user", content: "Hi" });
-      expect(result).toEqual(response);
-    });
-  });
-
-  describe("getWhatsAppConnectURL", () => {
-    test("should return URL without token when no auth", () => {
-      const url = base44.agents.getWhatsAppConnectURL("support");
-      expect(url).toBe(`${serverUrl}/api/apps/${appId}/agents/support/whatsapp`);
-    });
-
-    test("should include token when authenticated", () => {
-      const authed = createClient({ serverUrl, appId, token: "test-token" });
-      const url = authed.agents.getWhatsAppConnectURL("support");
-      expect(url).toBe(`${serverUrl}/api/apps/${appId}/agents/support/whatsapp?token=test-token`);
-    });
-
-    test("should encode agent name", () => {
-      const url = base44.agents.getWhatsAppConnectURL("my agent");
-      expect(url).toBe(`${serverUrl}/api/apps/${appId}/agents/my%20agent/whatsapp`);
-    });
-  });
-
-  describe("getTelegramConnectURL", () => {
-    test("should return URL without token when no auth", () => {
-      const url = base44.agents.getTelegramConnectURL("support");
-      expect(url).toBe(`${serverUrl}/api/apps/${appId}/agents/support/telegram`);
-    });
-
-    test("should include token when authenticated", () => {
-      const authed = createClient({ serverUrl, appId, token: "test-token" });
-      const url = authed.agents.getTelegramConnectURL("support");
-      expect(url).toBe(`${serverUrl}/api/apps/${appId}/agents/support/telegram?token=test-token`);
-    });
-
-    test("should encode agent name", () => {
-      const url = base44.agents.getTelegramConnectURL("my agent");
-      expect(url).toBe(`${serverUrl}/api/apps/${appId}/agents/my%20agent/telegram`);
-    });
+    await expect(base44.agents.getConversations()).resolves.toEqual([]);
+    expect(platform.requests.count("agents.listConversations")).toBe(1);
   });
 });
