@@ -38,6 +38,7 @@ jobs:
         uses: anthropics/claude-code-action@239e3a730883eeb5c53db12b0fc9573b3024b126 # v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          allowed_bots: base44-os-gremlins
           use_sticky_comment: true
           claude_args: |
             --model claude-sonnet-4-6
