@@ -12,6 +12,8 @@ import type { AiGatewayModule } from "./modules/ai-gateway.types.js";
 import type { AppLogsModule } from "./modules/app-logs.types.js";
 import type { AppModule } from "./modules/app.types.js";
 import type { AnalyticsModule } from "./modules/analytics.types.js";
+import type { ExperimentsModule } from "./modules/experiments.types.js";
+import type { ExperimentsContext } from "./modules/experiments-config.types.js";
 import type { ActorsModule } from "./modules/actors.types.js";
 import type { FetchWithAuthInit } from "./utils/fetch-with-auth.js";
 
@@ -44,9 +46,9 @@ export interface CreateClientAnalyticsConfig {
   /**
    * Whether app analytics is enabled for this client.
    *
-   * When disabled, automatic analytics and calls to `analytics.track()` are
-   * no-ops. The SDK does not create an analytics session identifier, start
-   * heartbeat timers, or send analytics requests.
+   * When disabled, automatic analytics, experiment exposures and calls to
+   * `analytics.track()` are no-ops. The SDK does not create an analytics session
+   * identifier, start heartbeat timers, or send analytics requests.
    *
    * @defaultValue `true`
    */
@@ -85,6 +87,12 @@ export interface CreateClientConfig {
    * Omit this option to preserve the default analytics behavior.
    */
   analytics?: CreateClientAnalyticsConfig;
+  /**
+   * Platform-validated context for local flag evaluation. Request-scoped on servers.
+   * Automatically read from the platform bootstrap in browsers and trusted headers
+   * by createClientFromRequest(). Not an authorization credential.
+   */
+  experiments?: ExperimentsContext;
   /**
    * User authentication token. Used to authenticate as a specific user.
    *
@@ -141,6 +149,8 @@ export interface Base44Client {
   connectors: UserConnectorsModule;
   /** {@link EntitiesModule | Entities module} for CRUD operations on your data models. */
   entities: EntitiesModule;
+  /** {@link ExperimentsModule | Experiments module} for local feature flags and exposures. */
+  experiments: ExperimentsModule;
   /** {@link FunctionsModule | Functions module} for invoking custom backend functions. */
   functions: FunctionsModule;
   /** {@link IntegrationsModule | Integrations module} for calling pre-built integration endpoints. */

@@ -22,6 +22,13 @@ describe("Analytics Module", () => {
   const serverUrl = "https://api.base44.com";
 
   beforeEach(() => {
+    const storage = { getItem: vi.fn(() => null), setItem: vi.fn(), removeItem: vi.fn() };
+    vi.stubGlobal("localStorage", storage);
+    vi.stubGlobal("document", { referrer: "", visibilityState: "visible" });
+    vi.stubGlobal("window", {
+      location: { origin: "https://example.com", pathname: "/", search: "" },
+      localStorage: storage, addEventListener: vi.fn(), removeEventListener: vi.fn(),
+    });
     vi.mock("../../src/utils/axios-client.ts", () => ({
       createAxiosClient: vi.fn().mockImplementation(
         () =>
@@ -46,9 +53,7 @@ describe("Analytics Module", () => {
     }));
     sharedState.isProcessing = false;
     sharedState.requestsQueue = [];
-    sharedState.sessionContext = {
-      user_id: "test-user-id",
-    };
+    Object.assign(sharedState, { wasInitializationTracked: true });
     sharedState.config = {
       enabled: true,
       maxQueueSize: 1000,
@@ -64,6 +69,9 @@ describe("Analytics Module", () => {
       appId,
       token: "test-access-token",
     });
+    sharedState.sessionContext = {
+      user_id: "test-user-id",
+    };
   });
 
   afterEach(() => {
@@ -157,12 +165,11 @@ describe("Analytics Module", () => {
   });
 
   test("should not start the heartbeat outside a browser", () => {
-    const heartBeatState = sharedState as unknown as {
-      isHeartBeatProcessing: boolean;
-    };
-
-    expect(typeof window).toBe("undefined");
-    expect(heartBeatState.isHeartBeatProcessing).toBeFalsy();
+    vi.stubGlobal("window", undefined);
+    const setInterval = vi.spyOn(globalThis, "setInterval");
+    const server = createClient({ serverUrl, appId });
+    expect(setInterval).not.toHaveBeenCalled();
+    server.cleanup();
   });
 
   test("should not resolve an identity when no token is set", async () => {

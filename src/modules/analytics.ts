@@ -11,6 +11,8 @@ import {
 import { getSharedInstance } from "../utils/sharedInstance.js";
 import type { InternalAuthModule } from "./auth.types";
 import { generateUuid, isReactNative } from "../utils/common.js";
+import { getExperimentsRuntime } from "./experiments-runtime.types.js";
+import type { ExperimentsContext } from "./experiments-config.types.js";
 
 export const USER_HEARTBEAT_EVENT_NAME = "__user_heartbeat_event__";
 export const ANALYTICS_INITIALIZATION_EVENT_NAME = "__initialization_event__";
@@ -35,15 +37,14 @@ const defaultConfiguration: AnalyticsModuleOptions = {
 ///////////////////////////////////////////////
 
 const ANALYTICS_SHARED_STATE_NAME = "analytics";
-// shared state//
-const analyticsSharedState = getSharedInstance(
-  ANALYTICS_SHARED_STATE_NAME,
-  () => ({
+function createAnalyticsState() {
+  return {
     requestsQueue: [] as TrackEventData[],
     isProcessing: false,
     isHeartBeatProcessing: false,
     wasInitializationTracked: false,
     sessionContext: null as SessionContext | null,
+    sessionContextPromise: null as Promise<SessionContext> | null,
     sessionStartTime: null as string | null,
     // Memoized session id for when `localStorage` can't persist one — see
     // getAnalyticsSessionId.
@@ -52,8 +53,11 @@ const analyticsSharedState = getSharedInstance(
       ...defaultConfiguration,
       ...getAnalyticsConfigFromUrlParams(),
     } as Required<AnalyticsModuleOptions>,
-  })
-);
+  };
+}
+type AnalyticsState = ReturnType<typeof createAnalyticsState>;
+const analyticsSharedState = getSharedInstance(ANALYTICS_SHARED_STATE_NAME, createAnalyticsState);
+const serverAnalyticsStates = new WeakMap<AxiosInstance, AnalyticsState>();
 
 ///////////////////////////////////////////////
 
@@ -63,6 +67,13 @@ export interface AnalyticsModuleArgs {
   appId: string;
   userAuthModule: InternalAuthModule;
   enabled: boolean;
+  getVisitorId?: () => string | undefined;
+  experimentsContext?: ExperimentsContext;
+}
+
+/** @internal */
+export function isAnalyticsEnabled(enabled: boolean, state = analyticsSharedState): boolean {
+  return enabled && state.config.enabled && !isReactNative;
 }
 
 export const createAnalyticsModule = ({
@@ -71,15 +82,19 @@ export const createAnalyticsModule = ({
   appId,
   userAuthModule,
   enabled,
+  getVisitorId,
+  experimentsContext,
 }: AnalyticsModuleArgs) => {
+  const state = typeof window === "undefined" ? createAnalyticsState() : analyticsSharedState;
+  if (typeof window === "undefined") serverAnalyticsStates.set(axiosClient, state);
   // prevent overflow of events //
-  const { maxQueueSize, throttleTime, batchSize } = analyticsSharedState.config;
+  const { maxQueueSize, throttleTime, batchSize } = state.config;
 
   // Disable analytics on React Native. It defines `window` but not `document`,
   // so the per-callsite `typeof window` guards below aren't enough to keep it
   // from touching `document` (e.g. `document.referrer` on init). Node/SSR is
   // still handled by those `window` guards, so this doesn't affect it.
-  if (!enabled || !analyticsSharedState.config?.enabled || isReactNative) {
+  if (!isAnalyticsEnabled(enabled, state)) {
     return {
       track: () => {},
       cleanup: () => {},
@@ -118,9 +133,9 @@ export const createAnalyticsModule = ({
   ) => {
     if (eventsData.length === 0) return;
 
-    const sessionContext_ = await getSessionContext(userAuthModule);
+    const sessionContext_ = await getSessionContext(userAuthModule, state);
     const events = eventsData.map(
-      transformEventDataToApiRequestData(sessionContext_)
+      transformEventDataToApiRequestData({ ...sessionContext_, session_id: getVisitorId?.() ?? sessionContext_.session_id })
     );
 
     try {
@@ -136,17 +151,27 @@ export const createAnalyticsModule = ({
     startAnalyticsProcessor(flush, {
       throttleTime,
       batchSize,
-    });
+    }, state);
   };
 
   const track = (params: TrackEventParams) => {
-    if (analyticsSharedState.requestsQueue.length >= maxQueueSize) {
+    if (state.requestsQueue.length >= maxQueueSize) {
       return;
     }
     const intrinsicData = getEventIntrinsicData();
-    analyticsSharedState.requestsQueue.push({
+    const preview = Object.fromEntries(
+      Object.entries(experimentsContext?.preview ?? {}).filter(([, value]) => typeof value === "boolean"),
+    );
+    const properties = { ...params.properties };
+    delete properties.__b44_experiment_preview;
+    if (Object.keys(preview).length) {
+      // Capture now: a queued event must retain its occurrence-time preview.
+      properties.__b44_experiment_preview = JSON.stringify(preview);
+    }
+    state.requestsQueue.push({
       ...params,
       ...intrinsicData,
+      properties: params.properties || Object.keys(properties).length ? properties : undefined,
     });
     startProcessing();
   };
@@ -155,18 +180,18 @@ export const createAnalyticsModule = ({
     startAnalyticsProcessor(flush, {
       throttleTime,
       batchSize,
-    });
-    clearHeartBeatProcessor = startHeartBeatProcessor(track);
-    setSessionDurationTimerStart();
+    }, state);
+    clearHeartBeatProcessor = startHeartBeatProcessor(track, state);
+    setSessionDurationTimerStart(state);
   };
 
   const onDocHidden = () => {
-    stopAnalyticsProcessor();
+    stopAnalyticsProcessor(state);
     clearHeartBeatProcessor?.();
-    trackSessionDurationEvent(track);
+    trackSessionDurationEvent(track, state);
 
     //  flush entire queue on visibility change and hope for the best //
-    const eventsData = analyticsSharedState.requestsQueue.splice(0);
+    const eventsData = state.requestsQueue.splice(0);
     flush(eventsData, { isBeacon: true });
   };
 
@@ -180,7 +205,7 @@ export const createAnalyticsModule = ({
   };
 
   const cleanup = () => {
-    stopAnalyticsProcessor();
+    stopAnalyticsProcessor(state);
     clearHeartBeatProcessor?.();
     if (typeof window !== "undefined") {
       window.removeEventListener("visibilitychange", onVisibilityChange);
@@ -190,9 +215,9 @@ export const createAnalyticsModule = ({
   // start the flusing process ///
   startProcessing();
   // start the heart beat processor //
-  clearHeartBeatProcessor = startHeartBeatProcessor(track);
+  clearHeartBeatProcessor = startHeartBeatProcessor(track, state);
   // track the referrer event //
-  trackInitializationEvent(track);
+  trackInitializationEvent(track, state);
   // start the visibility change listener //
   if (typeof window !== "undefined") {
     window.addEventListener("visibilitychange", onVisibilityChange);
@@ -204,68 +229,69 @@ export const createAnalyticsModule = ({
   };
 };
 
-function stopAnalyticsProcessor() {
-  analyticsSharedState.isProcessing = false;
+function stopAnalyticsProcessor(state: AnalyticsState) {
+  state.isProcessing = false;
 }
 
 async function startAnalyticsProcessor(
   handleTrack: (eventsData: TrackEventData[]) => Promise<void>,
-  options?: {
+  options: {
     throttleTime: number;
     batchSize: number;
-  }
+  },
+  state: AnalyticsState,
 ) {
-  if (analyticsSharedState.isProcessing) {
+  if (state.isProcessing) {
     // only one instance of the analytics processor can be running at a time //
     return;
   }
-  analyticsSharedState.isProcessing = true;
+  state.isProcessing = true;
 
   const { throttleTime = 1000, batchSize = 30 } = options ?? {};
   while (
-    analyticsSharedState.isProcessing &&
-    analyticsSharedState.requestsQueue.length > 0
+    state.isProcessing &&
+    state.requestsQueue.length > 0
   ) {
-    const requests = analyticsSharedState.requestsQueue.splice(0, batchSize);
+    const requests = state.requestsQueue.splice(0, batchSize);
     requests.length && (await handleTrack(requests));
     await new Promise((resolve) => setTimeout(resolve, throttleTime));
   }
-  analyticsSharedState.isProcessing = false;
+  state.isProcessing = false;
 }
 
-function startHeartBeatProcessor(track: (params: TrackEventParams) => void) {
+function startHeartBeatProcessor(track: (params: TrackEventParams) => void, state: AnalyticsState) {
   // Browser-only, like the other automatic events here (initialization, session
   // duration, visibility). Outside a browser this timer fired a `me()` every
   // interval for the lifetime of a long-lived server-side client, and kept the
   // Node event loop alive. Explicit `analytics.track()` calls still work.
   if (
     typeof window === "undefined" ||
-    analyticsSharedState.isHeartBeatProcessing ||
-    (analyticsSharedState.config.heartBeatInterval ?? 0) < 10
+    state.isHeartBeatProcessing ||
+    (state.config.heartBeatInterval ?? 0) < 10
   ) {
     return () => {};
   }
 
-  analyticsSharedState.isHeartBeatProcessing = true;
+  state.isHeartBeatProcessing = true;
   const interval = setInterval(() => {
     track({ eventName: USER_HEARTBEAT_EVENT_NAME });
-  }, analyticsSharedState.config.heartBeatInterval);
+  }, state.config.heartBeatInterval);
 
   return () => {
     clearInterval(interval);
-    analyticsSharedState.isHeartBeatProcessing = false;
+    state.isHeartBeatProcessing = false;
   };
 }
 
-function trackInitializationEvent(track: (params: TrackEventParams) => void) {
+function trackInitializationEvent(track: (params: TrackEventParams) => void, state: AnalyticsState) {
   if (
     typeof window === "undefined" ||
-    analyticsSharedState.wasInitializationTracked
+    state.wasInitializationTracked
   ) {
     return;
   }
 
-  analyticsSharedState.wasInitializationTracked = true;
+  state.wasInitializationTracked = true;
   track({
     eventName: ANALYTICS_INITIALIZATION_EVENT_NAME,
     properties: {
@@ -274,25 +300,25 @@ function trackInitializationEvent(track: (params: TrackEventParams) => void) {
   });
 }
 
-function setSessionDurationTimerStart() {
+function setSessionDurationTimerStart(state: AnalyticsState) {
   if (
     typeof window === "undefined" ||
-    analyticsSharedState.sessionStartTime !== null
+    state.sessionStartTime !== null
   ) {
     return;
   }
-  analyticsSharedState.sessionStartTime = new Date().toISOString();
+  state.sessionStartTime = new Date().toISOString();
 }
-function trackSessionDurationEvent(track: (params: TrackEventParams) => void) {
+function trackSessionDurationEvent(track: (params: TrackEventParams) => void, state: AnalyticsState) {
   if (
     typeof window === "undefined" ||
-    analyticsSharedState.sessionStartTime === null
+    state.sessionStartTime === null
   )
     return;
   const sessionDuration =
     new Date().getTime() -
-    new Date(analyticsSharedState.sessionStartTime).getTime();
-  analyticsSharedState.sessionStartTime = null;
+    new Date(state.sessionStartTime).getTime();
+  state.sessionStartTime = null;
   track({
     eventName: ANALYTICS_SESSION_DURATION_EVENT_NAME,
     properties: { sessionDuration },
@@ -318,8 +344,6 @@ function transformEventDataToApiRequestData(sessionContext: SessionContext) {
   });
 }
 
-let sessionContextPromise: Promise<SessionContext> | null = null;
-
 /**
  * Clears the memoized analytics session context.
  *
@@ -330,26 +354,28 @@ let sessionContextPromise: Promise<SessionContext> | null = null;
  *
  * @internal
  */
-export function resetAnalyticsSessionContext() {
-  analyticsSharedState.sessionContext = null;
-  sessionContextPromise = null;
+export function resetAnalyticsSessionContext(axiosClient?: AxiosInstance) {
+  const state = axiosClient ? serverAnalyticsStates.get(axiosClient) ?? analyticsSharedState : analyticsSharedState;
+  state.sessionContext = null;
+  state.sessionContextPromise = null;
 }
 
 async function getSessionContext(
-  userAuthModule: InternalAuthModule
+  userAuthModule: InternalAuthModule,
+  state: AnalyticsState,
 ): Promise<SessionContext> {
-  if (!analyticsSharedState.sessionContext) {
+  if (!state.sessionContext) {
     // With no token there is no identity to resolve: `me()` can only answer 401,
     // which the browser logs to the console before any handler here sees it. On
     // a public page that request is the sole reason an error appears, so skip
     // it. This is not memoized — a visitor who logs in later must still resolve.
     if (!userAuthModule.hasToken()) {
-      return { user_id: null, session_id: getAnalyticsSessionId() };
+      return { user_id: null, session_id: getAnalyticsSessionId(state) };
     }
 
-    if (!sessionContextPromise) {
-      const sessionId = getAnalyticsSessionId();
-      sessionContextPromise = userAuthModule
+    if (!state.sessionContextPromise) {
+      const sessionId = getAnalyticsSessionId(state);
+      state.sessionContextPromise = userAuthModule
         .me()
         .then((user) => ({
           user_id: user.id,
@@ -360,7 +386,7 @@ async function getSessionContext(
           session_id: sessionId,
         }));
     }
-    const pending = sessionContextPromise;
+    const pending = state.sessionContextPromise;
     const context = await pending;
     // Publish only if this lookup is still the current one. A reset that lands
     // while the request is in flight nulls `sessionContextPromise`, and an
@@ -368,12 +394,12 @@ async function getSessionContext(
     // for the rest of the session. The awaited value is still returned: these
     // events were queued before the identity changed, so that is who they
     // belong to.
-    if (sessionContextPromise === pending) {
-      analyticsSharedState.sessionContext = context;
+    if (state.sessionContextPromise === pending) {
+      state.sessionContext = context;
     }
     return context;
   }
-  return analyticsSharedState.sessionContext;
+  return state.sessionContext;
 }
 
 export function getAnalyticsConfigFromUrlParams():
@@ -401,15 +427,16 @@ export function getAnalyticsConfigFromUrlParams():
   return { enabled: analyticsEnable === "true" };
 }
 
-// When the id can't be persisted (React Native has no `localStorage`), keep
-// it stable for the process instead of minting a fresh one per call.
-function getFallbackSessionId(): string {
-  return (analyticsSharedState.fallbackSessionId ??= generateUuid());
+// Without persistent storage, keep the id stable within this analytics state.
+function getFallbackSessionId(state: AnalyticsState): string {
+  return (state.fallbackSessionId ??= generateUuid());
 }
 
-export function getAnalyticsSessionId(): string {
+export function getAnalyticsSessionId(state = analyticsSharedState): string {
+  const visitorId = getExperimentsRuntime()?.visitorId;
+  if (visitorId && visitorId !== "anon") return visitorId;
   if (typeof window === "undefined") {
-    return getFallbackSessionId();
+    return getFallbackSessionId(state);
   }
   try {
     const sessionId = localStorage.getItem(
@@ -425,6 +452,6 @@ export function getAnalyticsSessionId(): string {
     }
     return sessionId;
   } catch {
-    return getFallbackSessionId();
+    return getFallbackSessionId(state);
   }
 }
