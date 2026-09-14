@@ -43,6 +43,82 @@ function captureAnalytics() {
 }
 
 describe("client experiments integration", () => {
+  test("three distinct feature reads and a goal share one request-scoped Analytics batch", async () => {
+    const create = axios.create.bind(axios);
+    const adapter = vi.fn(async (config) => ({
+      data: config.url.endsWith("/entities/User/me") ? { id: "user" } : { accepted: 4 },
+      status: 200, statusText: "OK", headers: {}, config,
+    }));
+    vi.spyOn(axios, "create").mockImplementation((options) => {
+      const api = create(options);
+      api.defaults.adapter = adapter;
+      return api;
+    });
+    const requestContext = { ...context, config: { ...context.config,
+      experiments: ["checkout", "pricing", "headline"].map((flag_key) => ({
+        ...context.config.experiments[0], id: `experiment_${flag_key}`, flag_key,
+      })),
+    } };
+    const client = createClientFromRequest(new Request("https://app.example/checkout", { headers: {
+      "Base44-App-Id": "app", Authorization: "Bearer user-token",
+      "Base44-Experiments-Context": encode(requestContext),
+    } }));
+    for (const flag of ["checkout", "pricing", "headline"]) expect(client.experiments.isEnabled(flag)).toBe(true);
+    client.analytics.track({ eventName: "purchase", properties: { amount: 42 } });
+    await client.experiments.flush();
+    const batches = adapter.mock.calls.map(([request]) => request)
+      .filter((request) => request.url.endsWith("/analytics/track/batch"));
+    expect(batches).toHaveLength(1);
+    expect(batches[0].headers.get("Authorization")).toBe("Bearer user-token");
+    const events = JSON.parse(batches[0].data).events;
+    expect(events.map((event) => event.event_name)).toEqual([
+      "__experiment_exposure__", "__experiment_exposure__", "__experiment_exposure__", "purchase",
+    ]);
+    expect(new Set(events.slice(0, 3).map((event) => event.event_id)).size).toBe(3);
+    expect(events.every((event) => event.session_id === "visitor")).toBe(true);
+    client.cleanup();
+  });
+
+  test("a lost mixed-batch acknowledgement retries only exposures with their original time, ID and credential", async () => {
+    vi.useFakeTimers();
+    const create = axios.create.bind(axios);
+    let batchAttempt = 0;
+    const adapter = vi.fn(async (config) => {
+      if (config.url.endsWith("/analytics/track/batch") && batchAttempt++ === 0) throw new Error("lost acknowledgement");
+      return { data: config.url.endsWith("/entities/User/me") ? { id: "user" } : { accepted: 0 },
+        status: 200, statusText: "OK", headers: {}, config };
+    });
+    vi.spyOn(axios, "create").mockImplementation((options) => {
+      const api = create(options);
+      api.defaults.adapter = adapter;
+      return api;
+    });
+    const client = createClientFromRequest(new Request("https://app.example/checkout", { headers: {
+      "Base44-App-Id": "app", Authorization: "Bearer original-token", "Base44-Experiments-Context": encode(context),
+    } }));
+    const exposureTime = new Date().toISOString();
+    client.experiments.isEnabled("checkout");
+    await vi.advanceTimersByTimeAsync(25);
+    const goalTime = new Date().toISOString();
+    client.analytics.track({ eventName: "purchase" });
+    const delivery = client.experiments.flush();
+    client.setToken("replacement-token");
+    await vi.advanceTimersByTimeAsync(100);
+    await delivery;
+    const batches = adapter.mock.calls.map(([request]) => request)
+      .filter((request) => request.url.endsWith("/analytics/track/batch"));
+    expect(batches).toHaveLength(2);
+    expect(batches.map((request) => request.headers.get("Authorization"))).toEqual(["Bearer original-token", "Bearer original-token"]);
+    const first = JSON.parse(batches[0].data).events;
+    expect(JSON.parse(batches[1].data).events).toEqual([first[0]]);
+    expect(first.map((event) => event.timestamp)).toEqual([exposureTime, goalTime]);
+    expect(first[0].event_id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(first[1]).not.toHaveProperty("event_id");
+    await client.experiments.flush();
+    expect(adapter.mock.calls.filter(([request]) => request.url.endsWith("/analytics/track/batch"))).toHaveLength(2);
+    client.cleanup();
+  });
+
   test("request context evaluates synchronously and flushes with the request's user token", async () => {
     const create = axios.create.bind(axios);
     const adapter = vi.fn(async (config) => ({ data: { accepted: 1 }, status: 200, statusText: "OK", headers: {}, config }));

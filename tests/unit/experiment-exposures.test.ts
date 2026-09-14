@@ -32,16 +32,18 @@ describe("experiment exposure transport", () => {
     vi.resetModules();
   });
 
-  test("sends one immediate batch with the runtime visitor and no client user claim", () => {
+  test("queues exposure until flush with the runtime visitor and no client user claim", async () => {
     const tracker = createExposureTracker({ axiosClient: client, appId, enabled: true });
     tracker.track(assignment, identity);
+    expect(request).not.toHaveBeenCalled();
+    await tracker.flush();
 
     expect(request).toHaveBeenCalledOnce();
     expect(request).toHaveBeenCalledWith({
       method: "POST",
       url: `/apps/${appId}/analytics/track/batch`,
       headers: { Authorization: "Bearer user-1-token" },
-      timeout: 5000,
+      timeout: expect.any(Number),
       signal: expect.any(AbortSignal),
       data: { events: [{
         event_name: "__experiment_exposure__",
@@ -56,7 +58,7 @@ describe("experiment exposure transport", () => {
     expect(new Date(event.timestamp).toISOString()).toBe(event.timestamp);
   });
 
-  test("deduplicates reads but allows new runs, variants, users and visitors", () => {
+  test("deduplicates reads and batches distinct assignments only within the same identity", async () => {
     const tracker = createExposureTracker({ axiosClient: client, appId, enabled: true });
     tracker.track(assignment, identity);
     tracker.track({ ...assignment }, { ...identity });
@@ -64,8 +66,9 @@ describe("experiment exposure transport", () => {
     tracker.track({ ...assignment, variant_key: "treatment" }, identity);
     tracker.track(assignment, { ...identity, userId: "user-2" });
     tracker.track(assignment, { ...identity, visitorId: "visitor-2" });
-
-    expect(request).toHaveBeenCalledTimes(5);
+    await tracker.flush();
+    expect(request).toHaveBeenCalledTimes(3);
+    expect(request.mock.calls.map(([config]) => config.data.events.length)).toEqual([3, 1, 1]);
   });
 
   test.each(["getItem", "setItem"])("attributes goals to the exposure when storage %s fails", async (method) => {
@@ -115,13 +118,35 @@ describe("experiment exposure transport", () => {
     request.mockRejectedValueOnce(new Error("offline"));
     const tracker = createExposureTracker({ axiosClient: client, appId, enabled: true });
     tracker.track(assignment, identity);
+    const delivery = tracker.flush();
     client.defaults.headers.common.Authorization = "Bearer replacement";
     await vi.advanceTimersByTimeAsync(100);
-    await tracker.flush();
+    await delivery;
     expect(request).toHaveBeenCalledTimes(2);
-    expect(request.mock.calls[1][0]).toEqual(request.mock.calls[0][0]);
+    expect(request.mock.calls[1][0]).toMatchObject({
+      data: request.mock.calls[0][0].data, headers: request.mock.calls[0][0].headers,
+    });
     expect(request.mock.calls[0][0].data.events[0].event_id).toMatch(/^[0-9a-f-]{36}$/);
     vi.useRealTimers();
+  });
+
+  test("captures credential and visitor partitions before a mixed batch is flushed", async () => {
+    const tracker = createExposureTracker({ axiosClient: client, appId, enabled: true });
+    tracker.track(assignment, identity);
+    client.defaults.headers.common.Authorization = "Bearer token-2";
+    tracker.track({ ...assignment, experiment_id: "experiment-2" }, identity);
+    tracker.track(assignment, { ...identity, visitorId: "visitor-2" });
+    tracker.track(assignment, { visitorId: "visitor-2", userId: null });
+    await tracker.flush();
+    expect(request.mock.calls.map(([config]) => ({
+      authorization: config.headers.Authorization, visitor: config.data.events[0].session_id,
+      count: config.data.events.length,
+    }))).toEqual([
+      { authorization: "Bearer user-1-token", visitor: "runtime-visitor", count: 1 },
+      { authorization: "Bearer token-2", visitor: "runtime-visitor", count: 1 },
+      { authorization: "Bearer token-2", visitor: "visitor-2", count: 1 },
+      { authorization: null, visitor: "visitor-2", count: 1 },
+    ]);
   });
 
   test.each([0, 1])("backend flush settles accepted %s without resending on later reads", async (accepted) => {
@@ -157,8 +182,8 @@ describe("experiment exposure transport", () => {
     await settled;
     expect(request).toHaveBeenCalledTimes(3);
     const initial = request.mock.calls[0][0];
-    expect(request.mock.calls[1][0]).toEqual(initial);
-    expect(request.mock.calls[2][0]).toEqual(initial);
+    expect(request.mock.calls[1][0]).toMatchObject({ data: initial.data, headers: initial.headers });
+    expect(request.mock.calls[2][0]).toMatchObject({ data: initial.data, headers: initial.headers });
     tracker.track(assignment, identity);
     await tracker.flush();
     expect(request).toHaveBeenCalledTimes(3);
@@ -198,16 +223,18 @@ describe("experiment exposure transport", () => {
     tracker.track(assignment, { ...identity, userId });
     client.defaults.headers.common.Authorization = "Bearer replacement-token";
 
-    await vi.waitFor(() => expect(adapter).toHaveBeenCalledOnce());
+    await tracker.flush();
+    expect(adapter).toHaveBeenCalledOnce();
     expect(adapter.mock.calls[0][0].headers.get("Authorization")).toBe(
       userId ? "Bearer user-1-token" : null,
     );
   });
 
-  test("uses explicit null auth when no default header exists", () => {
+  test("uses explicit null auth when no default header exists", async () => {
     delete client.defaults.headers.common.Authorization;
-    createExposureTracker({ axiosClient: client, appId, enabled: true }).track(assignment, identity);
-
+    const tracker = createExposureTracker({ axiosClient: client, appId, enabled: true });
+    tracker.track(assignment, identity);
+    await tracker.flush();
     expect(request.mock.calls[0][0].headers.Authorization).toBeNull();
   });
 

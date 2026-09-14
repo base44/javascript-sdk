@@ -36,9 +36,12 @@ export interface ExperimentsModule {
    * visibility. Preview overrides and flags without an assignment are not tracked.
    * Exposures respect the client's analytics setting, are deduplicated per client,
    * experiment run, variant and identity. Network and server failures retry up to
-   * three attempts within five seconds, preserving the event ID, timestamp and
-   * credentials. HTTP successes (including rejected measurements) and client errors
-   * are terminal. On servers, use the runtime's background lifetime mechanism.
+   * three attempts within five seconds of batch delivery, preserving the event ID,
+   * timestamp and credentials. HTTP successes (including rejected measurements) and client errors
+   * are terminal. Exposures share the Analytics batch with compatible ordinary
+   * events; credentials and user/visitor identities are captured when tracking.
+   * Only exposures are retried; ordinary goals retain single-attempt delivery.
+   * On servers, use the runtime's background lifetime mechanism.
    *
    * @param flagKey - Feature flag key defined in your app.
    * @param fallback - Value for an unavailable flag or unresolved identity. Defaults to `false`.
@@ -105,13 +108,23 @@ export interface ExperimentsModule {
   ready(): Promise<ExperimentsSnapshot>;
 
   /**
-   * Waits for pending best-effort deliveries to settle without rejecting.
+   * Flushes this client's queued Analytics goals and exposures without rejecting.
    * Each delivery has a five-second total budget; exhausted or rejected events are
    * dropped and are not retried by later reads or flushes. Settlement is not proof
    * of ingestion, and raw storage is not exactly-once. No new exposures are created.
    * Worker handlers should use `ctx.waitUntil(client.experiments.flush())` instead
    * of awaiting Analytics on the application response path. Other runtimes must use
    * their supported background lifetime mechanism; fire-and-forget alone may be cut off.
+   * Base44's legacy Cloudflare runtime exposes `globalThis.Base44.waitUntil(...)`;
+   * the newer runtime exports `waitUntil` from `base44:runtime`. Use the API provided
+   * by your deployed runtime. Deno without a background lifetime API must await flush.
+   *
+   * @returns A promise that resolves when the current batch deliveries settle.
+   * @example
+   * ```typescript
+   * // In a Worker handler with an execution context:
+   * ctx.waitUntil(base44.experiments.flush());
+   * ```
    */
   flush(): Promise<void>;
 }

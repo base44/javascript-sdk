@@ -1,9 +1,6 @@
 import { AxiosInstance } from "axios";
 import {
   TrackEventParams,
-  TrackEventData,
-  AnalyticsApiRequestData,
-  AnalyticsApiBatchRequest,
   TrackEventIntrinsicData,
   AnalyticsModuleOptions,
   SessionContext,
@@ -13,6 +10,7 @@ import type { InternalAuthModule } from "./auth.types";
 import { generateUuid, isReactNative } from "../utils/common.js";
 import { getExperimentsRuntime } from "./experiments-runtime.types.js";
 import type { ExperimentsContext } from "./experiments-config.types.js";
+import { getAnalyticsQueue } from "./analytics-queue.js";
 
 export const USER_HEARTBEAT_EVENT_NAME = "__user_heartbeat_event__";
 export const ANALYTICS_INITIALIZATION_EVENT_NAME = "__initialization_event__";
@@ -32,15 +30,9 @@ const defaultConfiguration: AnalyticsModuleOptions = {
   heartBeatInterval: 60 * 1000,
 };
 
-///////////////////////////////////////////////
-//// shared queue for analytics events     ////
-///////////////////////////////////////////////
-
 const ANALYTICS_SHARED_STATE_NAME = "analytics";
 function createAnalyticsState() {
   return {
-    requestsQueue: [] as TrackEventData[],
-    isProcessing: false,
     isHeartBeatProcessing: false,
     wasInitializationTracked: false,
     sessionContext: null as SessionContext | null,
@@ -57,9 +49,20 @@ function createAnalyticsState() {
 }
 type AnalyticsState = ReturnType<typeof createAnalyticsState>;
 const analyticsSharedState = getSharedInstance(ANALYTICS_SHARED_STATE_NAME, createAnalyticsState);
-const serverAnalyticsStates = new WeakMap<AxiosInstance, AnalyticsState>();
+const clientAnalyticsStates = new WeakMap<AxiosInstance, AnalyticsState>();
 
-///////////////////////////////////////////////
+/** @internal */
+export function getAnalyticsState(axiosClient: AxiosInstance): AnalyticsState {
+  let state = clientAnalyticsStates.get(axiosClient);
+  if (!state) {
+    state = createAnalyticsState();
+    if (typeof window !== "undefined") {
+      state.config = analyticsSharedState.config;
+    }
+    clientAnalyticsStates.set(axiosClient, state);
+  }
+  return state;
+}
 
 export interface AnalyticsModuleArgs {
   axiosClient: AxiosInstance;
@@ -78,17 +81,15 @@ export function isAnalyticsEnabled(enabled: boolean, state = analyticsSharedStat
 
 export const createAnalyticsModule = ({
   axiosClient,
-  serverUrl,
   appId,
   userAuthModule,
   enabled,
   getVisitorId,
   experimentsContext,
 }: AnalyticsModuleArgs) => {
-  const state = typeof window === "undefined" ? createAnalyticsState() : analyticsSharedState;
-  if (typeof window === "undefined") serverAnalyticsStates.set(axiosClient, state);
-  // prevent overflow of events //
-  const { maxQueueSize, throttleTime, batchSize } = state.config;
+  const state = getAnalyticsState(axiosClient);
+  const automaticState = typeof window === "undefined" ? state : analyticsSharedState;
+  const queue = getAnalyticsQueue(axiosClient, appId, state.config);
 
   // Disable analytics on React Native. It defines `window` but not `document`,
   // so the per-callsite `typeof window` guards below aren't enough to keep it
@@ -102,63 +103,11 @@ export const createAnalyticsModule = ({
   }
 
   let clearHeartBeatProcessor: (() => void) | undefined = undefined;
-  const trackBatchUrl = `${serverUrl}/api/apps/${appId}/analytics/track/batch`;
-
-  const batchRequestFallback = async (events: AnalyticsApiRequestData[]) => {
-    await axiosClient.request({
-      method: "POST",
-      url: `/apps/${appId}/analytics/track/batch`,
-      data: { events },
-    } as AnalyticsApiBatchRequest);
-  };
-
-  // currently disabled, until fully tested  //
-  const beaconRequest = (events: AnalyticsApiRequestData[]) => {
-    try {
-      const beaconPayload = JSON.stringify({ events });
-      const blob = new Blob([beaconPayload], { type: "application/json" });
-      return (
-        typeof navigator === "undefined" ||
-        beaconPayload.length > 60000 ||
-        !navigator.sendBeacon(trackBatchUrl, blob)
-      );
-    } catch {
-      return false;
-    }
-  };
-
-  const flush = async (
-    eventsData: TrackEventData[],
-    options: { isBeacon?: boolean } = {}
-  ) => {
-    if (eventsData.length === 0) return;
-
-    const sessionContext_ = await getSessionContext(userAuthModule, state);
-    const events = eventsData.map(
-      transformEventDataToApiRequestData({ ...sessionContext_, session_id: getVisitorId?.() ?? sessionContext_.session_id })
-    );
-
-    try {
-      if (!options.isBeacon || !beaconRequest(events)) {
-        await batchRequestFallback(events);
-      }
-    } catch {
-      // do nothing
-    }
-  };
-
-  const startProcessing = () => {
-    startAnalyticsProcessor(flush, {
-      throttleTime,
-      batchSize,
-    }, state);
-  };
-
   const track = (params: TrackEventParams) => {
-    if (state.requestsQueue.length >= maxQueueSize) {
-      return;
-    }
     const intrinsicData = getEventIntrinsicData();
+    const visitorId = getVisitorId?.() ?? getAnalyticsSessionId(state);
+    const authorization = userAuthModule.hasToken() ? axiosClient.defaults.headers.common.Authorization : null;
+    const context = getSessionContext(userAuthModule, state);
     const preview = Object.fromEntries(
       Object.entries(experimentsContext?.preview ?? {}).filter(([, value]) => typeof value === "boolean"),
     );
@@ -168,31 +117,27 @@ export const createAnalyticsModule = ({
       // Capture now: a queued event must retain its occurrence-time preview.
       properties.__b44_experiment_preview = JSON.stringify(preview);
     }
-    state.requestsQueue.push({
-      ...params,
-      ...intrinsicData,
+    const event = {
+      event_name: params.eventName,
+      timestamp: intrinsicData.timestamp,
+      page_url: intrinsicData.pageUrl,
       properties: params.properties || Object.keys(properties).length ? properties : undefined,
-    });
-    startProcessing();
+    };
+    queue.enqueue(context.then((identity) => ({ ...event, ...identity, session_id: visitorId })),
+      typeof authorization === "string" ? authorization : null,
+      context.then((identity) => identity.user_id ?? null));
   };
 
   const onDocVisible = () => {
-    startAnalyticsProcessor(flush, {
-      throttleTime,
-      batchSize,
-    }, state);
-    clearHeartBeatProcessor = startHeartBeatProcessor(track, state);
-    setSessionDurationTimerStart(state);
+    clearHeartBeatProcessor = startHeartBeatProcessor(track, automaticState);
+    setSessionDurationTimerStart(automaticState);
   };
 
   const onDocHidden = () => {
-    stopAnalyticsProcessor(state);
     clearHeartBeatProcessor?.();
-    trackSessionDurationEvent(track, state);
+    trackSessionDurationEvent(track, automaticState);
 
-    //  flush entire queue on visibility change and hope for the best //
-    const eventsData = state.requestsQueue.splice(0);
-    flush(eventsData, { isBeacon: true });
+    void queue.flush();
   };
 
   const onVisibilityChange = () => {
@@ -205,19 +150,17 @@ export const createAnalyticsModule = ({
   };
 
   const cleanup = () => {
-    stopAnalyticsProcessor(state);
+    queue.cleanup();
     clearHeartBeatProcessor?.();
     if (typeof window !== "undefined") {
       window.removeEventListener("visibilitychange", onVisibilityChange);
     }
   };
 
-  // start the flusing process ///
-  startProcessing();
   // start the heart beat processor //
-  clearHeartBeatProcessor = startHeartBeatProcessor(track, state);
+  clearHeartBeatProcessor = startHeartBeatProcessor(track, automaticState);
   // track the referrer event //
-  trackInitializationEvent(track, state);
+  trackInitializationEvent(track, automaticState);
   // start the visibility change listener //
   if (typeof window !== "undefined") {
     window.addEventListener("visibilitychange", onVisibilityChange);
@@ -228,36 +171,6 @@ export const createAnalyticsModule = ({
     cleanup,
   };
 };
-
-function stopAnalyticsProcessor(state: AnalyticsState) {
-  state.isProcessing = false;
-}
-
-async function startAnalyticsProcessor(
-  handleTrack: (eventsData: TrackEventData[]) => Promise<void>,
-  options: {
-    throttleTime: number;
-    batchSize: number;
-  },
-  state: AnalyticsState,
-) {
-  if (state.isProcessing) {
-    // only one instance of the analytics processor can be running at a time //
-    return;
-  }
-  state.isProcessing = true;
-
-  const { throttleTime = 1000, batchSize = 30 } = options ?? {};
-  while (
-    state.isProcessing &&
-    state.requestsQueue.length > 0
-  ) {
-    const requests = state.requestsQueue.splice(0, batchSize);
-    requests.length && (await handleTrack(requests));
-    await new Promise((resolve) => setTimeout(resolve, throttleTime));
-  }
-  state.isProcessing = false;
-}
 
 function startHeartBeatProcessor(track: (params: TrackEventParams) => void, state: AnalyticsState) {
   // Browser-only, like the other automatic events here (initialization, session
@@ -334,16 +247,6 @@ function getEventIntrinsicData(): TrackEventIntrinsicData {
   };
 }
 
-function transformEventDataToApiRequestData(sessionContext: SessionContext) {
-  return (eventData: TrackEventData): AnalyticsApiRequestData => ({
-    event_name: eventData.eventName,
-    properties: eventData.properties,
-    timestamp: eventData.timestamp,
-    page_url: eventData.pageUrl,
-    ...sessionContext,
-  });
-}
-
 /**
  * Clears the memoized analytics session context.
  *
@@ -355,7 +258,7 @@ function transformEventDataToApiRequestData(sessionContext: SessionContext) {
  * @internal
  */
 export function resetAnalyticsSessionContext(axiosClient?: AxiosInstance) {
-  const state = axiosClient ? serverAnalyticsStates.get(axiosClient) ?? analyticsSharedState : analyticsSharedState;
+  const state = axiosClient ? getAnalyticsState(axiosClient) : analyticsSharedState;
   state.sessionContext = null;
   state.sessionContextPromise = null;
 }
