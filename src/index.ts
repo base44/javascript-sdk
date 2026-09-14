@@ -150,3 +150,99 @@ export type {
   RemoveAccessTokenOptions,
   GetLoginUrlOptions,
 } from "./utils/auth-utils.types.js";
+
+// Apple in-app purchase types.
+//
+// Type-only on purpose. The runtime lives behind the "@base44/sdk/iap" subpath
+// export so a browser or React Native bundle never downloads certificate
+// parsing or cryptography, while `dist/index.js` stays byte-identical — `tsc`
+// erases an `export type` entirely. Naming these from "@base44/sdk" in shared
+// front-end code therefore costs nothing at runtime.
+export type {
+  CreateIapClientOptions,
+  IapInternalOptions,
+} from "./iap/index.js";
+export type {
+  IapConfig,
+  IapConfiguredProductType,
+  IapModule,
+  IapProductConfig,
+  IapSetupReport,
+} from "./iap/iap.types.js";
+export type {
+  IapEvent,
+  IapEventHandler,
+  IapEventType,
+  IapExpiryReason,
+  IapRenewReason,
+  IapStartReason,
+} from "./iap/events/events.types.js";
+export type {
+  EntitlementQuery,
+  Entitlements,
+  IapExpirationReason,
+  IapRevocation,
+  IapSubscriptionOffer,
+  IapSubscriptionStatus,
+  OwnedNonConsumable,
+  OwnedNonRenewingSubscription,
+  SubscriptionQuery,
+  SubscriptionState,
+  TransactionQuery,
+} from "./iap/read/read.types.js";
+export type { HandleNotificationResult } from "./iap/ingest/notifications.js";
+export type {
+  RecordTransactionOptions,
+  RecordTransactionResult,
+  SyncPayload,
+  SyncResult,
+} from "./iap/ingest/device.types.js";
+export type {
+  IapConsumptionOutcome,
+  IapConsumptionRequestRecord,
+  IapNotificationOutcome,
+  IapNotificationRecord,
+  IapRecordSource,
+  IapSubscriptionRecord,
+  IapTransactionRecord,
+} from "./iap/store/rows.types.js";
+export type {
+  IapEntityName,
+  IapEntitySchema,
+  IapSchemaField,
+} from "./iap/store/schemas.js";
+export type {
+  ConsumptionRequestBody,
+  IapDeliveryStatus,
+  IapRefundPreference,
+  IapServerApiConfig,
+  IapServerApiModule,
+  SendAttempt,
+  SendAttemptResult,
+  TestNotificationResult,
+  TestNotificationStatus,
+} from "./iap/server-api/server-api.types.js";
+export type {
+  IapApiErrorCode,
+  IapConfigErrorCode,
+  IapSetupErrorCode,
+  IapStoreErrorCode,
+  IapVerificationErrorCode,
+} from "./iap/errors.types.js";
+export type {
+  DecodedNotification,
+  DecodedNotificationData,
+  DecodedNotificationSummary,
+  DecodedRenewalInfo,
+  DecodedTransaction,
+  IapAppleSubscriptionStatus,
+  IapConsumptionRequestReason,
+  IapEnvironment,
+  IapExpirationIntent,
+  IapOfferDiscountType,
+  IapOfferType,
+  IapOwnershipType,
+  IapProductType,
+  IapRevocationType,
+  IapTransactionReason,
+} from "./iap/verify/verify.types.js";
