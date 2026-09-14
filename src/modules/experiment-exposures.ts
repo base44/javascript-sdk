@@ -1,6 +1,8 @@
-import type { AxiosInstance } from "axios";
+import type { AxiosError, AxiosInstance } from "axios";
 import { v4 as uuid } from "uuid";
 import { isAnalyticsEnabled } from "./analytics.js";
+
+const DELIVERY_BUDGET_MS = 5000;
 
 /** @internal */
 export function createExposureTracker({
@@ -15,34 +17,46 @@ export function createExposureTracker({
   type Entry = {
     data: { events: Record<string, unknown>[] };
     authorization: string | null;
-    acknowledged: boolean;
+    settled: boolean;
     pending?: Promise<void>;
   };
   const entries = new Map<string, Entry>();
 
   function send(entry: Entry): Promise<void> {
     if (entry.pending) return entry.pending;
-    const pending = (async () => {
+    const controller = new AbortController();
+    const deadline = new Promise<void>((resolve) => {
+      controller.signal.addEventListener("abort", () => resolve(), { once: true });
+    });
+    const timeout = setTimeout(() => controller.abort(), DELIVERY_BUDGET_MS);
+    const delivery = (async () => {
       for (let attempt = 0; ; attempt++) {
         try {
-          const response = await axiosClient.request<unknown, { accepted: number }>({
+          if (controller.signal.aborted) return;
+          await axiosClient.request({
             method: "POST",
             url: `/apps/${appId}/analytics/track/batch`,
             headers: { Authorization: entry.authorization },
             data: entry.data,
+            timeout: DELIVERY_BUDGET_MS,
+            signal: controller.signal,
           });
-          if (response.accepted !== 1) throw new Error("Experiment exposure was not accepted");
-          entry.acknowledged = true;
           return;
         } catch (error) {
-          if (attempt === 2) throw error;
+          const status = (error as AxiosError).response?.status ?? (error as AxiosError).status;
+          if (controller.signal.aborted || attempt === 2 || (status !== undefined && (status < 500 || status >= 600))) return;
           await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 100 : 500));
         }
       }
-    })().finally(() => { entry.pending = undefined; });
+    })();
+    // Also settle flush when a stalled transport ignores cancellation.
+    const pending = Promise.race([delivery, deadline]).finally(() => {
+      clearTimeout(timeout);
+      controller.abort();
+      entry.settled = true;
+      entry.pending = undefined;
+    });
     entry.pending = pending;
-    // Reads stay synchronous; flush() lets request handlers observe delivery failures.
-    void pending.catch(() => {});
     return pending;
   }
 
@@ -58,7 +72,7 @@ export function createExposureTracker({
       if (!entry) {
         const authorization = identity.userId ? axiosClient.defaults.headers.common.Authorization : null;
         entry = {
-          acknowledged: false,
+          settled: false,
           authorization: typeof authorization === "string" ? authorization : null,
           data: { events: [{
             event_id: uuid(),
@@ -71,10 +85,10 @@ export function createExposureTracker({
         };
         entries.set(key, entry);
       }
-      if (!entry.acknowledged) void send(entry);
+      if (!entry.settled) void send(entry);
     },
     async flush(): Promise<void> {
-      await Promise.all([...entries.values()].filter((entry) => !entry.acknowledged).map(send));
+      await Promise.all([...entries.values()].filter((entry) => !entry.settled).map(send));
     },
   };
 }

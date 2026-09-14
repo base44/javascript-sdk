@@ -41,6 +41,8 @@ describe("experiment exposure transport", () => {
       method: "POST",
       url: `/apps/${appId}/analytics/track/batch`,
       headers: { Authorization: "Bearer user-1-token" },
+      timeout: 5000,
+      signal: expect.any(AbortSignal),
       data: { events: [{
         event_name: "__experiment_exposure__",
         event_id: expect.any(String),
@@ -122,26 +124,65 @@ describe("experiment exposure transport", () => {
     vi.useRealTimers();
   });
 
-  test("backend flush rejects unaccepted batches and a later flush reuses the same event", async () => {
-    vi.useFakeTimers();
+  test.each([0, 1])("backend flush settles accepted %s without resending on later reads", async (accepted) => {
     vi.stubGlobal("window", undefined);
-    request.mockResolvedValue({ accepted: 0 });
+    request.mockResolvedValue({ accepted });
     const tracker = createExposureTracker({ axiosClient: client, appId, enabled: true, source: "backend", pageUrl: "/checkout" });
     tracker.track(assignment, identity);
-    const failed = expect(tracker.flush()).rejects.toThrow("not accepted");
-    await vi.advanceTimersByTimeAsync(600);
-    await failed;
-    expect(request).toHaveBeenCalledTimes(3);
-    const initial = request.mock.calls[0][0];
-    expect(initial.data.events[0].properties.source).toBe("backend");
-    expect(initial.data.events[0].page_url).toBe("/checkout");
-    request.mockResolvedValue({ accepted: 1 });
-    await tracker.flush();
-    expect(request).toHaveBeenCalledTimes(4);
-    expect(request.mock.calls[3][0]).toEqual(initial);
+    await expect(tracker.flush()).resolves.toBeUndefined();
     tracker.track(assignment, identity);
     await tracker.flush();
-    expect(request).toHaveBeenCalledTimes(4);
+    expect(request).toHaveBeenCalledOnce();
+    expect(request.mock.calls[0][0].data.events[0]).toMatchObject({ properties: { source: "backend" }, page_url: "/checkout" });
+  });
+
+  test.each([400, 401, 403, 429])("terminal HTTP %s does not reject or resend", async (status) => {
+    request.mockRejectedValue({ status });
+    const tracker = createExposureTracker({ axiosClient: client, appId, enabled: true });
+    tracker.track(assignment, identity);
+    await expect(tracker.flush()).resolves.toBeUndefined();
+    tracker.track(assignment, identity);
+    await tracker.flush();
+    expect(request).toHaveBeenCalledOnce();
+  });
+
+  test.each([new Error("offline"), { response: { status: 503 } }])("exhausted transient delivery settles without changing the event or credentials", async (error) => {
+    vi.useFakeTimers();
+    request.mockRejectedValue(error);
+    const tracker = createExposureTracker({ axiosClient: client, appId, enabled: true, source: "backend" });
+    tracker.track(assignment, identity);
+    const settled = expect(tracker.flush()).resolves.toBeUndefined();
+    client.defaults.headers.common.Authorization = "Bearer replacement";
+    await vi.advanceTimersByTimeAsync(600);
+    await settled;
+    expect(request).toHaveBeenCalledTimes(3);
+    const initial = request.mock.calls[0][0];
+    expect(request.mock.calls[1][0]).toEqual(initial);
+    expect(request.mock.calls[2][0]).toEqual(initial);
+    tracker.track(assignment, identity);
+    await tracker.flush();
+    expect(request).toHaveBeenCalledTimes(3);
+  });
+
+  test("a stalled transport is cancelled at the total budget without failing the Worker", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("window", undefined);
+    request.mockReturnValue(new Promise(() => {}));
+    const tracker = createExposureTracker({ axiosClient: client, appId, enabled: true, source: "backend" });
+    tracker.track(assignment, identity);
+    const settled = vi.fn();
+    const delivery = tracker.flush().then(settled);
+    await vi.advanceTimersByTimeAsync(4999);
+    expect(settled).not.toHaveBeenCalled();
+    const signal = request.mock.calls[0][0].signal;
+    expect(signal.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await delivery;
+    expect(settled).toHaveBeenCalledOnce();
+    expect(signal.aborted).toBe(true);
+    tracker.track(assignment, identity);
+    await tracker.flush();
+    expect(request).toHaveBeenCalledOnce();
   });
 
   test.each(["user-1", null])("pins Authorization before defaults change for %s", async (userId) => {

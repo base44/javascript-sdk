@@ -26,7 +26,7 @@ export interface ExperimentsSnapshot {
  */
 export interface ExperimentsModule {
   /**
-   * Reads a flag and queues an acknowledged exposure for its current assignment.
+   * Reads a flag and queues a best-effort exposure for its current assignment.
    *
    * Never starts an authentication request. Reads return the fallback while the
    * app's normal auth initialization is pending or failed. Supply trusted bootstrap
@@ -35,8 +35,10 @@ export interface ExperimentsModule {
    * Call only where the feature is used: a read counts as exposure, not proof of
    * visibility. Preview overrides and flags without an assignment are not tracked.
    * Exposures respect the client's analytics setting, are deduplicated per client,
-   * experiment run, variant and identity. Failed sends retry up to three attempts
-   * with the same event ID, timestamp and credentials. Await flush() on servers.
+   * experiment run, variant and identity. Network and server failures retry up to
+   * three attempts within five seconds, preserving the event ID, timestamp and
+   * credentials. HTTP successes (including rejected measurements) and client errors
+   * are terminal. On servers, use the runtime's background lifetime mechanism.
    *
    * @param flagKey - Feature flag key defined in your app.
    * @param fallback - Value for an unavailable flag or unresolved identity. Defaults to `false`.
@@ -103,10 +105,13 @@ export interface ExperimentsModule {
   ready(): Promise<ExperimentsSnapshot>;
 
   /**
-   * Waits until queued exposures are acknowledged; rejects after bounded retries.
-   * Server/Worker handlers must await this before ending the request (or use waitUntil).
-   * Retries preserve event IDs but raw storage is not exactly-once. Calling again
-   * retries unacknowledged events with the same IDs. No new exposures are created.
+   * Waits for pending best-effort deliveries to settle without rejecting.
+   * Each delivery has a five-second total budget; exhausted or rejected events are
+   * dropped and are not retried by later reads or flushes. Settlement is not proof
+   * of ingestion, and raw storage is not exactly-once. No new exposures are created.
+   * Worker handlers should use `ctx.waitUntil(client.experiments.flush())` instead
+   * of awaiting Analytics on the application response path. Other runtimes must use
+   * their supported background lifetime mechanism; fire-and-forget alone may be cut off.
    */
   flush(): Promise<void>;
 }
