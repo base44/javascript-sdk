@@ -177,13 +177,46 @@ describe('Auth Module', () => {
       expect(scope.isDone()).toBe(true);
     });
 
-    test('setToken() clears the analytics session context', () => {
+    test('setToken() attributes subsequent browser analytics to the new user', async () => {
+      vi.stubGlobal('window', {
+        location: { origin: appBaseUrl, pathname: '/', search: '' },
+        localStorage: { getItem: () => null },
+        addEventListener: vi.fn(), removeEventListener: vi.fn(),
+      });
       const analyticsState = getSharedInstance('analytics', () => ({}));
-      analyticsState.sessionContext = { user_id: 'anonymous-user', session_id: 's1' };
+      const wasInitialized = analyticsState.wasInitializationTracked;
+      analyticsState.wasInitializationTracked = true;
+      let browserClient;
+      try {
+        browserClient = createClient({ serverUrl, appId, appBaseUrl });
+        scope.get(`/api/apps/${appId}/entities/User/me`)
+          .matchHeader('authorization', 'Bearer old-access-token')
+          .reply(200, { id: 'old-user' });
+        scope.post(`/api/apps/${appId}/analytics/track/batch`, (body) =>
+          body.events.length === 1 && body.events[0].event_name === 'before_login' && body.events[0].user_id === 'old-user')
+          .matchHeader('authorization', 'Bearer old-access-token')
+          .reply(200, { accepted: 1 });
+        browserClient.auth.setToken('old-access-token', false);
+        browserClient.analytics.track({ eventName: 'before_login' });
+        await browserClient.experiments.flush();
 
-      base44.auth.setToken('new-access-token', false);
+        scope.get(`/api/apps/${appId}/entities/User/me`)
+          .matchHeader('authorization', 'Bearer new-access-token')
+          .reply(200, { id: 'new-user' });
+        scope.post(`/api/apps/${appId}/analytics/track/batch`, (body) =>
+          body.events.length === 1 && body.events[0].event_name === 'after_login' && body.events[0].user_id === 'new-user')
+          .matchHeader('authorization', 'Bearer new-access-token')
+          .reply(200, { accepted: 1 });
+        browserClient.auth.setToken('new-access-token', false);
+        browserClient.analytics.track({ eventName: 'after_login' });
+        await browserClient.experiments.flush();
 
-      expect(analyticsState.sessionContext).toBeNull();
+        expect(scope.isDone()).toBe(true);
+      } finally {
+        browserClient?.cleanup();
+        analyticsState.wasInitializationTracked = wasInitialized;
+        vi.unstubAllGlobals();
+      }
     });
   });
 
@@ -967,4 +1000,4 @@ describe('Auth Module', () => {
       global.window = originalWindow;
     });
   });
-}); 
+});

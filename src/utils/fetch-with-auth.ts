@@ -58,6 +58,7 @@ export function createFetchWithAuth({
       ? header
       : null;
   };
+  const contextAuthorization = bearer(axios);
 
   return async function fetchWithAuth(
     path: string,
@@ -84,6 +85,11 @@ export function createFetchWithAuth({
     inherit("Base44-Functions-Version", functionsVersion);
     inherit("Base44-State", inherited.get("Base44-State"));
     inherit("X-Data-Env", inherited.get("X-Data-Env"));
+    inherit("Base44-Visitor-Id", inherited.get("Base44-Visitor-Id"));
+    inherit("Base44-Experiment-Preview", inherited.get("Base44-Experiment-Preview"));
+    if (headers.get("Authorization") === contextAuthorization) {
+      inherit("Base44-Experiments-Context", inherited.get("Base44-Experiments-Context"));
+    }
 
     // The path is passed through untouched: resolving it here would need a
     // document, and a root-relative path is already what a runtime that
