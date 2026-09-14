@@ -31,3 +31,9 @@ jobs:
 
       - name: Run unit tests
         run: npm run test:unit
+
+      - name: Verify built package entry points
+        run: npm run test:package
+
+      - name: Generate and validate platform reference
+        run: npm run docs:platform
