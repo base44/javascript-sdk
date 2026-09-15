@@ -23,7 +23,7 @@ export type IntegrationEndpointFunction = (
  * ```typescript
  * await base44.integrations.Core.InvokeLLM({
  *   prompt: 'Explain quantum computing',
- *   model: 'gpt_5'
+ *   model: 'gemini_3_8_flash'
  * });
  * ```
  *
@@ -48,9 +48,9 @@ export interface InvokeLLMParams {
   prompt: string;
   /** Optionally specify a model to override the app-level model setting for this specific call.
    *
-   * Options: `"gpt_5_mini"`, `"gemini_3_flash"`, `"gpt_5_4"`, `"gpt_5_6_sol"`, `"gpt_5_6_luna"`, `"gemini_3_1_pro"`, `"claude_sonnet_4_6"`, `"claude_opus_4_6"`, `"claude_opus_4_7"`, `"claude_opus_4_8"`, `"claude-sonnet-5"`
+   * Options: `"gemini_3_8_flash"`, `"gpt_5_6_luna"`, `"claude-sonnet-5"`, `"gpt_5_6_terra"`, `"claude_opus_5"`, `"gpt_5_6_sol"`, `"gpt_6_astra"`, `"claude_fable_5_1"`, `"glm_5_2"`. Retired values that are still served: `"gemini_3_1_pro"`, `"gpt_5_4"`, `"claude_sonnet_4_6"`, `"claude_opus_4_6"`, `"claude_opus_4_7"`, `"claude_opus_4_8"`.
    */
-  model?: 'gpt_5_mini' | 'gemini_3_flash' | 'gpt_5_4' | 'gpt_5_6_sol' | 'gpt_5_6_luna' | 'gemini_3_1_pro' | 'claude_sonnet_4_6' | 'claude_opus_4_6' | 'claude_opus_4_7' | 'claude_opus_4_8' | 'claude-sonnet-5';
+  model?: 'gemini_3_8_flash' | 'gpt_5_6_luna' | 'claude-sonnet-5' | 'gpt_5_6_terra' | 'claude_opus_5' | 'gpt_5_6_sol' | 'gpt_6_astra' | 'claude_fable_5_1' | 'glm_5_2' | 'gemini_3_1_pro' | 'gpt_5_4' | 'claude_sonnet_4_6' | 'claude_opus_4_6' | 'claude_opus_4_7' | 'claude_opus_4_8';
   /** If set to `true`, the LLM will use Google Search, Maps, and News to gather real-time context before answering.
    * @default false
    */
@@ -403,7 +403,7 @@ export type IntegrationsModule = {
    * ```typescript
    * const response = await base44.integrations.Core.InvokeLLM({
    *   prompt: 'Explain quantum computing',
-   *   model: 'gpt_5'
+   *   model: 'gemini_3_8_flash'
    * });
    * ```
    */
@@ -433,7 +433,7 @@ export type IntegrationsModule = {
    * ```typescript
    * const response = await base44.integrations.Core.InvokeLLM({
    *   prompt: 'Explain quantum computing',
-   *   model: 'gpt_5'
+   *   model: 'gemini_3_8_flash'
    * });
    * ```
    *
