@@ -1,0 +1,212 @@
+name: SDK Docs Scoped PR
+
+# Publishes the docs impact of ONE SDK change to mintlify-docs, and nothing else.
+#
+# The generated reference (mintlify-docs/developers/references/sdk/docs) is only
+# as fresh as the last time someone ran `create-docs-local`, so a plain
+# regeneration drags every unpublished JSDoc change into the same PR. Instead
+# this regenerates the reference at the commit BEFORE and AFTER the change,
+# diffs the two outputs, and applies just that diff to the published English
+# pages and every locale mirror (scripts/scoped-docs-patch.mjs).
+#
+# Runs automatically when a "Sync Runtime Models" PR merges, so a model change
+# in apper becomes an SDK PR and then a matching docs PR with no manual steps.
+# Can also be dispatched for any commit range to publish that change alone.
+#
+# Cross-org access: mintlify-docs lives in base44-dev. Uses the same GitHub App
+# as manual-publish (BASE44_GITHUB_ACTIONS_APP_ID); it must be installed on
+# base44-dev with contents:write + pull-requests:write on mintlify-docs.
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      head_sha:
+        description: "javascript-sdk commit whose docs impact to publish (default: main)"
+        required: false
+        default: ""
+        type: string
+      base_sha:
+        description: "Commit to compare against (default: first parent of head)"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sdk-docs-scoped-pr-${{ github.event.pull_request.merge_commit_sha || inputs.head_sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  DOCS_REPO: base44-dev/mintlify-docs
+  DOCS_DIR: mintlify-docs
+  SYNC_BRANCH: bot/sync-runtime-models
+
+jobs:
+  publish:
+    # Every closed PR fires this; only merged model-sync PRs (or a manual run) proceed.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'bot/sync-runtime-models')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout javascript-sdk
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha || inputs.head_sha || 'main' }}
+          fetch-depth: 0
+
+      - name: Wix gateway proxy (mandatory)
+        uses: ./.github/actions/wix-gateway-proxy
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20.x"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Resolve commit range
+        id: range
+        env:
+          INPUT_BASE: ${{ inputs.base_sha }}
+        run: |
+          set -euo pipefail
+          head="$(git rev-parse HEAD)"
+          base="${INPUT_BASE:-$(git rev-parse HEAD^1)}"
+          base="$(git rev-parse --verify "${base}^{commit}")"
+          git merge-base --is-ancestor "$base" "$head" || { echo "::error::${base} is not an ancestor of ${head}"; exit 1; }
+          # Both regenerations share one node_modules, so the range must not change dependencies.
+          if ! git diff --quiet "$base" "$head" -- package.json package-lock.json; then
+            echo "::error::package.json or package-lock.json changed between ${base:0:7} and ${head:0:7}; regenerate with create-docs-local by hand"
+            exit 1
+          fi
+          subject="$(git log -1 --format=%s "$head")"
+          # "fix(types): do X (#12)" -> "do X", for the docs PR title.
+          plain="$(printf '%s' "$subject" | sed -E 's/^[a-z]+(\([^)]*\))?!?: //; s/ \(#[0-9]+\)$//')"
+          {
+            echo "head=${head}"
+            echo "short=${head:0:7}"
+            echo "base=${base}"
+            echo "subject=${subject}"
+            echo "plain_subject=${plain}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Publishing docs impact of ${base:0:7}..${head:0:7}: ${subject}"
+
+      # Same trick the local docs recommend for worktrees: reuse node_modules.
+      - name: Generate reference at base
+        env:
+          BASE: ${{ steps.range.outputs.base }}
+        run: |
+          set -euo pipefail
+          git worktree add --detach "$RUNNER_TEMP/base" "$BASE"
+          ln -s "$GITHUB_WORKSPACE/node_modules" "$RUNNER_TEMP/base/node_modules"
+          npm run --prefix "$RUNNER_TEMP/base" create-docs
+          test -d "$RUNNER_TEMP/base/docs/content"
+
+      - name: Generate reference at head
+        run: |
+          set -euo pipefail
+          npm run create-docs
+          test -d docs/content
+
+      - name: Generate mintlify-docs write token
+        id: docs-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ vars.BASE44_GITHUB_ACTIONS_APP_ID }}
+          private-key: ${{ secrets.BASE44_GITHUB_ACTIONS_APP_PRIVATE_KEY }}
+          owner: base44-dev
+          repositories: mintlify-docs
+          permission-contents: write
+          permission-pull-requests: write
+
+      # Nested inside the workspace: actions/checkout cannot write outside it.
+      - name: Checkout mintlify-docs
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: ${{ env.DOCS_REPO }}
+          ref: main
+          token: ${{ steps.docs-token.outputs.token }}
+          path: ${{ env.DOCS_DIR }}
+
+      - name: Apply only this change to the published docs
+        id: patch
+        run: |
+          set -euo pipefail
+          node scripts/scoped-docs-patch.mjs \
+            --base "$RUNNER_TEMP/base/docs/content" \
+            --head docs/content \
+            --target "$GITHUB_WORKSPACE/$DOCS_DIR" \
+            --apply \
+            --summary "$RUNNER_TEMP/summary.md"
+
+      - name: Compose PR body
+        env:
+          HEAD: ${{ steps.range.outputs.head }}
+          SHORT: ${{ steps.range.outputs.short }}
+          BASE: ${{ steps.range.outputs.base }}
+          SUBJECT: ${{ steps.range.outputs.subject }}
+          SOURCE_PR: ${{ github.event.pull_request.html_url }}
+        run: |
+          set -euo pipefail
+          {
+            echo "Docs impact of [\`base44/javascript-sdk@${SHORT}\`](https://github.com/base44/javascript-sdk/commit/${HEAD}), compared against \`${BASE:0:7}\`:"
+            echo
+            echo '```'
+            echo "$SUBJECT"
+            echo '```'
+            if [ -n "$SOURCE_PR" ]; then
+              echo
+              echo "Source PR: ${SOURCE_PR}"
+            fi
+            echo
+            cat "$RUNNER_TEMP/summary.md"
+            echo
+            echo "_Opened by the \`sdk-docs-scoped-pr\` workflow in javascript-sdk. Generated output: review the rendered page, not the raw diff._"
+          } > "$RUNNER_TEMP/pr-body.md"
+          cat "$RUNNER_TEMP/pr-body.md"
+
+      # One branch per source commit, so two SDK changes never overwrite each
+      # other's docs PR. With no applied change the action is a no-op.
+      - name: Open pull request
+        id: pr
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          path: ${{ env.DOCS_DIR }}
+          token: ${{ steps.docs-token.outputs.token }}
+          add-paths: |
+            developers/references/sdk/docs
+            */developers/references/sdk/docs/*
+          branch: bot/sdk-docs/${{ steps.range.outputs.short }}
+          base: main
+          delete-branch: true
+          sign-commits: true
+          commit-message: |
+            docs(sdk): ${{ steps.range.outputs.plain_subject }}
+
+            Source: https://github.com/base44/javascript-sdk/commit/${{ steps.range.outputs.head }}
+          title: "docs(sdk): ${{ steps.range.outputs.plain_subject }} (javascript-sdk@${{ steps.range.outputs.short }})"
+          body-path: ${{ runner.temp }}/pr-body.md
+
+      - name: Report
+        env:
+          CHANGED: ${{ steps.patch.outputs.changed }}
+          OPERATION: ${{ steps.pr.outputs.pull-request-operation }}
+          URL: ${{ steps.pr.outputs.pull-request-url }}
+        run: |
+          {
+            echo "## SDK Docs Scoped PR"
+            echo
+            echo "- Docs changed: \`${CHANGED}\`"
+            echo "- Pull request: \`${OPERATION:-none}\` ${URL}"
+            echo
+            cat "$RUNNER_TEMP/summary.md"
+          } >> "$GITHUB_STEP_SUMMARY"
