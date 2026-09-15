@@ -8,6 +8,7 @@ import {
   ResetPasswordParams,
 } from "./auth.types";
 import { resetAnalyticsSessionContext } from "./analytics.js";
+import { showEmbedSessionEnded } from "../utils/embed-session.js";
 
 function isInsideIframe(): boolean {
   if (typeof window === "undefined") return false;
@@ -111,11 +112,19 @@ export function createAuthModule(
   // Tracked here rather than read off `axios.defaults` so the answer stays tied
   // to the identity transitions below (`setToken`, `logout`) instead of to the
   // header a caller may have set on the instance directly.
-  let hasAccessToken = Boolean(options.token);
+  let accessToken: string | null = options.token || null;
 
   return {
     hasToken() {
-      return hasAccessToken;
+      return accessToken !== null;
+    },
+
+    getToken() {
+      return accessToken;
+    },
+
+    isEmbedded() {
+      return Boolean(options.embedded);
     },
 
     // Get current user information
@@ -145,6 +154,16 @@ export function createAuthModule(
         throw new Error(
           "Login method can only be used in a browser environment"
         );
+      }
+
+      // Only the host platform can sign a platform user in, so there is no
+      // login page to send them to. (The app's own login would work in the
+      // frame — `loginWithProvider` opens a popup — but it would mint a
+      // different, app-level identity.) An app that wants its own notice
+      // checks `isEmbedded()` rather than asking for a login it cannot get.
+      if (options.embedded) {
+        showEmbedSessionEnded();
+        return;
       }
 
       // If nextUrl is not provided, use the current URL
@@ -191,14 +210,18 @@ export function createAuthModule(
 
     // Logout the current user
     logout(redirectUrl?: string) {
-      // Remove token from axios headers (always do this)
+      // Remove the token from both axios instances (always do this). Missing
+      // the functions one used to be hidden by the redirect below tearing the
+      // page down; an embedded logout returns instead, so the page lives on.
       delete axios.defaults.headers.common["Authorization"];
+      delete functionsAxiosClient.defaults.headers.common["Authorization"];
 
       // Drop identity resolved under the previous session: a `me()` already in
       // flight would otherwise resolve into callers that run after the logout.
       clearPendingMe();
       resetAnalyticsSessionContext();
-      hasAccessToken = false;
+      accessToken = null;
+      options.onSessionChange?.(false);
 
       // Only do the rest if in a browser environment
       if (typeof window !== "undefined") {
@@ -211,6 +234,14 @@ export function createAuthModule(
           } catch (e) {
             console.error("Failed to remove token from localStorage:", e);
           }
+        }
+
+        // An embedded session holds no app cookie to clear — it lived in
+        // memory — and navigating a third-party frame to the logout endpoint
+        // would only break the frame. The state above is already cleared.
+        if (options.embedded) {
+          showEmbedSessionEnded();
+          return;
         }
 
         // Determine the from_url parameter
@@ -226,24 +257,26 @@ export function createAuthModule(
     setToken(token: string, saveToStorage = true) {
       if (!token) return;
 
+      // An embedded session belongs to the frame the platform minted it for.
+      // Persisting it would let it outlive that frame and be picked up as the
+      // identity on a later top-level visit, so storage is refused outright.
+      const persist = saveToStorage && !options.embedded;
+
       // Same reasoning as in `logout`: the identity changes here, so anything
       // resolved for the previous one must not be handed to later callers.
       clearPendingMe();
       resetAnalyticsSessionContext();
-      hasAccessToken = true;
+      accessToken = token;
 
       // handle token change for axios clients
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
       functionsAxiosClient.defaults.headers.common[
         "Authorization"
       ] = `Bearer ${token}`;
+      options.onSessionChange?.(true);
 
       // Save token to localStorage if requested
-      if (
-        saveToStorage &&
-        typeof window !== "undefined" &&
-        window.localStorage
-      ) {
+      if (persist && typeof window !== "undefined" && window.localStorage) {
         try {
           window.localStorage.setItem("base44_access_token", token);
           // Set "token" that is set by the built-in SDK of platform version 2

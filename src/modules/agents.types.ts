@@ -172,8 +172,8 @@ export interface AgentsModuleConfig {
   appId: string;
   /** Server URL */
   serverUrl?: string;
-  /** Authentication token */
-  token?: string;
+  /** Returns the current authentication token, if any */
+  getToken: () => string | null;
 }
 
 /**
@@ -391,7 +391,9 @@ export interface AgentsModule {
    * Gets WhatsApp connection URL for an agent.
    *
    * Generates a URL that users can use to connect with the agent through WhatsApp.
-   * The URL includes authentication if a token is available.
+   * The URL includes authentication if a token is available. In an app a
+   * platform has embedded, that is only once the session has been exchanged —
+   * await a call such as `base44.auth.me()` before building the URL.
    *
    * @param agentName - The name of the agent.
    * @returns WhatsApp connection URL.
@@ -410,7 +412,9 @@ export interface AgentsModule {
    * Gets Telegram connection URL for an agent.
    *
    * Generates a URL that users can use to connect with the agent through Telegram.
-   * The URL includes authentication if a token is available. When the user opens
+   * The URL includes authentication if a token is available. In an app a
+   * platform has embedded, that is only once the session has been exchanged —
+   * await a call such as `base44.auth.me()` before building the URL. When the user opens
    * this URL, they are redirected to the agent's Telegram bot with an activation
    * code that securely links their account.
    *
