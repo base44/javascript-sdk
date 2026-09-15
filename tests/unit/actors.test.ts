@@ -50,7 +50,7 @@ const httpError = (status: number) =>
 
 const makeConfig = () => ({
   appId: "app-1",
-  getAuthToken: () => "user-tok" as string | null,
+  getAuthToken: async () => "user-tok" as string | null,
   functionsVersion: undefined as string | undefined,
   host: "https://app.example",
   mintConnectionToken: vi.fn(
@@ -307,7 +307,7 @@ describe("Actors Module — proxy fallback", () => {
 
   test("anonymous fallback omits the token; fv rides the query when set", async () => {
     const config = makeConfig();
-    config.getAuthToken = () => null;
+    config.getAuthToken = async () => null;
     config.functionsVersion = "draft";
     config.mintConnectionToken.mockRejectedValueOnce(httpError(409));
     mod(config).GameRoom("r").connect({ id: "c" });

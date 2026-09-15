@@ -8,6 +8,10 @@ import {
   createUserConnectorsModule,
 } from "./modules/connectors.js";
 import { getAccessToken } from "./utils/auth-utils.js";
+import {
+  exchangeEmbedToken,
+  takeEmbedTokenFromUrl,
+} from "./utils/embed-session.js";
 import { createFetchWithAuth } from "./utils/fetch-with-auth.js";
 import { createFunctionsModule } from "./modules/functions.js";
 import { createAgentsModule } from "./modules/agents.js";
@@ -79,7 +83,6 @@ export function createClient(config: CreateClientConfig): Base44Client {
     serverUrl = "https://base44.app",
     appId,
     analytics,
-    token,
     serviceToken,
     requiresAuth = false,
     appBaseUrl,
@@ -91,12 +94,19 @@ export function createClient(config: CreateClientConfig): Base44Client {
   // Normalize appBaseUrl to always be a string (empty if not provided or invalid)
   const normalizedAppBaseUrl = typeof appBaseUrl === "string" ? appBaseUrl : "";
 
+  const embedOtt = takeEmbedTokenFromUrl();
+
+  // A declaration, not a const: this block sits above the auth module.
+  function getToken(): string | null {
+    return userAuthModule.getToken() ?? (embedOtt ? null : getAccessToken());
+  }
+
   const socketConfig: RoomsSocketConfig = {
     serverUrl,
     mountPath: "/ws-user-apps/socket.io/",
     transports: ["websocket"],
     appId,
-    token,
+    getToken,
   };
 
   let socket: ReturnType<typeof RoomsSocket> | null = null;
@@ -109,6 +119,10 @@ export function createClient(config: CreateClientConfig): Base44Client {
     }
     return socket;
   };
+
+  // Apps pass getAccessToken() in as `token`, which in a frame is the OTT —
+  // what the exchange trades for a session, never a bearer itself.
+  const token = embedOtt ? undefined : config.token;
 
   const headers = {
     ...optionalHeaders,
@@ -174,6 +188,11 @@ export function createClient(config: CreateClientConfig): Base44Client {
       appBaseUrl: normalizedAppBaseUrl,
       serverUrl,
       token,
+      embedded: Boolean(embedOtt),
+      // The socket carries its token on the handshake, so it can only pick a
+      // new one up by redialling — or, on logout, by dropping what it has.
+      onSessionChange: (hasSession) =>
+        hasSession ? socket?.reconnect() : socket?.disconnect(),
     }
   );
 
@@ -181,10 +200,50 @@ export function createClient(config: CreateClientConfig): Base44Client {
   // requests during construction (notably analytics, which fires an init
   // event whose flush calls auth.me()). Without this, the first User/me
   // request is built before setToken runs and goes out unauthenticated.
-  if (typeof window !== "undefined") {
+  // Not in a frame: a stored token there belongs to an earlier visitor.
+  if (typeof window !== "undefined" && !embedOtt) {
     const accessToken = token || getAccessToken();
     if (accessToken) {
       userAuthModule.setToken(accessToken);
+    }
+  }
+
+  const session = embedOtt
+    ? exchangeEmbedToken({ serverUrl, appId, ott: embedOtt })
+    : null;
+
+  // Never rejects: every request waits on it, so one failure here must not
+  // become a rejection on each of them.
+  const authReady: Promise<void> = session
+    ? session
+        .then((sessionToken) => {
+          if (sessionToken) {
+            userAuthModule.setToken(sessionToken, false);
+            return;
+          }
+          const error = new Error(
+            "Base44: the embed token was refused, so this app is not signed in.",
+          );
+          console.error(error.message);
+          options?.onError?.(error);
+        })
+        .catch((e) => {
+          console.error("Base44: applying the embedded session failed:", e);
+        })
+    : Promise.resolve();
+
+  if (session) {
+    // Registered after createAxiosClient's so it runs first (axios unshifts),
+    // letting the anonymous-visitor header see the Authorization we just set.
+    for (const client of [axiosClient, functionsAxiosClient]) {
+      client.interceptors.request.use(async (requestConfig) => {
+        await authReady;
+        const sessionToken = getToken();
+        if (sessionToken && !requestConfig.headers.get("Authorization")) {
+          requestConfig.headers.set("Authorization", `Bearer ${sessionToken}`);
+        }
+        return requestConfig;
+      });
     }
   }
 
@@ -197,9 +256,13 @@ export function createClient(config: CreateClientConfig): Base44Client {
       typeof window !== "undefined" ? window.location?.origin : undefined,
     ),
     functionsVersion,
-    getAuthToken: () => token || getAccessToken(),
+    getAuthToken: async () => {
+      await authReady;
+      return getToken();
+    },
     mintConnectionToken: async (actorName, room, connectionId) => {
-      const authToken = token || getAccessToken();
+      await authReady;
+      const authToken = getToken();
       return await actorsAxiosClient.post<unknown, ActorConnectionCredentials>(
         `/apps/${appId}/actors/${encodeURIComponent(actorName)}/connection-token`,
         { room, connection_id: connectionId },
@@ -229,12 +292,12 @@ export function createClient(config: CreateClientConfig): Base44Client {
     connectors: createUserConnectorsModule(axiosClient, appId),
     auth: userAuthModule,
     functions: createFunctionsModule(functionsAxiosClient, appId, {
+      waitForAuth: () => authReady,
       getAuthHeaders: () => {
         const headers: Record<string, string> = {};
-        // Get current token from storage or initial config
-        const currentToken = token || getAccessToken();
-        if (currentToken) {
-          headers["Authorization"] = `Bearer ${currentToken}`;
+        const sessionToken = getToken();
+        if (sessionToken) {
+          headers["Authorization"] = `Bearer ${sessionToken}`;
         }
         return headers;
       },
@@ -245,9 +308,10 @@ export function createClient(config: CreateClientConfig): Base44Client {
       getSocket,
       appId,
       serverUrl,
-      token,
+      // Sync, unlike everything else: these return a URL, not a promise.
+      getToken,
     }),
-    aiGateway: createAiGatewayModule({ serverUrl, token, appId }),
+    aiGateway: createAiGatewayModule({ serverUrl, getToken, appId }),
     appLogs: createAppLogsModule(axiosClient, appId),
     app: createAppModule(axiosClient, appId),
     users: createUsersModule(axiosClient, appId),
@@ -293,9 +357,15 @@ export function createClient(config: CreateClientConfig): Base44Client {
       getSocket,
       appId,
       serverUrl,
-      token,
+      // The user's token, deliberately: this is read only for the `?token=` on
+      // a channel URL handed to that user. Never the service credential.
+      getToken,
     }),
-    aiGateway: createAiGatewayModule({ serverUrl, token: serviceToken, appId }),
+    aiGateway: createAiGatewayModule({
+      serverUrl,
+      getToken: () => serviceToken,
+      appId,
+    }),
     appLogs: createAppLogsModule(serviceRoleAxiosClient, appId),
     cleanup: () => {
       if (socket) {
@@ -332,6 +402,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
       serverUrl,
       functionsVersion,
       platformHeaders: optionalHeaders,
+      waitForAuth: () => authReady,
     }),
 
     /**
@@ -350,13 +421,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
      * ```
      */
     setToken(newToken: string) {
-      userModules.auth.setToken(newToken);
-      if (socket) {
-        socket.updateConfig({
-          token: newToken,
-        });
-      }
-      socketConfig.token = newToken;
+      userAuthModule.setToken(newToken, true);
     },
 
     /**

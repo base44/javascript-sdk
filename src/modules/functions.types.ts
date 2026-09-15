@@ -33,6 +33,12 @@ export type FunctionsFetchInit = RequestInit;
 export interface FunctionsModuleConfig {
   getAuthHeaders?: () => Record<string, string>;
   baseURL?: string;
+  /**
+   * Resolves once the client's session is settled. `fetch` builds its headers
+   * by hand rather than through axios, so without this it would miss the gate
+   * every other request goes through.
+   */
+  waitForAuth?: () => Promise<void>;
 }
 
 /**

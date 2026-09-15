@@ -19,8 +19,9 @@ interface ActorsConfig {
   appId: string;
   /** Current user access token, if authenticated. Rides the WS query on the
    * proxy-fallback path so the platform proxy can authenticate the connection;
-   * anonymous connects omit it. */
-  getAuthToken(): string | null | undefined;
+   * anonymous connects omit it. Awaited per dial, so a session still being
+   * exchanged is in hand before the URL is built. */
+  getAuthToken(): Promise<string | null | undefined>;
   /** Same semantics as function calls: editors with a non-prod version get the
    * draft actor script; everyone else gets the published one. */
   functionsVersion?: string;
@@ -150,7 +151,7 @@ class Connection {
         instanceId,
         this.id,
         config.appId,
-        config.getAuthToken(),
+        await config.getAuthToken(),
         config.functionsVersion,
       );
     };

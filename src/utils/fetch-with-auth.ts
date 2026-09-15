@@ -42,6 +42,7 @@ export function createFetchWithAuth({
   serverUrl,
   functionsVersion,
   platformHeaders,
+  waitForAuth,
 }: {
   axios: AxiosInstance;
   serviceRoleAxios: AxiosInstance;
@@ -49,6 +50,7 @@ export function createFetchWithAuth({
   serverUrl: string;
   functionsVersion?: string;
   platformHeaders?: Record<string, string>;
+  waitForAuth?: () => Promise<void>;
 }) {
   const inherited = new Headers(platformHeaders);
 
@@ -64,6 +66,10 @@ export function createFetchWithAuth({
     init: FetchWithAuthInit = {}
   ): Promise<Response> {
     assertOwnOriginPath(path);
+
+    // The Authorization below is read off the axios defaults, which a session
+    // still being negotiated has not written yet.
+    await waitForAuth?.();
 
     const { fetch: transport = fetch, ...requestInit } = init;
     const headers = new Headers(init.headers);
