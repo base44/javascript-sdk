@@ -1,0 +1,63 @@
+name: Open or update pull request
+description: >-
+  Commits the working-tree changes under `add-paths` to `branch`, pushes, and
+  opens or updates a pull request onto `base`. With no changes left, closes the
+  open pull request from `branch` (if any) and deletes the branch. Local
+  replacement for peter-evans/create-pull-request, which the org's Actions
+  policy does not allow.
+
+inputs:
+  token:
+    description: GitHub App installation token with contents and pull-requests write
+    required: true
+  bot-slug:
+    description: App slug, used as the commit author `<slug>[bot]`
+    required: true
+  path:
+    description: Repository checkout to operate on, relative to the workspace
+    required: false
+    default: "."
+  add-paths:
+    description: Newline-separated git pathspecs to commit
+    required: true
+  branch:
+    description: Pull request branch (force-pushed)
+    required: true
+  base:
+    description: Pull request base branch
+    required: false
+    default: main
+  title:
+    description: Pull request title
+    required: true
+  body-path:
+    description: File containing the pull request body
+    required: true
+  commit-message:
+    description: Commit message
+    required: true
+
+outputs:
+  operation:
+    description: created | updated | unchanged | closed | none
+    value: ${{ steps.pr.outputs.operation }}
+  url:
+    description: Pull request URL, when one exists
+    value: ${{ steps.pr.outputs.url }}
+
+runs:
+  using: composite
+  steps:
+    - id: pr
+      shell: bash
+      working-directory: ${{ inputs.path }}
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        BOT_SLUG: ${{ inputs.bot-slug }}
+        ADD_PATHS: ${{ inputs.add-paths }}
+        BRANCH: ${{ inputs.branch }}
+        BASE: ${{ inputs.base }}
+        TITLE: ${{ inputs.title }}
+        BODY_PATH: ${{ inputs.body-path }}
+        COMMIT_MESSAGE: ${{ inputs.commit-message }}
+      run: bash "$GITHUB_ACTION_PATH/open-or-update-pr.sh"

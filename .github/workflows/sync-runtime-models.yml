@@ -18,6 +18,9 @@ on:
         default: "main"
         type: string
 
+permissions:
+  contents: read
+
 concurrency:
   group: sync-runtime-models
   cancel-in-progress: false
@@ -29,8 +32,6 @@ env:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
 
     steps:
       - name: Checkout
@@ -108,15 +109,29 @@ jobs:
           permission-pull-requests: write
 
       # No diff: no-op. Open PR but no diff any more: closes it.
-      - name: Open or update pull request (TEMP experiment placeholder)
+      - name: Open or update pull request
         id: pr
-        run: echo "peter-evans/create-pull-request step removed for the allow-list experiment"
+        uses: ./.github/actions/open-or-update-pr
+        with:
+          token: ${{ steps.sdk-token.outputs.token }}
+          bot-slug: ${{ steps.sdk-token.outputs.app-slug }}
+          add-paths: src/modules/integrations.types.ts
+          branch: bot/sync-runtime-models
+          base: main
+          title: "fix(types): sync InvokeLLM model union with apper RuntimeModel"
+          body-path: ${{ runner.temp }}/pr-body.md
+          commit-message: |
+            fix(types): sync InvokeLLM model union with apper RuntimeModel
+
+            Source: ${{ env.APPER_REPO }}@${{ steps.fetch.outputs.sha }}
+            Added: ${{ steps.sync.outputs.added || '(none)' }}
+            Removed: ${{ steps.sync.outputs.removed || '(none)' }}
 
       - name: Report
         env:
           CHANGED: ${{ steps.sync.outputs.changed }}
-          OPERATION: ${{ steps.pr.outputs.pull-request-operation }}
-          URL: ${{ steps.pr.outputs.pull-request-url }}
+          OPERATION: ${{ steps.pr.outputs.operation }}
+          URL: ${{ steps.pr.outputs.url }}
         run: |
           {
             echo "## Sync Runtime Models"

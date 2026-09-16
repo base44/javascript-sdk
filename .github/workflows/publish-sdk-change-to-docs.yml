@@ -165,29 +165,28 @@ jobs:
       # One branch per source commit.
       - name: Open pull request
         id: pr
-        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        uses: ./.github/actions/open-or-update-pr
         with:
           path: ${{ env.DOCS_DIR }}
           token: ${{ steps.docs-token.outputs.token }}
+          bot-slug: ${{ steps.docs-token.outputs.app-slug }}
           add-paths: |
             developers/references/sdk/docs
             */developers/references/sdk/docs/*
           branch: bot/sdk-docs/${{ steps.range.outputs.short }}
           base: main
-          delete-branch: true
-          sign-commits: true
+          title: "docs(sdk): ${{ steps.range.outputs.plain_subject }} (javascript-sdk@${{ steps.range.outputs.short }})"
+          body-path: ${{ runner.temp }}/pr-body.md
           commit-message: |
             docs(sdk): ${{ steps.range.outputs.plain_subject }}
 
             Source: https://github.com/base44/javascript-sdk/commit/${{ steps.range.outputs.head }}
-          title: "docs(sdk): ${{ steps.range.outputs.plain_subject }} (javascript-sdk@${{ steps.range.outputs.short }})"
-          body-path: ${{ runner.temp }}/pr-body.md
 
       - name: Report
         env:
           CHANGED: ${{ steps.patch.outputs.changed }}
-          OPERATION: ${{ steps.pr.outputs.pull-request-operation }}
-          URL: ${{ steps.pr.outputs.pull-request-url }}
+          OPERATION: ${{ steps.pr.outputs.operation }}
+          URL: ${{ steps.pr.outputs.url }}
         run: |
           {
             echo "## Publish SDK Change to Docs"
