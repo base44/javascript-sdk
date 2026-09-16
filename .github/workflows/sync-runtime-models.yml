@@ -18,9 +18,6 @@ on:
         default: "main"
         type: string
 
-permissions:
-  contents: read
-
 concurrency:
   group: sync-runtime-models
   cancel-in-progress: false
@@ -32,6 +29,8 @@ env:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
