@@ -53,7 +53,10 @@ After exhaustion or a server/auth rejection, fix the cause and call `connect()`.
 `subscribe(appId, options)` returns a handle with `appId`, `active`, `cursor`, and
 idempotent `unsubscribe()`. App IDs are 24 lowercase hexadecimal characters. One
 subscription per app and at most eight subscriptions are allowed on a client.
-Subscriptions can be created before connecting. `close()` is terminal and stops
+Subscriptions can be created before connecting. Adding a subscription after removing
+one refreshes the connection before joining: the server has no leave acknowledgement,
+so a fresh connection prevents late events from an old stream entering a new one.
+Other active apps rejoin from their applied cursors. `close()` is terminal and stops
 reconnects, subscriptions and listeners; create a new client to start again.
 
 Delivery is serialized **per app**, including replay and `onJoined`; a slow app

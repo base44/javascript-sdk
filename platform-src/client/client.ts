@@ -10,6 +10,7 @@ export class Base44PlatformClient {
   private readonly subscriptions = new Map<string, Subscription>();
   private readonly options: PlatformClientOptions;
   private closed = false;
+  private needsFreshConnection = false;
   private generation = 0;
   private authAttempt = 0;
   private cancelAuth?: () => void;
@@ -32,6 +33,7 @@ export class Base44PlatformClient {
     });
     this.socket.on("connect", () => {
       const generation = ++this.generation;
+      this.needsFreshConnection = false;
       for (const subscription of this.subscriptions.values()) this.join(subscription, generation);
       this.resolveConnect?.();
       this.clearConnecting();
@@ -90,10 +92,17 @@ export class Base44PlatformClient {
     if (this.subscriptions.size >= 8) throw new PlatformSocketError("subscription_limit", appId);
     const subscription = new Subscription(appId, { ...options }, () => {
       this.subscriptions.delete(appId);
+      this.needsFreshConnection = true;
       if (this.socket.connected) this.socket.emit("leave", roomFor(appId));
     });
     this.subscriptions.set(appId, subscription);
-    if (this.socket.connected) this.join(subscription, this.generation);
+    if (this.socket.connected && this.needsFreshConnection) {
+      // Leave has no acknowledgement; a new transport fences late events from retired streams.
+      this.socket.disconnect();
+      void this.connect().catch(() => {}); // Connection errors are delivered through onError.
+    } else if (this.socket.connected) {
+      this.join(subscription, this.generation);
+    }
     return subscription;
   }
 

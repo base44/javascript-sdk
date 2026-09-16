@@ -177,6 +177,23 @@ describe("platform client", () => {
     expect(fake.socket.removeAllListeners).toHaveBeenCalledOnce();
   });
 
+
+  test("re-subscribing fences late events with a new connection before joining", async () => {
+    const { client } = setup();
+    const first = client.subscribe(app, { afterSeq: "saved", onEvent: vi.fn(), onError: vi.fn() });
+    await connected(client); first.unsubscribe();
+    fake.socket.disconnect.mockImplementationOnce(() => {
+      fake.socket.connected = false;
+      fake.handlers.disconnect("io client disconnect");
+    });
+    client.subscribe(app, { afterSeq: "saved", onEvent: vi.fn(), onError: vi.fn() });
+    await settle();
+    expect(fake.socket.disconnect).toHaveBeenCalledOnce();
+    expect(fake.socket.emit.mock.calls.filter(c => c[0] === "join")).toHaveLength(1);
+    fake.socket.connected = true; fake.handlers.connect(); await settle();
+    expect(fake.socket.emit).toHaveBeenLastCalledWith("join", room, { after_seq: "saved" });
+  });
+
   test("validates origins, app IDs, duplicate subscriptions and limits", () => {
     for (const serverUrl of ["https://secret@example.test", "https://example.test?token=secret", "https://example.test/path", "ws://example.test"]) {
       expect(() => new Base44PlatformClient({ serverUrl, getToken: () => "token", onError: vi.fn() })).toThrow(TypeError);
