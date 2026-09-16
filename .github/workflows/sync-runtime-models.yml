@@ -108,24 +108,9 @@ jobs:
           permission-pull-requests: write
 
       # No diff: no-op. Open PR but no diff any more: closes it.
-      - name: Open or update pull request
+      - name: Open or update pull request (TEMP experiment placeholder)
         id: pr
-        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
-        with:
-          token: ${{ steps.sdk-token.outputs.token }}
-          add-paths: src/modules/integrations.types.ts
-          branch: bot/sync-runtime-models
-          base: main
-          delete-branch: true
-          sign-commits: true
-          commit-message: |
-            fix(types): sync InvokeLLM model union with apper RuntimeModel
-
-            Source: ${{ env.APPER_REPO }}@${{ steps.fetch.outputs.sha }}
-            Added: ${{ steps.sync.outputs.added || '(none)' }}
-            Removed: ${{ steps.sync.outputs.removed || '(none)' }}
-          title: "fix(types): sync InvokeLLM model union with apper RuntimeModel"
-          body-path: ${{ runner.temp }}/pr-body.md
+        run: echo "peter-evans/create-pull-request step removed for the allow-list experiment"
 
       - name: Report
         env:
