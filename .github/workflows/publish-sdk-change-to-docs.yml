@@ -49,7 +49,7 @@ jobs:
       - name: Checkout javascript-sdk
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ github.event.pull_request.merge_commit_sha || inputs.head_sha || 'main' }}
+          ref: ${{ github.event.pull_request.base.ref || github.ref }}
           fetch-depth: 0
 
       - name: Wix gateway proxy (mandatory)
@@ -67,14 +67,14 @@ jobs:
       - name: Resolve commit range
         id: range
         env:
+          INPUT_HEAD: ${{ github.event.pull_request.merge_commit_sha || inputs.head_sha }}
           INPUT_BASE: ${{ inputs.base_sha }}
         run: |
           set -euo pipefail
-          head="$(git rev-parse HEAD)"
-          base="${INPUT_BASE:-$(git rev-parse HEAD^1)}"
-          base="$(git rev-parse --verify "${base}^{commit}")"
+          head="$(git rev-parse --verify "${INPUT_HEAD:-HEAD}^{commit}")"
+          base="$(git rev-parse --verify "${INPUT_BASE:-${head}^1}^{commit}")"
           git merge-base --is-ancestor "$base" "$head" || { echo "::error::${base} is not an ancestor of ${head}"; exit 1; }
-          # Both regenerations share node_modules.
+          # Both regenerations share this checkout's node_modules.
           if ! git diff --quiet "$base" "$head" -- package.json package-lock.json; then
             echo "::error::package.json or package-lock.json changed between ${base:0:7} and ${head:0:7}; regenerate with create-docs-local by hand"
             exit 1
@@ -91,21 +91,19 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "Publishing docs impact of ${base:0:7}..${head:0:7}: ${subject}"
 
-      - name: Generate reference at base
+      - name: Generate reference at base and head
         env:
           BASE: ${{ steps.range.outputs.base }}
+          HEAD: ${{ steps.range.outputs.head }}
         run: |
           set -euo pipefail
-          git worktree add --detach "$RUNNER_TEMP/base" "$BASE"
-          ln -s "$GITHUB_WORKSPACE/node_modules" "$RUNNER_TEMP/base/node_modules"
-          npm run --prefix "$RUNNER_TEMP/base" create-docs
-          test -d "$RUNNER_TEMP/base/docs/content"
-
-      - name: Generate reference at head
-        run: |
-          set -euo pipefail
-          npm run create-docs
-          test -d docs/content
+          for side in base head; do
+            sha="$BASE"; [ "$side" = head ] && sha="$HEAD"
+            git worktree add --detach "$RUNNER_TEMP/$side" "$sha"
+            ln -s "$GITHUB_WORKSPACE/node_modules" "$RUNNER_TEMP/$side/node_modules"
+            npm run --prefix "$RUNNER_TEMP/$side" create-docs
+            test -d "$RUNNER_TEMP/$side/docs/content"
+          done
 
       - name: Generate mintlify-docs write token
         id: docs-token
@@ -132,7 +130,7 @@ jobs:
           set -euo pipefail
           node scripts/scoped-docs-patch.mjs \
             --base "$RUNNER_TEMP/base/docs/content" \
-            --head docs/content \
+            --head "$RUNNER_TEMP/head/docs/content" \
             --target "$GITHUB_WORKSPACE/$DOCS_DIR" \
             --apply \
             --summary "$RUNNER_TEMP/summary.md"
