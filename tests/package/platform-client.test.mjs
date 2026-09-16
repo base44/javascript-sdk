@@ -42,9 +42,10 @@ test("runtime, platform and legacy deep imports resolve from the installed packa
     assert.equal(typeof runtime.createClient, "function");
     assert.equal("Base44PlatformClient" in runtime, false);
     assert.equal(createAxiosClient, explicit);
-    const client = new Base44PlatformClient({ serverUrl: "https://example.test", getToken: () => "browser-token", onError() {} });
-    assert.equal(typeof client.subscribe, "function");
-    client.close();
+    const client = new Base44PlatformClient({ serverUrl: "https://example.test", refreshToken: () => "browser-token" });
+    assert.equal(typeof client.builder.init, "function");
+    const builder = client.builder.init({ onError() {} });
+    builder.close();
   `);
 });
 
@@ -72,8 +73,8 @@ import { Base44PlatformClient, type PlatformEvent } from "@base44/sdk/platform/c
 import { createAxiosClient } from "@base44/sdk/dist/utils/axios-client";
 import { createAxiosClient as explicit } from "@base44/sdk/dist/utils/axios-client.js";
 const runtime: Base44Client = createClient({ appId: "app" });
-const platform = new Base44PlatformClient({ serverUrl: "https://example.test", getToken: async () => "token", onError() {} });
-platform.subscribe("a".repeat(24), {
+const platform = new Base44PlatformClient({ serverUrl: "https://example.test", refreshToken: async () => "token" });
+platform.builder.init({ onError() {} }).subscribe("a".repeat(24), {
   onEvent(event: PlatformEvent) {
     if (event.type === "update_model") {
       const text: string | null | undefined = event.data._last_msg?.content;

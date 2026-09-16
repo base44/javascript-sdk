@@ -10,14 +10,16 @@ import { Base44PlatformClient } from "@base44/sdk/platform/client";
 
 const client = new Base44PlatformClient({
   serverUrl: "https://base44.app",
-  async getToken() {
+  async refreshToken() {
     const response = await fetch("/api/platform/browser-token", { method: "POST" });
     if (!response.ok) throw new Error("Token request failed");
     return (await response.json()).token;
   },
+});
+const builder = client.builder.init({
   onError(error) { showConnectionError(error.code); },
 });
-const subscription = client.subscribe(appId, {
+const subscription = builder.subscribe(appId, {
   afterSeq: savedState?.cursor,
   async onEvent(event) {
     // Apply all five event types in this handler. It is awaited before the next event.
@@ -28,36 +30,46 @@ const subscription = client.subscribe(appId, {
   },
   onError(error) { showSubscriptionError(error.code); },
 });
-await client.connect();
+await builder.connect();
 // On view teardown:
 subscription.unsubscribe();
-client.close();
+builder.close();
 ```
 
 The `/api/platform/browser-token` route is your backend's route, not an SDK endpoint.
 Only browser-authorized tokens belong here. Never pass an API key or an elevated
 server credential. Tokens go exclusively in CONNECT `auth.token`, never URL/query
-parameters or browser persistence managed by this SDK. `getToken` is called on
+parameters or browser persistence managed by this SDK. `refreshToken` is called on
 every connection attempt, including automatic reconnects. Token retrieval has a
 twenty-second timeout and reports `token_unavailable` on failure.
 
 ## Lifecycle and replay
 
-Construction opens no connection. `connect()` resolves on namespace CONNECT;
+`new Base44PlatformClient({ serverUrl, refreshToken })` creates a lightweight module
+container: no Socket.IO instance, timers, token refresh or network activity. Its
+`builder` module follows the server SDK's module-factory pattern. Shared settings
+are copied at construction; adding another module need not initialize builder resources.
+
+`client.builder.init({ onError })` synchronously creates an independent `BuilderSession`
+without connecting. Repeated calls create separate sessions, each owning its own
+socket, listeners, subscriptions and cleanup. Close the returned session when its
+view is disposed; the root client and other sessions remain usable.
+
+`builder.connect()` resolves on namespace CONNECT;
 `onJoined` reports completion of each app's replay. Socket.IO uses `/partner`,
 `/ws-whitelabel/socket.io/`, WebSocket only and a dedicated manager. Transport
 reconnection uses five attempts, starting at one second and capped at ten seconds
 with Socket.IO jitter; each connection attempt has a twenty-second timeout.
-After exhaustion or a server/auth rejection, fix the cause and call `connect()`.
+After exhaustion or a server/auth rejection, fix the cause and call `builder.connect()`.
 
-`subscribe(appId, options)` returns a handle with `appId`, `active`, `cursor`, and
+`builder.subscribe(appId, options)` returns a handle with `appId`, `active`, `cursor`, and
 idempotent `unsubscribe()`. App IDs are 24 lowercase hexadecimal characters. One
-subscription per app and at most eight subscriptions are allowed on a client.
+subscription per app and at most eight subscriptions are allowed per builder session.
 Subscriptions can be created before connecting. Adding a subscription after removing
 one refreshes the connection before joining: the server has no leave acknowledgement,
 so a fresh connection prevents late events from an old stream entering a new one.
-Other active apps rejoin from their applied cursors. `close()` is terminal and stops
-reconnects, subscriptions and listeners; create a new client to start again.
+Other active apps rejoin from their applied cursors. `builder.close()` is terminal for that session and stops
+reconnects, subscriptions and listeners; call `client.builder.init(...)` again to start another session.
 
 Delivery is serialized **per app**, including replay and `onJoined`; a slow app
 does not block others. On reconnect the next join waits for queued application
@@ -90,6 +102,14 @@ finish its own side effects. Error observers are synchronous notifications; thei
 exceptions are isolated so they cannot interrupt another app's delivery.
 
 ## Public shapes
+
+- `PlatformClientOptions` (`client.types.ts`): `serverUrl`, `refreshToken`.
+- `BuilderModule` (`modules/builder.types.ts`): lazy `init(options)` factory.
+- `BuilderInitOptions`: connection-level `onError` observer.
+- `BuilderSession`: `connect()`, `subscribe(appId, options)`, `close()`.
+- `SubscriptionOptions`: optional `afterSeq` and `onJoined`, required `onEvent` and `onError`.
+- `PlatformSubscription`: read-only `appId`, `cursor`, `active`, and `unsubscribe()`.
+- Event/message models live in `modules/builder.events.types.ts`; error codes in `errors.types.ts`.
 
 Every exported shape and field has JSDoc. Run `npm run docs:platform-client` for
 validated reference pages in `docs/platform/client`. `PlatformEvent` is a
@@ -137,7 +157,7 @@ exceptions, payloads and credentials are never attached.
 | `token_unavailable` | Fix token retrieval; no provider exception details are forwarded. |
 | `protocol_error` | Invalid routing/envelope/JSON. Stop and investigate; affected subscriptions retain their cursor. |
 | `handler_failed` | Application callback failed; fix state application before resuming from the saved cursor. |
-| `client_closed` | The client was explicitly closed; create another client. |
+| `client_closed` | The builder session was explicitly closed; initialize another session. |
 
 No SDK dependency, package version or lockfile changes are required. Socket.IO
 remains the existing SDK dependency. Chat commands and HTTP APIs are outside this entry point.

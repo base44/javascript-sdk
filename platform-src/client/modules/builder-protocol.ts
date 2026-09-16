@@ -1,4 +1,4 @@
-import type { Joined, PlatformEvent, PlatformEventMap } from "./events.js";
+import type { Joined, PlatformEvent, PlatformEventMap } from "./builder.events.types.js";
 
 export const eventNames = ["update_model", "directive", "queue_update", "task_update", "image_ready"] as const;
 export const errorCodes = ["invalid_room", "invalid_cursor", "access_denied", "subscription_limit", "resync_required", "stream_unavailable"] as const;

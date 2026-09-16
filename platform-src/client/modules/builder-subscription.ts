@@ -1,6 +1,7 @@
-import type { Joined, PlatformEvent } from "./events.js";
-import { PlatformSocketError, type PlatformSocketErrorCode } from "./errors.js";
-import type { PlatformSubscription, SubscriptionOptions } from "./types.js";
+import type { Joined, PlatformEvent } from "./builder.events.types.js";
+import { PlatformSocketError } from "../errors.js";
+import type { PlatformSocketErrorCode } from "../errors.types.js";
+import type { PlatformSubscription, SubscriptionOptions } from "./builder.types.js";
 
 /** @internal */
 export function notify(callback: (error: PlatformSocketError) => void, error: PlatformSocketError): void {

@@ -36,12 +36,12 @@ test("real Socket.IO handshake, app join, reconnect and replay", async () => {
   await new Promise(resolve => http.listen(0, "127.0.0.1", resolve));
   const client = new Base44PlatformClient({
     serverUrl: `http://127.0.0.1:${http.address().port}`,
-    getToken: async () => `browser-${++tokenCalls}`,
-    onError: error => errors.push(error),
+    refreshToken: async () => `browser-${++tokenCalls}`,
   });
+  const builder = client.builder.init({ onError: error => errors.push(error) });
   try {
-    const sub = client.subscribe(appId, { onEvent: event => { applied.push(event); }, onError: error => errors.push(error) });
-    await client.connect();
+    const sub = builder.subscribe(appId, { onEvent: event => { applied.push(event); }, onError: error => errors.push(error) });
+    await builder.connect();
     await vi.waitFor(() => expect(sub.cursor).toBe("one"));
     peers[0].terminate();
     await vi.waitFor(() => expect(sub.cursor).toBe("two"), { timeout: 6000 });
@@ -55,7 +55,7 @@ test("real Socket.IO handshake, app join, reconnect and replay", async () => {
     }
     expect(errors).toEqual([]);
   } finally {
-    client.close();
+    builder.close();
     for (const peer of peers) peer.terminate();
     await new Promise(resolve => server.close(resolve));
     await new Promise(resolve => http.close(resolve));

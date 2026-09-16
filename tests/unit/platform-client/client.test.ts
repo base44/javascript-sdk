@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { Base44PlatformClient } from "../../../platform-src/client/index.js";
+import { Base44PlatformClient, type BuilderSession } from "../../../platform-src/client/index.js";
 
 const fake = vi.hoisted(() => {
   const handlers: Record<string, (...args: any[]) => void> = {};
@@ -15,25 +15,55 @@ const fake = vi.hoisted(() => {
 vi.mock("socket.io-client", () => ({ io: fake.io }));
 
 const app = "a".repeat(24), other = "b".repeat(24), room = `/apps/${app}`;
-const clients: Base44PlatformClient[] = [];
+const clients: BuilderSession[] = [];
 const settle = async () => { for (let i = 0; i < 100; i++) await Promise.resolve(); };
 const joined = (seq = "boundary") => fake.handlers.joined({ room, seq, max_entries: 2000, inactivity_expiry_seconds: 3600 });
 const update = (seq: string, data: unknown = { status: null }) => fake.handlers.update_model({ room, seq, data: JSON.stringify(data) });
-function setup(getToken = vi.fn(async () => "browser-token")) {
+function setup(refreshToken = vi.fn(async () => "browser-token")) {
   const onError = vi.fn();
-  const client = new Base44PlatformClient({ serverUrl: "https://api.example.test", getToken, onError });
+  const platform = new Base44PlatformClient({ serverUrl: "https://api.example.test", refreshToken });
+  const client = platform.builder.init({ onError });
   clients.push(client);
-  return { client, getToken, onError };
+  return { client, refreshToken, onError };
 }
-async function connected(client: Base44PlatformClient) {
+async function connected(client: BuilderSession) {
   const ready = client.connect(); fake.socket.connected = true; fake.handlers.connect(); await ready; await settle();
 }
 beforeEach(() => { vi.clearAllMocks(); fake.socket.connected = false; });
 afterEach(() => { clients.splice(0).forEach(client => client.close()); vi.useRealTimers(); });
 
 describe("platform client", () => {
+  test("constructing the root client does not initialize sockets or refresh tokens", () => {
+    const refreshToken = vi.fn(async () => "token");
+    const platform = new Base44PlatformClient({ serverUrl: "https://api.example.test", refreshToken });
+    expect(fake.io).not.toHaveBeenCalled();
+    expect(refreshToken).not.toHaveBeenCalled();
+    const first = platform.builder.init({ onError: vi.fn() });
+    const second = platform.builder.init({ onError: vi.fn() });
+    clients.push(first, second);
+    expect(first).not.toBe(second);
+    expect(fake.io).toHaveBeenCalledTimes(2);
+    expect(fake.socket.connect).not.toHaveBeenCalled();
+    expect(refreshToken).not.toHaveBeenCalled();
+  });
+  test("closing one initialized builder does not close another or the root module", () => {
+    const platform = new Base44PlatformClient({ serverUrl: "https://api.example.test", refreshToken: async () => "token" });
+    const firstSocket = { ...fake.socket, disconnect: vi.fn() };
+    const secondSocket = { ...fake.socket, disconnect: vi.fn() };
+    fake.io.mockReturnValueOnce(firstSocket).mockReturnValueOnce(secondSocket);
+    const first = platform.builder.init({ onError: vi.fn() });
+    const second = platform.builder.init({ onError: vi.fn() });
+    clients.push(first, second);
+    first.close();
+    expect(firstSocket.disconnect).toHaveBeenCalledOnce();
+    expect(secondSocket.disconnect).not.toHaveBeenCalled();
+    const third = platform.builder.init({ onError: vi.fn() });
+    clients.push(third);
+    expect(third).not.toBe(first);
+  });
+
   test("uses only CONNECT auth and the fixed namespace/path, with fresh credentials each attempt", async () => {
-    const { client, getToken } = setup();
+    const { client, refreshToken } = setup();
     expect(fake.socket.connect).not.toHaveBeenCalled();
     const [url, options] = fake.io.mock.calls[0] as unknown as [string, any];
     expect(url).toBe("https://api.example.test/partner");
@@ -41,7 +71,7 @@ describe("platform client", () => {
     expect(options.query).toBeUndefined();
     const callback = vi.fn(); options.auth(callback); await settle();
     expect(callback).toHaveBeenLastCalledWith({ token: "browser-token" });
-    getToken.mockResolvedValue("rotated"); options.auth(callback); await settle();
+    refreshToken.mockResolvedValue("rotated"); options.auth(callback); await settle();
     expect(callback).toHaveBeenLastCalledWith({ token: "rotated" });
     await connected(client);
   });
@@ -196,7 +226,7 @@ describe("platform client", () => {
 
   test("validates origins, app IDs, duplicate subscriptions and limits", () => {
     for (const serverUrl of ["https://secret@example.test", "https://example.test?token=secret", "https://example.test/path", "ws://example.test"]) {
-      expect(() => new Base44PlatformClient({ serverUrl, getToken: () => "token", onError: vi.fn() })).toThrow(TypeError);
+      expect(() => new Base44PlatformClient({ serverUrl, refreshToken: () => "token" })).toThrow(TypeError);
     }
     const { client } = setup(); const options = { onEvent: vi.fn(), onError: vi.fn() };
     expect(() => client.subscribe("bad", options)).toThrow(TypeError);

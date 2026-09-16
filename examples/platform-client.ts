@@ -2,16 +2,18 @@ import { Base44PlatformClient, type PlatformEvent } from "@base44/sdk/platform/c
 
 const client = new Base44PlatformClient({
   serverUrl: "https://base44.app",
-  async getToken() {
+  async refreshToken() {
     const response = await fetch("/api/platform/browser-token", { method: "POST" });
     if (!response.ok) throw new Error("Unable to obtain browser credential");
     const { token } = await response.json();
     return token;
   },
+});
+const builder = client.builder.init({
   onError(error) { console.error(error.code); },
 });
 
-const subscription = client.subscribe("0123456789abcdef01234567", {
+const subscription = builder.subscribe("0123456789abcdef01234567", {
   async onEvent(event: PlatformEvent) {
     if (event.type === "update_model") {
       // Apply omitted keys as unchanged and _last_msg as a replacement by id.
@@ -26,7 +28,7 @@ const subscription = client.subscribe("0123456789abcdef01234567", {
   },
 });
 
-await client.connect();
+await builder.connect();
 // Later, during teardown:
 subscription.unsubscribe();
-client.close();
+builder.close();
