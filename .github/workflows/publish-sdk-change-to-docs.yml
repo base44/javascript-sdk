@@ -72,6 +72,8 @@ jobs:
           INPUT_BASE: ${{ inputs.base_sha }}
         run: |
           set -euo pipefail
+          # A PR merge commit lives under refs/pull/*, which the checkout does not fetch.
+          for sha in "$INPUT_HEAD" "$INPUT_BASE"; do [ -n "$sha" ] && git fetch -q origin "$sha" 2>/dev/null || true; done
           head="$(git rev-parse --verify "${INPUT_HEAD:-HEAD}^{commit}")"
           base="$(git rev-parse --verify "${INPUT_BASE:-${head}^1}^{commit}")"
           git merge-base --is-ancestor "$base" "$head" || { echo "::error::${base} is not an ancestor of ${head}"; exit 1; }
