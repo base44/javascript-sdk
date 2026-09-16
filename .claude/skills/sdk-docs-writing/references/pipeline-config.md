@@ -44,6 +44,6 @@ Two workflows in `.github/workflows/` chain apper -> SDK -> docs for LLM model p
 | Workflow | Trigger | What it does |
 |---|---|---|
 | `sync-runtime-models.yml` | daily, or manual | Reads apper's `RuntimeModel` enum and opens a PR here that rewrites the `InvokeLLMParams.model` union via `scripts/sync-runtime-models.mjs`. |
-| `sdk-docs-scoped-pr.yml` | when that PR merges, or manual for any commit range | Regenerates the reference before and after the change, and applies only that diff to mintlify-docs (English + locale mirrors) via `scripts/scoped-docs-patch.mjs`. Opens one PR per source commit on `bot/sdk-docs/<sha>`. |
+| `publish-sdk-change-to-docs.yml` | when that PR merges, or manual for any commit range | Regenerates the reference before and after the change, and applies only that diff to mintlify-docs (English + locale mirrors) via `scripts/scoped-docs-patch.mjs`. Opens one PR per source commit on `bot/sdk-docs/<sha>`. |
 
 The scoped workflow never publishes unrelated drift, so `create-docs-local` remains the way to publish everything else (and any change that adds or removes a page, since that also needs `docs.json`).

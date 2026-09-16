@@ -1,4 +1,4 @@
-name: SDK Docs Scoped PR
+name: Publish SDK Change to Docs
 
 # Publishes the docs impact of ONE SDK change to mintlify-docs, and nothing else.
 #
@@ -38,7 +38,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: sdk-docs-scoped-pr-${{ github.event.pull_request.merge_commit_sha || inputs.head_sha || github.sha }}
+  group: publish-sdk-change-to-docs-${{ github.event.pull_request.merge_commit_sha || inputs.head_sha || github.sha }}
   cancel-in-progress: false
 
 env:
@@ -170,7 +170,7 @@ jobs:
             echo
             cat "$RUNNER_TEMP/summary.md"
             echo
-            echo "_Opened by the \`sdk-docs-scoped-pr\` workflow in javascript-sdk. Generated output: review the rendered page, not the raw diff._"
+            echo "_Opened by the \`publish-sdk-change-to-docs\` workflow in javascript-sdk. Generated output: review the rendered page, not the raw diff._"
           } > "$RUNNER_TEMP/pr-body.md"
           cat "$RUNNER_TEMP/pr-body.md"
 
@@ -203,7 +203,7 @@ jobs:
           URL: ${{ steps.pr.outputs.pull-request-url }}
         run: |
           {
-            echo "## SDK Docs Scoped PR"
+            echo "## Publish SDK Change to Docs"
             echo
             echo "- Docs changed: \`${CHANGED}\`"
             echo "- Pull request: \`${OPERATION:-none}\` ${URL}"

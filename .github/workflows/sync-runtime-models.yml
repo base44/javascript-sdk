@@ -6,8 +6,8 @@ name: Sync Runtime Models
 # rewrites the union from the Python file, and this workflow opens (or updates
 # in place) one PR while drift exists. If apper reverts, the PR closes itself.
 #
-# Once that PR merges, the "SDK Docs Scoped PR" workflow publishes just its
-# docs impact as a matching mintlify-docs PR.
+# Once that PR merges, the "Publish SDK Change to Docs" workflow publishes
+# just its docs impact as a matching mintlify-docs PR.
 #
 # Cross-org access: apper lives in base44-dev, this repo in base44. Both tokens
 # come from the same GitHub App (BASE44_GITHUB_ACTIONS_APP_ID), which must be

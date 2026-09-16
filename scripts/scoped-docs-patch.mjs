@@ -28,6 +28,7 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync, cpSync, existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const SDK_DOCS_PATH = "developers/references/sdk/docs";
 // Excluded from the diff: the copy pipeline drops it, so it is never published.
@@ -192,12 +193,15 @@ function main() {
   return 0;
 }
 
-try {
-  process.exit(main());
-} catch (err) {
-  if (err instanceof PatchError) {
-    console.error(`error: ${err.message}`);
-    process.exit(1);
+// Only run as a CLI when executed directly, so tests can import the functions.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  try {
+    process.exit(main());
+  } catch (err) {
+    if (err instanceof PatchError) {
+      console.error(`error: ${err.message}`);
+      process.exit(1);
+    }
+    throw err;
   }
-  throw err;
 }

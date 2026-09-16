@@ -247,7 +247,7 @@ function renderSummary({ models, target, added, removed, orderChanged, mentions,
     for (const h of mentions) out.push(`- \`${h.file}:${h.line}\` mentions ${code(h.model)}`);
   }
   out.push("");
-  out.push("After this merges, the SDK Docs Scoped PR workflow opens a mintlify-docs PR containing only the docs impact of this change.");
+  out.push("After this merges, the Publish SDK Change to Docs workflow opens a mintlify-docs PR containing only the docs impact of this change.");
   return out.join("\n") + "\n";
 }
 
@@ -307,12 +307,15 @@ function main() {
   return 0;
 }
 
-try {
-  process.exit(main());
-} catch (err) {
-  if (err instanceof SyncError) {
-    console.error(`error: ${err.message}`);
-    process.exit(1);
+// Only run as a CLI when executed directly, so tests can import the functions.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  try {
+    process.exit(main());
+  } catch (err) {
+    if (err instanceof SyncError) {
+      console.error(`error: ${err.message}`);
+      process.exit(1);
+    }
+    throw err;
   }
-  throw err;
 }
