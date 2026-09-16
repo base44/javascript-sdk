@@ -183,6 +183,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
       pageUrl: experimentsContext?.pageUrl,
   });
   const experiments = createExperimentsModule({
+    appId,
     getAuth: () => userAuthModule,
     trackExposure: exposureTracker.track,
     flushExposures: exposureTracker.flush,

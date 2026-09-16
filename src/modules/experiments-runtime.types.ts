@@ -18,8 +18,13 @@ export interface ExperimentsRuntime {
 }
 
 /** @internal */
-export function getExperimentsRuntime(): ExperimentsRuntime | undefined {
+export function getExperimentsRuntime(appId?: string): ExperimentsRuntime | undefined {
   if (typeof window === "undefined" || typeof document === "undefined") return;
-  return (window as Window & { __B44_EXPERIMENTS__?: ExperimentsRuntime })
-    .__B44_EXPERIMENTS__;
+  const page = window as Window & {
+    __B44_EXPERIMENTS__?: ExperimentsRuntime;
+    __B44_EXPERIMENTS_BOOTSTRAP__?: { config: { app_id: string } };
+  };
+  // The legacy evaluator has no app ID; its companion bootstrap identifies its owner.
+  if (appId !== undefined && page.__B44_EXPERIMENTS_BOOTSTRAP__?.config?.app_id !== appId) return;
+  return page.__B44_EXPERIMENTS__;
 }

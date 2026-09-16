@@ -28,6 +28,7 @@ describe("platform experiments context", () => {
     const me = vi.fn();
     const track = vi.fn();
     const make = (value: ExperimentsContext) => createExperimentsModule({
+      appId: "app",
       context: value, getAuth: () => ({ hasToken: () => true, me }) as unknown as InternalAuthModule, trackExposure: track,
     });
     const a = make(context);
@@ -49,6 +50,7 @@ describe("platform experiments context", () => {
     vi.stubGlobal("sessionStorage", { getItem: () => '{"checkout":true}' });
     const track = vi.fn();
     const sdk = createExperimentsModule({
+      appId: "app",
       context: getBrowserExperimentsContext("app"),
       getAuth: () => ({ hasToken: () => true }) as InternalAuthModule, trackExposure: track,
     });
@@ -63,6 +65,7 @@ describe("platform experiments context", () => {
   test("preserves server-rendered flags while common browser auth is still pending", () => {
     const serverFlags = { checkout: false };
     const sdk = createExperimentsModule({
+      appId: "app",
       context: { ...context, identity: { ...context.identity, userId: null, status: "pending" }, serverSnapshot: { flags: serverFlags, isLoading: false } },
       getAuth: () => ({ hasToken: () => true }) as InternalAuthModule, trackExposure: vi.fn(),
     });

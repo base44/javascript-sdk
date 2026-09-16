@@ -14,12 +14,14 @@ function setup(hasToken = false) {
       this.flags = { checkout: id !== null };
     },
   };
-  vi.stubGlobal("window", { __B44_EXPERIMENTS__: runtime });
+  const page = { __B44_EXPERIMENTS__: runtime, __B44_EXPERIMENTS_BOOTSTRAP__: { config: { app_id: "app" } } };
+  vi.stubGlobal("window", page);
   vi.stubGlobal("document", {});
   const requests: { resolve: (user: User) => void; reject: (error: Error) => void }[] = [];
   const me = vi.fn(() => new Promise<User>((resolve, reject) => requests.push({ resolve, reject })));
   const trackExposure = vi.fn();
   const bridge = createExperimentsModule({
+    appId: "app",
     getAuth: () => ({ hasToken: () => hasToken, me }) as InternalAuthModule,
     trackExposure,
   });
@@ -28,7 +30,7 @@ function setup(hasToken = false) {
     if (state.status === "authenticated") requests[index]?.resolve({ id: state.userId } as User);
     else requests[index]?.reject(new Error("lookup failed"));
   };
-  return { ...bridge, runtime, requests, settle, me, trackExposure };
+  return { ...bridge, runtime, page, requests, settle, me, trackExposure };
 }
 
 afterEach(() => vi.unstubAllGlobals());
@@ -139,9 +141,24 @@ describe("browser experiments", () => {
     b.module.getSnapshot();
     b.runtime.userId = "old-user";
     b.runtime.flags.checkout = true;
-    vi.stubGlobal("window", { __B44_EXPERIMENTS__: b.runtime });
+    vi.stubGlobal("window", b.page);
     expect(b.module.isEnabled("checkout")).toBe(false);
     expect(b.runtime.userId).toBeNull();
+  });
+
+  test("auth updates cannot adopt a replacement runtime owned by another app", () => {
+    const b = setup();
+    expect(b.module.isEnabled("checkout")).toBe(false);
+    b.trackExposure.mockClear();
+    b.page.__B44_EXPERIMENTS_BOOTSTRAP__.config.app_id = "other-app";
+    const setUser = vi.spyOn(b.runtime, "setUser");
+
+    b.onAuthStateChange({ status: "authenticated", userId: "user-b" });
+    expect(b.module.getSnapshot()).toEqual({ flags: {}, isLoading: false });
+    b.onAuthStateChange({ status: "anonymous" });
+    expect(b.module.isEnabled("checkout", true)).toBe(true);
+    expect(setUser).not.toHaveBeenCalled();
+    expect(b.trackExposure).not.toHaveBeenCalled();
   });
 
   test("cleanup and throwing subscribers cannot restore or interrupt identity", async () => {

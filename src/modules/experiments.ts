@@ -18,11 +18,13 @@ const EMPTY: ExperimentsSnapshot = Object.freeze({
 
 /** @internal */
 export function createExperimentsModule({
+  appId,
   getAuth,
   trackExposure,
   flushExposures = async () => {},
   context,
 }: {
+  appId: string;
   getAuth: () => InternalAuthModule;
   trackExposure: ReturnType<typeof createExposureTracker>["track"];
   flushExposures?: () => Promise<void>;
@@ -93,7 +95,7 @@ export function createExperimentsModule({
   function activate() {
     if (disposed) return;
     active = true;
-    if (!context) runtime = getExperimentsRuntime();
+    if (!context) runtime = getExperimentsRuntime(appId);
     if (!runtime) {
       publish();
       return;
@@ -109,7 +111,7 @@ export function createExperimentsModule({
     if (disposed) return;
     state = next;
     if (!active) return;
-    if (!context) runtime = getExperimentsRuntime();
+    if (!context) runtime = getExperimentsRuntime(appId);
     applyIdentity();
   }
 

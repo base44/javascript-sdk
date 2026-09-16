@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createClient, createClientFromRequest } from "../../src/client.js";
 import { resetAnalyticsSessionContext } from "../../src/modules/analytics.js";
 import type { ExperimentsContext } from "../../src/modules/experiments-config.types.js";
+import { createExperimentsRuntime } from "../../src/modules/experiments-context.js";
 import { getSharedInstance } from "../../src/utils/sharedInstance.js";
 
 vi.mock("partysocket", () => ({ WebSocket: class {} }));
@@ -43,6 +44,38 @@ function captureAnalytics() {
 }
 
 describe("client experiments integration", () => {
+  test.each(["other-app", "unidentified"])("does not adopt an %s legacy runtime or send its exposures", async (owner) => {
+    vi.useFakeTimers();
+    const published: ExperimentsContext = {
+      ...context, identity: { visitorId: "visitor-a", userId: null, status: "anonymous" },
+      config: { ...context.config, experiments: [{ ...context.config.experiments[0], assign_by: "visitor" }] },
+    };
+    const runtime = createExperimentsRuntime(published);
+    vi.stubGlobal("window", {
+      __B44_EXPERIMENTS__: runtime,
+      __B44_EXPERIMENTS_BOOTSTRAP__: owner === "other-app" ? published : undefined,
+      location: { origin: "https://app.example", pathname: "/", search: "" },
+      localStorage: { getItem: () => null, setItem: () => {} },
+      addEventListener: vi.fn(), removeEventListener: vi.fn(),
+    });
+    vi.stubGlobal("document", { referrer: "" });
+    const adapter = captureAnalytics();
+    const client = createClient({ appId: "second-app" });
+    try {
+      expect(client.experiments.getSnapshot()).toEqual({ flags: {}, isLoading: false });
+      expect(client.experiments.isEnabled("checkout")).toBe(false);
+      expect(client.experiments.isEnabled("checkout", true)).toBe(true);
+      await client.experiments.ready();
+      await client.experiments.flush();
+      await vi.advanceTimersByTimeAsync(1500);
+      expect(adapter).not.toHaveBeenCalled();
+      expect(runtime.flags.checkout).toBe(true);
+      expect(runtime.userId).toBeNull();
+    } finally {
+      client.cleanup();
+    }
+  });
+
   test("three distinct feature reads and a goal share one request-scoped Analytics batch", async () => {
     const create = axios.create.bind(axios);
     const adapter = vi.fn(async (config) => ({

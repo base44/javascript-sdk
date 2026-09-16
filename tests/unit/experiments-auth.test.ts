@@ -22,11 +22,12 @@ function setup(token?: string) {
   };
   vi.stubGlobal("window", {
     __B44_EXPERIMENTS__: runtime,
+    __B44_EXPERIMENTS_BOOTSTRAP__: { config: { app_id: "app-id" } },
     localStorage: { setItem: vi.fn(), removeItem: vi.fn() },
     location: { href: "https://example.test/dashboard" },
   });
   vi.stubGlobal("document", {});
-  const bridge = createExperimentsModule({ getAuth: () => auth, trackExposure: vi.fn() });
+  const bridge = createExperimentsModule({ appId: "app-id", getAuth: () => auth, trackExposure: vi.fn() });
   const auth = createAuthModule(api, axios.create(), "app-id", {
     serverUrl: "https://example.test", appBaseUrl: "https://example.test",
     onAuthStateChange: bridge.onAuthStateChange,
