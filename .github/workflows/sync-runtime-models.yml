@@ -1,18 +1,10 @@
 name: Sync Runtime Models
 
-# Keeps `InvokeLLMParams.model` in src/modules/integrations.types.ts in sync
-# with apper's `RuntimeModel` enum, the backend source of truth for which model
-# presets InvokeLLM accepts. Deterministic: scripts/sync-runtime-models.mjs
-# rewrites the union from the Python file, and this workflow opens (or updates
-# in place) one PR while drift exists. If apper reverts, the PR closes itself.
+# Keeps the `InvokeLLMParams.model` union in sync with apper's `RuntimeModel`
+# enum. Runs daily; opens one PR on `bot/sync-runtime-models` when they differ.
 #
-# Once that PR merges, the "Publish SDK Change to Docs" workflow publishes
-# just its docs impact as a matching mintlify-docs PR.
-#
-# Cross-org access: apper lives in base44-dev, this repo in base44. Both tokens
-# come from the same GitHub App (BASE44_GITHUB_ACTIONS_APP_ID), which must be
-# installed on BOTH orgs: base44-dev with contents:read on apper, and base44
-# with contents:write + pull-requests:write on javascript-sdk.
+# Needs the GitHub App installed on base44-dev (apper: contents read) and on
+# base44 (javascript-sdk: contents + pull requests write).
 
 on:
   schedule:
@@ -47,7 +39,6 @@ jobs:
       - name: Wix gateway proxy (mandatory)
         uses: ./.github/actions/wix-gateway-proxy
 
-      # The sync script has no dependencies, so there is no `npm ci` here.
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -104,10 +95,7 @@ jobs:
           } > "$RUNNER_TEMP/pr-body.md"
           cat "$RUNNER_TEMP/pr-body.md"
 
-      # Not GITHUB_TOKEN: pull requests created with it never trigger
-      # `pull_request` workflows, so the PR would have no lint, tests, or the
-      # required proxy check. The App token also lets the action sign commits
-      # as the App's bot user.
+      # App token (not GITHUB_TOKEN) so CI runs on the PR and commits are signed.
       - name: Generate javascript-sdk write token
         id: sdk-token
         uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
@@ -119,9 +107,7 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
 
-      # Runs unconditionally on purpose. With no diff it is a no-op, and if a
-      # PR is open but the drift is gone (apper reverted, or someone fixed it
-      # by hand) the action closes the PR and deletes the branch.
+      # No diff: no-op. Open PR but no diff any more: closes it.
       - name: Open or update pull request
         id: pr
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1

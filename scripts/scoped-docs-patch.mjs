@@ -1,20 +1,10 @@
 #!/usr/bin/env node
 /**
- * Apply ONLY the docs impact of one SDK change to a mintlify-docs checkout.
- *
- * `npm run create-docs-local` republishes the whole generated reference, which
- * drags every unpublished JSDoc change into the same PR. This script isolates a
- * single change instead: given the generated `docs/content` trees from BEFORE
- * and AFTER that change, it diffs them and applies that diff (and nothing else)
- * to the published English pages and every locale mirror in mintlify-docs.
- *
- * Deliberately narrow:
- *   - Only modified pages are handled. An added or removed page also needs a
- *     `docs.json` nav update, which is the full pipeline's job, so that case
- *     fails with instructions instead of shipping a broken nav.
- *   - `git apply --check` runs for every locale before anything is written. If
- *     the published page has unpublished drift in the same lines, the patch
- *     will not apply and this fails loudly rather than guessing.
+ * Applies the diff between two generated `docs/content` trees (before and after
+ * an SDK change) to the published pages in a mintlify-docs checkout: English and
+ * every locale mirror. Modified pages only; added or removed pages need the full
+ * pipeline (docs.json nav), so they are refused, as is a patch that does not
+ * apply cleanly.
  *
  * Usage:
  *   node scripts/scoped-docs-patch.mjs --base <content-dir> --head <content-dir> \
@@ -31,7 +21,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SDK_DOCS_PATH = "developers/references/sdk/docs";
-// Excluded from the diff: the copy pipeline drops it, so it is never published.
+// Never published by the copy pipeline.
 const IGNORED = new Set(["README.mdx"]);
 const MAX_PATCH_IN_SUMMARY = 20_000;
 
@@ -137,9 +127,7 @@ function main() {
     );
   }
 
-  // One patch, built per file so the ignored files never enter it. Headers are
-  // `a/base/<file>` and `b/head/<file>`; `git apply -p2 --directory=...` strips
-  // the two leading components and re-roots each file under the docs tree.
+  // Per-file patch with `a/base/<file>` / `b/head/<file>` headers; `git apply -p2` reduces them to `<file>`.
   const relPatch = entries
     .map((e) => git(["diff", "--no-index", "--", `base/${e.path}`, `head/${e.path}`], { cwd: work, okCodes: [0, 1] }))
     .join("");

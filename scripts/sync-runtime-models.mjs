@@ -1,23 +1,9 @@
 #!/usr/bin/env node
 /**
- * Sync the `InvokeLLMParams.model` union with apper's `RuntimeModel` enum.
- *
- * apper (backend/app/integrations/core/runtime_model_config.py) is the source
- * of truth for which model presets `InvokeLLM` accepts. This script reads that
- * Python file, extracts the enum's string values (minus `automatic`, which is
- * the server-side default and is not a selectable preset), and rewrites the two
- * places in `src/modules/integrations.types.ts` that list them:
- *
- *   1. the `model?: 'a' | 'b' | ...;` union on `InvokeLLMParams`
- *   2. the JSDoc line above it: ` * Options: `"a"`, `"b"`, ...`
- *
- * Both are rewritten in apper's declaration order, so the output is a pure
- * function of the Python file and running twice is a no-op.
- *
- * It is deliberately strict. A regex that silently stops matching would turn a
- * drift checker into a machine that reports "in sync" forever, so every anchor
- * this script depends on is asserted and the run fails loudly if any is missing.
- * No dependencies: it runs before `npm ci` in CI and from a plain checkout locally.
+ * Rewrites the `InvokeLLMParams.model` union and its `Options:` JSDoc line in
+ * src/modules/integrations.types.ts from apper's `RuntimeModel` enum
+ * (backend/app/integrations/core/runtime_model_config.py), minus `automatic`,
+ * in apper's declaration order. Fails if any expected anchor is missing.
  *
  * Usage:
  *   node scripts/sync-runtime-models.mjs --source <runtime_model_config.py> [options]
@@ -25,7 +11,7 @@
  *   --source <path>    apper's runtime_model_config.py (required)
  *   --target <path>    the .types.ts to rewrite (default: src/modules/integrations.types.ts)
  *   --write            apply the change (default: report only)
- *   --check            exit 2 if drift exists (for CI gates; implies no write)
+ *   --check            exit 2 if drift exists
  *   --summary <path>   write a Markdown summary (used as the PR body)
  *
  * Exit codes: 0 in sync or synced, 1 parse/validation failure, 2 drift (--check only).
@@ -39,19 +25,13 @@ import { fileURLToPath } from "node:url";
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_TARGET = join(REPO_ROOT, "src/modules/integrations.types.ts");
 
-// The enum member that is intentionally NOT part of the SDK union. Its presence
-// is also asserted: if apper renames or removes it, the enum's shape changed in
-// a way a human should look at before this script keeps going.
+// Server-side default, not a selectable preset. Must exist in the enum.
 const EXCLUDED_MEMBER = "automatic";
-// The union must contain at least this many presets. A smaller result almost
-// certainly means the parser matched the wrong block, not that apper shipped
-// with one model.
+// Fewer than this means the parser matched the wrong block.
 const MIN_MODELS = 3;
-// Model presets are used as TypeScript string literals and in Markdown code
-// spans, so restrict them to characters that need no escaping in either.
+// Safe to embed unescaped in a TS string literal and a Markdown code span.
 const SAFE_VALUE = /^[A-Za-z0-9][A-Za-z0-9_.-]*$/;
-// How far above the `model?:` line the `Options:` JSDoc line may sit and still
-// be treated as its documentation.
+// Max lines between the `Options:` JSDoc line and the `model?:` line.
 const MAX_OPTIONS_DISTANCE = 20;
 
 class SyncError extends Error {}
