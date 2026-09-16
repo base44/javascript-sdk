@@ -7,6 +7,7 @@ name: Sync Runtime Models
 # base44 (javascript-sdk: contents + pull requests write).
 
 on:
+  pull_request: # TEMP: verification run on PR #284, revert before merge
   schedule:
     - cron: "0 6 * * *" # daily, 06:00 UTC
   workflow_dispatch:

@@ -10,7 +10,7 @@ name: Publish SDK Change to Docs
 
 on:
   pull_request:
-    types: [closed]
+    types: [closed, opened, synchronize] # TEMP: opened/synchronize for verification on PR #284, revert before merge
     branches: [main]
   workflow_dispatch:
     inputs:
@@ -42,14 +42,15 @@ jobs:
     # Merged model-sync PRs and manual runs only.
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'bot/sync-runtime-models')
+      (github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'bot/sync-runtime-models') ||
+      github.event.action == 'opened' || github.event.action == 'synchronize'
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout javascript-sdk
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ github.event.pull_request.base.ref || github.ref }}
+          ref: ${{ github.event.pull_request.merged && github.event.pull_request.base.ref || github.event.pull_request.head.sha || github.ref }} # TEMP: head.sha for open-PR verification
           fetch-depth: 0
 
       - name: Wix gateway proxy (mandatory)
