@@ -37,5 +37,13 @@ const tool: ToolCall = {
   results: "Plan updated.",
 };
 void tool;
+const generatedMedia: ToolCall = {
+  results: {
+    placeholder_url: "/__generating__/hero.png",
+    status: "completed",
+    image_url: "https://images.example/hero.png",
+  },
+};
+void generatedMedia;
 // @ts-expect-error Raw command text is not part of reviewed display metadata.
 void tool.display_projection?.command;

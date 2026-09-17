@@ -98,6 +98,16 @@ export interface ToolMediaArguments {
   aspect_ratio?: string;
 }
 
+/** Reviewed state of generated media. Raw generation prompts and IDs are never included. */
+export interface ToolMediaResult {
+  /** Existing placeholder URL, used to associate an `image_ready` event with this tool. */
+  placeholder_url: string;
+  /** Current media-generation status. */
+  status: "pending" | "completed" | "failed";
+  /** Approved generated asset URL, once available. */
+  image_url: string | null;
+}
+
 /** A reviewed answer to a clarifying question. Secret-form input is never included. */
 export interface ToolQuestionAnswer {
   /** Zero-based question index. */
@@ -119,6 +129,9 @@ export type ToolOutcome =
   | "Secret configuration completed."
   | "Package installation completed."
   | "Plan updated.";
+
+/** A fixed reviewed outcome or reviewed generated-media state. */
+export type ToolResult = ToolOutcome | ToolMediaResult;
 
 /** Public progress of an existing builder tool. */
 export interface ToolCall {
@@ -149,8 +162,8 @@ export interface ToolCall {
   display_projection?: ToolDisplayProjection;
   /** Reviewed clarifying-question answers only. */
   user_input?: ToolQuestionInput;
-  /** Fixed reviewed success outcome only. */
-  results?: ToolOutcome;
+  /** Fixed reviewed success outcome or generated-media state only. */
+  results?: ToolResult;
 }
 
 /** Public message replacement. Omitted properties are not synthesized by the SDK. */
