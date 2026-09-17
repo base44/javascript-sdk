@@ -22,6 +22,8 @@
   "EntityHandler",
   "EntityRecord",
   "EntityTypeRegistry",
+  "ExperimentsModule",
+  "ExperimentsSnapshot",
   "FunctionName",
   "FunctionNameRegistry",
   "FunctionsModule",
