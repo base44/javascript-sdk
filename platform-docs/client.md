@@ -130,10 +130,20 @@ filtering are the server's responsibility. Unknown event names are not forwarded
 
 `ChatMessage` has optional `id`, `role` (`user`/`assistant`), text/null `content`,
 `file_urls`, `tool_calls`, timestamp-only `metadata.created_date`, and `checkpoint_id`.
-`ToolCall` has optional `id`, `name`, `status`, `requires_user_input`, and the existing
-nested `waiting_on.kind` (`approval`/`choice`/`input`/null). `status` is `running`,
-`success`, `error`, `stopped`, or `waiting_for_user_input`. No raw tool arguments,
-results, or interaction forms are exposed. `AppUpdate.status` contains optional
+`ToolCall` has optional `id`, `name`, `status`, `requires_user_input`, `auto_approved`,
+`mutation_applied`, and the existing nested `waiting_on.kind`
+(`approval`/`choice`/`input`/null). `status` is `running`, `success`, `error`,
+`stopped`, or `waiting_for_user_input`. Its optional reviewed extensions are:
+
+| Field | Exact public contract |
+| --- | --- |
+| `display_projection` | File activity has `file_paths` and optional `content_empty`; execution activity has optional `summary` and `writes_entities`; entity activity has optional `entity_name` and `record_count`. |
+| `arguments_string` | JSON for one of `ToolQuestionArguments`, `ToolSecretArguments`, `ToolPackageArguments`, `ToolPlanArguments`, or `ToolMediaArguments`. It is absent for all other tools. |
+| `user_input` | `ToolQuestionInput` only, for clarifying-question answers. Secret-form values are never exposed. |
+| `results` | One fixed `ToolOutcome` success string. Raw errors, command output, source, diffs, arbitrary tool results, credentials, workspace context, customer data and diagnostics are excluded. |
+
+Generated-media completion arrives through `image_ready.image_url`; the corresponding
+tool arguments include only its label and aspect ratio. `AppUpdate.status` contains optional
 `state` (`ready`/`processing`/`error`) and nullable `last_updated_date`.
 `QueueItem` contains `id`, `content`, `created_at`, optional nullable `file_urls` and
 `branch_id`. Numeric progress fields are optional nullable `current`, `total`,

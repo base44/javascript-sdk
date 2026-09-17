@@ -1,4 +1,4 @@
-import { Base44PlatformClient, type PlatformEvent } from "@base44/sdk/platform/client";
+import { Base44PlatformClient, type PlatformEvent, type ToolCall } from "@base44/sdk/platform/client";
 const client = new Base44PlatformClient({ serverUrl: "https://example.test", refreshToken: async () => "token" });
 const builder = client.builder.init({ onError: error => { void error.code; } });
 const subscription = builder.subscribe("a".repeat(24), {
@@ -29,3 +29,13 @@ new Base44PlatformClient({ apiKey: "private" });
 client.connect();
 // @ts-expect-error Retired callback name is not accepted.
 new Base44PlatformClient({ serverUrl: "https://example.test", getToken: async () => "token" });
+
+const tool: ToolCall = {
+  display_projection: { file_paths: ["src/App.tsx"] },
+  arguments_string: JSON.stringify({ questions: [{ question: "Which layout?", options: [{ label: "Cards" }] }] }),
+  user_input: { answers: [{ question_index: 0, selected_labels: ["Cards"] }] },
+  results: "Plan updated.",
+};
+void tool;
+// @ts-expect-error Raw command text is not part of reviewed display metadata.
+void tool.display_projection?.command;
