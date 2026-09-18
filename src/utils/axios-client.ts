@@ -240,18 +240,18 @@ export function createAxiosClient({
         return response.data;
       },
       (error) => {
+        const data = error.response?.data;
         const message =
-          error.response?.data?.message ||
-          error.response?.data?.detail ||
-          error.message;
+          data?.error?.message || data?.message || data?.detail || error.message;
 
         const base44Error = new Base44Error(
           message,
           error.response?.status,
-          error.response?.data?.code ??
+          data?.error?.code ??
+            data?.code ??
             error.response?.headers?.get?.("x-base44-connector-error") ??
             error.response?.headers?.["x-base44-connector-error"],
-          error.response?.data,
+          data,
           error
         );
 

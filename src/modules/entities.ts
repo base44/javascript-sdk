@@ -3,8 +3,15 @@ import {
   DeleteManyResult,
   DeleteResult,
   EntitiesModule,
+  EntityAggregateResult,
+  EntityAggregateSpec,
+  EntityDistinctOptions,
   EntityFilterQuery,
   EntityHandler,
+  EntityListOptions,
+  EntityPage,
+  EntityUpsertOptions,
+  EntityUpsertResult,
   ImportResult,
   RealtimeCallback,
   RealtimeEvent,
@@ -75,6 +82,14 @@ function parseRealtimeMessage<T = any>(dataStr: string): RealtimeEvent<T> | null
   }
 }
 
+const DEFAULT_PAGE_LIMIT = 100;
+
+type PageOptions<T> = EntityListOptions<T, any> | EntityDistinctOptions<T, any>;
+
+function isPageOptions(value: unknown): value is PageOptions<any> {
+  return typeof value === "object" && value !== null;
+}
+
 /**
  * Creates a handler for a specific entity.
  *
@@ -93,43 +108,52 @@ function createEntityHandler<T = any>(
 ): EntityHandler<T> {
   const baseURL = `/apps/${appId}/entities/${entityName}`;
 
-  return {
-    // List entities with optional pagination and sorting
-    async list<K extends keyof T = keyof T>(
-      sort?: SortField<T>,
-      limit?: number,
-      skip?: number,
-      fields?: K[]
-    ): Promise<Pick<T, K>[]> {
-      const params: Record<string, string | number> = {};
-      if (sort) params.sort = sort;
-      if (limit) params.limit = limit;
-      if (skip) params.skip = skip;
-      if (fields)
-        params.fields = Array.isArray(fields) ? fields.join(",") : fields;
+  const fieldsParam = (fields?: readonly (keyof T)[]) =>
+    Array.isArray(fields) ? fields.join(",") : (fields as string | undefined);
 
-      return axios.get(baseURL, { params });
+  // GET /{entity}: the array form shared by list() and filter()
+  const readArray = (
+    sort?: SortField<T>,
+    limit?: number,
+    skip?: number,
+    fields?: (keyof T)[],
+    query?: EntityFilterQuery<T>
+  ) => {
+    const params: Record<string, string | number> = {};
+    if (query) params.q = JSON.stringify(query);
+    if (sort) params.sort = sort;
+    if (limit) params.limit = limit;
+    if (skip) params.skip = skip;
+    if (fields) params.fields = fieldsParam(fields)!;
+    return axios.get(baseURL, { params });
+  };
+
+  // GET /{entity}/v2/list: one cursor page of records or distinct values, shared by list(options) and filter(query, options)
+  const readPage = (options: PageOptions<T>, query?: EntityFilterQuery<T>) => {
+    const params: Record<string, string | number> = {};
+    if (query) params.q = JSON.stringify(query);
+    params.limit = options.limit || DEFAULT_PAGE_LIMIT;
+    if (options.cursor) params.cursor = options.cursor;
+    if ("distinct" in options) {
+      params.distinct = options.distinct;
+    } else {
+      if (options.sort) params.sort = options.sort;
+      if (options.fields) params.fields = fieldsParam(options.fields)!;
+    }
+    return axios.get(`${baseURL}/v2/list`, { params });
+  };
+
+  return {
+    // list(sort, limit, skip, fields) returns an array; list(options) returns one cursor page.
+    async list(...args: any[]): Promise<any> {
+      const [sort, limit, skip, fields] = args;
+      return isPageOptions(sort) ? readPage(sort) : readArray(sort, limit, skip, fields);
     },
 
-    // Filter entities based on query
-    async filter<K extends keyof T = keyof T>(
-      query: EntityFilterQuery<T>,
-      sort?: SortField<T>,
-      limit?: number,
-      skip?: number,
-      fields?: K[]
-    ): Promise<Pick<T, K>[]> {
-      const params: Record<string, string | number> = {
-        q: JSON.stringify(query),
-      };
-
-      if (sort) params.sort = sort;
-      if (limit) params.limit = limit;
-      if (skip) params.skip = skip;
-      if (fields)
-        params.fields = Array.isArray(fields) ? fields.join(",") : fields;
-
-      return axios.get(baseURL, { params });
+    // filter(query, sort, limit, skip, fields) returns an array; filter(query, options) returns one cursor page.
+    async filter(query: EntityFilterQuery<T>, ...args: any[]): Promise<any> {
+      const [sort, limit, skip, fields] = args;
+      return isPageOptions(sort) ? readPage(sort, query) : readArray(sort, limit, skip, fields, query);
     },
 
     // Get entity by ID
@@ -165,6 +189,27 @@ function createEntityHandler<T = any>(
     // Update multiple entities matching a query using a MongoDB update operator
     async updateMany(query: Partial<T>, data: Record<string, Record<string, any>>): Promise<UpdateManyResult> {
       return axios.patch(`${baseURL}/update-many`, { query, data });
+    },
+
+    // Count entities matching a query
+    async count(query?: EntityFilterQuery<T>): Promise<number> {
+      const params: Record<string, string> = {};
+      if (query) params.q = JSON.stringify(query);
+      const result: { count: number } = await axios.get(`${baseURL}/count`, { params });
+      return result.count;
+    },
+
+    // Server-side group-by aggregation
+    async aggregate(spec: EntityAggregateSpec<T>): Promise<EntityAggregateResult> {
+      return axios.post(`${baseURL}/aggregate`, spec);
+    },
+
+    // Create or update by a natural key
+    async upsert(
+      records: Partial<T>[],
+      options: EntityUpsertOptions<T>
+    ): Promise<EntityUpsertResult<T>> {
+      return axios.post(`${baseURL}/upsert`, { records, key: options.key });
     },
 
     // Update multiple entities by ID, each with its own update data
