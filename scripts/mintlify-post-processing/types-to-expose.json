@@ -3,6 +3,7 @@
   "AgentNameRegistry",
   "AgentsModule",
   "AiGatewayConnection",
+  "AiGatewayConnectionOptions",
   "AiGatewayModule",
   "AnalyticsModule",
   "AppLogsModule",
