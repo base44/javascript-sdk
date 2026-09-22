@@ -87,19 +87,66 @@ export interface UploadFileResult {
   file_url: string;
 }
 
+/** Requires at least one key from Keys to be present. */
+type RequireAtLeastOne<T, Keys extends keyof T = keyof T> =
+  Pick<T, Exclude<keyof T, Keys>> &
+  { [K in Keys]-?: Required<Pick<T, K>> & Partial<Pick<T, Exclude<Keys, K>>> }[Keys];
+
 /**
- * Parameters for the SendEmail function.
+ * A file to attach to a `SendEmail` call.
+ *
+ * Provide exactly one content source per attachment:
+ * - `content` — base64-encoded bytes generated at runtime (e.g. a PDF built in the function).
+ * - `file_url` — a URL returned by `UploadFile` or `UploadPrivateFile` for a file already in storage.
+ *
+ * Allowed extensions: `pdf`, `png`, `jpg`/`jpeg`, `gif`, `webp`, `csv`, `txt`, `md`, `ics`, `xlsx`, `docx`.
+ * Limits: up to **5 attachments**, **5 MB each**, **10 MB total**.
  */
-export interface SendEmailParams {
+export type EmailAttachment =
+  | { /** Attachment filename, including extension. */ filename: string; /** Base64-encoded file content. */ content: string; file_url?: never }
+  | { /** Attachment filename, including extension. */ filename: string; /** URL from `UploadFile` or `UploadPrivateFile`. */ file_url: string; content?: never };
+
+interface SendEmailParamsBase {
   /** Recipient email address. */
   to: string;
   /** Email subject line. */
   subject: string;
-  /** Plain text email body content. */
-  body: string;
+  /** HTML email body content. Alias of `html` — set one or the other, never both. */
+  body?: string;
+  /** HTML email body content. The same thing as `body` under an explicit name. */
+  html?: string;
+  /**
+   * Plain-text email body content.
+   *
+   * On its own, sends a plain-text (`text/plain`) email. Alongside `body`/`html`,
+   * both parts go out as a single `multipart/alternative` email and the recipient's
+   * mail client renders whichever it prefers — so the two must say the same thing.
+   */
+  text?: string;
   /** The name of the sender. If omitted, the app's name will be used. */
   from_name?: string;
+  /**
+   * Files to attach to the email. Up to 5 attachments, 5 MB each, 10 MB total.
+   *
+   * Each item must have a `filename` and exactly one content source:
+   * `content` (inline base64) or `file_url` (storage reference).
+   */
+  attachments?: EmailAttachment[];
 }
+
+/**
+ * Parameters for the SendEmail function.
+ *
+ * At least one of `body`, `html`, or `text` is required; the backend returns 422 otherwise.
+ *
+ * | Fields set | Result |
+ * |---|---|
+ * | `body` or `html` alone | `text/html` email |
+ * | `text` alone | `text/plain` email |
+ * | `body`/`html` + `text` | `multipart/alternative` — one email, two representations; recipient sees whichever their client prefers — both parts must say the same thing |
+ * | `body` + `html` | **422** — same slot, set one not both |
+ */
+export type SendEmailParams = RequireAtLeastOne<SendEmailParamsBase, 'body' | 'html' | 'text'>;
 
 export type SendEmailResult = any;
 
