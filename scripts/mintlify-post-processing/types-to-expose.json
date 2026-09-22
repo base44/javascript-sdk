@@ -1,4 +1,12 @@
 [
+  "ActorClient",
+  "ActorConnectOptions",
+  "ActorNameRegistry",
+  "ActorRef",
+  "ActorRegistry",
+  "ActorSubscription",
+  "ActorsModule",
+  "Connection",
   "AgentName",
   "AgentNameRegistry",
   "AgentsModule",
