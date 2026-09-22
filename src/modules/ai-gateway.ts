@@ -1,4 +1,3 @@
-import { getAccessToken } from "../utils/auth-utils.js";
 import {
   AiGatewayModule,
   AiGatewayModuleConfig,
@@ -7,12 +6,12 @@ import {
 
 export function createAiGatewayModule({
   serverUrl,
-  token,
+  getToken,
   appId,
 }: AiGatewayModuleConfig): AiGatewayModule {
   const connection = (): AiGatewayConnection => ({
     baseURL: `${serverUrl}/api/apps/${appId}/ai/openai/v1`,
-    token: token ?? getAccessToken() ?? "",
+    token: getToken() ?? "",
   });
 
   return {

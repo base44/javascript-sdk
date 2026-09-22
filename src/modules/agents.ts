@@ -1,4 +1,3 @@
-import { getAccessToken } from "../utils/auth-utils.js";
 import { ModelFilterParams } from "../types.js";
 import {
   AgentConversation,
@@ -13,7 +12,7 @@ export function createAgentsModule({
   getSocket,
   appId,
   serverUrl,
-  token,
+  getToken,
 }: AgentsModuleConfig): AgentsModule {
   const baseURL = `/apps/${appId}/agents`;
 
@@ -102,7 +101,7 @@ export function createAgentsModule({
     const baseUrl = `${serverUrl}/api/apps/${appId}/agents/${encodeURIComponent(
       agentName
     )}/whatsapp`;
-    const accessToken = token ?? getAccessToken();
+    const accessToken = getToken();
 
     if (accessToken) {
       return `${baseUrl}?token=${accessToken}`;
@@ -116,7 +115,7 @@ export function createAgentsModule({
     const baseUrl = `${serverUrl}/api/apps/${appId}/agents/${encodeURIComponent(
       agentName
     )}/telegram`;
-    const accessToken = token ?? getAccessToken();
+    const accessToken = getToken();
 
     if (accessToken) {
       return `${baseUrl}?token=${accessToken}`;

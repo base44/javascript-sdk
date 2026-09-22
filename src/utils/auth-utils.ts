@@ -4,12 +4,18 @@ import {
   RemoveAccessTokenOptions,
   GetLoginUrlOptions,
 } from "./auth-utils.types.js";
+import { EMBED_TOKEN_PARAM, isFramed } from "./embed-session.js";
+
+/** The URL parameter a Base44 session token arrives on. */
+const DEFAULT_TOKEN_PARAM = "access_token";
 
 /**
  * Retrieves an access token from URL parameters or local storage.
  *
  * Low-level utility for manually retrieving tokens. In most cases, the Base44 client handles
  * token management automatically. This function is useful for custom authentication flows or when you need direct access to stored tokens. Requires a browser environment and can't be used in the backend.
+ *
+ * When a host platform has embedded the app with a one-time token (`?ott=`), that token is returned as it stands: it is what {@linkcode createClient} trades for the session, so a page that gates on "is there a token?" as it loads sees one. It is neither stored nor removed from the URL here, and it is reported only inside a frame, where such a token is redeemed.
  *
  * @internal
  *
@@ -44,7 +50,7 @@ import {
 export function getAccessToken(options: GetAccessTokenOptions = {}) {
   const {
     storageKey = "base44_access_token",
-    paramName = "access_token",
+    paramName = DEFAULT_TOKEN_PARAM,
     saveToStorage = true,
     removeFromUrl = true,
   } = options;
@@ -74,6 +80,22 @@ export function getAccessToken(options: GetAccessTokenOptions = {}) {
         }
 
         return token;
+      }
+
+      // A platform-embedded load carries a one-time token instead. It is not a
+      // session yet — createClient takes it off the URL and exchanges it — but
+      // it is the identity this load arrives with, and callers that read this
+      // once as the page loads must not conclude there is none.
+      //
+      // Only in a frame, and only for the parameter a session arrives on: a
+      // one-time token is redeemed nowhere else, so a top-level load still
+      // carrying one (a URL rewrite the browser refused) must not have it
+      // applied as a session — and never saved as one.
+      if (paramName === DEFAULT_TOKEN_PARAM && isFramed()) {
+        const embedToken = urlParams.get(EMBED_TOKEN_PARAM);
+        if (embedToken) {
+          return embedToken;
+        }
       }
     } catch (e) {
       console.error("Error retrieving token from URL:", e);

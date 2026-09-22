@@ -20,10 +20,6 @@ vi.mock("socket.io-client", () => ({
   })),
 }));
 
-vi.mock("../../src/utils/auth-utils.ts", () => ({
-  getAccessToken: vi.fn(() => undefined),
-}));
-
 vi.mock("../../src/modules/analytics.ts", () => ({
   getAnalyticsSessionId: vi.fn(() => "anon-session-123"),
 }));
@@ -56,20 +52,32 @@ describe("RoomsSocket", () => {
     }
 
     test("sends a stable anonymous_id and no token when unauthenticated", () => {
-      RoomsSocket({ config: { ...baseConfig } });
+      RoomsSocket({ config: { ...baseConfig, getToken: () => null } });
 
       const query = lastHandshakeQuery();
       expect(query.app_id).toBe("test-app-id");
       expect(query.anonymous_id).toBe("anon-session-123");
-      expect(query.token).toBeUndefined();
+      expect(query.token).toBeNull();
     });
 
     test("sends the token and no anonymous_id when authenticated", () => {
-      RoomsSocket({ config: { ...baseConfig, token: "test-token" } });
+      RoomsSocket({ config: { ...baseConfig, getToken: () => "test-token" } });
 
       const query = lastHandshakeQuery();
       expect(query.token).toBe("test-token");
       expect(query.anonymous_id).toBeUndefined();
+    });
+
+    test("asks for the token again on every reconnect", () => {
+      let token: string | null = null;
+      const socket = RoomsSocket({ config: { ...baseConfig, getToken: () => token } });
+      expect(lastHandshakeQuery().token).toBeNull();
+
+      token = "next-token";
+      socket.reconnect();
+
+      expect(lastHandshakeQuery().token).toBe("next-token");
+      expect(lastHandshakeQuery().anonymous_id).toBeUndefined();
     });
   });
 
@@ -80,7 +88,7 @@ describe("RoomsSocket", () => {
         mountPath: "/socket.io/",
         transports: ["websocket"],
         appId: "test-app-id",
-        token: "test-token",
+        getToken: () => "test-token",
       },
     });
   }
@@ -166,7 +174,7 @@ describe("RoomsSocket", () => {
     const unsubscribe = socket.subscribeToRoom("room-a", {});
 
     unsubscribe();
-    socket.updateConfig({ token: "next-token" });
+    socket.reconnect();
     socket.subscribeToRoom("room-a", {});
 
     vi.advanceTimersByTime(250);

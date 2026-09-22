@@ -88,6 +88,9 @@ export function createFunctionsModule(
       const normalizedPath = path.startsWith("/") ? path : `/${path}`;
       const primaryPath = `/functions${normalizedPath}`;
 
+      // Headers are read after this: a session still being negotiated must be
+      // in hand before the Authorization is built, not after.
+      await config?.waitForAuth?.();
       const headers = toHeaders(init.headers);
 
       const requestInit: RequestInit = {

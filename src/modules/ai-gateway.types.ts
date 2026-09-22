@@ -18,8 +18,8 @@ export interface AiGatewayConnection {
 export interface AiGatewayModuleConfig {
   /** Server URL */
   serverUrl?: string;
-  /** Authentication token */
-  token?: string;
+  /** Returns the current authentication token, if any */
+  getToken: () => string | null | undefined;
   /** Application ID */
   appId: string;
 }

@@ -106,6 +106,13 @@ export interface AuthModuleOptions {
    * which is how the server-side SDK reports a token it never sets explicitly.
    */
   token?: string;
+  /** Whether a host platform embedded this client in a frame. */
+  embedded?: boolean;
+  /**
+   * Called when the identity changes: `true` on `setToken`, `false` on
+   * `logout`. Lets the client redial the socket, which holds its own copy.
+   */
+  onSessionChange?: (hasSession: boolean) => void;
 }
 
 /**
@@ -192,6 +199,25 @@ export interface AuthModule {
    * ```
    */
   redirectToLogin(nextUrl: string): void;
+
+  /**
+   * Whether a host platform embedded this app and signed its user in.
+   *
+   * Only the platform can renew that session, so {@linkcode AuthModule.redirectToLogin | redirectToLogin()} and {@linkcode AuthModule.logout | logout()} show a "session ended" notice rather than a login page. Use this to render your own notice, or to hide sign-in controls that cannot work in the frame.
+   *
+   * The session lives in memory, so a reload inside the frame ends it and returns `false` here. Prefer client-side navigation.
+   *
+   * @returns `true` when a host platform embedded this app.
+   *
+   * @example
+   * ```typescript
+   * // Show your own message instead of a login screen
+   * if (!user && base44.auth.isEmbedded()) {
+   *   return <SessionEnded />;
+   * }
+   * ```
+   */
+  isEmbedded(): boolean;
 
   /**
    * Redirects the user to a third-party authentication provider's login page.
@@ -569,4 +595,7 @@ export interface InternalAuthModule extends AuthModule {
    * could not succeed without a session, not to decide that one is valid.
    */
   hasToken(): boolean;
+
+  /** The token currently set on the client, or `null`. */
+  getToken(): string | null;
 }

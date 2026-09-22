@@ -1,5 +1,4 @@
 import { Socket, io } from "socket.io-client";
-import { getAccessToken } from "./auth-utils.js";
 import { getAnalyticsSessionId } from "../modules/analytics.js";
 
 export interface RoomsSocketConfig {
@@ -7,7 +6,7 @@ export interface RoomsSocketConfig {
   mountPath: string;
   transports: string[];
   appId: string;
-  token?: string;
+  getToken: () => string | null;
 }
 
 export type TSocketRoom = string;
@@ -42,7 +41,7 @@ function initializeSocket(
   // handshake so the backend can verify room access for anonymous agent
   // conversations (mirrors the X-Base44-Anonymous-Id HTTP header). Authenticated
   // clients are identified by their token instead.
-  const resolvedToken = config.token ?? getAccessToken();
+  const resolvedToken = config.getToken();
   const query: Record<string, string | null | undefined> = {
     app_id: config.appId,
     token: resolvedToken,
@@ -81,7 +80,6 @@ function initializeSocket(
 export type RoomsSocket = ReturnType<typeof RoomsSocket>;
 
 export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
-  let currentConfig = { ...config };
   const roomsToListeners: Record<
     TSocketRoom,
     Partial<RoomsSocketEventsMap["listen"]>[]
@@ -136,13 +134,10 @@ export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
     }
   }
 
-  function updateConfig(config: Partial<RoomsSocketConfig>) {
+  /** Drops the connection and opens a new one with the current token. */
+  function reconnect() {
     cleanup();
-    currentConfig = {
-      ...currentConfig,
-      ...config,
-    };
-    socket = initializeSocket(currentConfig, handlers);
+    socket = initializeSocket(config, handlers);
   }
 
   function joinRoom(room: string) {
@@ -229,7 +224,7 @@ export function RoomsSocket({ config }: { config: RoomsSocketConfig }) {
   return {
     socket,
     subscribeToRoom,
-    updateConfig,
+    reconnect,
     updateModel,
     disconnect,
   };
