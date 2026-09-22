@@ -45,7 +45,7 @@ export function convertExamplesToCodeGroup(content) {
   const exampleSectionRegex = /^(#{2,4})\s+(Example|Examples)\s*$([\s\S]*?)(?=^#{2,4}\s|\n<\/ResponseField>|\n\*\*\*|$(?!\n))/gm;
 
   return content.replace(exampleSectionRegex, (match, headingLevel, exampleHeading, exampleContent) => {
-    const codeBlockRegex = /```([\w-]*)[ \t]*([^\n]*)\n([\s\S]*?)```/g;
+    const codeBlockRegex = /```([\w-]*)\s*([^\n]*)\n([\s\S]*?)```/g;
     const examples = [];
     let codeMatch;
 

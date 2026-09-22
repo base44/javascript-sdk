@@ -18,15 +18,6 @@
     "type-aliases/AgentName",
     "interfaces/AgentNameRegistry"
   ],
-  "type-aliases/ActorsModule": [
-    "interfaces/ActorRef",
-    "interfaces/Connection",
-    "interfaces/ActorConnectOptions",
-    "interfaces/ActorSubscription",
-    "interfaces/ActorClient",
-    "interfaces/ActorRegistry",
-    "interfaces/ActorNameRegistry"
-  ],
   "type-aliases/integrations": [
     "interfaces/CoreIntegrations",
     "interfaces/CustomIntegrationsModule"
