@@ -30,7 +30,7 @@ export interface ActorRegistry {}
  * with [`types generate`](/developers/references/cli/commands/types-generate).
  *
  * The generated names provide autocomplete for deployed actors. To define
- * incoming and outgoing message types manually, augment {@link ActorRegistry}.
+ * incoming and outgoing message types manually, augment [ActorRegistry](#actorregistry).
  */
 export interface ActorNameRegistry {}
 
@@ -49,7 +49,7 @@ type ToServerFor<N extends string> = N extends keyof ActorRegistry
   : unknown;
 
 /**
- * Options for {@link ActorRef.connect}.
+ * Options for [ActorRef.connect](#connect).
  */
 export interface ActorConnectOptions {
   /**
@@ -66,7 +66,7 @@ export interface ActorConnectOptions {
 
 /**
  * Represents an outgoing-message listener registered with
- * {@link Connection.subscribe}.
+ * [Connection.subscribe](#subscribe).
  */
 export interface ActorSubscription {
   /**
@@ -78,7 +78,7 @@ export interface ActorSubscription {
 /**
  * Represents a client's WebSocket connection to an actor session.
  *
- * {@link ActorRef.connect} returns this object while the socket connects.
+ * [ActorRef.connect](#connect) returns this object while the socket connects.
  * The socket buffers messages sent during connection setup until it opens.
  */
 export interface Connection<N extends string = string> {
@@ -98,10 +98,10 @@ export interface Connection<N extends string = string> {
   /**
    * Sends an incoming message to the actor.
    *
-   * The socket buffers messages until it opens. After {@link close}, the socket
+   * The socket buffers messages until it opens. After [close](#close), the socket
    * drops further sends.
    *
-   * @param data - Incoming message to send. Typed through {@link ActorRegistry} when configured.
+   * @param data - Incoming message to send. Typed through [ActorRegistry](#actorregistry) when configured.
    */
   send(data: ToServerFor<N>): void;
 
@@ -109,7 +109,7 @@ export interface Connection<N extends string = string> {
    * Closes the connection and removes all listeners.
    *
    * Safe to call more than once. A connection also closes itself when it fails
-   * permanently. See {@link ActorRef.connect} for how to open a fresh connection.
+   * permanently. See [ActorRef.connect](#connect) for how to open a fresh connection.
    */
   close(): void;
 }
@@ -117,11 +117,11 @@ export interface Connection<N extends string = string> {
 /**
  * Represents an actor session selected by actor name and session ID.
  *
- * Call {@link connect} to open the WebSocket and get a {@link Connection}.
+ * Call [connect](#connect) to open the WebSocket and get a [Connection](#connection).
  */
 export interface ActorRef<N extends string = string> {
   /**
-   * Creates or returns the {@link Connection} for this session.
+   * Creates or returns the [Connection](#connection) for this session.
    *
    * Repeated calls return the same connection until it closes. After a permanent
    * failure, such as a missing actor or denied connection, fix the cause and call
@@ -131,7 +131,7 @@ export interface ActorRef<N extends string = string> {
    * for a sample flow.
    *
    * @param options - Optional connection settings, such as a stable connection ID.
-   * @returns The {@link Connection} for this actor session.
+   * @returns The [Connection](#connection) for this actor session.
    */
   connect(options?: ActorConnectOptions): Connection<N>;
 }
@@ -139,8 +139,8 @@ export interface ActorRef<N extends string = string> {
 /**
  * Selects a session for a named actor.
  *
- * Typed automatically when the actor is registered in {@link ActorRegistry} or
- * {@link ActorNameRegistry}.
+ * Typed automatically when the actor is registered in [ActorRegistry](#actorregistry) or
+ * [ActorNameRegistry](#actornameregistry).
  */
 export interface ActorClient<N extends string = string> {
   /**
@@ -157,16 +157,25 @@ export interface ActorClient<N extends string = string> {
 /**
  * Provides access to actors and their shared, live sessions.
  *
- * Select an actor by name and session ID, then connect a client to the
- * session. Clients in the same session can exchange realtime messages through the
- * actor. The client works in the browser and in Node.
+ * Use `base44.actors` to connect clients to a running actor session. The actors
+ * client lets you:
+ *
+ * - Subscribe to messages the actor sends — either broadcast to all connected
+ *   clients or sent to your client directly.
+ * - Send messages to the actor from the client.
+ * - Share a session across multiple clients: any clients with the same actor
+ *   name and session ID connect to the same session.
+ * - Type your messages using [ActorRegistry](#actorregistry) for autocomplete
+ *   and compile-time safety.
+ *
+ * The client works in the browser and in Node.js.
  *
  * ## Connection flow
  *
  * - Connect to a session with `base44.actors.<ActorName>(sessionId).connect()`.
- * - Subscribe to outgoing messages with {@link Connection.subscribe}.
- * - Send incoming messages with {@link Connection.send}.
- * - Close the connection with {@link Connection.close}.
+ * - Subscribe to outgoing messages with [Connection.subscribe](#subscribe).
+ * - Send incoming messages with [Connection.send](#send).
+ * - Close the connection with [Connection.close](#close).
  *
  * See [Actors Overview](/developers/backend/resources/actors/overview)
  * for actor concepts and terminology, [Actor Class Reference](/developers/backend/resources/actors/reference)
