@@ -155,32 +155,19 @@ export interface ActorClient<N extends string = string> {
 }
 
 /**
- * Provides access to actors and their shared, live sessions.
+ * Use `base44.actors` to connect your frontend to [actor sessions](/developers/backend/resources/actors/overview),
+ * shared live backend processes where clients exchange messages in realtime.
  *
- * Use `base44.actors` to connect clients to a running actor session. The actors
- * client lets you:
- *
- * - Subscribe to messages the actor sends — either broadcast to all connected
- *   clients or sent to your client directly.
- * - Send messages to the actor from the client.
+ * - Connect to a session with `base44.actors.<ActorName>(sessionId).connect()`.
+ * - Subscribe to messages the actor sends using [Connection.subscribe](#subscribe),
+ *   either broadcast to all clients or sent directly to your client.
+ * - Send messages to the actor with [Connection.send](#send).
  * - Share a session across multiple clients: any clients with the same actor
  *   name and session ID connect to the same session.
  * - Type your messages using [ActorRegistry](#actorregistry) for autocomplete
  *   and compile-time safety.
  *
- * The client works in the browser and in Node.js.
- *
- * ## Connection flow
- *
- * - Connect to a session with `base44.actors.<ActorName>(sessionId).connect()`.
- * - Subscribe to outgoing messages with [Connection.subscribe](#subscribe).
- * - Send incoming messages with [Connection.send](#send).
- * - Close the connection with [Connection.close](#close).
- *
- * See [Actors Overview](/developers/backend/resources/actors/overview)
- * for actor concepts and terminology, [Actor Class Reference](/developers/backend/resources/actors/reference)
- * for the backend class API, and [Sample Flows](/developers/backend/resources/actors/samples)
- * for common patterns.
+ * Learn more about [actors](/developers/backend/resources/actors/overview).
  *
  * ## Authentication modes
  *
