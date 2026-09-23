@@ -34,22 +34,23 @@ export interface AiGatewayModuleConfig {
  * AI Gateway module for calling Base44's managed AI models from your own code.
  *
  * `connection()` hands you a `baseURL` and `token` that authenticate as your
- * Base44 app. It defaults to the OpenAI-compatible Chat Completions provider;
- * pass `{ provider: "typesafe" }` for the TypeSafe evaluation provider. Pass
- * the returned values to the corresponding client with no separate provider
- * account, API key, or billing setup.
+ * Base44 app. An OpenAI-compatible client is any library, such as the `openai`
+ * SDK or the Vercel AI SDK, that has the same request and response format
+ * as OpenAI's Chat Completions API and lets you point it at a custom `baseURL`
+ * instead of OpenAI's own servers. Pass `connection()`'s values to one of
+ * these clients and it works against Base44's gateway exactly as it would
+ * against the provider directly, no separate account, API key, or billing
+ * setup with the underlying model provider required.
+ *
+ * By default, `connection()` uses the OpenAI-compatible provider. Pass
+ * `{ provider: "typesafe" }` to connect to TypeSafe for structured evaluations
+ * with `@ai-sdk/typesafe-ai`.
  *
  * Call `connection()` from a backend function rather than the browser. This
  * keeps your instructions, tools, and business logic server-side, and lets
  * you enforce your own auth, rate, and spend limits around the call. The
  * `token` it returns is the caller's regular session token, the same one
  * used for every other SDK call.
- *
- * ## Providers
- *
- * - **OpenAI-compatible** (default): Works with clients such as the `openai`
- *   SDK or Vercel AI SDK clients that accept a custom `baseURL`.
- * - **TypeSafe**: Works with `@ai-sdk/typesafe-ai` for structured evaluations.
  *
  * ## OpenAI-compatible models
  *
@@ -88,7 +89,7 @@ export interface AiGatewayModule {
    *
    * @example
    * ```typescript
-   * // Call an OpenAI-compatible model directly
+   * // Call a model directly
    * import { createClientFromRequest } from "@base44/sdk";
    * import OpenAI from "openai";
    *
