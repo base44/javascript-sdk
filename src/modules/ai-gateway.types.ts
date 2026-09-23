@@ -2,13 +2,19 @@
  * Connection details for the Base44 AI Gateway.
  */
 export interface AiGatewayConnection {
-  /** Base URL of the gateway's OpenAI-compatible Chat Completions endpoint. */
+  /** Base URL of the selected gateway provider. */
   baseURL: string;
   /**
    * Bearer token that authenticates the request. Empty string when the caller is
    * unauthenticated.
    */
   token: string;
+}
+
+/** Options for selecting an AI Gateway provider. */
+export interface AiGatewayConnectionOptions {
+  /** Gateway provider to connect to. Defaults to `openai`. */
+  provider?: "openai" | "typesafe";
 }
 
 /**
@@ -36,13 +42,17 @@ export interface AiGatewayModuleConfig {
  * against the provider directly, no separate account, API key, or billing
  * setup with the underlying model provider required.
  *
+ * By default, `connection()` uses the OpenAI-compatible provider. Pass
+ * `{ provider: "typesafe" }` to connect to TypeSafe for structured evaluations
+ * with `@ai-sdk/typesafe-ai`.
+ *
  * Call `connection()` from a backend function rather than the browser. This
  * keeps your instructions, tools, and business logic server-side, and lets
  * you enforce your own auth, rate, and spend limits around the call. The
  * `token` it returns is the caller's regular session token, the same one
  * used for every other SDK call.
  *
- * ## Models
+ * ## OpenAI-compatible models
  *
  * You can use any of the [models available through `InvokeLLM`](/developers/references/sdk/docs/type-aliases/integrations#invokellm).
  * Pass `'automatic'` to let Base44 choose one, or pin a specific model such
@@ -71,7 +81,9 @@ export interface AiGatewayModule {
   /**
    * Gets the connection details for the Base44 AI Gateway.
    *
-   * Returns the `baseURL` and `token` to pass to any OpenAI-compatible client.
+   * Returns the `baseURL` and `token` to pass to the selected provider client.
+   *
+   * @param options - Provider selection. Omit it to use the OpenAI-compatible gateway.
    *
    * @returns The gateway {@linkcode AiGatewayConnection | connection} (`baseURL` and `token`).
    *
@@ -137,5 +149,5 @@ export interface AiGatewayModule {
    * await agent.generate({ prompt: `Review this return request: ${JSON.stringify(returnRequest)}` });
    * ```
    */
-  connection(): AiGatewayConnection;
+  connection(options?: AiGatewayConnectionOptions): AiGatewayConnection;
 }
