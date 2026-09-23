@@ -173,13 +173,6 @@ export interface ActorClient<N extends string = string> {
  * for the backend class API, and [Sample Flows](/developers/backend/resources/actors/samples)
  * for common patterns.
  *
- * ## See also
- *
- * - [Actors Overview](/developers/backend/resources/actors/overview) — Actor concepts, sessions, message types, storage, and timers
- * - [Actor Class Reference](/developers/backend/resources/actors/reference) — Backend class API
- * - [Sample Flows](/developers/backend/resources/actors/samples) — Connect a client, run ticks, schedule wakes, and persist data
- * - [`types generate`](/developers/references/cli/commands/types-generate) — Generate TypeScript types from deployed actors
- *
  * ## Authentication modes
  *
  * This module is available in anonymous or user authentication mode
