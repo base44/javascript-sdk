@@ -156,7 +156,9 @@ export interface ActorClient<N extends string = string> {
 
 /**
  * Use `base44.actors` to connect your frontend to [actor sessions](/developers/backend/resources/actors/overview),
- * shared live backend processes where clients exchange messages in realtime.
+ * shared live backend processes where clients can exchange messages in realtime.
+ * 
+ * With the Actors SDK module you can: 
  *
  * - Connect to a session with `base44.actors.<ActorName>(sessionId).connect()`.
  * - Subscribe to messages the actor sends using [Connection.subscribe](#subscribe),
@@ -171,14 +173,17 @@ export interface ActorClient<N extends string = string> {
  *
  * ## Authentication modes
  *
- * This module is available in anonymous or user authentication mode
- * (`base44.actors`). It isn't available with service role authentication. Apps that
- * require login can reject anonymous connections in the actor's `handleConnect()` method.
- * See [Manage client connections](/developers/backend/resources/actors/samples#manage-client-connections)
- * for a sample flow.
- *
+ * This module is available in anonymous or user authentication mode. 
+ * Apps that require login can reject anonymous connections in the actor's `handleConnect()` method.
+ * Learn more about [managing client connections](/developers/backend/resources/actors/samples#manage-client-connections). 
+
+
  * @example
+ * 
+ * The following example displays the general lifecycle of a client connected to an actor named `Chat`:  
+ *  
  * ```typescript
+ * Example 
  * const conn = base44.actors.Chat("session-1").connect({ id: "tab-1" });
  * const sub = conn.subscribe((msg) => console.log(msg));
  * conn.send({ type: "message", text: "hi" });
