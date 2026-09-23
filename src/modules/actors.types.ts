@@ -178,6 +178,8 @@ export interface ActorClient<N extends string = string> {
  * This module is available in anonymous or user authentication mode
  * (`base44.actors`). It isn't available with service role authentication. Apps that
  * require login can reject anonymous connections in the actor's `handleConnect()` method.
+ * See [Manage client connections](/developers/backend/resources/actors/samples#manage-client-connections)
+ * for a sample flow.
  *
  * @example
  * ```typescript
