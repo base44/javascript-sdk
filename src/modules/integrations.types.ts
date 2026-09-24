@@ -65,8 +65,17 @@ export interface InvokeLLMParams {
  * Parameters for the GenerateImage function.
  */
 export interface GenerateImageParams {
-  /** Description of the image to generate. */
+  /**
+   * Description of the image to generate. When you pass `existing_image_urls`,
+   * describe what to do with the reference images instead.
+   */
   prompt: string;
+  /**
+   * URLs of images to use as references, for example to edit an existing
+   * image, match a style, or add visual context. Images that can't be read are
+   * skipped. If none of them can be read, the request fails.
+   */
+  existing_image_urls?: string[];
 }
 
 export interface GenerateImageResult {
@@ -192,12 +201,17 @@ export interface CoreIntegrations {
   InvokeLLM(params: InvokeLLMParams): Promise<string | object>;
 
   /**
-   * Create AI-generated images from text prompts.
+   * Create AI-generated images from text prompts, optionally guided by reference images.
    *
    * Images are generated as PNG files at approximately 1024px on the shorter side. The
-   * exact dimensions vary by aspect ratio. 
-   * 
-   * Prompts that violate the AI provider's content policy will be refused.
+   * exact dimensions vary by aspect ratio.
+   *
+   * Pass `existing_image_urls` to edit an existing image or to guide the result
+   * with reference images. To choose the model, aspect ratio, resolution, or
+   * quality, use the [AI Gateway image endpoints](/developers/references/sdk/getting-started/ai-gateway-images)
+   * instead.
+   *
+   * Prompts that violate the AI provider's content policy are refused.
    *
    * @param params - Parameters for image generation
    * @returns Promise resolving to an object containing the URL of the generated PNG image.
@@ -209,6 +223,15 @@ export interface CoreIntegrations {
    *   prompt: "A serene mountain landscape with a lake in the foreground"
    * });
    * console.log(url); // https://...generated_image.png
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Edit an existing image
+   * const {url} = await base44.integrations.Core.GenerateImage({
+   *   prompt: "Replace the background with a sunset beach",
+   *   existing_image_urls: [productPhotoUrl]
+   * });
    * ```
    */
   GenerateImage(params: GenerateImageParams): Promise<GenerateImageResult>;
