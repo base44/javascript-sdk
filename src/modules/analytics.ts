@@ -45,7 +45,7 @@ const analyticsSharedState = getSharedInstance(
     wasInitializationTracked: false,
     sessionContext: null as SessionContext | null,
     sessionStartTime: null as string | null,
-    // Memoized session id for when `localStorage` can't persist one — see
+    // Memoized session id for when `localStorage` can't persist one. See
     // getAnalyticsSessionId.
     fallbackSessionId: null as string | null,
     config: {
@@ -342,7 +342,7 @@ async function getSessionContext(
     // With no token there is no identity to resolve: `me()` can only answer 401,
     // which the browser logs to the console before any handler here sees it. On
     // a public page that request is the sole reason an error appears, so skip
-    // it. This is not memoized — a visitor who logs in later must still resolve.
+    // it. This is not memoized. A visitor who logs in later must still resolve.
     if (!userAuthModule.hasToken()) {
       return { user_id: null, session_id: getAnalyticsSessionId() };
     }

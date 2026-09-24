@@ -13,12 +13,18 @@ Docs in this repo are **auto-generated** from JSDoc comments in TypeScript sourc
 
 You write JSDoc. The tooling produces the final pages.
 
+Two things follow from that, and they govern everything below.
+
+**This JSDoc is published prose.** It renders into the public SDK reference, so it follows the same style rules as the rest of the Base44 docs. Read `mintlify-docs/.claude/skills/base44-docs-writing/SKILL.md` first, and treat the writing guidance here as the SDK-specific additions to it.
+
+**Fix the source, never the generated MDX.** Every run overwrites `developers/references/sdk/docs/` in `mintlify-docs`, so an edit made there is gone on the next regeneration. When something reads wrong on a published page, the fix belongs in the JSDoc that produced it.
+
 ## Where docs come from
 
 | File pattern | Role |
 |---|---|
-| `src/modules/*.types.ts` | **Public API surface** — JSDoc here becomes the published docs |
-| `src/modules/*.ts` | Implementation — mark with `@internal` to hide from docs |
+| `src/modules/*.types.ts` | **Public API surface.** JSDoc here becomes the published docs |
+| `src/modules/*.ts` | Implementation. Mark with `@internal` to hide from docs |
 | `src/client.types.ts` | Client factory types |
 | `src/types.ts` | Shared types |
 
@@ -75,6 +81,8 @@ Every public method needs: description, `@param` tags, `@returns`, and at least 
 ## Writing style
 
 - **Developer audience.** These are SDK reference docs for JavaScript/TypeScript developers.
+- **Never use em dashes.** Use a comma or a separate sentence instead. Colons are allowed but should be rare, so reach for one only to introduce a genuine list.
+- **Grammar and punctuation must be correct.** This is public-facing professional documentation. Two slips come up often when rewriting an em dash away. Do not put a comma before a restrictive `because` clause, and do not leave a sentence fragment behind when you split one sentence into two.
 - **Concise descriptions.** First sentence is a verb phrase: "Lists records...", "Creates a new...", "Sends an invitation...".
 - **Sentence case** for free-text headings in JSDoc.
 - **State environment constraints** when a method is browser-only: "Requires a browser environment and can't be used in the backend."
@@ -92,5 +100,6 @@ Every public method needs: description, `@param` tags, `@returns`, and at least 
 1. **JSDoc completeness:** Every public method has description, `@param`, `@returns`, and `@example`.
 2. **`@internal` on implementation:** Factory functions, config interfaces, and helpers are marked `@internal`.
 3. **Examples work:** Code examples are syntactically valid TypeScript and use the `base44.` call path.
-4. **Pipeline config:** New public types are in `types-to-expose.json`. Helper types that belong on another page are in `appended-articles.json`.
-5. **Generate and review:** Run `npm run create-docs` and check the output renders correctly.
+4. **No em dashes:** `grep -rn '—' src/` comes back empty for any file you touched.
+5. **Pipeline config:** New public types are in `types-to-expose.json`. Helper types that belong on another page are in `appended-articles.json`.
+6. **Generate and review:** Run `npm run create-docs` and check the output renders correctly.

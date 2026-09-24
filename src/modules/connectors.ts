@@ -151,8 +151,8 @@ function assertNonEmptyString(value: unknown, label: string): void {
  * POST a request to the connector proxy and normalize the response.
  *
  * The proxy reports upstream outcomes in the body rather than as HTTP status, so
- * a provider 4xx/5xx arrives here as a resolved response with `success: false` —
- * only Base44-side failures reject through the axios error interceptor.
+ * a provider 4xx/5xx arrives here as a resolved response with `success: false`.
+ * Only Base44-side failures reject through the axios error interceptor.
  *
  * @internal
  */

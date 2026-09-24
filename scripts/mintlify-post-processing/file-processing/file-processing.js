@@ -391,7 +391,15 @@ function generateDocsJson(docsContent) {
 
     if (existingGroup) {
       existingGroup.pages.push(...docsContent.typeAliases);
-      existingGroup.pages.sort(); // Sort combined pages alphabetically
+      // Sort on the page name rather than the full path, so a module declared
+      // as a type alias sorts next to its neighbours instead of after every
+      // interface-declared one.
+      existingGroup.pages.sort((a, b) =>
+        a
+          .split("/")
+          .pop()
+          .localeCompare(b.split("/").pop(), "en", { sensitivity: "base" })
+      );
     } else {
       groups.push({
         group: groupName,
