@@ -43,11 +43,12 @@ function initializeSocket(
   // conversations (mirrors the X-Base44-Anonymous-Id HTTP header). Authenticated
   // clients are identified by their token instead.
   const resolvedToken = config.token ?? getAccessToken();
-  const query: Record<string, string | null | undefined> = {
+  const query: Record<string, string> = {
     app_id: config.appId,
-    token: resolvedToken,
   };
-  if (!resolvedToken) {
+  if (resolvedToken) {
+    query.token = resolvedToken;
+  } else {
     query.anonymous_id = getAnalyticsSessionId();
   }
 
