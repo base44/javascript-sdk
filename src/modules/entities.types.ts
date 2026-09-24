@@ -1030,17 +1030,6 @@ type DynamicEntitiesModule = {
  * - **Anonymous or User authentication** (`base44.entities`): Access is scoped to the current user's permissions. Anonymous users can only access public entities, while authenticated users can access entities they have permission to view or modify.
  * - **Service role authentication** (`base44.asServiceRole.entities`): Operations bypass entity access rules and field-level security entirely. Can read and write any record in any entity.
  *
- * ## How denied reads and writes differ
- *
- * Denied reads behave as if the data doesn't exist, so they don't reveal
- * what's there. Denied writes throw, so a blocked change never fails silently.
- *
- * | Operation | When a rule denies it |
- * | --- | --- |
- * | `list()`, `filter()` | Returns an empty result, the same as if nothing matched. No error is thrown. |
- * | `get()` | Throws a not-found error (HTTP 404), whether or not the record exists. |
- * | `create()`, `update()` | Throws a permission error (HTTP 403). |
- *
  * ## Entity Handlers
  *
  * An entity handler is the object you get when you access an entity through `base44.entities.EntityName`. Every entity in your app automatically gets a handler with CRUD methods for managing records.
@@ -1054,6 +1043,17 @@ type DynamicEntitiesModule = {
  * Every app includes a built-in `User` entity that stores user account information. This entity has special security rules that can't be changed.
  *
  * Regular users can only read and update their own user record. With service role authentication, you can read, update, and delete any user. You can't create users using the entities module. Instead, use the functions of the {@link AuthModule | auth module} to invite or register new users.
+ *
+ * ## Denied reads and writes
+ *
+ * Denied reads behave as if the data doesn't exist, so they don't reveal
+ * what's there. Denied writes throw, so a blocked change never fails silently.
+ *
+ * | Operation | When a rule denies it |
+ * | --- | --- |
+ * | `list()`, `filter()` | Returns an empty result, the same as if nothing matched. No error is thrown. |
+ * | `get()` | Throws a not-found error (HTTP 404), whether or not the record exists. |
+ * | `create()`, `update()` | Throws a permission error (HTTP 403). |
  *
  * ## Generated Types
  *
