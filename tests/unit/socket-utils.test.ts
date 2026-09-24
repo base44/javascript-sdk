@@ -21,7 +21,7 @@ vi.mock("socket.io-client", () => ({
 }));
 
 vi.mock("../../src/utils/auth-utils.ts", () => ({
-  getAccessToken: vi.fn(() => undefined),
+  getAccessToken: vi.fn(() => null),
 }));
 
 vi.mock("../../src/modules/analytics.ts", () => ({
@@ -61,7 +61,7 @@ describe("RoomsSocket", () => {
       const query = lastHandshakeQuery();
       expect(query.app_id).toBe("test-app-id");
       expect(query.anonymous_id).toBe("anon-session-123");
-      expect(query.token).toBeUndefined();
+      expect(query).not.toHaveProperty("token");
     });
 
     test("sends the token and no anonymous_id when authenticated", () => {
