@@ -1030,6 +1030,10 @@ type DynamicEntitiesModule = {
  * - **Anonymous or User authentication** (`base44.entities`): Access is scoped to the current user's permissions. Anonymous users can only access public entities, while authenticated users can access entities they have permission to view or modify.
  * - **Service role authentication** (`base44.asServiceRole.entities`): Operations bypass entity access rules and field-level security entirely. Can read and write any record in any entity.
  *
+ * ## Read and write denial
+ *
+ * A row-level security rule that denies a read doesn't raise an error. `list()` and `filter()` return an empty result, indistinguishable from a query that matched nothing. A denied `create()`, `update()`, or `delete()` throws instead, with an HTTP 403 status.
+ *
  * ## Entity Handlers
  *
  * An entity handler is the object you get when you access an entity through `base44.entities.EntityName`. Every entity in your app automatically gets a handler with CRUD methods for managing records.
