@@ -7,6 +7,24 @@ You can use it in two ways:
 - **Inside Base44 apps**: When Base44 generates your app, the SDK is already set up and ready to use.
 - **External apps**: Use the SDK to build your own frontend or backend that uses Base44 as a backend service.
 
+## Platform SDK (server)
+
+The same package includes a separate server entry point for provisioning users and
+managing their apps:
+
+```ts
+import { Base44PlatformClient } from "@base44/sdk/platform/server";
+
+const platform = new Base44PlatformClient({ apiKey, workspaceId });
+await platform.users.provision({ externalId: "customer_42" });
+const apps = await platform.asUser("customer_42").apps.list();
+```
+
+Use this entry point only on your server. `tokenStore` is optional and defaults to
+in-memory caching. See the [platform guide](platform-docs/README.md),
+[complete API reference](platform-docs/api.md), and [token lifecycle](platform-docs/tokens.md).
+The existing `@base44/sdk` root import continues to provide the runtime SDK.
+
 ## Installation
 
 **Inside Base44 apps**: The SDK is already available. No installation needed.
