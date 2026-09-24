@@ -676,6 +676,10 @@ export interface EntityHandler<T = any> {
    *
    * Permanently removes a record from the database.
    *
+   * **Note:** Usually throws a not-found error if a row-level security rule
+   * denies this call, some rules can instead throw a permission error. See
+   * {@link EntitiesModule | Denied reads and writes}.
+   *
    * @param id - The unique identifier of the record to delete.
    * @returns Promise resolving to the deletion result.
    *
@@ -1070,6 +1074,7 @@ type DynamicEntitiesModule = {
  * | `list()`, `filter()` | Returns an empty result, the same as if nothing matched. No error is thrown. |
  * | `get()` | Throws a not-found error (HTTP 404), whether or not the record exists. |
  * | `create()`, `update()` | Throws a permission error (HTTP 403). |
+ * | `delete()` | Usually throws a not-found error like {@linkcode EntityHandler.get | get()}. Some rules can instead throw a permission error (HTTP 403). |
  *
  * ## Generated Types
  *
