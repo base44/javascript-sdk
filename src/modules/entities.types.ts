@@ -1030,9 +1030,15 @@ type DynamicEntitiesModule = {
  * - **Anonymous or User authentication** (`base44.entities`): Access is scoped to the current user's permissions. Anonymous users can only access public entities, while authenticated users can access entities they have permission to view or modify.
  * - **Service role authentication** (`base44.asServiceRole.entities`): Operations bypass entity access rules and field-level security entirely. Can read and write any record in any entity.
  *
- * ## Read and write denial
+ * ## How denied reads and writes differ
  *
- * A row-level security rule that denies a read doesn't raise an error. `list()` and `filter()` return an empty result, indistinguishable from a query that matched nothing. A denied `create()`, `update()`, or `delete()` throws instead, with an HTTP 403 status.
+ * Row-level security handles reads and writes differently.
+ *
+ * | Operation | When a rule denies it |
+ * | --- | --- |
+ * | `list()`, `filter()` | Returns an empty result, the same as if nothing matched. No error is thrown. |
+ * | `get()` | Throws a not-found error, whether or not the record exists. |
+ * | `create()`, `update()` | Throws a permission error with HTTP 403. |
  *
  * ## Entity Handlers
  *
