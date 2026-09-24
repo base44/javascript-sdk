@@ -8,7 +8,7 @@ import {
 import { getSharedInstance } from "../../src/utils/sharedInstance.ts";
 import { resetAnalyticsSessionContext } from "../../src/modules/analytics.ts";
 import { InternalAuthModule, User } from "../../src/modules/auth.types.ts";
-import { AxiosInstance } from "axios";
+import { platform } from "../mocks/platform";
 
 describe("Analytics Module", () => {
   let base44: ReturnType<typeof createClient>;
@@ -22,22 +22,9 @@ describe("Analytics Module", () => {
   const serverUrl = "https://api.base44.com";
 
   beforeEach(() => {
-    vi.mock("../../src/utils/axios-client.ts", () => ({
-      createAxiosClient: vi.fn().mockImplementation(
-        () =>
-          ({
-            // `setToken` and `logout` write through to these, so the mock needs
-            // them present per instance.
-            defaults: { headers: { common: {} as Record<string, string> } },
-            request: vi.fn().mockResolvedValue({
-              status: 200,
-              data: {
-                message: "success",
-              },
-            }),
-          } as unknown as AxiosInstance)
-      ),
-    }));
+    platform.given
+      .app(appId)
+      .auth.principal("test-access-token", { id: "test-user-id" });
     sharedState = getSharedInstance("analytics", () => ({
       requestsQueue: [],
       isProcessing: false,
@@ -66,9 +53,18 @@ describe("Analytics Module", () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Let real intercepted requests and the processor finish before resetting shared state.
+    await vi.waitFor(() => expect(sharedState?.isProcessing).toBe(false), {
+      timeout: 5000,
+    });
+    vi.useRealTimers();
+    vi.restoreAllMocks();
     vi.clearAllMocks();
     base44.cleanup();
+    // cleanup flips the shared flag but does not cancel a processor throttle timer.
+    // Drain that existing timer before another test starts a new processor.
+    await new Promise((resolve) => setTimeout(resolve, 1100));
     vi.unstubAllGlobals();
     sharedState = null;
   });
@@ -139,7 +135,7 @@ describe("Analytics Module", () => {
     vi.spyOn(base44.auth, "me").mockReturnValue(
       new Promise<User>((resolve) => {
         resolveMe = resolve;
-      })
+      }),
     );
 
     // Flushing this event resolves the session context, which suspends on me().
@@ -218,24 +214,35 @@ describe("Analytics Module", () => {
   });
 
   test("should track multiple events", async () => {
-    vi.useFakeTimers();
-
     for (let i = 0; i < 5; i++) {
       base44.analytics.track({ eventName: `test-event ${i}` });
     }
 
     expect(sharedState?.isProcessing).toBe(true);
     expect(sharedState?.requestsQueue.length).toBe(4);
-    await vi.advanceTimersByTimeAsync(1000);
-    expect(sharedState?.requestsQueue.length).toBe(2);
+    await vi.waitFor(() => expect(sharedState?.requestsQueue.length).toBe(2), {
+      timeout: 2500,
+    });
     // add another event while processing to mix things up
     base44.analytics.track({ eventName: `test-event 5` });
 
-    await vi.advanceTimersByTimeAsync(1000);
-    expect(sharedState?.requestsQueue.length).toBe(1);
-    await vi.advanceTimersByTimeAsync(1000);
-    expect(sharedState?.requestsQueue.length).toBe(0);
-    await vi.advanceTimersByTimeAsync(1000);
-    expect(sharedState?.isProcessing).toBe(false);
+    await vi.waitFor(() => expect(sharedState?.requestsQueue.length).toBe(1), {
+      timeout: 2500,
+    });
+    await vi.waitFor(() => expect(sharedState?.requestsQueue.length).toBe(0), {
+      timeout: 2500,
+    });
+    await vi.waitFor(() => expect(sharedState?.isProcessing).toBe(false), {
+      timeout: 2500,
+    });
+
+    const batches = platform.requests
+      .all("analytics.trackBatch")
+      .map((request) => request.body as { events: { event_name: string }[] });
+    expect(batches.length).toBeGreaterThan(0);
+    expect(batches.every((batch) => batch.events.length <= 2)).toBe(true);
+    expect(
+      batches.flatMap((batch) => batch.events.map((event) => event.event_name)),
+    ).toEqual(Array.from({ length: 6 }, (_, index) => `test-event ${index}`));
   });
 });

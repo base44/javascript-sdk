@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { createClient, createClientFromRequest } from "../../src/index.ts";
+import { createClient, createClientFromRequest as fromRequest } from "../../src/index.ts";
+import { platform } from "../mocks/platform";
 
 const appId = "test-app-id";
 const origin = "https://my-app.base44.app";
@@ -35,29 +36,41 @@ function stubBrowser(storage = makeLocalStorage()) {
   vi.stubGlobal("localStorage", storage);
 }
 
-const createTestClient = (token?: string) =>
-  createClient({
-    serverUrl: "",
-    appId,
-    token,
-    analytics: { enabled: false },
-  });
-
-let fetchMock: ReturnType<typeof vi.fn>;
-
+// Node has no browser-relative fetch base. This injected platform adapter resolves
+// the URL, then uses real fetch intercepted by MSW; it never fabricates a response.
+const transportCalls: Array<[string, RequestInit]> = [];
+const clients: Array<ReturnType<typeof createClient>> = [];
+const createClientFromRequest = (request: Request) => {
+  const client = fromRequest(request);
+  clients.push(client);
+  return client;
+};
+const transport: typeof fetch = async (input, init = {}) => {
+  transportCalls.push([String(input), init]);
+  return fetch(new URL(String(input), origin), init);
+};
+const createTestClient = (token?: string) => {
+  const client = createClient({serverUrl: "", appId, token, analytics: {enabled: false}});
+  clients.push(client);
+  const original = client.fetchWithAuth.bind(client);
+  client.fetchWithAuth = (path, options = {}) => original(path, {fetch: transport, ...options});
+  return client;
+};
 beforeEach(() => {
-  fetchMock = vi.fn().mockResolvedValue(new Response("{}"));
-  vi.stubGlobal("fetch", fetchMock);
+  transportCalls.length = 0;
+  for (const path of ["/api/orders", "/api/public", "/api/items"])
+    platform.given.generic.route(path);
 });
-
 afterEach(() => {
+  for (const client of clients.splice(0)) client.cleanup();
   vi.unstubAllGlobals();
   vi.clearAllMocks();
 });
-
 const lastCall = () => {
-  const [url, init] = fetchMock.mock.calls[0];
-  return { url, init, headers: new Headers(init.headers) };
+  const requests = platform.requests.all("generic.request");
+  expect(requests).toHaveLength(1);
+  const [url, init] = transportCalls[0]!;
+  return { url, init, request: requests[0]!, headers: new Headers(requests[0]!.headers) };
 };
 
 describe("fetchWithAuth", () => {
@@ -110,7 +123,7 @@ describe("fetchWithAuth", () => {
     await base44.fetchWithAuth("/api/public");
 
     expect(lastCall().headers.get("Authorization")).toBeNull();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(platform.requests.count("generic.request")).toBe(1);
   });
 
   test("forwards init options and keeps a caller-set Authorization header", async () => {
@@ -129,6 +142,7 @@ describe("fetchWithAuth", () => {
     const { init, headers } = lastCall();
     expect(init.method).toBe("POST");
     expect(init.body).toBe(JSON.stringify({ productId: "abc" }));
+    expect(lastCall().request.body).toEqual({ productId: "abc" });
     expect(headers.get("Content-Type")).toBe("application/json");
     expect(headers.get("Authorization")).toBe("Bearer caller-token");
   });
@@ -160,7 +174,8 @@ describe("fetchWithAuth", () => {
     await expect(base44.fetchWithAuth(path)).rejects.toThrow(
       /only sends requests to your app's own origin/
     );
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(transportCalls).toHaveLength(0);
+    expect(platform.requests.count("generic.request")).toBe(0);
   });
 
   test("rejects an empty path", async () => {
@@ -168,7 +183,8 @@ describe("fetchWithAuth", () => {
     const base44 = createTestClient("user-token");
 
     await expect(base44.fetchWithAuth("")).rejects.toThrow(/requires a path/);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(transportCalls).toHaveLength(0);
+    expect(platform.requests.count("generic.request")).toBe(0);
   });
 
   test("works with no document, as in a server route", async () => {
@@ -188,7 +204,8 @@ describe("fetchWithAuth", () => {
     await expect(
       base44.fetchWithAuth("https://evil.example/steal")
     ).rejects.toThrow(/only sends requests to your app's own origin/);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(transportCalls).toHaveLength(0);
+    expect(platform.requests.count("generic.request")).toBe(0);
   });
 });
 
@@ -220,7 +237,7 @@ describe("fetchWithAuth from a server route", () => {
   test("sends every header createClientFromRequest reads, so the callee rebuilds the same client", async () => {
     const base44 = createClientFromRequest(inboundRequest());
 
-    await base44.fetchWithAuth("/api/items", { fetch: fetchMock });
+    await base44.fetchWithAuth("/api/items", { fetch: transport });
 
     const { url, headers } = lastCall();
     expect(url).toBe("/api/items");
@@ -235,7 +252,7 @@ describe("fetchWithAuth from a server route", () => {
   test("carries the service credential, so asServiceRole works in the callee", async () => {
     const base44 = createClientFromRequest(inboundRequest());
 
-    await base44.fetchWithAuth("/api/items", { fetch: fetchMock });
+    await base44.fetchWithAuth("/api/items", { fetch: transport });
 
     expect(lastCall().headers.get("Base44-Service-Authorization")).toBe(
       "Bearer service-credential"
@@ -245,7 +262,7 @@ describe("fetchWithAuth from a server route", () => {
   test("does not forward host, which would repoint the sub-request's origin", async () => {
     const base44 = createClientFromRequest(inboundRequest());
 
-    await base44.fetchWithAuth("/api/items", { fetch: fetchMock });
+    await base44.fetchWithAuth("/api/items", { fetch: transport });
 
     expect(lastCall().headers.has("host")).toBe(false);
   });
@@ -253,7 +270,7 @@ describe("fetchWithAuth from a server route", () => {
   test("forwards nothing from the inbound request beyond that set", async () => {
     const base44 = createClientFromRequest(inboundRequest());
 
-    await base44.fetchWithAuth("/api/items", { fetch: fetchMock });
+    await base44.fetchWithAuth("/api/items", { fetch: transport });
 
     expect(lastCall().headers.has("cookie")).toBe(false);
   });
@@ -263,7 +280,7 @@ describe("fetchWithAuth from a server route", () => {
       inboundRequest({ Authorization: undefined })
     );
 
-    await base44.fetchWithAuth("/api/items", { fetch: fetchMock });
+    await base44.fetchWithAuth("/api/items", { fetch: transport });
 
     const { headers } = lastCall();
     expect(headers.has("Authorization")).toBe(false);
@@ -281,7 +298,7 @@ describe("fetchWithAuth from a server route", () => {
       })
     );
 
-    await base44.fetchWithAuth("/api/items", { fetch: fetchMock });
+    await base44.fetchWithAuth("/api/items", { fetch: transport });
 
     const { headers } = lastCall();
     expect(headers.has("Base44-State")).toBe(false);
@@ -293,7 +310,7 @@ describe("fetchWithAuth from a server route", () => {
     const base44 = createClientFromRequest(inboundRequest());
 
     await base44.fetchWithAuth("/api/items", {
-      fetch: fetchMock,
+      fetch: transport,
       headers: { Authorization: "" },
     });
 
@@ -301,12 +318,12 @@ describe("fetchWithAuth from a server route", () => {
   });
 
   test("uses the given transport and does not pass it on as request init", async () => {
-    vi.stubGlobal("fetch", vi.fn());
     const base44 = createClientFromRequest(inboundRequest());
 
-    await base44.fetchWithAuth("/api/items", { fetch: fetchMock });
+    await base44.fetchWithAuth("/api/items", { fetch: transport });
 
-    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(transportCalls).toHaveLength(1);
+    expect(platform.requests.count("generic.request")).toBe(1);
     expect(lastCall().init).not.toHaveProperty("fetch");
   });
 
@@ -314,9 +331,10 @@ describe("fetchWithAuth from a server route", () => {
     const base44 = createClientFromRequest(inboundRequest());
 
     await expect(
-      base44.fetchWithAuth("https://evil.example/steal", { fetch: fetchMock })
+      base44.fetchWithAuth("https://evil.example/steal", { fetch: transport })
     ).rejects.toThrow(/only sends requests to your app's own origin/);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(transportCalls).toHaveLength(0);
+    expect(platform.requests.count("generic.request")).toBe(0);
   });
 });
 

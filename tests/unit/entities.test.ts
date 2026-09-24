@@ -1,19 +1,15 @@
 import { describe, test, expect, beforeEach, afterEach } from "vitest";
-import nock from "nock";
 import { createClient } from "../../src/index.ts";
-import type { DeleteResult, UpdateManyResult } from "../../src/modules/entities.types.ts";
+import { platform } from "../mocks/platform";
 
-/**
- * Todo entity type for testing.
- */
 interface Todo {
   id: string;
   title: string;
   completed: boolean;
-  description?: string;
+  description?: string | null;
+  view_count?: number;
 }
 
-// Module augmentation: register Todo type in EntityTypeRegistry
 declare module "../../src/modules/entities.types.ts" {
   interface EntityTypeRegistry {
     Todo: Todo;
@@ -22,305 +18,340 @@ declare module "../../src/modules/entities.types.ts" {
 
 describe("Entities Module", () => {
   let base44: ReturnType<typeof createClient>;
-  let scope: nock.Scope;
   const appId = "test-app-id";
-  const serverUrl = "https://api.base44.com";
 
   beforeEach(() => {
-    // Create a new client for each test
+    platform.reset();
     base44 = createClient({
-      serverUrl,
+      serverUrl: "https://api.base44.com",
       appId,
     });
-
-    // Create a nock scope for mocking API calls
-    scope = nock(serverUrl);
-
-    // Enable request debugging for Nock
-    nock.disableNetConnect();
-    nock.emitter.on("no match", (req) => {
-      console.log(`Nock: No match for ${req.method} ${req.path}`);
-      console.log("Headers:", req.getHeaders());
-    });
   });
 
-  afterEach(() => {
-    // Clean up any pending mocks
-    nock.cleanAll();
-    nock.emitter.removeAllListeners("no match");
-    nock.enableNetConnect();
-  });
+  afterEach(() => base44.cleanup());
 
-  test("list() should fetch entities with correct parameters", async () => {
-    const mockTodos: Todo[] = [
+  test("list() fetches arranged entities with the correct parameters", async () => {
+    platform.given.app(appId).entities.records("Todo", [
       { id: "1", title: "Task 1", completed: false },
       { id: "2", title: "Task 2", completed: true },
-    ];
+    ]);
 
-    // Mock the API response
-    scope
-      .get(`/api/apps/${appId}/entities/Todo`)
-      .query(true) // Accept any query parameters
-      .reply(200, mockTodos);
-
-    // Call the API
     const result = await base44.entities.Todo.list("title", 10, 0, [
       "id",
       "title",
     ]);
 
-    // Verify the response
-    expect(result).toHaveLength(2);
-    expect(result[0].title).toBe("Task 1");
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    expect(result).toEqual([
+      { id: "1", title: "Task 1" },
+      { id: "2", title: "Task 2" },
+    ]);
+    expect(platform.requests.last("entities.list").query).toEqual({
+      fields: "id,title",
+      limit: "10",
+      sort: "title",
+    });
   });
 
-  test("filter() should send correct query parameters", async () => {
-    const filterQuery: Partial<Todo> = { completed: true };
-    const mockTodos: Todo[] = [{ id: "2", title: "Task 2", completed: true }];
+  test("list() retains id when a field projection omits it", async () => {
+    platform.given
+      .app(appId)
+      .entities.records("Todo", [
+        { id: "1", title: "Projected", completed: false },
+      ]);
 
-    // Mock the API response
-    scope
-      .get(`/api/apps/${appId}/entities/Todo`)
-      .query((query) => {
-        // Verify the query contains our filter
-        const parsedQ = JSON.parse(query.q as string);
-        return parsedQ.completed === true;
-      })
-      .reply(200, mockTodos);
-
-    // Call the API
-    const result = await base44.entities.Todo.filter(filterQuery);
-
-    // Verify the response
-    expect(result).toHaveLength(1);
-    expect(result[0].completed).toBe(true);
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    await expect(
+      base44.entities.Todo.list(undefined, undefined, undefined, ["title"]),
+    ).resolves.toEqual([{ id: "1", title: "Projected" }]);
   });
 
-  test("filter() should support typed advanced query syntax", async () => {
-    const mockTodos: Todo[] = [{ id: "2", title: "Task 2", completed: true }];
+  test("list() sorts numeric fields numerically in both directions", async () => {
+    platform.given.app(appId).entities.records("Todo", [
+      { id: "1", title: "Ten", completed: false, view_count: 10 },
+      { id: "2", title: "Two", completed: false, view_count: 2 },
+      { id: "3", title: "Thirty", completed: false, view_count: 30 },
+    ]);
 
-    scope
-      .get(`/api/apps/${appId}/entities/Todo`)
-      .query((query) => {
-        const parsedQ = JSON.parse(query.q as string);
+    await expect(
+      base44.entities.Todo.list("view_count"),
+    ).resolves.toMatchObject([
+      { view_count: 2 },
+      { view_count: 10 },
+      { view_count: 30 },
+    ]);
+    await expect(
+      base44.entities.Todo.list("-view_count"),
+    ).resolves.toMatchObject([
+      { view_count: 30 },
+      { view_count: 10 },
+      { view_count: 2 },
+    ]);
+  });
 
-        return (
-          parsedQ.title.$in[0] === "Task 1" &&
-          parsedQ.title.$in[1] === "Task 2" &&
-          parsedQ.description === null &&
-          parsedQ.$or[0].title === "Task 2" &&
-          parsedQ.$or[1].completed === true
-        );
-      })
-      .reply(200, mockTodos);
+  test("list() applies pagination after numeric sorting", async () => {
+    platform.given.app(appId).entities.records("Todo", [
+      { id: "1", title: "Ten", completed: false, view_count: 10 },
+      { id: "2", title: "Two", completed: false, view_count: 2 },
+      { id: "3", title: "Thirty", completed: false, view_count: 30 },
+      { id: "4", title: "Twenty", completed: false, view_count: 20 },
+    ]);
 
-    const result = await base44.entities.Todo.filter({
+    await expect(
+      base44.entities.Todo.list("view_count", 2, 1),
+    ).resolves.toMatchObject([
+      { id: "1", view_count: 10 },
+      { id: "4", view_count: 20 },
+    ]);
+    expect(platform.requests.last("entities.list").query).toMatchObject({
+      limit: "2",
+      skip: "1",
+      sort: "view_count",
+    });
+  });
+
+  test("list() groups missing and null values consistently around sorted pages", async () => {
+    platform.given.app(appId).entities.records("Todo", [
+      { id: "missing", title: "Missing" },
+      { id: "null", title: "Null", description: null },
+      { id: "zulu", title: "Zulu", description: "Zulu" },
+      { id: "alpha", title: "Alpha", description: "Alpha" },
+    ]);
+
+    await expect(base44.entities.Todo.list("description")).resolves.toEqual([
+      { id: "missing", title: "Missing" },
+      { id: "null", title: "Null", description: null },
+      { id: "alpha", title: "Alpha", description: "Alpha" },
+      { id: "zulu", title: "Zulu", description: "Zulu" },
+    ]);
+    await expect(base44.entities.Todo.list("-description")).resolves.toEqual([
+      { id: "zulu", title: "Zulu", description: "Zulu" },
+      { id: "alpha", title: "Alpha", description: "Alpha" },
+      { id: "missing", title: "Missing" },
+      { id: "null", title: "Null", description: null },
+    ]);
+    await expect(
+      base44.entities.Todo.list("description", 2, 1),
+    ).resolves.toEqual([
+      { id: "null", title: "Null", description: null },
+      { id: "alpha", title: "Alpha", description: "Alpha" },
+    ]);
+  });
+
+  test("filter() sends the query and returns matching domain state", async () => {
+    platform.given.app(appId).entities.records("Todo", [
+      { id: "1", title: "Task 1", completed: false },
+      { id: "2", title: "Task 2", completed: true },
+    ]);
+
+    const result = await base44.entities.Todo.filter({ completed: true });
+
+    expect(result).toEqual([{ id: "2", title: "Task 2", completed: true }]);
+    expect(JSON.parse(platform.requests.last("entities.list").query.q)).toEqual(
+      {
+        completed: true,
+      },
+    );
+  });
+
+  test("filter() supports typed advanced query syntax", async () => {
+    platform.given.app(appId).entities.records("Todo", [
+      { id: "1", title: "Task 1", completed: false, description: "notes" },
+      { id: "2", title: "Task 2", completed: true, description: null },
+    ]);
+    const query = {
       title: { $in: ["Task 1", "Task 2"] },
       description: null,
       $or: [{ title: "Task 2" }, { completed: true }],
-    });
+    };
+
+    const result = await base44.entities.Todo.filter(query);
 
     expect(result).toHaveLength(1);
-    expect(scope.isDone()).toBe(true);
+    expect(result[0].id).toBe("2");
+    expect(JSON.parse(platform.requests.last("entities.list").query.q)).toEqual(
+      query,
+    );
   });
 
-  test("get() should fetch a single entity", async () => {
-    const todoId = "123";
-    const mockTodo: Todo = {
-      id: todoId,
+  test("get() fetches one arranged entity", async () => {
+    platform.given
+      .app(appId)
+      .entities.records("Todo", [
+        { id: "123", title: "Get milk", completed: false },
+      ]);
+
+    await expect(base44.entities.Todo.get("123")).resolves.toEqual({
+      id: "123",
       title: "Get milk",
       completed: false,
-    };
-
-    // Mock the API response
-    scope.get(`/api/apps/${appId}/entities/Todo/${todoId}`).reply(200, mockTodo);
-
-    // Call the API
-    const todo = await base44.entities.Todo.get(todoId);
-
-    // Verify the response
-    expect(todo.id).toBe(todoId);
-    expect(todo.title).toBe("Get milk");
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    });
   });
 
-  test("create() should send correct data", async () => {
-    const newTodo: Partial<Todo> = {
+  test("create() persists so subsequent get() and list() observe the record", async () => {
+    platform.given.app(appId).entities.records("Todo", []);
+
+    const created = await base44.entities.Todo.create({
       title: "New task",
       completed: false,
-    };
-    const createdTodo: Todo = {
+    });
+
+    expect(created).toEqual({ id: "1", title: "New task", completed: false });
+    await expect(base44.entities.Todo.get(created.id)).resolves.toEqual(
+      created,
+    );
+    await expect(base44.entities.Todo.list()).resolves.toContainEqual(created);
+    expect(platform.requests.last("entities.create").body).toEqual({
+      title: "New task",
+      completed: false,
+    });
+  });
+
+  test("isolates entity state and generated identifiers by application", async () => {
+    const otherAppId = "other-entity-app";
+    const otherClient = createClient({
+      serverUrl: "https://api.base44.com",
+      appId: otherAppId,
+    });
+    platform.given
+      .app(appId)
+      .entities.records("Todo", [
+        { id: "7", title: "App A", completed: false },
+      ]);
+    platform.given
+      .app(otherAppId)
+      .entities.records("Todo", [{ id: "7", title: "App B", completed: true }]);
+
+    const createdA = await base44.entities.Todo.create({
+      title: "Only A",
+      completed: false,
+    });
+    const createdB = await otherClient.entities.Todo.create({
+      title: "Only B",
+      completed: true,
+    });
+    expect(createdA.id).toBe("8");
+    expect(createdB.id).toBe("8");
+    await expect(base44.entities.Todo.list()).resolves.toHaveLength(2);
+    await expect(otherClient.entities.Todo.list()).resolves.toEqual([
+      { id: "7", title: "App B", completed: true },
+      createdB,
+    ]);
+    await expect(base44.entities.Todo.list()).resolves.not.toContainEqual(
+      createdB,
+    );
+    otherClient.cleanup();
+  });
+
+  test("update() changes the stored entity", async () => {
+    platform.given
+      .app(appId)
+      .entities.records("Todo", [
+        { id: "123", title: "Old task", completed: false },
+      ]);
+
+    const updated = await base44.entities.Todo.update("123", {
+      title: "Updated task",
+      completed: true,
+    });
+
+    expect(updated).toEqual({
       id: "123",
-      title: "New task",
-      completed: false,
-    };
-
-    // Mock the API response
-    scope
-      .post(`/api/apps/${appId}/entities/Todo`, newTodo as nock.RequestBodyMatcher)
-      .reply(201, createdTodo);
-
-    // Call the API
-    const todo = await base44.entities.Todo.create(newTodo);
-
-    // Verify the response
-    expect(todo.id).toBe("123");
-    expect(todo.title).toBe("New task");
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
-  });
-
-  test("update() should send correct data", async () => {
-    const todoId = "123";
-    const updates: Partial<Todo> = {
       title: "Updated task",
       completed: true,
-    };
-    const updatedTodo: Todo = {
-      id: todoId,
+    });
+    await expect(base44.entities.Todo.get("123")).resolves.toEqual(updated);
+    expect(platform.requests.last("entities.update").body).toEqual({
       title: "Updated task",
       completed: true,
-    };
-
-    // Mock the API response
-    scope
-      .put(
-        `/api/apps/${appId}/entities/Todo/${todoId}`,
-        updates as nock.RequestBodyMatcher
-      )
-      .reply(200, updatedTodo);
-
-    // Call the API
-    const todo = await base44.entities.Todo.update(todoId, updates);
-
-    // Verify the response
-    expect(todo.id).toBe(todoId);
-    expect(todo.title).toBe("Updated task");
-    expect(todo.completed).toBe(true);
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    });
   });
 
-  test("delete() should call correct endpoint and return DeleteResult", async () => {
-    const todoId = "123";
-    const deleteResult: DeleteResult = { success: true };
+  test("delete() removes the stored entity and returns DeleteResult", async () => {
+    platform.given
+      .app(appId)
+      .entities.records("Todo", [
+        { id: "123", title: "Delete me", completed: false },
+      ]);
 
-    // Mock the API response
-    scope
-      .delete(`/api/apps/${appId}/entities/Todo/${todoId}`)
-      .reply(200, deleteResult);
-
-    // Call the API
-    const result = await base44.entities.Todo.delete(todoId);
-
-    // Verify the response matches DeleteResult type
-    expect(result.success).toBe(true);
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
-  });
-
-  test("updateMany() should send query and data to correct endpoint", async () => {
-    const mockResult: UpdateManyResult = {
+    await expect(base44.entities.Todo.delete("123")).resolves.toEqual({
       success: true,
-      updated: 3,
-      has_more: false,
-    };
+    });
+    await expect(base44.entities.Todo.list()).resolves.toEqual([]);
+  });
 
-    // Mock the API response
-    scope
-      .patch(`/api/apps/${appId}/entities/Todo/update-many`, {
-        query: { completed: false },
-        data: { $set: { completed: true } },
-      })
-      .reply(200, mockResult);
+  test("updateMany() applies update operators to matching records", async () => {
+    platform.given.app(appId).entities.records("Todo", [
+      { id: "1", title: "One", completed: false },
+      { id: "2", title: "Two", completed: false },
+      { id: "3", title: "Three", completed: false },
+      { id: "4", title: "Done", completed: true },
+    ]);
 
-    // Call the API
     const result = await base44.entities.Todo.updateMany(
       { completed: false },
-      { $set: { completed: true } }
+      { $set: { completed: true } },
     );
 
-    // Verify the response
-    expect(result.success).toBe(true);
-    expect(result.updated).toBe(3);
-    expect(result.has_more).toBe(false);
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    expect(result).toEqual({ success: true, updated: 3, has_more: false });
+    expect(await base44.entities.Todo.filter({ completed: true })).toHaveLength(
+      4,
+    );
+    expect(platform.requests.last("entities.updateMany").body).toEqual({
+      query: { completed: false },
+      data: { $set: { completed: true } },
+    });
   });
 
-  test("updateMany() should handle has_more response", async () => {
-    const mockResult: UpdateManyResult = {
-      success: true,
-      updated: 500,
-      has_more: true,
-    };
+  test("updateMany() reports has_more at the platform batch limit", async () => {
+    platform.given.app(appId).entities.records(
+      "Todo",
+      Array.from({ length: 501 }, (_, index) => ({
+        id: String(index + 1),
+        title: `Task ${index + 1}`,
+        completed: false,
+        view_count: 0,
+      })),
+    );
 
-    // Mock the API response
-    scope
-      .patch(`/api/apps/${appId}/entities/Todo/update-many`, {
-        query: {},
-        data: { $inc: { view_count: 1 } },
-      })
-      .reply(200, mockResult);
-
-    // Call the API
     const result = await base44.entities.Todo.updateMany(
       {},
-      { $inc: { view_count: 1 } }
+      { $inc: { view_count: 1 } },
     );
 
-    // Verify the response
-    expect(result.success).toBe(true);
-    expect(result.updated).toBe(500);
-    expect(result.has_more).toBe(true);
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    expect(result).toEqual({ success: true, updated: 500, has_more: true });
+    expect((await base44.entities.Todo.get("1")).view_count).toBe(1);
+    expect((await base44.entities.Todo.get("501")).view_count).toBe(0);
   });
 
-  test("bulkUpdate() should send array of updates to correct endpoint", async () => {
-    const updatePayload = [
+  test("bulkUpdate() updates records without dropping existing fields", async () => {
+    platform.given.app(appId).entities.records("Todo", [
+      { id: "1", title: "Task 1", completed: false },
+      { id: "2", title: "Task 2", completed: false },
+    ]);
+    const updates = [
       { id: "1", title: "Updated Task 1", completed: true },
       { id: "2", title: "Updated Task 2" },
     ];
-    const mockResponse: Todo[] = [
+
+    const result = await base44.entities.Todo.bulkUpdate(updates);
+
+    expect(result).toEqual([
       { id: "1", title: "Updated Task 1", completed: true },
       { id: "2", title: "Updated Task 2", completed: false },
-    ];
-
-    // Mock the API response
-    scope
-      .put(
-        `/api/apps/${appId}/entities/Todo/bulk`,
-        updatePayload as nock.RequestBodyMatcher
-      )
-      .reply(200, mockResponse);
-
-    // Call the API
-    const result = await base44.entities.Todo.bulkUpdate(updatePayload);
-
-    // Verify the response
-    expect(result).toHaveLength(2);
-    expect(result[0].id).toBe("1");
-    expect(result[0].title).toBe("Updated Task 1");
-    expect(result[0].completed).toBe(true);
-    expect(result[1].id).toBe("2");
-    expect(result[1].title).toBe("Updated Task 2");
-
-    // Verify all mocks were called
-    expect(scope.isDone()).toBe(true);
+    ]);
+    expect(platform.requests.last("entities.bulkUpdate").body).toEqual(updates);
   });
 
+  test("reset() isolates platform state and request history", async () => {
+    platform.given
+      .app(appId)
+      .entities.records("Todo", [
+        { id: "1", title: "Transient", completed: false },
+      ]);
+    await base44.entities.Todo.list();
+
+    platform.reset();
+
+    await expect(base44.entities.Todo.list()).resolves.toEqual([]);
+    expect(platform.requests.count("entities.list")).toBe(1);
+  });
 });
