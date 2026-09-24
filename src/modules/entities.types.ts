@@ -1032,13 +1032,14 @@ type DynamicEntitiesModule = {
  *
  * ## How denied reads and writes differ
  *
- * Row-level security handles reads and writes differently.
+ * Denied reads behave as if the data doesn't exist, so they don't reveal
+ * what's there. Denied writes throw, so a blocked change never fails silently.
  *
  * | Operation | When a rule denies it |
  * | --- | --- |
  * | `list()`, `filter()` | Returns an empty result, the same as if nothing matched. No error is thrown. |
- * | `get()` | Throws a not-found error, whether or not the record exists. |
- * | `create()`, `update()` | Throws a permission error with HTTP 403. |
+ * | `get()` | Throws a not-found error (HTTP 404), whether or not the record exists. |
+ * | `create()`, `update()` | Throws a permission error (HTTP 403). |
  *
  * ## Entity Handlers
  *
