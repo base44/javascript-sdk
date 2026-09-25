@@ -31,6 +31,8 @@
   "EntityTypeRegistry",
   "EntityUpsertOptions",
   "EntityUpsertResult",
+  "ExperimentsModule",
+  "ExperimentsSnapshot",
   "FunctionName",
   "FunctionNameRegistry",
   "FunctionsModule",
