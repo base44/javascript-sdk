@@ -379,6 +379,9 @@ export interface EntityHandler<T = any> {
    * and records deleted between pages never shift the boundary. `skip` is kept
    * for existing code and is deprecated for loops.
    *
+   * **Note:** Returns an empty result if a row-level security rule denies
+   * this call. See {@link EntitiesModule | Denied reads and writes}.
+   *
    * @typeParam K - The fields to include in the response. Defaults to all fields.
    * @param sort - Sort parameter, such as `'-created_date'` for descending. Defaults to `'-created_date'`.
    * @param limit - Maximum number of results to return. Defaults to `5000`.
@@ -453,6 +456,9 @@ export interface EntityHandler<T = any> {
    * `cursor` instead of `skip`: every page costs the same however deep you are,
    * and records deleted between pages never shift the boundary. `skip` is kept
    * for existing code and is deprecated for loops.
+   *
+   * **Note:** Returns an empty result if a row-level security rule denies
+   * this call. See {@link EntitiesModule | Denied reads and writes}.
    *
    * @typeParam K - The fields to include in the response. Defaults to all fields.
    * @param query - Query object with field-value pairs. Each key should be a field name
@@ -587,6 +593,10 @@ export interface EntityHandler<T = any> {
    *
    * Retrieves a specific record using its unique identifier.
    *
+   * **Note:** Throws a not-found error, whether or not the record exists,
+   * if a row-level security rule denies this call. See
+   * {@link EntitiesModule | Denied reads and writes}.
+   *
    * @param id - The unique identifier of the record.
    * @returns Promise resolving to the record.
    *
@@ -603,6 +613,9 @@ export interface EntityHandler<T = any> {
    * Creates a new record.
    *
    * Creates a new record with the provided data.
+   *
+   * **Note:** Throws a permission error if a row-level security rule
+   * denies this call. See {@link EntitiesModule | Denied reads and writes}.
    *
    * @param data - Object containing the record data.
    * @returns Promise resolving to the created record.
@@ -630,6 +643,9 @@ export interface EntityHandler<T = any> {
    * update to many records matching a query, use {@linkcode updateMany | updateMany()}.
    * To update multiple specific records with different data each, use
    * {@linkcode bulkUpdate | bulkUpdate()}.
+   *
+   * **Note:** Throws a permission error if a row-level security rule
+   * denies this call. See {@link EntitiesModule | Denied reads and writes}.
    *
    * @param id - The unique identifier of the record to update.
    * @param data - Object containing the fields to update.
@@ -659,6 +675,10 @@ export interface EntityHandler<T = any> {
    * Deletes a single record by ID.
    *
    * Permanently removes a record from the database.
+   *
+   * **Note:** Usually throws a not-found error if a row-level security rule
+   * denies this call, some rules can instead throw a permission error. See
+   * {@link EntitiesModule | Denied reads and writes}.
    *
    * @param id - The unique identifier of the record to delete.
    * @returns Promise resolving to the deletion result.
@@ -1043,6 +1063,18 @@ type DynamicEntitiesModule = {
  * Every app includes a built-in `User` entity that stores user account information. This entity has special security rules that can't be changed.
  *
  * Regular users can only read and update their own user record. With service role authentication, you can read, update, and delete any user. You can't create users using the entities module. Instead, use the functions of the {@link AuthModule | auth module} to invite or register new users.
+ *
+ * ## Denied reads and writes
+ *
+ * Denied reads behave as if the data doesn't exist, so they don't reveal
+ * what's there. Denied writes throw, so a blocked change never fails silently.
+ *
+ * | Operation | When a rule denies it |
+ * | --- | --- |
+ * | `list()`, `filter()` | Returns an empty result, the same as if nothing matched. No error is thrown. |
+ * | `get()` | Throws a not-found error (HTTP 404), whether or not the record exists. |
+ * | `create()`, `update()` | Throws a permission error (HTTP 403). |
+ * | `delete()` | Usually throws a not-found error like {@linkcode EntityHandler.get | get()}. Some rules can instead throw a permission error (HTTP 403). |
  *
  * ## Generated Types
  *
