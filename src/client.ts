@@ -115,6 +115,13 @@ export function createClient(config: CreateClientConfig): Base44Client {
     "X-App-Id": String(appId),
   };
 
+  // Base44-State is the platform's signed proof that the caller passed the
+  // workspace IP allowlist; the gateway checks it like any other app route.
+  const stateHeader = optionalHeaders?.["Base44-State"];
+  const aiGatewayHeaders: Record<string, string> = stateHeader
+    ? { "Base44-State": stateHeader }
+    : {};
+
   const functionHeaders = functionsVersion
     ? {
         ...headers,
@@ -247,7 +254,12 @@ export function createClient(config: CreateClientConfig): Base44Client {
       serverUrl,
       token,
     }),
-    aiGateway: createAiGatewayModule({ serverUrl, token, appId }),
+    aiGateway: createAiGatewayModule({
+      serverUrl,
+      token,
+      appId,
+      headers: aiGatewayHeaders,
+    }),
     appLogs: createAppLogsModule(axiosClient, appId),
     app: createAppModule(axiosClient, appId),
     users: createUsersModule(axiosClient, appId),
@@ -295,7 +307,12 @@ export function createClient(config: CreateClientConfig): Base44Client {
       serverUrl,
       token,
     }),
-    aiGateway: createAiGatewayModule({ serverUrl, token: serviceToken, appId }),
+    aiGateway: createAiGatewayModule({
+      serverUrl,
+      token: serviceToken,
+      appId,
+      headers: aiGatewayHeaders,
+    }),
     appLogs: createAppLogsModule(serviceRoleAxiosClient, appId),
     cleanup: () => {
       if (socket) {

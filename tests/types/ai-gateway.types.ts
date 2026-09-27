@@ -8,6 +8,8 @@ declare const aiGateway: AiGatewayModule;
 const options: AiGatewayConnectionOptions = { provider: "typesafe" };
 aiGateway.connection(options);
 aiGateway.connection();
+const headers: Record<string, string> = aiGateway.connection().headers;
+void headers;
 aiGateway.connection({ provider: "openai" });
 
 // @ts-expect-error Only gateway providers exposed by the SDK are accepted.
