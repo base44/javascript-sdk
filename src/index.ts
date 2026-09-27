@@ -48,6 +48,7 @@ export type {
   EntityFilterValue,
   EntityHandler,
   EntityListOptions,
+  EntityArrayOptions,
   EntityPage,
   EntityRecord,
   EntityTypeRegistry,

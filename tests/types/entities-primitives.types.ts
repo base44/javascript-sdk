@@ -79,6 +79,16 @@ async function inferred() {
   const id: string = page.items[0].id;
   // @ts-expect-error amount was not selected
   page.items[0].amount;
-  return [s, n, id];
+  const viaPage = await client.entities.Sale.page({ query: { store: "s1" }, fields: ["id"] });
+  const pageId: string = viaPage.items[0].id;
+  const values = await client.entities.Sale.page({ distinct: "store" });
+  const v: string = values.items[0];
+  const rows = await client.entities.Sale.list({ sort: "-amount", limit: 10 });
+  const firstRow: string = rows[0].id;
+  const filtered = await client.entities.Sale.filter({ store: "s1" }, { limit: 5, fields: ["id"] });
+  const filteredId: string = filtered[0].id;
+  // @ts-expect-error an options object without cursor returns an array, not a page
+  rows.items;
+  return [s, n, id, pageId, v, firstRow, filteredId];
 }
 export { inferred };

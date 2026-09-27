@@ -57,13 +57,14 @@ export interface UpdateManyResult {
 }
 
 /**
- * Options object accepted by {@linkcode EntityHandler.list | list()} and
- * {@linkcode EntityHandler.filter | filter()} to read one cursor page.
+ * Options object accepted by {@linkcode EntityHandler.page | page()} to read one cursor page of records.
  *
  * @typeParam T - Entity record type.
  * @typeParam K - The fields to include in each record.
  */
 export interface EntityListOptions<T, K extends keyof T = keyof T> {
+  /** Filter for the records, in the same form as {@linkcode EntityHandler.filter | filter()}'s query. Defaults to all records. */
+  query?: EntityFilterQuery<T>;
   /** Sort parameter, such as `'-created_date'` for descending. Defaults to `'-created_date'`. */
   sort?: SortField<T>;
   /** Maximum number of records per page, up to 5,000. Defaults to 100. */
@@ -80,14 +81,15 @@ export interface EntityListOptions<T, K extends keyof T = keyof T> {
 }
 
 /**
- * Options object accepted by {@linkcode EntityHandler.list | list()} and
- * {@linkcode EntityHandler.filter | filter()} to read the distinct values of one field
+ * Options object accepted by {@linkcode EntityHandler.page | page()} to read the distinct values of one field
  * instead of records.
  *
  * @typeParam T - Entity record type.
  * @typeParam K - The field whose distinct values to read.
  */
 export interface EntityDistinctOptions<T, K extends keyof T = keyof T> {
+  /** Filter for the records whose values are read. Defaults to all records. */
+  query?: EntityFilterQuery<T>;
   /** Field whose distinct values to return, in ascending order. Array fields contribute each element. */
   distinct: K;
   /** Maximum number of values per page, up to 1,000. Defaults to 100. */
@@ -97,8 +99,27 @@ export interface EntityDistinctOptions<T, K extends keyof T = keyof T> {
 }
 
 /**
- * One page of records, returned by {@linkcode EntityHandler.list | list()} and
- * {@linkcode EntityHandler.filter | filter()} when called with an options object.
+ * Options object accepted by {@linkcode EntityHandler.list | list()} and
+ * {@linkcode EntityHandler.filter | filter()} in place of positional arguments. Both still return an array.
+ *
+ * @typeParam T - Entity record type.
+ * @typeParam K - The fields to include in each record.
+ */
+export interface EntityArrayOptions<T, K extends keyof T = keyof T> {
+  /** Sort parameter, such as `'-created_date'` for descending. Defaults to `'-created_date'`. */
+  sort?: SortField<T>;
+  /** Maximum number of records to return. Defaults to `5000`. */
+  limit?: number;
+  /** Number of records to skip. Defaults to `0`. For loops over many records, use {@linkcode EntityHandler.page | page()}. */
+  skip?: number;
+  /** Array of field names to include in each record. Defaults to all fields. */
+  fields?: K[];
+  /** Filter for the records. Only read by `list()`; `filter()` takes its query as the first argument. */
+  filter?: EntityFilterQuery<T>;
+}
+
+/**
+ * One page of records, returned by {@linkcode EntityHandler.page | page()}.
  *
  * @typeParam T - Record type of the items.
  */
@@ -374,17 +395,19 @@ export interface EntityHandler<T = any> {
    * pagination, and field selection.
    *
    * **Note:** The maximum limit is 5,000 items per request. To read more than
-   * one page, pass an {@linkcode EntityListOptions | options object} with a
-   * `cursor` instead of `skip`: every page costs the same however deep you are,
-   * and records deleted between pages never shift the boundary. `skip` is kept
-   * for existing code and is deprecated for loops.
+   * one page, use {@linkcode EntityHandler.page | page()} with a cursor instead of
+   * `skip`: every page costs the same however deep you are, and records deleted
+   * between pages never shift the boundary.
+   *
+   * The arguments can also be passed as one {@linkcode EntityArrayOptions | options object}
+   * (`{ sort, limit, skip, fields, filter }`); the result is still an array.
    *
    * @typeParam K - The fields to include in the response. Defaults to all fields.
    * @param sort - Sort parameter, such as `'-created_date'` for descending. Defaults to `'-created_date'`.
    * @param limit - Maximum number of results to return. Defaults to `5000`.
-   * @param skip - Number of results to skip for pagination. Defaults to `0`. Deprecated for loops; use a cursor.
+   * @param skip - Number of results to skip for pagination. Defaults to `0`. For loops, use `page()`.
    * @param fields - Array of field names to include in the response. Defaults to all fields.
-   * @returns Promise resolving to an array of records with selected fields. When called with an options object, resolves instead to an {@linkcode EntityPage | EntityPage} with `items`, `next_cursor` and `has_more`; with a `distinct` option the items are the field's values.
+   * @returns Promise resolving to an array of records with selected fields.
    *
    * @example
    * ```typescript
@@ -413,20 +436,8 @@ export interface EntityHandler<T = any> {
    *
    * @example
    * ```typescript
-   * // Walk every record with a cursor. Pass an options object instead of
-   * // positional arguments to get a page with `next_cursor` and `has_more`.
-   * let page = await base44.entities.MyEntity.list({ sort: '-created_date', limit: 1000 });
-   * await exportRows(page.items);
-   * while (page.has_more) {
-   *   page = await base44.entities.MyEntity.list({ cursor: page.next_cursor, limit: 1000 });
-   *   await exportRows(page.items);
-   * }
-   * ```
-   *
-   * @example
-   * ```typescript
-   * // Distinct values of one field, instead of records
-   * const { items: categories } = await base44.entities.Product.list({ distinct: 'category' });
+   * // The same arguments as one options object; still an array
+   * const recent = await base44.entities.MyEntity.list({ sort: '-created_date', limit: 10 });
    * ```
    */
   list<K extends keyof T = keyof T>(
@@ -435,11 +446,16 @@ export interface EntityHandler<T = any> {
     skip?: number,
     fields?: K[],
   ): Promise<Pick<T, K>[]>;
+  list<K extends keyof T = keyof T>(
+    options: EntityArrayOptions<T, K>,
+  ): Promise<Pick<T, K>[]>;
+  /** @deprecated Use {@linkcode EntityHandler.page | page()}. */
   list<K extends keyof T>(
     options: EntityDistinctOptions<T, K>,
   ): Promise<EntityPage<T[K]>>;
+  /** @deprecated Use {@linkcode EntityHandler.page | page()}. */
   list<K extends keyof T = keyof T>(
-    options: EntityListOptions<T, K>,
+    options: EntityListOptions<T, K> & { cursor: string | null },
   ): Promise<EntityPage<Pick<T, K>>>;
 
   /**
@@ -449,10 +465,13 @@ export interface EntityHandler<T = any> {
    * sorting, pagination, and field selection.
    *
    * **Note:** The maximum limit is 5,000 items per request. To read more than
-   * one page, pass an {@linkcode EntityListOptions | options object} with a
-   * `cursor` instead of `skip`: every page costs the same however deep you are,
-   * and records deleted between pages never shift the boundary. `skip` is kept
-   * for existing code and is deprecated for loops.
+   * one page, use {@linkcode EntityHandler.page | page()} with a cursor instead of
+   * `skip`: every page costs the same however deep you are, and records deleted
+   * between pages never shift the boundary.
+   *
+   * The arguments after the query can also be passed as one
+   * {@linkcode EntityArrayOptions | options object} (`{ sort, limit, skip, fields }`);
+   * the result is still an array.
    *
    * @typeParam K - The fields to include in the response. Defaults to all fields.
    * @param query - Query object with field-value pairs. Each key should be a field name
@@ -462,9 +481,9 @@ export interface EntityHandler<T = any> {
    * provided values, or documented MongoDB query operators for advanced filtering.
    * @param sort - Sort parameter, such as `'-created_date'` for descending. Defaults to `'-created_date'`.
    * @param limit - Maximum number of results to return. Defaults to `5000`.
-   * @param skip - Number of results to skip for pagination. Defaults to `0`. Deprecated for loops; use a cursor.
+   * @param skip - Number of results to skip for pagination. Defaults to `0`. For loops, use `page()`.
    * @param fields - Array of field names to include in the response. Defaults to all fields.
-   * @returns Promise resolving to an array of filtered records with selected fields. When called with an options object, resolves instead to an {@linkcode EntityPage | EntityPage} with `items`, `next_cursor` and `has_more`; with a `distinct` option the items are the field's values.
+   * @returns Promise resolving to an array of filtered records with selected fields.
    *
    * @example
    * ```typescript
@@ -544,26 +563,8 @@ export interface EntityHandler<T = any> {
    *
    * @example
    * ```typescript
-   * // Walk all matching records with a cursor. Pass an options object as the
-   * // second argument to get a page with `next_cursor` and `has_more`.
-   * let page = await base44.entities.Order.filter(
-   *   { status: 'open' },
-   *   { sort: '-created_date', limit: 1000 }
-   * );
-   * await exportRows(page.items);
-   * while (page.has_more) {
-   *   page = await base44.entities.Order.filter({ status: 'open' }, { cursor: page.next_cursor, limit: 1000 });
-   *   await exportRows(page.items);
-   * }
-   * ```
-   *
-   * @example
-   * ```typescript
-   * // Distinct values of one field among the matching records
-   * const { items: agents } = await base44.entities.Order.filter(
-   *   { status: 'open' },
-   *   { distinct: 'agent_id' }
-   * );
+   * // Sort and limit as an options object; still an array
+   * const open = await base44.entities.Order.filter({ status: 'open' }, { sort: '-created_date', limit: 20 });
    * ```
    */
   filter<K extends keyof T = keyof T>(
@@ -573,13 +574,57 @@ export interface EntityHandler<T = any> {
     skip?: number,
     fields?: K[],
   ): Promise<Pick<T, K>[]>;
+  filter<K extends keyof T = keyof T>(
+    query: EntityFilterQuery<T>,
+    options: EntityArrayOptions<T, K>,
+  ): Promise<Pick<T, K>[]>;
+  /** @deprecated Use {@linkcode EntityHandler.page | page()}. */
   filter<K extends keyof T>(
     query: EntityFilterQuery<T>,
     options: EntityDistinctOptions<T, K>,
   ): Promise<EntityPage<T[K]>>;
+  /** @deprecated Use {@linkcode EntityHandler.page | page()}. */
   filter<K extends keyof T = keyof T>(
     query: EntityFilterQuery<T>,
-    options: EntityListOptions<T, K>,
+    options: EntityListOptions<T, K> & { cursor: string | null },
+  ): Promise<EntityPage<Pick<T, K>>>;
+
+  /**
+   * Reads one page of records, or of one field's distinct values, with a cursor.
+   *
+   * Use it for "load more", infinite scroll and exports. Every page costs the same
+   * however deep you are, records deleted between pages never shift the boundary,
+   * and records that share a sort value are each returned once. Pass `next_cursor`
+   * from one page as `cursor` on the next; the token carries the query, sort and
+   * fields, so a later page needs only `cursor` and `limit`. Stop when `has_more`
+   * is false. Every page holds `limit` items except the last.
+   *
+   * @typeParam K - The fields to include in each record, or the field whose values to read.
+   * @param options - `{ query, sort, limit, fields, cursor }` for records, or `{ query, distinct, limit, cursor }` for distinct values.
+   * @returns Promise resolving to an {@linkcode EntityPage | EntityPage} with `items`, `next_cursor` and `has_more`.
+   *
+   * @example
+   * ```typescript
+   * // Walk all matching records
+   * let page = await base44.entities.Order.page({ query: { status: 'open' }, sort: '-created_date', limit: 1000 });
+   * await exportRows(page.items);
+   * while (page.has_more) {
+   *   page = await base44.entities.Order.page({ cursor: page.next_cursor, limit: 1000 });
+   *   await exportRows(page.items);
+   * }
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Distinct values of one field among the matching records
+   * const { items: agents } = await base44.entities.Order.page({ query: { status: 'open' }, distinct: 'agent_id' });
+   * ```
+   */
+  page<K extends keyof T>(
+    options: EntityDistinctOptions<T, K>,
+  ): Promise<EntityPage<T[K]>>;
+  page<K extends keyof T = keyof T>(
+    options?: EntityListOptions<T, K>,
   ): Promise<EntityPage<Pick<T, K>>>;
 
   /**
