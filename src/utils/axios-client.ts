@@ -132,6 +132,41 @@ function safeErrorLog(prefix: string, error: unknown) {
   }
 }
 
+const CREDENTIAL_HEADERS = new Set([
+  "authorization",
+  "on-behalf-of",
+  "base44-service-authorization",
+]);
+
+/**
+ * Removes credentials from a failed request's error before app code sees it.
+ *
+ * An axios error carries its request config and the raw Node request, so
+ * logging it (for example `console.log(error)`) printed the bearer token.
+ *
+ * @param error - The axios error to scrub in place
+ * @internal
+ */
+function redactCredentials(error: any) {
+  const headers = error?.config?.headers;
+  if (headers) {
+    const names = Object.keys(
+      typeof headers.toJSON === "function" ? headers.toJSON() : headers
+    );
+    for (const name of names) {
+      if (CREDENTIAL_HEADERS.has(name.toLowerCase())) {
+        headers[name] = "[REDACTED]";
+      }
+    }
+  }
+  // The Node request object also holds the raw header block (`_header`).
+  for (const target of [error, error?.response]) {
+    if (target && "request" in target) {
+      Object.defineProperty(target, "request", { enumerable: false });
+    }
+  }
+}
+
 /**
  * Creates an axios client with default configuration and interceptors.
  *
@@ -172,6 +207,12 @@ export function createAxiosClient({
   if (token) {
     client.defaults.headers.common["Authorization"] = `Bearer ${token}`;
   }
+
+  // Registered first so it also covers clients that skip the Base44Error wrapper.
+  client.interceptors.response.use(undefined, (error) => {
+    redactCredentials(error);
+    return Promise.reject(error);
+  });
 
   // Add origin URL in browser environment
   client.interceptors.request.use((config) => {
