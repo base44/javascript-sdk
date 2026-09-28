@@ -64,7 +64,7 @@ export interface FunctionsModule {
    *
    * @param functionName - The name of the function to invoke.
    * @param data - An object containing named parameters for the function.
-   * @returns Promise resolving to the function's response. The `data` property contains the data returned by the function, if there is any.
+   * @returns Promise resolving to the function's response, with `data`, `status`, `statusText`, and `headers` properties. The `data` property contains the data returned by the function, if there is any. The request config isn't included, since it holds the auth headers.
    *
    * @example
    * ```typescript
