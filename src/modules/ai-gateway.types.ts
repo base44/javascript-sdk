@@ -9,6 +9,16 @@ export interface AiGatewayConnection {
    * unauthenticated.
    */
   token: string;
+  /**
+   * Extra headers to send with every gateway request. Pass them to your client's
+   * header option, such as `defaultHeaders` for the `openai` SDK and TanStack AI,
+   * or `headers` for the Vercel AI SDK.
+   *
+   * On a client from {@linkcode createClientFromRequest | createClientFromRequest()},
+   * this carries the signed `Base44-State` the platform attached to the request,
+   * which a workspace IP allowlist requires. Otherwise it's empty.
+   */
+  headers: Record<string, string>;
 }
 
 /** Options for selecting an AI Gateway provider. */
@@ -28,13 +38,15 @@ export interface AiGatewayModuleConfig {
   token?: string;
   /** Application ID */
   appId: string;
+  /** Platform headers to forward on gateway requests */
+  headers?: Record<string, string>;
 }
 
 /**
  * AI Gateway module for calling Base44's managed AI models from your own code.
  *
- * `connection()` hands you a `baseURL` and `token` that authenticate as your
- * Base44 app. An OpenAI-compatible client is any library, such as the `openai`
+ * `connection()` hands you a `baseURL`, `token`, and `headers` that
+ * authenticate as your Base44 app. An OpenAI-compatible client is any library, such as the `openai`
  * SDK or the Vercel AI SDK, that has the same request and response format
  * as OpenAI's API and lets you point it at a custom `baseURL`
  * instead of OpenAI's own servers. Pass `connection()`'s values to one of
@@ -83,18 +95,16 @@ export interface AiGatewayModuleConfig {
  * app until the quota resets. A request is rejected before the model runs if
  * the app is out of credits. If you need to cap usage per user, build that
  * check yourself, for example by tracking calls per user in your own entity.
- *
- * Streaming responses aren't supported yet, so leave `stream` unset on your requests.
  */
 export interface AiGatewayModule {
   /**
    * Gets the connection details for the Base44 AI Gateway.
    *
-   * Returns the `baseURL` and `token` to pass to the selected provider client.
+   * Returns the `baseURL`, `token`, and `headers` to pass to the selected provider client.
    *
    * @param options - Provider selection. Omit it to use the OpenAI-compatible gateway.
    *
-   * @returns The gateway {@linkcode AiGatewayConnection | connection} (`baseURL` and `token`).
+   * @returns The gateway {@linkcode AiGatewayConnection | connection} (`baseURL`, `token`, and `headers`).
    *
    * @example
    * ```typescript
@@ -104,8 +114,8 @@ export interface AiGatewayModule {
    *
    * // Runs inside a backend function
    * const base44 = createClientFromRequest(request);
-   * const { baseURL, token } = base44.aiGateway.connection();
-   * const openai = new OpenAI({ baseURL, apiKey: token });
+   * const { baseURL, token, headers } = base44.aiGateway.connection();
+   * const openai = new OpenAI({ baseURL, apiKey: token, defaultHeaders: headers });
    *
    * const response = await openai.chat.completions.create({
    *   model: "automatic",
@@ -126,9 +136,9 @@ export interface AiGatewayModule {
    * // Runs inside a backend function, reviewing a return request
    * const base44 = createClientFromRequest(request);
    * const returnRequest = await base44.entities.ReturnRequest.get(returnId);
-   * const { baseURL, token } = base44.aiGateway.connection();
-   * // Point any OpenAI-compatible client at `baseURL` with `apiKey: token`.
-   * const models = createOpenAICompatible({ name: "base44", baseURL, apiKey: token });
+   * const { baseURL, token, headers } = base44.aiGateway.connection();
+   * // Point any OpenAI-compatible client at `baseURL` with `apiKey: token` and `headers`.
+   * const models = createOpenAICompatible({ name: "base44", baseURL, apiKey: token, headers });
    *
    * const agent = new ToolLoopAgent({
    *   model: models("automatic"),
@@ -167,8 +177,8 @@ export interface AiGatewayModule {
    *
    * // Runs inside a backend function
    * const base44 = createClientFromRequest(request);
-   * const { baseURL, token } = base44.aiGateway.connection();
-   * const models = createOpenAICompatible({ name: "base44", baseURL, apiKey: token });
+   * const { baseURL, token, headers } = base44.aiGateway.connection();
+   * const models = createOpenAICompatible({ name: "base44", baseURL, apiKey: token, headers });
    *
    * const { image } = await generateImage({
    *   model: models.imageModel("automatic"),

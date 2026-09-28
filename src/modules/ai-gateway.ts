@@ -15,6 +15,7 @@ export function createAiGatewayModule({
   serverUrl,
   token,
   appId,
+  headers = {},
 }: AiGatewayModuleConfig): AiGatewayModule {
   const connection = (
     { provider = "openai" }: AiGatewayConnectionOptions = {}
@@ -27,6 +28,7 @@ export function createAiGatewayModule({
     return {
       baseURL: `${serverUrl}/api/apps/${appId}/ai/${providerPath}/v1`,
       token: token ?? getAccessToken() ?? "",
+      headers: { ...headers },
     };
   };
 

@@ -40,6 +40,7 @@ describe("AI Gateway Module", () => {
       expect(base44.aiGateway.connection({ provider: "typesafe" })).toEqual({
         baseURL: typesafeBaseURL,
         token: "user-token",
+        headers: {},
       });
     });
 
@@ -58,12 +59,14 @@ describe("AI Gateway Module", () => {
       expect(base44.aiGateway.connection({ provider: "typesafe" })).toEqual({
         baseURL: backendTypesafeBaseURL,
         token: "user-token",
+        headers: {},
       });
       expect(
         base44.asServiceRole.aiGateway.connection({ provider: "typesafe" })
       ).toEqual({
         baseURL: backendTypesafeBaseURL,
         token: "service-token",
+        headers: {},
       });
     });
 
@@ -79,7 +82,39 @@ describe("AI Gateway Module", () => {
       ).toEqual({
         baseURL: typesafeBaseURL,
         token: "service-token",
+        headers: {},
       });
+    });
+
+    test("should forward the request's Base44-State in both authentication modes", () => {
+      const request = new Request("https://functions.internal/run", {
+        headers: {
+          "Base44-App-Id": appId,
+          "Base44-Api-Url": serverUrl,
+          "Base44-State": "signed-state",
+          "X-Data-Env": "dev",
+          Authorization: "Bearer user-token",
+          "Base44-Service-Authorization": "Bearer service-token",
+        },
+      });
+      const base44 = createClientFromRequest(request);
+      expect(base44.aiGateway.connection().headers).toEqual({
+        "Base44-State": "signed-state",
+      });
+      expect(base44.asServiceRole.aiGateway.connection().headers).toEqual({
+        "Base44-State": "signed-state",
+      });
+    });
+
+    test("should return a fresh headers object on every call", () => {
+      const request = new Request("https://functions.internal/run", {
+        headers: { "Base44-App-Id": appId, "Base44-State": "signed-state" },
+      });
+      const base44 = createClientFromRequest(request);
+      base44.aiGateway.connection().headers["Base44-State"] = "tampered";
+      expect(base44.aiGateway.connection().headers["Base44-State"]).toBe(
+        "signed-state"
+      );
     });
   });
 });
