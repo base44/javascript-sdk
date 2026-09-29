@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { AxiosHeaders } from "axios";
 import { isInIFrame } from "./common.js";
 import { v4 as uuidv4 } from "uuid";
 import { getAnalyticsSessionId } from "../modules/analytics.js";
@@ -132,6 +132,135 @@ function safeErrorLog(prefix: string, error: unknown) {
   }
 }
 
+const REDACTED = "[REDACTED]";
+
+const CREDENTIAL_HEADERS = [
+  "Authorization",
+  "on-behalf-of",
+  "Base44-Service-Authorization",
+  // Signed proof that the caller passed the IP allowlist; replayable if logged.
+  "Base44-State",
+];
+
+// Request body fields that hold secrets (see the bodies built in modules/auth.ts).
+const SECRET_BODY_KEYS = new Set([
+  "password",
+  "current_password",
+  "new_password",
+  "reset_token",
+  "turnstile_token",
+  "otp_code",
+  "access_token",
+  "refresh_token",
+  "token",
+]);
+
+/**
+ * Returns a copy of request headers with credential values replaced.
+ *
+ * @param headers - The request's headers, left unchanged
+ * @returns A new AxiosHeaders instance
+ * @internal
+ */
+function redactHeaders(headers: unknown) {
+  // Not `AxiosHeaders.from`, which returns an AxiosHeaders argument as-is.
+  const copy = new AxiosHeaders(headers as any);
+  for (const name of CREDENTIAL_HEADERS) {
+    if (copy.has(name)) {
+      copy.set(name, REDACTED);
+    }
+  }
+  return copy;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== "object") return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+function redactSecretKeys(value: unknown, seen: WeakSet<object>): unknown {
+  if (Array.isArray(value)) {
+    if (seen.has(value)) return value;
+    seen.add(value);
+    return value.map((item) => redactSecretKeys(item, seen));
+  }
+  if (!isPlainObject(value) || seen.has(value)) return value;
+  seen.add(value);
+  const copy: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value)) {
+    copy[key] = SECRET_BODY_KEYS.has(key.toLowerCase())
+      ? REDACTED
+      : redactSecretKeys(item, seen);
+  }
+  return copy;
+}
+
+/**
+ * Returns a copy of a request body with secret fields replaced.
+ *
+ * Handles both a serialized JSON string (the usual case by the time a request
+ * has been sent) and a plain object. Other bodies, such as `FormData`, are
+ * returned unchanged.
+ *
+ * @param data - The request body, left unchanged
+ * @returns The redacted body
+ * @internal
+ */
+function redactBody(data: unknown): unknown {
+  if (typeof data === "string") {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(data);
+    } catch {
+      return data;
+    }
+    return typeof parsed === "object" && parsed !== null
+      ? JSON.stringify(redactSecretKeys(parsed, new WeakSet()))
+      : data;
+  }
+  return redactSecretKeys(data, new WeakSet());
+}
+
+/**
+ * Removes credentials from a failed request's error before app code sees it.
+ *
+ * An axios error carries its request config and the raw Node request, so
+ * logging it (for example `console.log(error)`) printed the bearer token.
+ * The config is replaced with a redacted copy, so the object axios sent is not
+ * changed, and the raw request is removed.
+ *
+ * Never throws: a failure here must not replace the original error.
+ *
+ * @param error - The rejection value to scrub
+ * @internal
+ */
+function sanitizeError(error: unknown) {
+  if (!error || typeof error !== "object") return;
+  try {
+    const target = error as Record<string, any>;
+    const config = target.config;
+    if (config && typeof config === "object") {
+      const redactedConfig = {
+        ...config,
+        headers: redactHeaders(config.headers),
+        data: redactBody(config.data),
+      };
+      target.config = redactedConfig;
+      if (target.response?.config === config) {
+        target.response.config = redactedConfig;
+      }
+    }
+    // The Node request object also holds the raw header block (`_header`).
+    delete target.request;
+    if (target.response && typeof target.response === "object") {
+      delete target.response.request;
+    }
+  } catch {
+    /* leave the error as it is */
+  }
+}
+
 /**
  * Creates an axios client with default configuration and interceptors.
  *
@@ -172,6 +301,12 @@ export function createAxiosClient({
   if (token) {
     client.defaults.headers.common["Authorization"] = `Bearer ${token}`;
   }
+
+  // Registered first so it also covers clients that skip the Base44Error wrapper.
+  client.interceptors.response.use(undefined, (error) => {
+    sanitizeError(error);
+    return Promise.reject(error);
+  });
 
   // Add origin URL in browser environment
   client.interceptors.request.use((config) => {

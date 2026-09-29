@@ -76,11 +76,15 @@ export function createFunctionsModule(
         contentType = "application/json";
       }
 
-      return axios.post(
-        `/apps/${appId}/functions/${functionName}`,
-        formData || data,
-        { headers: { "Content-Type": contentType } }
-      );
+      // Return only the response fields: the axios response also carries the
+      // request config and raw request, both of which hold the auth headers.
+      const { data: responseData, status, statusText, headers } =
+        await axios.post(
+          `/apps/${appId}/functions/${functionName}`,
+          formData || data,
+          { headers: { "Content-Type": contentType } }
+        );
+      return { data: responseData, status, statusText, headers };
     },
 
     // Fetch a backend function endpoint directly.
