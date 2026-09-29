@@ -86,8 +86,16 @@ const DEFAULT_PAGE_LIMIT = 100;
 
 type PageOptions<T> = EntityListOptions<T, any> | EntityDistinctOptions<T, any>;
 
-function isPageOptions(value: unknown): value is PageOptions<any> {
-  return typeof value === "object" && value !== null;
+// Keys of the object form of list()/filter(). An object passed to list() with none of them is a filter query.
+const ARRAY_OPTION_KEYS = ["sort", "limit", "skip", "fields", "filter", "query"];
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+// Code written for 0.8.49 reads a page from list()/filter() with a cursor or distinct option; keep it working.
+function isPageRequest(value: Record<string, any>): value is PageOptions<any> {
+  return "cursor" in value || "distinct" in value;
 }
 
 /**
@@ -128,7 +136,7 @@ function createEntityHandler<T = any>(
     return axios.get(baseURL, { params });
   };
 
-  // GET /{entity}/v2/list: one cursor page of records or distinct values, shared by list(options) and filter(query, options)
+  // GET /{entity}/v2/list: one cursor page of records or distinct values
   const readPage = (options: PageOptions<T>, query?: EntityFilterQuery<T>) => {
     const params: Record<string, string | number> = {};
     if (query) params.q = JSON.stringify(query);
@@ -144,16 +152,28 @@ function createEntityHandler<T = any>(
   };
 
   return {
-    // list(sort, limit, skip, fields) returns an array; list(options) returns one cursor page.
     async list(...args: any[]): Promise<any> {
-      const [sort, limit, skip, fields] = args;
-      return isPageOptions(sort) ? readPage(sort) : readArray(sort, limit, skip, fields);
+      const [first, ...rest]: any[] = args;
+      if (!isPlainObject(first)) return readArray(first, ...rest);
+      if (isPageRequest(first)) return readPage(first, first.query);
+      if (Object.keys(first).some((key) => ARRAY_OPTION_KEYS.includes(key))) {
+        return readArray(first.sort, first.limit, first.skip, first.fields, first.filter ?? first.query);
+      }
+      // The object took sort's slot: list({}, 5) means limit 5; list({ email }, '-created_date', 100) follows filter()'s order.
+      return typeof rest[0] === "string"
+        ? readArray(rest[0] as SortField<T>, rest[1], rest[2], rest[3], first)
+        : readArray(undefined, rest[0], rest[1], rest[2], first);
     },
 
-    // filter(query, sort, limit, skip, fields) returns an array; filter(query, options) returns one cursor page.
     async filter(query: EntityFilterQuery<T>, ...args: any[]): Promise<any> {
-      const [sort, limit, skip, fields] = args;
-      return isPageOptions(sort) ? readPage(sort, query) : readArray(sort, limit, skip, fields, query);
+      const [second, ...rest] = args;
+      if (!isPlainObject(second)) return readArray(second, rest[0], rest[1], rest[2], query);
+      if (isPageRequest(second)) return readPage(second, query);
+      return readArray(second.sort, second.limit, second.skip, second.fields, query);
+    },
+
+    async page(options: any = {}): Promise<any> {
+      return readPage(options, options.query);
     },
 
     // Get entity by ID

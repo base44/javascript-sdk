@@ -40,7 +40,7 @@ describe("Entities scan-free primitives", () => {
     nock.enableNetConnect();
   });
 
-  test("filter() with an options object reads a cursor page from v2/list", async () => {
+  test("filter() with a cursor option still reads a page from v2/list (0.8.49 code)", async () => {
     const reply: EntityPage<Pick<Order, "id" | "amount">> = {
       items: [{ id: "1", amount: 10 }],
       next_cursor: "tok-2",
@@ -115,6 +115,47 @@ describe("Entities scan-free primitives", () => {
 
     expect(await base44.entities.Order.list("-created_date", 10, 20)).toEqual([{ id: "1" }]);
     expect(await base44.entities.Order.filter({ status: "open" }, "-created_date", 5)).toEqual([{ id: "2" }]);
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test("page() reads a cursor page from v2/list with the query inside the options", async () => {
+    scope
+      .get(`${base}/v2/list`)
+      .query((q) => JSON.parse(q.q as string).status === "open" && q.sort === "-amount" && q.limit === "50" && q.cursor === undefined)
+      .reply(200, { items: [{ id: "1" }], next_cursor: "tok-2", has_more: true });
+    scope
+      .get(`${base}/v2/list`)
+      .query((q) => q.cursor === "tok-2" && q.limit === "50" && q.q === undefined)
+      .reply(200, { items: [{ id: "2" }], next_cursor: null, has_more: false });
+    scope
+      .get(`${base}/v2/list`)
+      .query((q) => q.distinct === "agent_id" && q.limit === "100" && q.q === undefined)
+      .reply(200, { items: ["a1"], next_cursor: null, has_more: false });
+
+    const first = await base44.entities.Order.page({ query: { status: "open" }, sort: "-amount", limit: 50 });
+    const second = await base44.entities.Order.page({ cursor: first.next_cursor, limit: 50 });
+    const agents = await base44.entities.Order.page({ distinct: "agent_id" });
+    expect([first.items, second.items, agents.items]).toEqual([[{ id: "1" }], [{ id: "2" }], ["a1"]]);
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test("an options object without cursor or distinct returns an array from the list route and honours its keys", async () => {
+    scope.get(base).query((q) => q.sort === "-created_date" && q.limit === "10" && q.skip === "5" && q.fields === "id,amount").reply(200, [{ id: "1" }]);
+    scope.get(base).query((q) => JSON.parse(q.q as string).status === "open" && q.sort === "date" && q.limit === undefined).reply(200, [{ id: "2" }]);
+    scope.get(base).query((q) => JSON.parse(q.q as string).status === "open" && q.limit === "20").reply(200, [{ id: "3" }]);
+
+    expect(await base44.entities.Order.list({ sort: "-created_date", limit: 10, skip: 5, fields: ["id", "amount"] })).toEqual([{ id: "1" }]);
+    expect(await base44.entities.Order.list({ filter: { status: "open" }, sort: "date" })).toEqual([{ id: "2" }]);
+    expect(await base44.entities.Order.filter({ status: "open" }, { limit: 20 })).toEqual([{ id: "3" }]);
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test("an object with no option keys is list()'s filter query, and the positional arguments after it still apply", async () => {
+    scope.get(base).query((q) => q.q === "{}" && q.limit === "5").reply(200, [{ id: "1" }]);
+    scope.get(base).query((q) => JSON.parse(q.q as string).agent_id === "a1" && q.sort === "-created_date" && q.limit === "100").reply(200, [{ id: "2" }]);
+
+    expect(await base44.entities.Order.list({}, 5)).toEqual([{ id: "1" }]);
+    expect(await base44.entities.Order.list({ agent_id: "a1" } as any, "-created_date", 100)).toEqual([{ id: "2" }]);
     expect(scope.isDone()).toBe(true);
   });
 
