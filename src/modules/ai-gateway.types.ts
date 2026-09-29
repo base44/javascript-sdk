@@ -54,8 +54,10 @@ export interface AiGatewayModuleConfig {
  * against the provider directly, no separate account, API key, or billing
  * setup with the underlying model provider required.
  *
- * By default, `connection()` uses the OpenAI-compatible provider, which serves
- * chat and images. Pass `{ provider: "typesafe" }` for structured evaluations.
+ * `connection()` takes an optional `provider`, and each provider serves a different API:
+ *
+ * - `openai` (default): OpenAI-compatible chat completions and image endpoints.
+ * - `typesafe`: structured evaluations with the `jev` model.
  *
  * Call `connection()` from a backend function rather than the browser. This
  * keeps your instructions, tools, and business logic server-side, and lets
