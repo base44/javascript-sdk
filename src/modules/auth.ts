@@ -1,3 +1,4 @@
+import { createMfaModule, prepareMfaPkce, type LoginResult } from "./mfa.js";
 import { AxiosInstance } from "axios";
 import {
   AuthModuleOptions,
@@ -25,23 +26,23 @@ function isInsideIframe(): boolean {
  * @param expectedOrigin - The origin we expect the postMessage to come from.
  */
 function loginViaPopup(
-  url: string,
+  url: Promise<string>,
   redirectUrl: string,
   expectedOrigin: string
-): void {
+): Promise<void> {
   const width = 500;
   const height = 600;
   const left = Math.round(window.screenX + (window.outerWidth - width) / 2);
   const top = Math.round(window.screenY + (window.outerHeight - height) / 2);
 
   const popup = window.open(
-    url,
+    "about:blank",
     "base44_auth",
     `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
   );
 
   if (!popup) {
-    return;
+    return Promise.resolve();
   }
 
   const cleanup = () => {
@@ -75,6 +76,7 @@ function loginViaPopup(
   }, 500);
 
   window.addEventListener("message", onMessage);
+  return url.then(value => { popup.location.href = value; }, error => { cleanup(); throw error; });
 }
 
 /**
@@ -113,7 +115,8 @@ export function createAuthModule(
   // header a caller may have set on the instance directly.
   let hasAccessToken = Boolean(options.token);
 
-  return {
+  const module: InternalAuthModule = {
+    mfa: createMfaModule(axios, appId, token => module.setToken(token)),
     hasToken() {
       return hasAccessToken;
     },
@@ -160,10 +163,11 @@ export function createAuthModule(
     },
 
     // Redirects the user to a provider's login page
-    loginWithProvider(provider: string, fromUrl: string = "/") {
+    async loginWithProvider(provider: string, fromUrl: string = "/") {
       // Build the full redirect URL
       const redirectUrl = new URL(fromUrl, window.location.origin).toString();
 
+      const mfaPkce = provider === "sso" ? Promise.resolve("") : prepareMfaPkce(appId).then(value => `&app_mfa_code_challenge=${value}`);
       const queryParams = `app_id=${appId}&from_url=${encodeURIComponent(redirectUrl)}`;
 
       // SSO uses a different URL structure with appId in the path
@@ -181,12 +185,12 @@ export function createAuthModule(
       // When running inside an iframe, use a popup to avoid OAuth providers
       // blocking iframe navigation.
       if (isInsideIframe()) {
-        const popupLoginUrl = `${loginUrl}&popup_origin=${encodeURIComponent(window.location.origin)}`;
+        const popupLoginUrl = mfaPkce.then(pkce => `${loginUrl}${pkce}&popup_origin=${encodeURIComponent(window.location.origin)}`);
         return loginViaPopup(popupLoginUrl, redirectUrl, window.location.origin);
       }
 
       // Default: full-page redirect
-      window.location.href = loginUrl;
+      window.location.href = loginUrl + await mfaPkce;
     },
 
     // Logout the current user
@@ -261,7 +265,7 @@ export function createAuthModule(
       turnstileToken?: string
     ) {
       try {
-        const response: { access_token: string; user: any } = await axios.post(
+        const response: LoginResult = await axios.post(
           `/apps/${appId}/auth/login`,
           {
             email,
@@ -270,6 +274,7 @@ export function createAuthModule(
           }
         );
 
+        if (response.mfa_required) return response;
         const { access_token, user } = response;
 
         if (access_token) {
@@ -359,4 +364,5 @@ export function createAuthModule(
     },
 
   };
+  return module;
 }

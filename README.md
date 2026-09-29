@@ -151,3 +151,5 @@ npm run create-docs
 cd docs
 mintlify dev
 ```
+
+See [experimental app-user MFA](MFA.md) for challenge handling and managed continuation.

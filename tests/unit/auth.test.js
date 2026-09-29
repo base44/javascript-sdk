@@ -740,14 +740,17 @@ describe('Auth Module', () => {
   });
 
   describe('loginWithProvider()', () => {
-    test('should redirect to google login URL by default', () => {
+    beforeEach(() => {
+      vi.stubGlobal('sessionStorage', { setItem: vi.fn() });
+    });
+    test('should redirect to google login URL by default', async () => {
       const originalWindow = global.window;
       const mockLocation = { href: '', origin: 'https://myapp.com' };
       const win = { location: mockLocation };
       win.parent = win; // not in iframe
       global.window = win;
 
-      base44.auth.loginWithProvider('google', '/dashboard');
+      await base44.auth.loginWithProvider('google', '/dashboard');
 
       expect(mockLocation.href).toContain(`${appBaseUrl}/api/apps/auth/login?`);
       expect(mockLocation.href).toContain(`app_id=${appId}`);
@@ -756,37 +759,37 @@ describe('Auth Module', () => {
       global.window = originalWindow;
     });
 
-    test('should include provider path for non-google providers', () => {
+    test('should include provider path for non-google providers', async () => {
       const originalWindow = global.window;
       const mockLocation = { href: '', origin: 'https://myapp.com' };
       const win = { location: mockLocation };
       win.parent = win;
       global.window = win;
 
-      base44.auth.loginWithProvider('microsoft', '/dashboard');
+      await base44.auth.loginWithProvider('microsoft', '/dashboard');
 
       expect(mockLocation.href).toContain('/api/apps/auth/microsoft/login?');
 
       global.window = originalWindow;
     });
 
-    test('should use SSO URL structure for sso provider', () => {
+    test('should use SSO URL structure for sso provider', async () => {
       const originalWindow = global.window;
       const mockLocation = { href: '', origin: 'https://myapp.com' };
       const win = { location: mockLocation };
       win.parent = win;
       global.window = win;
 
-      base44.auth.loginWithProvider('sso', '/dashboard');
+      await base44.auth.loginWithProvider('sso', '/dashboard');
 
       expect(mockLocation.href).toContain(`/api/apps/${appId}/auth/sso/login?`);
 
       global.window = originalWindow;
     });
 
-    test('should use popup when inside an iframe', () => {
+    test('should use popup when inside an iframe', async () => {
       const originalWindow = global.window;
-      const mockPopup = { closed: false, close: vi.fn() };
+      const mockPopup = { closed: false, close: vi.fn(), location: { href: '' } };
       const mockLocation = { href: '', origin: 'https://myapp.com' };
       // Simulate iframe: window.parent !== window
       const parentWindow = {};
@@ -802,20 +805,21 @@ describe('Auth Module', () => {
         removeEventListener: vi.fn(),
       };
 
-      base44.auth.loginWithProvider('google', '/dashboard');
+      await base44.auth.loginWithProvider('google', '/dashboard');
 
       // Should NOT have redirected
       expect(mockLocation.href).toBe('');
       // Should have opened a popup
       expect(global.window.open).toHaveBeenCalledTimes(1);
       const openCall = global.window.open.mock.calls[0];
-      expect(openCall[0]).toContain('popup_origin=');
+      expect(mockPopup.location.href).toContain('popup_origin=');
+      expect(mockPopup.location.href).toContain('app_mfa_code_challenge=');
       expect(openCall[1]).toBe('base44_auth');
 
       global.window = originalWindow;
     });
 
-    test('should not use popup when not inside an iframe', () => {
+    test('should not use popup when not inside an iframe', async () => {
       const originalWindow = global.window;
       const mockLocation = { href: '', origin: 'https://myapp.com' };
       // window.parent === window (not in iframe)
@@ -823,7 +827,7 @@ describe('Auth Module', () => {
       win.parent = win;
       global.window = win;
 
-      base44.auth.loginWithProvider('google', '/dashboard');
+      await base44.auth.loginWithProvider('google', '/dashboard');
 
       // Should have redirected directly
       expect(mockLocation.href).toContain(`${appBaseUrl}/api/apps/auth/login?`);
@@ -833,7 +837,7 @@ describe('Auth Module', () => {
       global.window = originalWindow;
     });
 
-    test('should handle popup being blocked by browser', () => {
+    test('should handle popup being blocked by browser', async () => {
       const originalWindow = global.window;
       const mockLocation = { href: '', origin: 'https://myapp.com' };
       const parentWindow = {};
@@ -850,16 +854,14 @@ describe('Auth Module', () => {
       };
 
       // Should not throw
-      expect(() => {
-        base44.auth.loginWithProvider('google', '/dashboard');
-      }).not.toThrow();
+      await expect(base44.auth.loginWithProvider('google', '/dashboard')).resolves.toBeUndefined();
 
       global.window = originalWindow;
     });
 
-    test('should redirect on postMessage with valid token from popup', () => {
+    test('should redirect on postMessage with valid token from popup', async () => {
       const originalWindow = global.window;
-      const mockPopup = { closed: false, close: vi.fn() };
+      const mockPopup = { closed: false, close: vi.fn(), location: { href: '' } };
       const mockLocation = { href: '', origin: 'https://myapp.com' };
       const parentWindow = {};
       let messageHandler;
@@ -877,7 +879,7 @@ describe('Auth Module', () => {
         removeEventListener: vi.fn(),
       };
 
-      base44.auth.loginWithProvider('google', '/callback');
+      await base44.auth.loginWithProvider('google', '/callback');
 
       // Simulate postMessage from popup
       messageHandler({
@@ -895,9 +897,9 @@ describe('Auth Module', () => {
       global.window = originalWindow;
     });
 
-    test('should ignore postMessage from wrong origin', () => {
+    test('should ignore postMessage from wrong origin', async () => {
       const originalWindow = global.window;
-      const mockPopup = { closed: false, close: vi.fn() };
+      const mockPopup = { closed: false, close: vi.fn(), location: { href: '' } };
       const mockLocation = { href: '', origin: 'https://myapp.com' };
       const parentWindow = {};
       let messageHandler;
@@ -915,7 +917,7 @@ describe('Auth Module', () => {
         removeEventListener: vi.fn(),
       };
 
-      base44.auth.loginWithProvider('google', '/callback');
+      await base44.auth.loginWithProvider('google', '/callback');
 
       // Simulate postMessage from wrong origin
       messageHandler({
@@ -931,9 +933,9 @@ describe('Auth Module', () => {
       global.window = originalWindow;
     });
 
-    test('should ignore postMessage from wrong source', () => {
+    test('should ignore postMessage from wrong source', async () => {
       const originalWindow = global.window;
-      const mockPopup = { closed: false, close: vi.fn() };
+      const mockPopup = { closed: false, close: vi.fn(), location: { href: '' } };
       const mockLocation = { href: '', origin: 'https://myapp.com' };
       const parentWindow = {};
       let messageHandler;
@@ -951,7 +953,7 @@ describe('Auth Module', () => {
         removeEventListener: vi.fn(),
       };
 
-      base44.auth.loginWithProvider('google', '/callback');
+      await base44.auth.loginWithProvider('google', '/callback');
 
       // Simulate postMessage from correct origin but different source
       messageHandler({
