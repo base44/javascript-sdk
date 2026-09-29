@@ -1,7 +1,8 @@
-import type { Joined, PlatformEvent, PlatformEventMap } from "./builder.events.types.js";
+import type { PlatformEvent, PlatformEventMap, Snapshot } from "./builder.events.types.js";
 
 export const eventNames = ["update_model", "directive", "queue_update", "task_update", "image_ready"] as const;
-export const errorCodes = ["invalid_room", "invalid_cursor", "access_denied", "subscription_limit", "resync_required", "stream_unavailable"] as const;
+/** Error frames that name an app room. */
+export const roomErrorCodes = ["access_denied", "access_revoked", "snapshot_unavailable"] as const;
 export const appPattern = /^[a-f0-9]{24}$/;
 export const roomFor = (appId: string) => `/apps/${appId}`;
 
@@ -16,24 +17,17 @@ export function string(value: unknown): string {
 export function appFromRoom(value: unknown): string | undefined {
   return typeof value === "string" && /^\/apps\/[a-f0-9]{24}$/.test(value) ? value.slice(6) : undefined;
 }
-export function eventApp(type: keyof PlatformEventMap, raw: unknown): string | undefined {
-  const frame = object(raw);
-  return type === "queue_update"
-    ? typeof frame.app_id === "string" && appPattern.test(frame.app_id) ? frame.app_id : undefined
-    : appFromRoom(frame.room);
-}
 export function decode(type: keyof PlatformEventMap, appId: string, raw: unknown): PlatformEvent {
   const frame = object(raw);
-  const seq = string(frame.seq);
   const wrapped = type === "update_model" || type === "task_update" || type === "image_ready";
-  const { seq: _, ...flat } = frame;
-  const data = wrapped ? object(JSON.parse(string(frame.data))) : flat;
+  const data = wrapped ? object(JSON.parse(string(frame.data))) : frame;
   // Payload schemas are owned by the service; only decode/validate the transport envelope here.
-  return { type, appId, seq, data } as PlatformEvent;
+  return { type, appId, data } as PlatformEvent;
 }
-export function decodeJoined(raw: unknown): Joined {
+export function decodeSnapshot(raw: unknown): Snapshot {
   const frame = object(raw);
-  if (!appFromRoom(frame.room) || !Number.isInteger(frame.max_entries) || !Number.isInteger(frame.inactivity_expiry_seconds)) throw new Error("Invalid boundary");
-  string(frame.seq);
-  return frame as unknown as Joined;
+  if (!appFromRoom(frame.room) || !Array.isArray(frame.messages) || (frame.status !== null && typeof frame.status !== "object")) {
+    throw new Error("Invalid snapshot");
+  }
+  return frame as unknown as Snapshot;
 }

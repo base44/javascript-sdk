@@ -4,54 +4,53 @@ import { expect, test, vi } from "vitest";
 import { Base44PlatformClient } from "../../../platform-src/client/index.js";
 
 // Minimal Engine.IO/Socket.IO peer exercises the real client without a new server dependency.
-test("real Socket.IO handshake, app join, reconnect and replay", async () => {
+test("real Socket.IO handshake, join, snapshot, reconnect and session renewal", async () => {
   const http = createServer();
   const server = new WebSocketServer({ server: http });
   const appId = "a".repeat(24), room = `/apps/${appId}`;
-  const handshakes = [], joins = [], peers = [], applied = [], errors = [];
+  const handshakes = [], joins = [], peers = [], snapshots = [], errors = [];
   let tokenCalls = 0;
-  const send = (peer, event, data) => peer.send(`42/partner,${JSON.stringify([event, data])}`);
-  const boundary = (peer, seq) => send(peer, "joined", { room, seq, max_entries: 2000, inactivity_expiry_seconds: 3600 });
-  const update = (peer, seq) => send(peer, "update_model", { room, seq, data: '{"status":{"state":"ready"}}' });
+  const send = (peer, event, data) => peer.send(`42${JSON.stringify([event, data])}`);
   server.on("connection", (peer, request) => {
     peers.push(peer);
-    const url = new URL(request.url, "http://localhost");
-    handshakes.push({ url, token: undefined });
-    const handshake = handshakes.at(-1);
+    const handshake = { url: new URL(request.url, "http://localhost"), token: undefined };
+    handshakes.push(handshake);
     peer.send(`0${JSON.stringify({ sid: String(peers.length), upgrades: [], pingInterval: 25000, pingTimeout: 20000, maxPayload: 1000000 })}`);
     peer.on("message", bytes => {
       const packet = bytes.toString();
-      if (packet.startsWith("40/partner,")) {
-        handshake.token = JSON.parse(packet.slice("40/partner,".length)).token;
-        peer.send(`40/partner,${JSON.stringify({ sid: `namespace-${peers.length}` })}`);
-      } else if (packet.startsWith("42/partner,")) {
-        const [event, ...args] = JSON.parse(packet.slice("42/partner,".length));
+      if (packet.startsWith("40")) {
+        handshake.token = JSON.parse(packet.slice(2)).session_token;
+        peer.send(`40${JSON.stringify({ sid: `socket-${peers.length}` })}`);
+      } else if (packet.startsWith("42")) {
+        const [event, ...args] = JSON.parse(packet.slice(2));
         if (event !== "join") return;
         joins.push(args);
-        if (joins.length === 1) { boundary(peer, "start"); update(peer, "one"); }
-        else { update(peer, "two"); boundary(peer, "two"); }
+        send(peer, "joined", { room, status: { state: "ready" }, messages: [{ id: `m${joins.length}` }] });
       }
     });
   });
   await new Promise(resolve => http.listen(0, "127.0.0.1", resolve));
   const client = new Base44PlatformClient({
     serverUrl: `http://127.0.0.1:${http.address().port}`,
-    refreshToken: async () => `browser-${++tokenCalls}`,
+    getSessionToken: async () => `session-${++tokenCalls}`,
   });
   const builder = client.builder.init({ onError: error => errors.push(error) });
   try {
-    const sub = builder.subscribe(appId, { onEvent: event => { applied.push(event); }, onError: error => errors.push(error) });
+    builder.subscribe(appId, { onSnapshot: s => { snapshots.push(s.messages[0].id); }, onEvent: vi.fn(), onError: error => errors.push(error) });
     await builder.connect();
-    await vi.waitFor(() => expect(sub.cursor).toBe("one"));
+    await vi.waitFor(() => expect(snapshots).toEqual(["m1"]));
     peers[0].terminate();
-    await vi.waitFor(() => expect(sub.cursor).toBe("two"), { timeout: 6000 });
-    expect(joins).toEqual([[room, {}], [room, { after_seq: "one" }]]);
-    expect(applied.map(event => event.seq)).toEqual(["one", "two"]);
-    expect(handshakes.map(item => item.token)).toEqual(["browser-1", "browser-2"]);
+    await vi.waitFor(() => expect(snapshots).toEqual(["m1", "m2"]), { timeout: 6000 });
+    // The server expires the session: an error frame, then a server-side disconnect.
+    send(peers[1], "error", { room: null, code: "session_expired" });
+    peers[1].send("41");
+    await vi.waitFor(() => expect(snapshots).toEqual(["m1", "m2", "m3"]), { timeout: 6000 });
+    expect(joins).toEqual([[room], [room], [room]]);
+    expect(handshakes.map(item => item.token)).toEqual(["session-1", "session-1", "session-2"]);
     for (const { url } of handshakes) {
-      expect(url.pathname).toBe("/ws-whitelabel/socket.io/");
+      expect(url.pathname).toBe("/ws/socket.io/");
       expect(url.searchParams.get("transport")).toBe("websocket");
-      expect(url.searchParams.has("token")).toBe(false);
+      expect([...url.searchParams.keys()].some(key => /token/i.test(key))).toBe(false);
     }
     expect(errors).toEqual([]);
   } finally {

@@ -154,9 +154,10 @@ mintlify dev
 
 ### Platform browser subscriptions
 
-The separate `@base44/sdk/platform/client` entry point subscribes to public builder
-updates through the white-label socket. It supports typed events, bounded delivery,
-and reconnect replay using browser credentials supplied by your backend.
+The separate `@base44/sdk/platform/client` entry point watches public builder
+updates for up to eight apps over the platform socket. It supports typed events,
+a snapshot on every join and bounded delivery, using a socket-session token your
+backend opens with its workspace key.
 See [setup, public contract and recovery](platform-docs/client.md) and the
-[TypeScript example](examples/platform-client.ts). Backend token integration and
-workspace rollout are prerequisites; never use an API key in the browser.
+[TypeScript example](examples/platform-client.ts). White-label sockets must be enabled
+for the workspace; never use an API key in the browser.

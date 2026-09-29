@@ -90,6 +90,29 @@ export interface ToolPlanArguments {
   sections_with_enough?: string[];
 }
 
+/** A reviewed plan, serialized in `generate_prd`'s `ToolCall.arguments_string`. The plan is the
+ * user's own spec; in plan mode the message `content` beside it can be empty. */
+export interface ToolPrdArguments {
+  /** App or feature name. */
+  app_name?: string;
+  /** What is being built and why. */
+  intent_and_goal?: string;
+  /** Who uses it and their roles. */
+  audience_and_roles?: string;
+  /** End-to-end user flows. */
+  core_flows?: string[];
+  /** Specific technical requirements. */
+  technical_requirements?: string;
+  /** Design preferences. */
+  design_preferences?: string;
+  /** Build or plan declaration, when the builder asks for one. */
+  prd_type?: string;
+  /** Store platform settled in planning, for e-commerce plans. */
+  store_platform?: string;
+  /** Engine settled in planning, for game plans. */
+  game_engine?: string;
+}
+
 /** Reviewed generated-media arguments, serialized in `ToolCall.arguments_string`. */
 export interface ToolMediaArguments {
   /** Visible media label. */
@@ -130,8 +153,33 @@ export type ToolOutcome =
   | "Package installation completed."
   | "Plan updated.";
 
-/** A fixed reviewed outcome or reviewed generated-media state. */
-export type ToolResult = ToolOutcome | ToolMediaResult;
+/** Why a safety guard parked a call for approval. Only present while the call waits. */
+export interface ToolGuardApproval {
+  /** Guard identifier, e.g. `exec_tool_send_email` or `bash_approval`. */
+  guard: string;
+  /** Human-readable reason. Omitted for shell commands, whose reason can quote the command. */
+  reason?: string;
+  /** Reviewed details for the guard; commands and record data are never included. */
+  details?: {
+    /** Entity method the code calls, e.g. `delete`. */
+    method?: string;
+    /** The agent's summary of what the code does. */
+    summary?: string;
+    /** Entity whose access rules change. */
+    entity_name?: string;
+    /** How the access rules change. */
+    change_type?: string;
+    /** Access operations whose rules change. */
+    changed_ops?: string[];
+    /** Backend function under test. */
+    function_name?: string;
+    /** The guard could not verify the function's source. */
+    inspection_failed?: boolean;
+  };
+}
+
+/** A fixed reviewed outcome, reviewed generated-media state, or a guard's approval reason. */
+export type ToolResult = ToolOutcome | ToolMediaResult | ToolGuardApproval;
 
 /** Public progress of an existing builder tool. */
 export interface ToolCall {
@@ -153,8 +201,8 @@ export interface ToolCall {
     kind?: "approval" | "choice" | "input" | null;
   } | null;
   /**
-   * JSON containing one reviewed argument shape: ToolQuestionArguments,
-   * ToolSecretArguments, ToolPackageArguments, ToolPlanArguments, or ToolMediaArguments.
+   * JSON containing one reviewed argument shape: ToolQuestionArguments, ToolSecretArguments,
+   * ToolPackageArguments, ToolPlanArguments, ToolPrdArguments, or ToolMediaArguments.
    * It is omitted for all other tools and malformed/partial streaming arguments.
    */
   arguments_string?: string;
@@ -162,7 +210,7 @@ export interface ToolCall {
   display_projection?: ToolDisplayProjection;
   /** Reviewed clarifying-question answers only. */
   user_input?: ToolQuestionInput;
-  /** Fixed reviewed success outcome or generated-media state only. */
+  /** Fixed reviewed success outcome, generated-media state, or a parked call's guard reason. */
   results?: ToolResult;
 }
 
@@ -174,8 +222,6 @@ export interface ChatMessage {
   role?: "user" | "assistant";
   /** Generated or user-authored text. Structural filtering is not prose redaction. */
   content?: string | null;
-  /** Attached file URLs. */
-  file_urls?: string[] | null;
   /** Public tool progress with optional reviewed interaction details. */
   tool_calls?: ToolCall[] | null;
   /** Message timestamp, without author identity. */
@@ -185,17 +231,36 @@ export interface ChatMessage {
   } | null;
   /** Existing checkpoint reference; mutations remain on the partner backend. */
   checkpoint_id?: string | null;
+  /** Reviewed scalar message parameters. */
+  additional_message_params?: MessageParams;
+}
+
+/** Reviewed scalar parameters a chat UI needs while a turn runs. */
+export interface MessageParams {
+  /** Identifier the sending client attached, to match its optimistic message. */
+  client_creation_id?: string;
+  /** The message was sent in plan mode. */
+  plan_mode?: boolean;
+  /** The message approves a plan. */
+  plan_approved?: boolean;
+  /** The message expects no AI reply. */
+  skip_ai_response?: boolean;
+  /** System message category. */
+  system_message_type?: string;
+}
+
+/** Public builder state, without error diagnostics or billing context. */
+export interface AppStatus {
+  /** Current builder state. */
+  state?: "ready" | "processing" | "error";
+  /** Existing state timestamp. */
+  last_updated_date?: string | null;
 }
 
 /** Partial app update. Omitted keys mean unchanged; explicit null means clear. */
 export interface AppUpdate {
-  /** Public builder state, without error diagnostics or billing context. */
-  status?: {
-    /** Current builder state. */
-    state?: "ready" | "processing" | "error";
-    /** Existing state timestamp. */
-    last_updated_date?: string | null;
-  } | null;
+  /** Public builder state. */
+  status?: AppStatus | null;
   /** Whole-message replacement by identifier, not a recursive message patch. */
   _last_msg?: ChatMessage | null;
   /** Conversation containing the replacement message. */
@@ -216,8 +281,6 @@ export interface QueueItem {
   id: string;
   /** User-authored request text. */
   content: string;
-  /** Attached file URLs. */
-  file_urls?: string[] | null;
   /** Existing creation timestamp. */
   created_at: string;
   /** Existing branch scope. */
@@ -226,6 +289,8 @@ export interface QueueItem {
 
 /** Full public queue snapshot, replacing the previous queue. */
 export interface QueueUpdate {
+  /** Canonical app room. */
+  room: string;
   /** App owning this queue. */
   app_id: string;
   /** Existing branch scope. */
@@ -269,12 +334,14 @@ export interface ImageReady {
   image_url?: string | null;
 }
 
-/** Invalidation notice; fetch current state through the partner backend. */
+/** Invalidation notice. A main-conversation `conversation_changed` is followed by a snapshot. */
 export interface Directive {
   /** Canonical app room. */
   room: string;
   /** Public invalidation category. */
-  type: "conversation_changed" | "app_files_changed";
+  type:
+    | "conversation_changed" | "app_files_changed" | "branch_deleted"
+    | "imported_git_changed" | "imported_pull_request_changed";
   /** Existing branch scope. */
   branch_id?: string | null;
 }
@@ -293,28 +360,24 @@ export interface PlatformEventMap {
   image_ready: ImageReady;
 }
 
-/** Ordered delivery with decoded data and the original event name and cursor. */
+/** Ordered delivery with decoded data and the original event name. */
 export type PlatformEvent = {
   [K in keyof PlatformEventMap]: {
     /** Original socket event name; narrows the payload type. */
     type: K;
     /** Authorized app receiving this event. */
     appId: string;
-    /** Opaque replay cursor. Never parse, compare or increment it. */
-    seq: string;
     /** Decoded payload; existing field names and omission/null semantics are retained. */
     data: PlatformEventMap[K];
   }
 }[keyof PlatformEventMap];
 
-/** Server replay boundary, delivered after all retained events through that boundary. */
-export interface Joined {
+/** An app's current state: sent after each join and rejoin, and after a main-conversation rewrite. */
+export interface Snapshot {
   /** Canonical app room. */
   room: string;
-  /** Opaque boundary cursor; not an initial app snapshot. */
-  seq: string;
-  /** Server retention limit (currently 2,000 events per app). */
-  max_entries: number;
-  /** Server inactivity expiry (currently 3,600 seconds). */
-  inactivity_expiry_seconds: number;
+  /** Current builder state. */
+  status: AppStatus | null;
+  /** The last 50 public messages, oldest first. */
+  messages: ChatMessage[];
 }

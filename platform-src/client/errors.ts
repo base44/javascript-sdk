@@ -1,6 +1,6 @@
 import type { PlatformSocketErrorCode } from "./errors.types.js";
 
-/** Sanitized failure. Original token-provider, handler and server exceptions are not retained. */
+/** Sanitized failure. Original session-token provider, handler and server exceptions are not retained. */
 export class PlatformSocketError extends Error {
   /** Stable machine-readable category. */
   readonly code: PlatformSocketErrorCode;

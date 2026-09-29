@@ -1,4 +1,4 @@
-import type { Joined, PlatformEvent } from "./builder.events.types.js";
+import type { PlatformEvent, Snapshot } from "./builder.events.types.js";
 import { PlatformSocketError } from "../errors.js";
 import type { PlatformSocketErrorCode } from "../errors.types.js";
 import type { PlatformSubscription, SubscriptionOptions } from "./builder.types.js";
@@ -10,43 +10,32 @@ export function notify(callback: (error: PlatformSocketError) => void, error: Pl
 
 /** @internal */
 export class Subscription implements PlatformSubscription {
-  cursor: string | undefined;
   active = true;
-  private ready = false;
   private pending = 0;
   private tail: Promise<void> = Promise.resolve();
 
-  constructor(readonly appId: string, private options: SubscriptionOptions, private remove: () => void) {
-    this.cursor = options.afterSeq;
-  }
+  constructor(readonly appId: string, private options: SubscriptionOptions, private remove: () => void) {}
 
-  enqueue(work: () => void | Promise<void>): void {
+  private enqueue(work: () => void | Promise<void>): void {
     if (!this.active) return;
-    if (this.pending >= 1000) { this.fail("resync_required"); return; }
+    if (this.pending >= 1000) { this.fail("delivery_overflow"); return; }
     this.pending++;
     this.tail = this.tail.then(async () => {
       if (this.active) await work();
     }).catch(() => this.fail("handler_failed")).finally(() => { this.pending--; });
   }
 
-  join(send: (cursor?: string) => void): void {
-    this.enqueue(() => { this.ready = false; send(this.cursor); });
-  }
-
   event(event: PlatformEvent): void {
-    this.enqueue(async () => {
-      // A fresh subscription starts at joined, not at any old in-flight room events.
-      if ((!this.ready && this.cursor === undefined) || event.seq === this.cursor) return;
-      await this.options.onEvent(event);
-      if (this.active) this.cursor = event.seq;
-    });
+    this.enqueue(() => this.options.onEvent(event));
   }
 
-  joined(joined: Joined): void {
-    this.enqueue(async () => {
-      await this.options.onJoined?.(joined);
-      if (this.active) { this.cursor = joined.seq; this.ready = true; }
-    });
+  snapshot(snapshot: Snapshot): void {
+    this.enqueue(() => this.options.onSnapshot(snapshot));
+  }
+
+  /** A non-fatal problem; the subscription keeps receiving events. */
+  warn(code: PlatformSocketErrorCode): void {
+    if (this.active) notify(this.options.onError, new PlatformSocketError(code, this.appId));
   }
 
   fail(code: PlatformSocketErrorCode): void {

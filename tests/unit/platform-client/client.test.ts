@@ -17,37 +17,42 @@ vi.mock("socket.io-client", () => ({ io: fake.io }));
 const app = "a".repeat(24), other = "b".repeat(24), room = `/apps/${app}`;
 const clients: BuilderSession[] = [];
 const settle = async () => { for (let i = 0; i < 100; i++) await Promise.resolve(); };
-const joined = (seq = "boundary") => fake.handlers.joined({ room, seq, max_entries: 2000, inactivity_expiry_seconds: 3600 });
-const update = (seq: string, data: unknown = { status: null }) => fake.handlers.update_model({ room, seq, data: JSON.stringify(data) });
-function setup(refreshToken = vi.fn(async () => "browser-token")) {
+const snapshot = (messages: unknown[] = []) => fake.handlers.joined({ room, status: { state: "ready" }, messages });
+const update = (data: unknown = { status: null }) => fake.handlers.update_model({ room, data: JSON.stringify(data) });
+const denied = (retryable: boolean) => fake.handlers.connect_error(Object.assign(new Error("connection_denied"), { data: { retryable } }));
+const auth = async () => {
+  const callback = vi.fn(); (fake.io.mock.calls.at(-1) as any)[1].auth(callback); await settle(); return callback;
+};
+function setup(getSessionToken = vi.fn(async () => "session-token")) {
   const onError = vi.fn();
-  const platform = new Base44PlatformClient({ serverUrl: "https://api.example.test", refreshToken });
+  const platform = new Base44PlatformClient({ serverUrl: "https://api.example.test", getSessionToken });
   const client = platform.builder.init({ onError });
   clients.push(client);
-  return { client, refreshToken, onError };
+  return { client, getSessionToken, onError };
 }
 async function connected(client: BuilderSession) {
   const ready = client.connect(); fake.socket.connected = true; fake.handlers.connect(); await ready; await settle();
 }
+const joins = () => fake.socket.emit.mock.calls.filter(c => c[0] === "join");
 beforeEach(() => { vi.clearAllMocks(); fake.socket.connected = false; });
 afterEach(() => { clients.splice(0).forEach(client => client.close()); vi.useRealTimers(); });
 
 describe("platform client", () => {
-  test("constructing the root client does not initialize sockets or refresh tokens", () => {
-    const refreshToken = vi.fn(async () => "token");
-    const platform = new Base44PlatformClient({ serverUrl: "https://api.example.test", refreshToken });
+  test("constructing the root client does not initialize sockets or fetch session tokens", () => {
+    const getSessionToken = vi.fn(async () => "token");
+    const platform = new Base44PlatformClient({ serverUrl: "https://api.example.test", getSessionToken });
     expect(fake.io).not.toHaveBeenCalled();
-    expect(refreshToken).not.toHaveBeenCalled();
     const first = platform.builder.init({ onError: vi.fn() });
     const second = platform.builder.init({ onError: vi.fn() });
     clients.push(first, second);
     expect(first).not.toBe(second);
     expect(fake.io).toHaveBeenCalledTimes(2);
     expect(fake.socket.connect).not.toHaveBeenCalled();
-    expect(refreshToken).not.toHaveBeenCalled();
+    expect(getSessionToken).not.toHaveBeenCalled();
   });
+
   test("closing one initialized builder does not close another or the root module", () => {
-    const platform = new Base44PlatformClient({ serverUrl: "https://api.example.test", refreshToken: async () => "token" });
+    const platform = new Base44PlatformClient({ serverUrl: "https://api.example.test", getSessionToken: async () => "token" });
     const firstSocket = { ...fake.socket, disconnect: vi.fn() };
     const secondSocket = { ...fake.socket, disconnect: vi.fn() };
     fake.io.mockReturnValueOnce(firstSocket).mockReturnValueOnce(secondSocket);
@@ -57,178 +62,203 @@ describe("platform client", () => {
     first.close();
     expect(firstSocket.disconnect).toHaveBeenCalledOnce();
     expect(secondSocket.disconnect).not.toHaveBeenCalled();
-    const third = platform.builder.init({ onError: vi.fn() });
-    clients.push(third);
-    expect(third).not.toBe(first);
   });
 
-  test("uses only CONNECT auth and the fixed namespace/path, with fresh credentials each attempt", async () => {
-    const { client, refreshToken } = setup();
-    expect(fake.socket.connect).not.toHaveBeenCalled();
+  test("connects to the shared platform socket with the session token in CONNECT auth only", async () => {
+    const { getSessionToken } = setup();
     const [url, options] = fake.io.mock.calls[0] as unknown as [string, any];
-    expect(url).toBe("https://api.example.test/partner");
-    expect(options).toMatchObject({ path: "/ws-whitelabel/socket.io/", transports: ["websocket"], autoConnect: false, forceNew: true, reconnectionAttempts: 5 });
+    expect(url).toBe("https://api.example.test");
+    expect(options).toMatchObject({ path: "/ws/socket.io/", transports: ["websocket"], autoConnect: false, forceNew: true, reconnectionAttempts: 5 });
     expect(options.query).toBeUndefined();
-    const callback = vi.fn(); options.auth(callback); await settle();
-    expect(callback).toHaveBeenLastCalledWith({ token: "browser-token" });
-    refreshToken.mockResolvedValue("rotated"); options.auth(callback); await settle();
-    expect(callback).toHaveBeenLastCalledWith({ token: "rotated" });
-    await connected(client);
+    expect(await auth()).toHaveBeenLastCalledWith({ session_token: "session-token" });
+    expect(getSessionToken).toHaveBeenCalledOnce();
   });
 
-  test("shares concurrent connects and rejects a sanitized denial", async () => {
+  test("transport reconnects reuse the session token instead of opening a new session", async () => {
+    const { client, getSessionToken } = setup();
+    await auth(); await connected(client);
+    fake.handlers.disconnect("transport close");
+    expect(await auth()).toHaveBeenLastCalledWith({ session_token: "session-token" });
+    expect(getSessionToken).toHaveBeenCalledOnce();
+  });
+
+  test("a rejected cached token is renewed once, and a rejected fresh one is reported", async () => {
+    const { client, getSessionToken, onError } = setup();
+    await auth(); await connected(client);
+    fake.handlers.disconnect("transport close"); fake.socket.connected = false; fake.socket.connect.mockClear();
+    denied(false);
+    expect(fake.socket.connect).toHaveBeenCalledOnce();
+    getSessionToken.mockResolvedValue("renewed");
+    expect(await auth()).toHaveBeenLastCalledWith({ session_token: "renewed" });
+    denied(false);
+    expect(fake.socket.connect).toHaveBeenCalledOnce();
+    expect(onError.mock.calls[0][0].code).toBe("connection_denied");
+  });
+
+  test("a retryable refusal is retried with backoff before giving up", async () => {
+    vi.useFakeTimers();
     const { client, onError } = setup();
-    const a = client.connect(), b = client.connect(); expect(a).toBe(b);
-    const rejection = expect(a).rejects.toMatchObject({ code: "connection_denied" });
-    fake.handlers.connect_error({ message: "secret token", data: { code: "connection_denied" } });
-    await rejection;
-    expect(onError.mock.calls[0][0].message).not.toContain("secret");
-    await connected(client);
+    const failure = expect(client.connect()).rejects.toMatchObject({ code: "connection_failed" });
+    fake.socket.connect.mockClear();
+    for (let i = 0; i < 5; i++) { denied(true); await vi.advanceTimersByTimeAsync(10000); }
+    expect(fake.socket.connect).toHaveBeenCalledTimes(5);
+    denied(true); await failure;
+    expect(onError.mock.calls[0][0].code).toBe("connection_failed");
   });
 
-  test("token failures reject without handing credentials or provider errors to Socket.IO", async () => {
+  test("an expired session reconnects with a new session token", async () => {
+    const { client, getSessionToken, onError } = setup();
+    await auth(); await connected(client); fake.socket.connect.mockClear();
+    fake.handlers.error({ room: null, code: "session_expired" });
+    fake.handlers.disconnect("io server disconnect");
+    expect(fake.socket.connect).toHaveBeenCalledOnce();
+    getSessionToken.mockResolvedValue("next-session");
+    expect(await auth()).toHaveBeenLastCalledWith({ session_token: "next-session" });
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  test("a replaced session stops without reconnecting", async () => {
+    const { client, onError } = setup();
+    await auth(); await connected(client); fake.socket.connect.mockClear();
+    fake.handlers.error({ room: null, code: "session_replaced" });
+    fake.handlers.disconnect("io server disconnect");
+    expect(fake.socket.connect).not.toHaveBeenCalled();
+    expect(onError.mock.calls[0][0].code).toBe("session_replaced");
+  });
+
+  test("shares concurrent connects; session-token failures never reach Socket.IO", async () => {
     const { client, onError } = setup(vi.fn(async () => { throw new Error("secret"); }));
-    const rejection = expect(client.connect()).rejects.toMatchObject({ code: "token_unavailable" });
-    const callback = vi.fn(); (fake.io.mock.calls[0] as any)[1].auth(callback);
+    const a = client.connect(), b = client.connect(); expect(a).toBe(b);
+    const rejection = expect(a).rejects.toMatchObject({ code: "session_unavailable" });
+    const callback = await auth();
     await rejection;
     expect(callback).not.toHaveBeenCalled();
     expect(onError.mock.calls[0][0].message).not.toContain("secret");
   });
 
-
-  test("token retrieval has a bounded timeout", async () => {
+  test("session-token retrieval has a bounded timeout", async () => {
     vi.useFakeTimers();
     const { client } = setup(vi.fn(() => new Promise<string>(() => {})));
-    const failure = expect(client.connect()).rejects.toMatchObject({ code: "token_unavailable" });
+    const failure = expect(client.connect()).rejects.toMatchObject({ code: "session_unavailable" });
     const callback = vi.fn(); (fake.io.mock.calls[0] as any)[1].auth(callback);
     await vi.advanceTimersByTimeAsync(20000); await failure;
     expect(callback).not.toHaveBeenCalled();
   });
 
-  test("late token results cannot authenticate after close", async () => {
+  test("late session tokens cannot authenticate after close", async () => {
     let resolve!: (token: string) => void;
     const { client } = setup(vi.fn(() => new Promise<string>(r => { resolve = r; })));
     const callback = vi.fn(); (fake.io.mock.calls[0] as any)[1].auth(callback);
     await settle(); client.close(); resolve("secret"); await settle(); expect(callback).not.toHaveBeenCalled();
   });
 
-  test("fresh subscription waits for joined; preserves null, omission and message replacement", async () => {
-    const { client } = setup(); const onEvent = vi.fn();
-    const sub = client.subscribe(app, { onEvent, onError: vi.fn() });
+  test("joins without metadata and delivers the snapshot, then events in order", async () => {
+    const { client } = setup(); const onSnapshot = vi.fn(), onEvent = vi.fn();
+    client.subscribe(app, { onSnapshot, onEvent, onError: vi.fn() });
     await connected(client);
-    expect(fake.socket.emit).toHaveBeenCalledWith("join", room, {});
-    update("old"); joined(); update("one", { _last_msg: { id: "m", content: "hello" }, status: null });
+    expect(joins()).toEqual([["join", room]]);
+    snapshot([{ id: "m", role: "assistant", content: "hi" }]);
+    update({ _last_msg: { id: "m", content: "hello" }, status: null });
     await settle();
-    expect(onEvent).toHaveBeenCalledExactlyOnceWith({ type: "update_model", appId: app, seq: "one", data: { _last_msg: { id: "m", content: "hello" }, status: null } });
-    expect(sub.cursor).toBe("one");
+    expect(onSnapshot).toHaveBeenCalledExactlyOnceWith({ room, status: { state: "ready" }, messages: [{ id: "m", role: "assistant", content: "hi" }] });
+    expect(onEvent).toHaveBeenCalledExactlyOnceWith({ type: "update_model", appId: app, data: { _last_msg: { id: "m", content: "hello" }, status: null } });
   });
 
-  test("resumed replay applies before joined and serializes async handlers", async () => {
-    const { client } = setup(); let finish!: () => void;
-    const onEvent = vi.fn(() => new Promise<void>(r => { finish = r; })); const onJoined = vi.fn();
-    const sub = client.subscribe(app, { afterSeq: "saved", onEvent, onJoined, onError: vi.fn() });
-    await connected(client); update("replay"); joined("replay"); await settle();
-    expect(sub.cursor).toBe("saved"); expect(onJoined).not.toHaveBeenCalled();
-    finish(); await settle(); expect(sub.cursor).toBe("replay"); expect(onJoined).toHaveBeenCalledOnce();
+  test("reconnect rejoins active subscriptions for a fresh snapshot", async () => {
+    const { client } = setup();
+    client.subscribe(app, { onSnapshot: vi.fn(), onEvent: vi.fn(), onError: vi.fn() });
+    await connected(client);
+    fake.handlers.disconnect("transport close"); fake.handlers.connect(); await settle();
+    expect(joins()).toEqual([["join", room], ["join", room]]);
   });
 
-  test("reconnect waits for in-flight application and rejoins with its resulting cursor", async () => {
-    const { client } = setup(); let finish!: () => void;
-    client.subscribe(app, { afterSeq: "saved", onEvent: () => new Promise<void>(r => { finish = r; }), onError: vi.fn() });
-    await connected(client); update("applied"); await settle();
-    fake.socket.connected = false; fake.handlers.disconnect("transport close");
-    fake.socket.connected = true; fake.handlers.connect(); await settle();
-    expect(fake.socket.emit.mock.calls.filter(c => c[0] === "join")).toHaveLength(1);
-    finish(); await settle(); expect(fake.socket.emit).toHaveBeenLastCalledWith("join", room, { after_seq: "applied" });
+  test("async callbacks are serialized per app", async () => {
+    const { client } = setup(); let finish!: () => void; const order: string[] = [];
+    client.subscribe(app, {
+      onSnapshot: () => new Promise<void>(r => { order.push("snapshot"); finish = r; }),
+      onEvent: () => { order.push("event"); }, onError: vi.fn(),
+    });
+    await connected(client); snapshot(); update(); await settle();
+    expect(order).toEqual(["snapshot"]);
+    finish(); await settle(); expect(order).toEqual(["snapshot", "event"]);
   });
 
-  test("callback rejection stops delivery without advancing the cursor", async () => {
+  test("callback rejection ends the subscription and leaves the room", async () => {
     const { client } = setup(); const onError = vi.fn();
-    const sub = client.subscribe(app, { afterSeq: "saved", onEvent: async () => { throw new Error("private"); }, onError });
-    await connected(client); update("failed"); await settle();
-    expect(sub.cursor).toBe("saved"); expect(sub.active).toBe(false);
+    const sub = client.subscribe(app, { onSnapshot: vi.fn(), onEvent: async () => { throw new Error("private"); }, onError });
+    await connected(client); update(); await settle();
+    expect(sub.active).toBe(false);
     expect(onError.mock.calls[0][0]).toMatchObject({ code: "handler_failed", appId: app });
+    expect(onError.mock.calls[0][0].message).not.toContain("private");
     expect(fake.socket.emit).toHaveBeenLastCalledWith("leave", room);
   });
 
-  test.each(["invalid_room", "invalid_cursor", "access_denied", "subscription_limit", "resync_required", "stream_unavailable"])("surfaces %s without silently resetting/retrying a subscription", async code => {
+  test.each(["access_denied", "access_revoked"])("%s ends only that app's subscription", async code => {
     const { client } = setup(); const onError = vi.fn();
-    const sub = client.subscribe(app, { afterSeq: "saved", onEvent: vi.fn(), onError });
-    await connected(client); fake.handlers.error({ room, code });
-    expect(sub.active).toBe(false); expect(sub.cursor).toBe("saved");
-    expect(onError.mock.calls[0][0].code).toBe(code);
+    const sub = client.subscribe(app, { onSnapshot: vi.fn(), onEvent: vi.fn(), onError });
+    const second = client.subscribe(other, { onSnapshot: vi.fn(), onEvent: vi.fn(), onError: vi.fn() });
+    await connected(client); fake.handlers.error({ room, code, message: "Access denied to this room" });
+    expect(sub.active).toBe(false); expect(second.active).toBe(true);
+    expect(onError.mock.calls[0][0]).toMatchObject({ code, appId: app });
     fake.handlers.connect(); await settle();
-    expect(fake.socket.emit.mock.calls.filter(c => c[0] === "join")).toHaveLength(1);
+    expect(joins().filter(c => c[1] === room)).toHaveLength(1);
   });
 
-  test("routes all five event shapes and keeps app cursors isolated", async () => {
+  test("an unavailable snapshot is reported without ending the subscription", async () => {
+    const { client } = setup(); const onError = vi.fn(), onEvent = vi.fn();
+    const sub = client.subscribe(app, { onSnapshot: vi.fn(), onEvent, onError });
+    await connected(client); fake.handlers.error({ room, code: "snapshot_unavailable" }); update(); await settle();
+    expect(sub.active).toBe(true); expect(onEvent).toHaveBeenCalledOnce();
+    expect(onError.mock.calls[0][0]).toMatchObject({ code: "snapshot_unavailable", appId: app });
+  });
+
+  test("routes all five event shapes by room and keeps apps isolated", async () => {
     const { client } = setup(); const onEvent = vi.fn(), otherEvent = vi.fn();
-    const sub = client.subscribe(app, { afterSeq: "saved", onEvent, onError: vi.fn() });
-    const second = client.subscribe(other, { afterSeq: "other", onEvent: otherEvent, onError: vi.fn() });
+    client.subscribe(app, { onSnapshot: vi.fn(), onEvent, onError: vi.fn() });
+    client.subscribe(other, { onSnapshot: vi.fn(), onEvent: otherEvent, onError: vi.fn() });
     await connected(client);
-    update("1");
-    fake.handlers.directive({ room, seq: "2", type: "conversation_changed", branch_id: "feature" });
-    fake.handlers.queue_update({ app_id: app, seq: "3", items: [], is_paused: false });
-    fake.handlers.task_update({ room, seq: "4", data: '{"event_type":"task_progress","progress":{"current":1}}' });
-    fake.handlers.image_ready({ room, seq: "5", data: '{"placeholder_url":"placeholder","status":"completed","image_url":"image"}' });
+    update();
+    fake.handlers.directive({ room, type: "branch_deleted", branch_id: "feature" });
+    fake.handlers.queue_update({ room, app_id: app, items: [], is_paused: false });
+    fake.handlers.task_update({ room, data: '{"event_type":"task_progress","progress":{"current":1}}' });
+    fake.handlers.image_ready({ room, data: '{"placeholder_url":"placeholder","status":"completed","image_url":"image"}' });
     await settle(); expect(onEvent.mock.calls.map(c => c[0].type)).toEqual(["update_model", "directive", "queue_update", "task_update", "image_ready"]);
-    expect(onEvent.mock.calls[1][0].data).toEqual({ room, type: "conversation_changed", branch_id: "feature" });
-    expect(sub.cursor).toBe("5"); expect(second.cursor).toBe("other"); expect(otherEvent).not.toHaveBeenCalled();
+    expect(onEvent.mock.calls[1][0].data).toEqual({ room, type: "branch_deleted", branch_id: "feature" });
+    expect(otherEvent).not.toHaveBeenCalled();
   });
 
-  test("duplicate last cursor is not applied twice", async () => {
-    const { client } = setup(); const onEvent = vi.fn();
-    client.subscribe(app, { afterSeq: "saved", onEvent, onError: vi.fn() }); await connected(client);
-    update("one"); update("one"); await settle(); expect(onEvent).toHaveBeenCalledOnce();
-  });
-
-  test("malformed JSON fails only the identified app without losing its cursor", async () => {
+  test("malformed JSON fails only the identified app", async () => {
     const { client } = setup(); const onError = vi.fn();
-    const sub = client.subscribe(app, { afterSeq: "saved", onEvent: vi.fn(), onError });
-    const second = client.subscribe(other, { onEvent: vi.fn(), onError: vi.fn() }); await connected(client);
-    fake.handlers.update_model({ room, seq: "bad", data: "{" });
-    expect(sub.cursor).toBe("saved"); expect(sub.active).toBe(false); expect(second.active).toBe(true);
+    const sub = client.subscribe(app, { onSnapshot: vi.fn(), onEvent: vi.fn(), onError });
+    const second = client.subscribe(other, { onSnapshot: vi.fn(), onEvent: vi.fn(), onError: vi.fn() }); await connected(client);
+    fake.handlers.update_model({ room, data: "{" });
+    expect(sub.active).toBe(false); expect(second.active).toBe(true);
     expect(onError.mock.calls[0][0].code).toBe("protocol_error");
   });
 
   test("bounded pending delivery overflows explicitly", async () => {
     const { client } = setup(); const onError = vi.fn();
-    const sub = client.subscribe(app, { afterSeq: "saved", onEvent: () => new Promise(() => {}), onError });
-    await connected(client); for (let i = 0; i <= 1000; i++) update(`event-${i}`);
-    expect(sub.active).toBe(false); expect(sub.cursor).toBe("saved"); expect(onError.mock.calls[0][0].code).toBe("resync_required");
+    const sub = client.subscribe(app, { onSnapshot: vi.fn(), onEvent: () => new Promise(() => {}), onError });
+    await connected(client); for (let i = 0; i <= 1000; i++) update();
+    expect(sub.active).toBe(false); expect(onError.mock.calls[0][0].code).toBe("delivery_overflow");
   });
 
-  test("unsubscribe cancels queued work and close is terminal and idempotent", async () => {
+  test("unsubscribe cancels queued work, re-subscribing rejoins, and close is terminal", async () => {
     const { client } = setup(); const onEvent = vi.fn();
-    const sub = client.subscribe(app, { afterSeq: "saved", onEvent, onError: vi.fn() }); await connected(client);
-    update("late"); sub.unsubscribe(); sub.unsubscribe(); await settle(); expect(onEvent).not.toHaveBeenCalled();
+    const sub = client.subscribe(app, { onSnapshot: vi.fn(), onEvent, onError: vi.fn() }); await connected(client);
+    update(); sub.unsubscribe(); sub.unsubscribe(); await settle(); expect(onEvent).not.toHaveBeenCalled();
+    client.subscribe(app, { onSnapshot: vi.fn(), onEvent, onError: vi.fn() });
+    expect(joins()).toEqual([["join", room], ["join", room]]);
     client.close(); client.close(); expect(fake.socket.disconnect).toHaveBeenCalledOnce();
     await expect(client.connect()).rejects.toMatchObject({ code: "client_closed" });
     expect(fake.socket.removeAllListeners).toHaveBeenCalledOnce();
   });
 
-
-  test("re-subscribing fences late events with a new connection before joining", async () => {
-    const { client } = setup();
-    const first = client.subscribe(app, { afterSeq: "saved", onEvent: vi.fn(), onError: vi.fn() });
-    await connected(client); first.unsubscribe();
-    fake.socket.disconnect.mockImplementationOnce(() => {
-      fake.socket.connected = false;
-      fake.handlers.disconnect("io client disconnect");
-    });
-    client.subscribe(app, { afterSeq: "saved", onEvent: vi.fn(), onError: vi.fn() });
-    await settle();
-    expect(fake.socket.disconnect).toHaveBeenCalledOnce();
-    expect(fake.socket.emit.mock.calls.filter(c => c[0] === "join")).toHaveLength(1);
-    fake.socket.connected = true; fake.handlers.connect(); await settle();
-    expect(fake.socket.emit).toHaveBeenLastCalledWith("join", room, { after_seq: "saved" });
-  });
-
   test("validates origins, app IDs, duplicate subscriptions and limits", () => {
     for (const serverUrl of ["https://secret@example.test", "https://example.test?token=secret", "https://example.test/path", "ws://example.test"]) {
-      expect(() => new Base44PlatformClient({ serverUrl, refreshToken: () => "token" })).toThrow(TypeError);
+      expect(() => new Base44PlatformClient({ serverUrl, getSessionToken: () => "token" })).toThrow(TypeError);
     }
-    const { client } = setup(); const options = { onEvent: vi.fn(), onError: vi.fn() };
+    const { client } = setup(); const options = { onSnapshot: vi.fn(), onEvent: vi.fn(), onError: vi.fn() };
     expect(() => client.subscribe("bad", options)).toThrow(TypeError);
     client.subscribe(app, options); expect(() => client.subscribe(app, options)).toThrow(TypeError);
     for (let i = 0; i < 7; i++) client.subscribe(String(i).repeat(24), options);

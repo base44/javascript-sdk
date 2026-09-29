@@ -1,9 +1,11 @@
 import { io, type Socket } from "socket.io-client";
 import { PlatformSocketError } from "../errors.js";
-import { appFromRoom, appPattern, decode, decodeJoined, errorCodes, eventApp, eventNames, object, roomFor } from "./builder-protocol.js";
+import { appFromRoom, appPattern, decode, decodeSnapshot, eventNames, object, roomErrorCodes, roomFor } from "./builder-protocol.js";
 import { notify, Subscription } from "./builder-subscription.js";
 import type { PlatformClientOptions } from "../client.types.js";
 import type { BuilderInitOptions, BuilderSession, PlatformSubscription, SubscriptionOptions } from "./builder.types.js";
+
+const MAX_DENIAL_RETRIES = 5;
 
 /** @internal */
 export class BuilderSocket implements BuilderSession {
@@ -11,8 +13,12 @@ export class BuilderSocket implements BuilderSession {
   private readonly subscriptions = new Map<string, Subscription>();
   private readonly options: PlatformClientOptions & BuilderInitOptions;
   private closed = false;
-  private needsFreshConnection = false;
-  private generation = 0;
+  // The session token outlives reconnects; it is replaced only when the server rejects or expires it.
+  private token?: string;
+  private tokenFresh = false;
+  private ending?: "session_expired" | "session_replaced";
+  private denialRetries = 0;
+  private retryTimer?: ReturnType<typeof setTimeout>;
   private authAttempt = 0;
   private cancelAuth?: () => void;
   private connecting?: Promise<void>;
@@ -21,47 +27,48 @@ export class BuilderSocket implements BuilderSession {
 
   constructor(config: PlatformClientOptions, options: BuilderInitOptions) {
     this.options = { ...config, onError: options.onError };
-    this.socket = io(`${config.serverUrl}/partner`, {
-      path: "/ws-whitelabel/socket.io/", transports: ["websocket"], autoConnect: false,
+    this.socket = io(config.serverUrl, {
+      path: "/ws/socket.io/", transports: ["websocket"], autoConnect: false,
       forceNew: true, reconnectionAttempts: 5, reconnectionDelay: 1000, reconnectionDelayMax: 10000,
       timeout: 20000,
       auth: (callback) => { void this.authenticate(callback); },
     });
     this.socket.on("connect", () => {
-      const generation = ++this.generation;
-      this.needsFreshConnection = false;
-      for (const subscription of this.subscriptions.values()) this.join(subscription, generation);
+      this.tokenFresh = false;
+      this.denialRetries = 0;
+      for (const subscription of this.subscriptions.values()) this.join(subscription);
       this.resolveConnect?.();
       this.clearConnecting();
     });
     this.socket.on("disconnect", (reason) => {
-      ++this.generation;
       ++this.authAttempt;
-      if (reason === "io server disconnect") this.connectionError(new PlatformSocketError("connection_failed"));
+      if (this.closed || reason !== "io server disconnect") return; // Transport loss reconnects by itself.
+      const ending = this.ending;
+      this.ending = undefined;
+      if (ending === "session_expired") this.socket.connect(); // Renew through getSessionToken.
+      else this.connectionError(new PlatformSocketError(ending === "session_replaced" ? "session_replaced" : "connection_failed"));
     });
-    this.socket.on("connect_error", (error) => {
-      this.connectionError(new PlatformSocketError((error as Error & { data?: { code?: string } }).data?.code === "connection_denied" ? "connection_denied" : "connection_failed"));
-    });
+    this.socket.on("connect_error", (error) => this.refused(error as Error & { data?: { retryable?: boolean } }));
     this.socket.io.on("reconnect_failed", () => this.connectionError(new PlatformSocketError("connection_failed")));
     this.socket.on("joined", (raw: unknown) => {
       try {
-        const joined = decodeJoined(raw);
-        this.subscriptions.get(appFromRoom(joined.room)!)?.joined(joined);
+        const snapshot = decodeSnapshot(raw);
+        this.subscriptions.get(appFromRoom(snapshot.room)!)?.snapshot(snapshot);
       } catch { this.protocolError(raw); }
     });
     this.socket.on("error", (raw: unknown) => this.serverError(raw));
     for (const type of eventNames) this.socket.on(type, (raw: unknown) => {
       try {
-        const appId = eventApp(type, raw);
+        const appId = appFromRoom(object(raw).room);
         if (!appId) throw new Error("Invalid app");
         this.subscriptions.get(appId)?.event(decode(type, appId, raw));
       } catch { this.protocolError(raw); }
     });
   }
 
-  /** Connect using a freshly obtained token. Resolves on CONNECT, not on app replay completion.
-   * Unexpected transport loss retries up to five times and rejoins active subscriptions.
-   * Call again after addressing a connection/auth failure; concurrent calls share one attempt.
+  /** Connect with the session token. Resolves on CONNECT, before snapshots arrive.
+   * Transport loss retries up to five times and rejoins active subscriptions.
+   * Call again after a failure or `session_replaced`; concurrent calls share one attempt.
    */
   connect(): Promise<void> {
     if (this.closed) return Promise.reject(new PlatformSocketError("client_closed"));
@@ -76,29 +83,21 @@ export class BuilderSocket implements BuilderSession {
     return promise;
   }
 
-  /** Subscribe before or after connecting. One subscription per app, maximum eight.
-   * Events and boundary callbacks are awaited in order per app. Failed application,
-   * invalid frames or server errors end the subscription without advancing its cursor.
+  /** Subscribe before or after connecting. One subscription per app, maximum eight, each on the
+   * session's allowlist. Snapshots and events are awaited in order per app; a failed callback,
+   * an invalid frame or a server refusal ends the subscription.
    */
   subscribe(appId: string, options: SubscriptionOptions): PlatformSubscription {
     if (this.closed) throw new PlatformSocketError("client_closed");
     if (!appPattern.test(appId)) throw new TypeError("appId must be 24 lowercase hexadecimal characters");
-    if (options.afterSeq !== undefined && (typeof options.afterSeq !== "string" || !options.afterSeq)) throw new TypeError("afterSeq must be a nonempty opaque cursor");
     if (this.subscriptions.has(appId)) throw new TypeError("An app may only have one subscription per builder session");
     if (this.subscriptions.size >= 8) throw new PlatformSocketError("subscription_limit", appId);
     const subscription = new Subscription(appId, { ...options }, () => {
       this.subscriptions.delete(appId);
-      this.needsFreshConnection = true;
       if (this.socket.connected) this.socket.emit("leave", roomFor(appId));
     });
     this.subscriptions.set(appId, subscription);
-    if (this.socket.connected && this.needsFreshConnection) {
-      // Leave has no acknowledgement; a new transport fences late events from retired streams.
-      this.socket.disconnect();
-      void this.connect().catch(() => {}); // Connection errors are delivered through onError.
-    } else if (this.socket.connected) {
-      this.join(subscription, this.generation);
-    }
+    if (this.socket.connected) this.join(subscription);
     return subscription;
   }
 
@@ -108,7 +107,7 @@ export class BuilderSocket implements BuilderSession {
     this.closed = true;
     ++this.authAttempt;
     this.cancelAuth?.();
-    ++this.generation;
+    clearTimeout(this.retryTimer);
     for (const subscription of this.subscriptions.values()) subscription.unsubscribe();
     this.rejectConnect?.(new PlatformSocketError("client_closed"));
     this.clearConnecting();
@@ -117,35 +116,56 @@ export class BuilderSocket implements BuilderSession {
     this.socket.disconnect();
   }
 
-  private join(subscription: Subscription, generation: number): void {
-    subscription.join((cursor) => {
-      if (this.socket.connected && generation === this.generation) {
-        this.socket.emit("join", roomFor(subscription.appId), cursor === undefined ? {} : { after_seq: cursor });
-      }
-    });
+  private join(subscription: Subscription): void {
+    this.socket.emit("join", roomFor(subscription.appId));
   }
 
-  private async authenticate(callback: (auth: { token: string }) => void): Promise<void> {
+  private async authenticate(callback: (auth: { session_token: string }) => void): Promise<void> {
     const attempt = ++this.authAttempt;
     this.cancelAuth?.();
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error("Token timeout")), 20000);
+      timer = setTimeout(() => reject(new Error("Session token timeout")), 20000);
       this.cancelAuth = () => { clearTimeout(timer); reject(new Error("Cancelled")); };
     });
     try {
-      const token = await Promise.race([Promise.resolve().then(() => this.options.refreshToken()), timeout]);
-      if (this.closed || attempt !== this.authAttempt) return;
-      if (typeof token !== "string" || !token.trim()) throw new Error("Missing token");
-      callback({ token });
+      if (!this.token) {
+        const token = await Promise.race([Promise.resolve().then(() => this.options.getSessionToken()), timeout]);
+        if (this.closed || attempt !== this.authAttempt) return;
+        if (typeof token !== "string" || !token.trim()) throw new Error("Missing session token");
+        this.token = token;
+        this.tokenFresh = true;
+      }
+      callback({ session_token: this.token });
     } catch {
       if (this.closed || attempt !== this.authAttempt) return;
       this.socket.disconnect();
-      this.connectionError(new PlatformSocketError("token_unavailable"));
+      this.connectionError(new PlatformSocketError("session_unavailable"));
     } finally {
       clearTimeout(timer);
       if (attempt === this.authAttempt) this.cancelAuth = undefined;
     }
+  }
+
+  /** A connect the server refused. Transport errors are Socket.IO's to retry. */
+  private refused(error: Error & { data?: { retryable?: boolean } }): void {
+    if (this.closed || error.message !== "connection_denied") return;
+    if (error.data?.retryable === true) { this.retryDenied(); return; }
+    // A token this attempt did not just fetch may have expired: renew it once.
+    const renew = !this.tokenFresh;
+    this.token = undefined;
+    if (renew) this.socket.connect();
+    else this.connectionError(new PlatformSocketError("connection_denied"));
+  }
+
+  private retryDenied(): void {
+    if (++this.denialRetries > MAX_DENIAL_RETRIES) {
+      this.denialRetries = 0;
+      this.connectionError(new PlatformSocketError("connection_failed"));
+      return;
+    }
+    const delay = Math.min(1000 * 2 ** (this.denialRetries - 1), 10000) * (0.5 + Math.random() / 2);
+    this.retryTimer = setTimeout(() => { this.retryTimer = undefined; if (!this.closed) this.socket.connect(); }, delay);
   }
 
   private clearConnecting(): void {
@@ -163,21 +183,27 @@ export class BuilderSocket implements BuilderSession {
   private serverError(raw: unknown): void {
     try {
       const frame = object(raw);
-      const code = errorCodes.find((code) => code === frame.code);
-      if (!code) throw new Error("Unknown error");
+      if (frame.room === null && (frame.code === "session_expired" || frame.code === "session_replaced")) {
+        // The server disconnects next; the disconnect handler renews or stops.
+        this.token = undefined;
+        this.ending = frame.code;
+        return;
+      }
       const appId = appFromRoom(frame.room);
-      if (appId) this.subscriptions.get(appId)?.fail(code);
-      else if (frame.room === null) this.connectionError(new PlatformSocketError(code));
-      else throw new Error("Invalid room");
+      const code = roomErrorCodes.find((code) => code === frame.code);
+      if (!appId || !code) throw new Error("Unknown error");
+      const subscription = this.subscriptions.get(appId);
+      if (code === "snapshot_unavailable") subscription?.warn(code);
+      else subscription?.fail(code);
     } catch { this.protocolError(raw); }
   }
 
   private protocolError(raw: unknown): void {
     const frame = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
-    const appId = appFromRoom(frame.room) ?? (typeof frame.app_id === "string" && appPattern.test(frame.app_id) ? frame.app_id : undefined);
+    const appId = appFromRoom(frame.room);
     if (appId) this.subscriptions.get(appId)?.fail("protocol_error");
     else {
-      // Unknown routing means no app cursor can safely advance past this frame.
+      // Unknown routing: no app can be told which update it missed.
       for (const subscription of [...this.subscriptions.values()]) subscription.fail("protocol_error");
       this.connectionError(new PlatformSocketError("protocol_error"));
     }
