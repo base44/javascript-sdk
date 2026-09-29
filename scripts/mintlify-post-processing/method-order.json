@@ -16,5 +16,29 @@
   "functions": [
     "invoke",
     "fetch"
+  ],
+  "iap": [
+    "hasActiveSubscription",
+    "getSubscriptionState",
+    "getEntitlements",
+    "getPurchase",
+    "listTransactions",
+    "listRefunds",
+    "listPendingConsumptionRequests",
+    "handleNotification",
+    "handleSignedPayload",
+    "recordTransaction",
+    "syncEntitlements",
+    "onEvent",
+    "checkSetup",
+    "appAccountTokenFor",
+    "verifyTransaction",
+    "verifyRenewalInfo",
+    "verifyNotification"
+  ],
+  "iap-server-api": [
+    "sendConsumptionInformation",
+    "requestTestNotification",
+    "getTestNotificationStatus"
   ]
 }
