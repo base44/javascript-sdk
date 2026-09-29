@@ -56,10 +56,11 @@ export function createFunctionsModule(
       let contentType: string;
 
       // Handle file uploads with FormData
-      if (
-        data instanceof FormData ||
-        (data && Object.values(data).some((value) => value instanceof File))
-      ) {
+      if (data instanceof FormData) {
+        // Preserve fields, repeated keys, and files already encoded by callers.
+        formData = data;
+        contentType = "multipart/form-data";
+      } else if (data && Object.values(data).some((value) => value instanceof File)) {
         formData = new FormData();
         Object.keys(data).forEach((key) => {
           if (data[key] instanceof File) {
