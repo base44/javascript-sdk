@@ -1,5 +1,5 @@
-/** A reviewed file, execution, or entity activity summary. */
-export interface ToolDisplayProjection {
+/** Activity a file, execution or entity tool declared public. */
+export interface ToolDisplay {
   /** Changed file paths for a file operation. Source bodies and diffs are never included. */
   file_paths?: string[];
   /** Whether a file write intentionally used empty content. */
@@ -14,75 +14,75 @@ export interface ToolDisplayProjection {
   record_count?: number;
 }
 
-/** A reviewed selectable answer to a builder question. */
+/** A selectable answer to a builder question. */
 export interface ToolQuestionOption {
   /** Visible option label. */
-  label: string;
+  label?: string;
 }
 
-/** A reviewed builder question. Image/HTML source and private design context are excluded. */
+/** A builder question. Image/HTML source and private design context are excluded. */
 export interface ToolQuestion {
   /** Visible question text. */
   question?: string;
-  /** Existing question category. */
+  /** Question category. */
   type?: string;
   /** Optional visible supporting text. */
   description?: string;
   /** Whether more than one answer may be selected. */
   multi_select?: boolean;
-  /** Optional existing plan section identifier. */
+  /** Plan section the question covers. */
   covers?: string;
-  /** Reviewed selectable options. */
-  options?: ToolQuestionOption[];
+  /** Selectable options; a bare string option is its label. */
+  options?: (ToolQuestionOption | string)[];
 }
 
-/** Reviewed question arguments, serialized in `ToolCall.arguments_string`. */
+/** `ask_clarifying_questions` and `ask_plan_questions` arguments. */
 export interface ToolQuestionArguments {
-  /** Questions presented by a clarifying-question tool. */
-  questions: ToolQuestion[];
+  /** Questions presented to the user. */
+  questions?: ToolQuestion[];
 }
 
 /** A requested secret field. The secret value is never sent over the socket. */
 export interface ToolSecretField {
   /** Requested secret name. */
-  secretName: string;
+  secretName?: string;
   /** Optional explanation of where to obtain it. */
   description?: string;
 }
 
-/** Reviewed secret-form arguments, serialized in `ToolCall.arguments_string`. */
+/** `set_secrets` arguments. */
 export interface ToolSecretArguments {
   /** Requested secret fields. */
-  secrets_schema: ToolSecretField[];
+  secrets_schema?: ToolSecretField[];
 }
 
-/** A reviewed package operation. Versions and package-manager output are excluded. */
+/** A package operation. Versions and package-manager output are excluded. */
 export interface ToolPackageOperation {
   /** Package name. */
-  name: string;
+  name?: string;
   /** Requested package operation. */
   action?: string;
 }
 
-/** Reviewed package arguments, serialized in `ToolCall.arguments_string`. */
+/** `install_npm_package` arguments. */
 export interface ToolPackageArguments {
   /** Requested package operations. */
-  packages: ToolPackageOperation[];
+  packages?: ToolPackageOperation[];
 }
 
-/** A reviewed add-only builder plan update. */
+/** An add-only builder plan update. */
 export interface ToolPlanUpdate {
-  /** Existing update action. */
+  /** Update action. */
   action?: string;
   /** Plan section key. */
   section?: string;
   /** Optional user-facing section label. */
   section_label?: string;
-  /** Reviewed plan point. */
+  /** Plan point. */
   text?: string;
 }
 
-/** Reviewed plan arguments, serialized in `ToolCall.arguments_string`. */
+/** `update_plan` arguments. */
 export interface ToolPlanArguments {
   /** Plan updates in their emitted order. */
   updates?: ToolPlanUpdate[];
@@ -90,8 +90,7 @@ export interface ToolPlanArguments {
   sections_with_enough?: string[];
 }
 
-/** A reviewed plan, serialized in `generate_prd`'s `ToolCall.arguments_string`. The plan is the
- * user's own spec; in plan mode the message `content` beside it can be empty. */
+/** `generate_prd` arguments: the user's own plan. In plan mode the message `content` beside it can be empty. */
 export interface ToolPrdArguments {
   /** App or feature name. */
   app_name?: string;
@@ -113,7 +112,7 @@ export interface ToolPrdArguments {
   game_engine?: string;
 }
 
-/** Reviewed generated-media arguments, serialized in `ToolCall.arguments_string`. */
+/** Image, game-image and video generation arguments. */
 export interface ToolMediaArguments {
   /** Visible media label. */
   label?: string;
@@ -121,17 +120,22 @@ export interface ToolMediaArguments {
   aspect_ratio?: string;
 }
 
-/** Reviewed state of generated media. Raw generation prompts and IDs are never included. */
+/** The public arguments of a tool that declares them; narrow by the tool call's `name`. */
+export type ToolArguments =
+  | ToolQuestionArguments | ToolSecretArguments | ToolPackageArguments
+  | ToolPlanArguments | ToolPrdArguments | ToolMediaArguments;
+
+/** Generated-media state. Raw generation prompts and IDs are never included. */
 export interface ToolMediaResult {
-  /** Existing placeholder URL, used to associate an `image_ready` event with this tool. */
-  placeholder_url: string;
+  /** Placeholder URL, used to associate an `image.resolved` event with this tool. */
+  placeholder_url?: string;
   /** Current media-generation status. */
-  status: "pending" | "completed" | "failed";
-  /** Approved generated asset URL, once available. */
-  image_url: string | null;
+  status?: "pending" | "completed" | "failed";
+  /** Generated asset URL, once available. */
+  image_url?: string | null;
 }
 
-/** A reviewed answer to a clarifying question. Secret-form input is never included. */
+/** An answer to a clarifying question. Secret-form input is never included. */
 export interface ToolQuestionAnswer {
   /** Zero-based question index. */
   question_index?: number;
@@ -141,25 +145,19 @@ export interface ToolQuestionAnswer {
   custom_text?: string;
 }
 
-/** Reviewed clarifying-question input. */
+/** Clarifying-question answers. */
 export interface ToolQuestionInput {
   /** Answers supplied to the question card. */
-  answers: ToolQuestionAnswer[];
+  answers?: ToolQuestionAnswer[];
 }
-
-/** Fixed reviewed completion text. Raw tool results and errors are never included. */
-export type ToolOutcome =
-  | "Secret configuration completed."
-  | "Package installation completed."
-  | "Plan updated.";
 
 /** Why a safety guard parked a call for approval. Only present while the call waits. */
 export interface ToolGuardApproval {
   /** Guard identifier, e.g. `exec_tool_send_email` or `bash_approval`. */
   guard: string;
-  /** Human-readable reason. Omitted for shell commands, whose reason can quote the command. */
+  /** Human-readable reason, for guards whose reason never quotes input (not shell commands). */
   reason?: string;
-  /** Reviewed details for the guard; commands and record data are never included. */
+  /** The details the guard declares public; commands and record data are never included. */
   details?: {
     /** Entity method the code calls, e.g. `delete`. */
     method?: string;
@@ -178,64 +176,38 @@ export interface ToolGuardApproval {
   };
 }
 
-/** A fixed reviewed outcome, reviewed generated-media state, or a guard's approval reason. */
-export type ToolResult = ToolOutcome | ToolMediaResult | ToolGuardApproval;
-
-/** Public progress of an existing builder tool. */
+/** Public progress of a builder tool call. Only what the tool and its guard declare public is present. */
 export interface ToolCall {
-  /** Stable tool call identifier, when included in the update. */
+  /** Stable tool call identifier. */
   id?: string;
-  /** Tool name displayed by the builder. */
+  /** Tool name. */
   name?: string;
   /** Current execution state. */
   status?: "running" | "success" | "error" | "stopped" | "waiting_for_user_input";
   /** Whether the tool needs a user response through the partner backend. */
   requires_user_input?: boolean;
-  /** Whether the builder auto-approved the reviewed operation. */
-  auto_approved?: boolean | null;
-  /** Whether the reviewed mutation was applied. */
+  /** Whether the builder auto-approved the operation. */
+  auto_approved?: boolean;
+  /** Whether the mutation was applied. */
   mutation_applied?: boolean | null;
-  /** Existing serialized interaction category; no raw interaction payload. */
+  /** Kind of response a parked call waits for. */
   waiting_on?: {
     /** Kind of response expected. */
-    kind?: "approval" | "choice" | "input" | null;
-  } | null;
-  /**
-   * JSON containing one reviewed argument shape: ToolQuestionArguments, ToolSecretArguments,
-   * ToolPackageArguments, ToolPlanArguments, ToolPrdArguments, or ToolMediaArguments.
-   * It is omitted for all other tools and malformed/partial streaming arguments.
-   */
-  arguments_string?: string;
-  /** Reviewed activity metadata for file, execution, or entity tools. */
-  display_projection?: ToolDisplayProjection;
-  /** Reviewed clarifying-question answers only. */
+    kind?: "approval" | "choice" | "input";
+  };
+  /** The tool's public arguments; absent for tools that declare none and for partial streaming arguments. */
+  arguments?: ToolArguments;
+  /** What a file, execution or entity tool touched. */
+  display?: ToolDisplay;
+  /** Clarifying-question answers. */
   user_input?: ToolQuestionInput;
-  /** Fixed reviewed success outcome, generated-media state, or a parked call's guard reason. */
-  results?: ToolResult;
+  /** Generated-media state, once the call is not waiting on a guard. */
+  results?: ToolMediaResult;
+  /** A parked call's guard, and its reason and details where the guard declares them. */
+  approval?: ToolGuardApproval;
 }
 
-/** Public message replacement. Omitted properties are not synthesized by the SDK. */
-export interface ChatMessage {
-  /** Existing message identifier; replace a message with the same identifier. */
-  id?: string;
-  /** Public message author category. System messages are never delivered. */
-  role?: "user" | "assistant";
-  /** Generated or user-authored text. Structural filtering is not prose redaction. */
-  content?: string | null;
-  /** Public tool progress with optional reviewed interaction details. */
-  tool_calls?: ToolCall[] | null;
-  /** Message timestamp, without author identity. */
-  metadata?: {
-    /** Existing timestamp string. */
-    created_date?: string | null;
-  } | null;
-  /** Existing checkpoint reference; mutations remain on the partner backend. */
-  checkpoint_id?: string | null;
-  /** Reviewed scalar message parameters. */
-  additional_message_params?: MessageParams;
-}
-
-/** Reviewed scalar parameters a chat UI needs while a turn runs. */
+/** Scalar parameters a chat UI needs while a turn runs. */
 export interface MessageParams {
   /** Identifier the sending client attached, to match its optimistic message. */
   client_creation_id?: string;
@@ -249,79 +221,102 @@ export interface MessageParams {
   system_message_type?: string;
 }
 
+/** A public chat message. Replace the message with the same `id` as a whole. */
+export interface ChatMessage {
+  /** Message identifier. */
+  id?: string;
+  /** Author category. System and hidden messages are never delivered. */
+  role?: "user" | "assistant";
+  /** Message text; structured content is withheld. Structural filtering is not prose redaction. */
+  content?: string | null;
+  /** Public tool progress. */
+  tool_calls?: ToolCall[] | null;
+  /** Message timestamp, without author identity. */
+  metadata?: {
+    /** ISO timestamp string. */
+    created_date?: string;
+  };
+  /** Checkpoint reference; mutations remain on the partner backend. */
+  checkpoint_id?: string | null;
+  /** Scalar message parameters. */
+  additional_message_params?: MessageParams;
+}
+
 /** Public builder state, without error diagnostics or billing context. */
 export interface AppStatus {
   /** Current builder state. */
   state?: "ready" | "processing" | "error";
-  /** Existing state timestamp. */
+  /** State timestamp. */
   last_updated_date?: string | null;
 }
 
-/** Removes the message with this identifier. */
-export interface DeletedMessage {
-  /** Message identifier. */
-  id: string;
-  /** Always true. */
-  is_deleted: true;
+/** Branch scope carried by app events. Null or absent is the main branch. */
+export interface BranchScoped {
+  /** Branch the change belongs to; null is main. */
+  branch_id?: string | null;
 }
 
-/** Partial app update. Omitted keys mean unchanged; explicit null means clear. */
-export interface AppUpdate {
-  /** Public builder state. */
-  status?: AppStatus | null;
-  /** Whole-message replacement or removal by identifier, not a recursive message patch. */
-  _last_msg?: ChatMessage | DeletedMessage | null;
-  /** Conversation containing the replacement message. */
-  _last_msg_conversation_id?: string | null;
-  /** Existing branch scope, if supplied by the producer. */
-  _scope_branch_id?: string | null;
-  /** Whether to reload the app preview. */
-  sandbox_should_reload?: boolean | null;
-  /** Existing preview navigation target. */
-  navigate_preview_to?: string | null;
-  /** Existing forced preview navigation target. */
-  navigate_preview_force_to?: string | null;
+/** `message.updated`: a chat message was added or replaced. */
+export interface MessageUpdated extends BranchScoped {
+  /** The whole message; replace the one with the same `id`. */
+  message: ChatMessage;
+  /** Conversation containing the message. */
+  conversation_id?: string | null;
 }
 
-/** Public queued builder request. */
+/** `message.removed`: a message was removed or hidden. An `id` the viewer never saw is a no-op. */
+export interface MessageRemoved extends BranchScoped {
+  /** Identifier of the message to remove. */
+  message_id: string;
+  /** Conversation that contained the message. */
+  conversation_id?: string | null;
+}
+
+/** `app.status_changed`: a turn started, finished or failed. */
+export interface AppStatusChanged extends BranchScoped {
+  /** The new state; null clears it. */
+  status: AppStatus | null;
+}
+
+/** `preview.navigation_requested`: show this page of the app in the preview. */
+export interface PreviewNavigationRequested extends BranchScoped {
+  /** App path to show. */
+  path: string;
+  /** Navigate even when the user has moved away from the page. */
+  force: boolean;
+}
+
+/** A queued builder request. */
 export interface QueueItem {
-  /** Stable queue item identifier. */
-  id: string;
+  /** Queue item identifier. */
+  id?: string;
   /** User-authored request text. */
-  content: string;
-  /** Existing creation timestamp. */
-  created_at: string;
-  /** Existing branch scope. */
+  content?: string;
+  /** Creation timestamp. */
+  created_at?: string;
+  /** Branch the request belongs to. */
   branch_id?: string | null;
 }
 
-/** Full public queue snapshot, replacing the previous queue. */
-export interface QueueUpdate {
-  /** Canonical app room. */
-  room: string;
-  /** App owning this queue. */
-  app_id: string;
-  /** Existing branch scope. */
-  branch_id?: string | null;
-  /** Current pending items. */
-  items: QueueItem[];
+/** `queue.updated`: the whole prompt queue, replacing the previous one. */
+export interface QueueUpdated extends BranchScoped {
+  /** Pending items. */
+  items?: QueueItem[];
   /** Whether queue processing is paused. */
-  is_paused: boolean;
+  is_paused?: boolean;
   /** Identifier of the item just processed, when supplied. */
   processed_item_id?: string | null;
 }
 
-/** Public tool task progress. */
-export interface TaskUpdate {
-  /** Existing task lifecycle event. */
-  event_type: "task_started" | "task_progress" | "task_completed" | "task_failed" | "task_cancelled";
+/** `task.progressed`: progress of a long-running tool. */
+export interface TaskProgressed extends BranchScoped {
   /** Associated tool call. */
   tool_call_id?: string | null;
   /** Associated chat message. */
   message_id?: string | null;
-  /** Existing branch scope. */
-  branch_id?: string | null;
-  /** Numeric progress only; diagnostic/free-text messages are withheld. */
+  /** Task lifecycle event, e.g. `task_progress`. */
+  event_type?: string | null;
+  /** Numeric progress only; diagnostic text is withheld. */
   progress?: {
     /** Completed work units. */
     current?: number | null;
@@ -332,55 +327,52 @@ export interface TaskUpdate {
   } | null;
 }
 
-/** Placeholder resolution or image-generation completion. */
-export interface ImageReady {
-  /** Placeholder being resolved. */
-  placeholder_url: string;
-  /** Existing generation state. */
-  status: "pending" | "completed" | "failed";
-  /** Resolved image URL, or null when unavailable. */
-  image_url?: string | null;
-}
+/** `image.resolved`: a generated image finished or failed. Replace its `placeholder_url` wherever it appears. */
+export type ImageResolved = ToolMediaResult;
 
-/** Invalidation notice. A main-conversation `conversation_changed` is followed by a snapshot. */
-export interface Directive {
-  /** Canonical app room. */
-  room: string;
-  /** Public invalidation category. */
-  type:
-    | "conversation_changed" | "app_files_changed" | "branch_deleted"
-    | "imported_git_changed" | "imported_pull_request_changed";
-  /** Existing branch scope. */
-  branch_id?: string | null;
-}
-
-/** Mapping of wire event names to decoded public payloads. */
+/** Mapping of public event names to their payloads. */
 export interface PlatformEventMap {
-  /** Partial builder/app update. */
-  update_model: AppUpdate;
-  /** Conversation or file invalidation. */
-  directive: Directive;
-  /** Full queue snapshot. */
-  queue_update: QueueUpdate;
-  /** Numeric tool progress. */
-  task_update: TaskUpdate;
-  /** Image placeholder resolution. */
-  image_ready: ImageReady;
+  /** A chat message was added or replaced. */
+  "message.updated": MessageUpdated;
+  /** A chat message was removed or hidden. */
+  "message.removed": MessageRemoved;
+  /** The builder started, finished or failed a turn. */
+  "app.status_changed": AppStatusChanged;
+  /** Reload the app preview. */
+  "preview.reload_requested": BranchScoped;
+  /** Show a page of the app in the preview. */
+  "preview.navigation_requested": PreviewNavigationRequested;
+  /** The whole prompt queue. */
+  "queue.updated": QueueUpdated;
+  /** Progress of a long-running tool. */
+  "task.progressed": TaskProgressed;
+  /** A generated image finished or failed. */
+  "image.resolved": ImageResolved;
+  /** The conversation was rewritten (undo, restore, sync). On main, the SDK rejoins for a fresh snapshot. */
+  "conversation.changed": BranchScoped;
+  /** The app's files changed outside a chat turn. Re-read them. */
+  "files.changed": BranchScoped;
+  /** A branch was deleted. */
+  "branch.deleted": BranchScoped;
+  /** The imported app's repository changed. */
+  "repository.changed": BranchScoped;
+  /** The imported app's pull request changed. */
+  "pull_request.changed": BranchScoped;
 }
 
-/** Ordered delivery with decoded data and the original event name. */
+/** Ordered delivery of one public event. */
 export type PlatformEvent = {
   [K in keyof PlatformEventMap]: {
-    /** Original socket event name; narrows the payload type. */
+    /** Public event name; narrows the payload type. */
     type: K;
     /** Authorized app receiving this event. */
     appId: string;
-    /** Decoded payload; existing field names and omission/null semantics are retained. */
+    /** Event payload. Omitted keys mean unchanged; explicit null clears. */
     data: PlatformEventMap[K];
   }
 }[keyof PlatformEventMap];
 
-/** An app's current state: sent after each join and rejoin, and after a main-conversation rewrite. */
+/** An app's current state: sent after every join and rejoin, and after a main-conversation rewrite. */
 export interface Snapshot {
   /** Canonical app room. */
   room: string;

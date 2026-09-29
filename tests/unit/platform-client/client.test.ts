@@ -17,8 +17,9 @@ vi.mock("socket.io-client", () => ({ io: fake.io }));
 const app = "a".repeat(24), other = "b".repeat(24), room = `/apps/${app}`;
 const clients: BuilderSession[] = [];
 const settle = async () => { for (let i = 0; i < 100; i++) await Promise.resolve(); };
-const snapshot = (messages: unknown[] = []) => fake.handlers.joined({ room, status: { state: "ready" }, messages });
-const update = (data: unknown = { status: null }) => fake.handlers.update_model({ room, data: JSON.stringify(data) });
+const snapshot = (messages: unknown[] = []) => fake.handlers["app.snapshot"]({ room, data: { status: { state: "ready" }, messages } });
+const update = (data: unknown = { status: null }) => fake.handlers["app.status_changed"]({ room, data });
+const notice = (name: string, data: unknown = {}, at: string | null = room) => fake.handlers[name]({ room: at, data });
 const denied = (retryable: boolean) => fake.handlers.connect_error(Object.assign(new Error("connection_denied"), { data: { retryable } }));
 const auth = async () => {
   const callback = vi.fn(); (fake.io.mock.calls.at(-1) as any)[1].auth(callback); await settle(); return callback;
@@ -109,7 +110,7 @@ describe("platform client", () => {
   test("an expired session reconnects with a new session token", async () => {
     const { client, getSessionToken, onError } = setup();
     await auth(); await connected(client); fake.socket.connect.mockClear();
-    fake.handlers.error({ room: null, code: "session_expired" });
+    notice("session.ended", { reason: "expired" }, null);
     fake.handlers.disconnect("io server disconnect");
     expect(fake.socket.connect).toHaveBeenCalledOnce();
     getSessionToken.mockResolvedValue("next-session");
@@ -120,7 +121,7 @@ describe("platform client", () => {
   test("a replaced session stops without reconnecting", async () => {
     const { client, onError } = setup();
     await auth(); await connected(client); fake.socket.connect.mockClear();
-    fake.handlers.error({ room: null, code: "session_replaced" });
+    notice("session.ended", { reason: "replaced" }, null);
     fake.handlers.disconnect("io server disconnect");
     expect(fake.socket.connect).not.toHaveBeenCalled();
     expect(onError.mock.calls[0][0].code).toBe("session_replaced");
@@ -158,10 +159,10 @@ describe("platform client", () => {
     await connected(client);
     expect(joins()).toEqual([["join", room]]);
     snapshot([{ id: "m", role: "assistant", content: "hi" }]);
-    update({ _last_msg: { id: "m", content: "hello" }, status: null });
+    fake.handlers["message.updated"]({ room, data: { message: { id: "m", content: "hello" } } });
     await settle();
     expect(onSnapshot).toHaveBeenCalledExactlyOnceWith({ room, status: { state: "ready" }, messages: [{ id: "m", role: "assistant", content: "hi" }] });
-    expect(onEvent).toHaveBeenCalledExactlyOnceWith({ type: "update_model", appId: app, data: { _last_msg: { id: "m", content: "hello" }, status: null } });
+    expect(onEvent).toHaveBeenCalledExactlyOnceWith({ type: "message.updated", appId: app, data: { message: { id: "m", content: "hello" } } });
   });
 
   test("reconnect rejoins active subscriptions for a fresh snapshot", async () => {
@@ -197,7 +198,7 @@ describe("platform client", () => {
     const { client } = setup(); const onError = vi.fn();
     const sub = client.subscribe(app, { onSnapshot: vi.fn(), onEvent: vi.fn(), onError });
     const second = client.subscribe(other, { onSnapshot: vi.fn(), onEvent: vi.fn(), onError: vi.fn() });
-    await connected(client); fake.handlers.error({ room, code, message: "Access denied to this room" });
+    await connected(client); notice(`room.${code}`);
     expect(sub.active).toBe(false); expect(second.active).toBe(true);
     expect(onError.mock.calls[0][0]).toMatchObject({ code, appId: app });
     fake.handlers.connect(); await settle();
@@ -207,31 +208,44 @@ describe("platform client", () => {
   test("an unavailable snapshot is reported without ending the subscription", async () => {
     const { client } = setup(); const onError = vi.fn(), onEvent = vi.fn();
     const sub = client.subscribe(app, { onSnapshot: vi.fn(), onEvent, onError });
-    await connected(client); fake.handlers.error({ room, code: "snapshot_unavailable" }); update(); await settle();
+    await connected(client); notice("room.snapshot_unavailable"); update(); await settle();
     expect(sub.active).toBe(true); expect(onEvent).toHaveBeenCalledOnce();
     expect(onError.mock.calls[0][0]).toMatchObject({ code: "snapshot_unavailable", appId: app });
   });
 
-  test("routes all five event shapes by room and keeps apps isolated", async () => {
+  test("routes every public event by room and keeps apps isolated", async () => {
     const { client } = setup(); const onEvent = vi.fn(), otherEvent = vi.fn();
     client.subscribe(app, { onSnapshot: vi.fn(), onEvent, onError: vi.fn() });
     client.subscribe(other, { onSnapshot: vi.fn(), onEvent: otherEvent, onError: vi.fn() });
     await connected(client);
-    update();
-    fake.handlers.directive({ room, type: "branch_deleted", branch_id: "feature" });
-    fake.handlers.queue_update({ room, app_id: app, items: [], is_paused: false });
-    fake.handlers.task_update({ room, data: '{"event_type":"task_progress","progress":{"current":1}}' });
-    fake.handlers.image_ready({ room, data: '{"placeholder_url":"placeholder","status":"completed","image_url":"image"}' });
-    await settle(); expect(onEvent.mock.calls.map(c => c[0].type)).toEqual(["update_model", "directive", "queue_update", "task_update", "image_ready"]);
-    expect(onEvent.mock.calls[1][0].data).toEqual({ room, type: "branch_deleted", branch_id: "feature" });
+    const names = [
+      "message.updated", "message.removed", "app.status_changed", "preview.reload_requested",
+      "preview.navigation_requested", "queue.updated", "task.progressed", "image.resolved",
+      "conversation.changed", "files.changed", "branch.deleted", "repository.changed", "pull_request.changed",
+    ];
+    for (const name of names) fake.handlers[name]({ room, data: { branch_id: "feature" } });
+    await settle(); expect(onEvent.mock.calls.map(c => c[0].type)).toEqual(names);
+    expect(onEvent.mock.calls[10][0]).toEqual({ type: "branch.deleted", appId: app, data: { branch_id: "feature" } });
     expect(otherEvent).not.toHaveBeenCalled();
   });
 
-  test("malformed JSON fails only the identified app", async () => {
+  test("a rewrite of main rejoins for a fresh snapshot; a branch rewrite does not", async () => {
+    const { client } = setup(); const onEvent = vi.fn();
+    client.subscribe(app, { onSnapshot: vi.fn(), onEvent, onError: vi.fn() });
+    await connected(client);
+    fake.handlers["conversation.changed"]({ room, data: { branch_id: "feature" } });
+    expect(joins()).toHaveLength(1);
+    fake.handlers["conversation.changed"]({ room, data: {} });
+    await settle();
+    expect(joins()).toEqual([["join", room], ["join", room]]);
+    expect(onEvent).toHaveBeenCalledTimes(2);
+  });
+
+  test("a malformed envelope fails only the identified app", async () => {
     const { client } = setup(); const onError = vi.fn();
     const sub = client.subscribe(app, { onSnapshot: vi.fn(), onEvent: vi.fn(), onError });
     const second = client.subscribe(other, { onSnapshot: vi.fn(), onEvent: vi.fn(), onError: vi.fn() }); await connected(client);
-    fake.handlers.update_model({ room, data: "{" });
+    fake.handlers["message.updated"]({ room, data: "{" });
     expect(sub.active).toBe(false); expect(second.active).toBe(true);
     expect(onError.mock.calls[0][0].code).toBe("protocol_error");
   });

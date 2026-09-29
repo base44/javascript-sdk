@@ -8,17 +8,18 @@ const subscription = builder.subscribe("a".repeat(24), {
     void snapshot.messages[0]?.additional_message_params?.plan_mode;
   },
   onEvent(event: PlatformEvent) {
-    if (event.type === "update_model") {
-      const message = event.data._last_msg;
-      if (message && !("is_deleted" in message)) {
-        const content: string | null | undefined = message.content;
-        void content;
-      }
+    if (event.type === "message.updated") {
+      const content: string | null | undefined = event.data.message.content;
+      void content;
       // @ts-expect-error Private billing fields are not a public contract.
-      void event.data.credits;
+      void event.data.message.usage;
     }
-    if (event.type === "image_ready") {
-      const status: "pending" | "completed" | "failed" = event.data.status;
+    if (event.type === "message.removed") {
+      const id: string = event.data.message_id;
+      void id;
+    }
+    if (event.type === "image.resolved") {
+      const status: "pending" | "completed" | "failed" | undefined = event.data.status;
       void status;
     }
     // @ts-expect-error Payload must be narrowed by event.type.
@@ -43,16 +44,15 @@ client.connect();
 new Base44PlatformClient({ serverUrl: "https://example.test", refreshToken: async () => "token" });
 
 const tool: ToolCall = {
-  display_projection: { file_paths: ["src/App.tsx"] },
-  arguments_string: JSON.stringify({ questions: [{ question: "Which layout?", options: [{ label: "Cards" }] }] }),
+  display: { file_paths: ["src/App.tsx"] },
+  arguments: { questions: [{ question: "Which layout?", options: [{ label: "Cards" }] }] },
   user_input: { answers: [{ question_index: 0, selected_labels: ["Cards"] }] },
-  results: "Plan updated.",
 };
 void tool;
 const guarded: ToolCall = {
   status: "waiting_for_user_input",
   waiting_on: { kind: "approval" },
-  results: { guard: "entity_rls_guard", reason: "RLS rules on entity 'Order' will be modified", details: { entity_name: "Order", changed_ops: ["read"] } },
+  approval: { guard: "entity_rls_guard", reason: "RLS rules on entity 'Order' will be modified", details: { entity_name: "Order", changed_ops: ["read"] } },
 };
 void guarded;
 const generatedMedia: ToolCall = {
@@ -63,5 +63,7 @@ const generatedMedia: ToolCall = {
   },
 };
 void generatedMedia;
-// @ts-expect-error Raw command text is not part of reviewed display metadata.
-void tool.display_projection?.command;
+// @ts-expect-error Raw command text is not part of the public display.
+void tool.display?.command;
+// @ts-expect-error Raw arguments are never delivered.
+void tool.arguments_string;

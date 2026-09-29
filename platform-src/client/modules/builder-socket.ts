@@ -1,6 +1,6 @@
 import { io, type Socket } from "socket.io-client";
 import { PlatformSocketError } from "../errors.js";
-import { appFromRoom, appPattern, decode, decodeSnapshot, eventNames, object, roomErrorCodes, roomFor } from "./builder-protocol.js";
+import { appFromRoom, appPattern, decode, decodeSnapshot, eventNames, object, roomFor, roomNotices } from "./builder-protocol.js";
 import { notify, Subscription } from "./builder-subscription.js";
 import type { PlatformClientOptions } from "../client.types.js";
 import type { BuilderInitOptions, BuilderSession, PlatformSubscription, SubscriptionOptions } from "./builder.types.js";
@@ -50,18 +50,23 @@ export class BuilderSocket implements BuilderSession {
     });
     this.socket.on("connect_error", (error) => this.refused(error as Error & { data?: { retryable?: boolean } }));
     this.socket.io.on("reconnect_failed", () => this.connectionError(new PlatformSocketError("connection_failed")));
-    this.socket.on("joined", (raw: unknown) => {
+    this.socket.on("app.snapshot", (raw: unknown) => {
       try {
         const snapshot = decodeSnapshot(raw);
         this.subscriptions.get(appFromRoom(snapshot.room)!)?.snapshot(snapshot);
       } catch { this.protocolError(raw); }
     });
-    this.socket.on("error", (raw: unknown) => this.serverError(raw));
+    this.socket.on("session.ended", (raw: unknown) => this.sessionEnded(raw));
+    for (const [name, code] of Object.entries(roomNotices)) this.socket.on(name, (raw: unknown) => this.roomNotice(code, raw));
     for (const type of eventNames) this.socket.on(type, (raw: unknown) => {
       try {
         const appId = appFromRoom(object(raw).room);
         if (!appId) throw new Error("Invalid app");
-        this.subscriptions.get(appId)?.event(decode(type, appId, raw));
+        const event = decode(type, appId, raw);
+        const subscription = this.subscriptions.get(appId);
+        subscription?.event(event);
+        // The server does not resend a snapshot after a rewrite of main: rejoining asks for one.
+        if (subscription && event.type === "conversation.changed" && event.data.branch_id == null) this.join(subscription);
       } catch { this.protocolError(raw); }
     });
   }
@@ -180,18 +185,20 @@ export class BuilderSocket implements BuilderSession {
     if (!this.closed) notify(this.options.onError, error);
   }
 
-  private serverError(raw: unknown): void {
+  private sessionEnded(raw: unknown): void {
     try {
-      const frame = object(raw);
-      if (frame.room === null && (frame.code === "session_expired" || frame.code === "session_replaced")) {
-        // The server disconnects next; the disconnect handler renews or stops.
-        this.token = undefined;
-        this.ending = frame.code;
-        return;
-      }
-      const appId = appFromRoom(frame.room);
-      const code = roomErrorCodes.find((code) => code === frame.code);
-      if (!appId || !code) throw new Error("Unknown error");
+      const reason = object(object(raw).data).reason;
+      if (reason !== "expired" && reason !== "replaced") throw new Error("Unknown reason");
+      // The server disconnects next; the disconnect handler renews or stops.
+      this.token = undefined;
+      this.ending = reason === "expired" ? "session_expired" : "session_replaced";
+    } catch { this.protocolError(raw); }
+  }
+
+  private roomNotice(code: (typeof roomNotices)[keyof typeof roomNotices], raw: unknown): void {
+    try {
+      const appId = appFromRoom(object(raw).room);
+      if (!appId) throw new Error("Invalid app");
       const subscription = this.subscriptions.get(appId);
       if (code === "snapshot_unavailable") subscription?.warn(code);
       else subscription?.fail(code);

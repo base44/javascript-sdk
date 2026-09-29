@@ -20,12 +20,9 @@ const subscription = builder.subscribe("0123456789abcdef01234567", {
     console.log(snapshot.status?.state, snapshot.messages.length);
   },
   async onEvent(event: PlatformEvent) {
-    if (event.type === "update_model") {
-      // Apply omitted keys as unchanged and _last_msg as a replacement or removal by id.
-      const message = event.data._last_msg;
-      if (message && "is_deleted" in message) console.log("removed", message.id);
-      else console.log(message?.content);
-    }
+    // Replace messages by id; omitted keys mean unchanged, explicit null clears.
+    if (event.type === "message.updated") console.log(event.data.message.content);
+    if (event.type === "message.removed") console.log("removed", event.data.message_id);
   },
   onError(error) {
     // access_revoked: the app left the session's allowlist; do not resubscribe.

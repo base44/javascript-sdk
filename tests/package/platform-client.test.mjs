@@ -77,9 +77,8 @@ const platform = new Base44PlatformClient({ serverUrl: "https://example.test", g
 platform.builder.init({ onError() {} }).subscribe("a".repeat(24), {
   onSnapshot(snapshot) { void snapshot.messages; },
   onEvent(event: PlatformEvent) {
-    if (event.type === "update_model") {
-      const message = event.data._last_msg;
-      const text: string | null | undefined = message && !("is_deleted" in message) ? message.content : undefined;
+    if (event.type === "message.updated") {
+      const text: string | null | undefined = event.data.message.content;
       void text;
     }
   },

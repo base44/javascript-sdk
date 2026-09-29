@@ -25,7 +25,7 @@ test("real Socket.IO handshake, join, snapshot, reconnect and session renewal", 
         const [event, ...args] = JSON.parse(packet.slice(2));
         if (event !== "join") return;
         joins.push(args);
-        send(peer, "joined", { room, status: { state: "ready" }, messages: [{ id: `m${joins.length}` }] });
+        send(peer, "app.snapshot", { room, data: { status: { state: "ready" }, messages: [{ id: `m${joins.length}` }] } });
       }
     });
   });
@@ -41,8 +41,8 @@ test("real Socket.IO handshake, join, snapshot, reconnect and session renewal", 
     await vi.waitFor(() => expect(snapshots).toEqual(["m1"]));
     peers[0].terminate();
     await vi.waitFor(() => expect(snapshots).toEqual(["m1", "m2"]), { timeout: 6000 });
-    // The server expires the session: an error frame, then a server-side disconnect.
-    send(peers[1], "error", { room: null, code: "session_expired" });
+    // The server expires the session: a session notice, then a server-side disconnect.
+    send(peers[1], "session.ended", { room: null, data: { reason: "expired" } });
     peers[1].send("41");
     await vi.waitFor(() => expect(snapshots).toEqual(["m1", "m2", "m3"]), { timeout: 6000 });
     expect(joins).toEqual([[room], [room], [room]]);

@@ -77,8 +77,9 @@ session; call `client.builder.init(...)` again to start another.
 
 There is no replay cursor. Every join, including each rejoin after a reconnect, is
 answered with a `Snapshot`: the app's current `status` and its last 50 public
-messages. A main-conversation rewrite (undo, restore, sync) also sends one, right after
-its `conversation_changed` directive. Treat a snapshot as the app's current state.
+messages. After a main-conversation rewrite (undo, restore, sync), the SDK delivers
+`conversation.changed` and rejoins the room, so a fresh snapshot follows. Treat a
+snapshot as the app's current state.
 Live events can arrive just before it; merge its messages by `id` rather than
 discarding newer ones.
 
@@ -100,33 +101,40 @@ their exceptions are isolated so they cannot interrupt another app's delivery.
 Every exported shape and field has JSDoc. Run `npm run docs:platform-client` for
 validated reference pages in `docs/platform/client`. `PlatformEvent` is a
 **discriminated union**: switch on `event.type` to narrow `event.data`. Each delivery
-contains `type`, `appId` and decoded `data`. JSON strings are decoded for
-`update_model`, `task_update` and `image_ready`; the flat payloads keep their fields.
-The SDK validates routing/envelopes; payload schema validation and private-field
-filtering are the server's responsibility. Unknown event names are not forwarded.
+contains `type`, `appId` and `data`. On the wire every event is `{room, data}`; the SDK
+routes by `room` and validates the envelope, while payload schemas and private-field
+filtering are the server's. Omitted keys mean unchanged and explicit null clears.
+Events carrying `branch_id` belong to that branch; null or absent is main. Unknown
+event names are not forwarded.
 
 | Event | Data contract |
 | --- | --- |
-| `update_model` | `AppUpdate`: optional `status`, `_last_msg`, `_last_msg_conversation_id`, `_scope_branch_id`, `sandbox_should_reload`, `navigate_preview_to`, `navigate_preview_force_to`. Omission means unchanged; null means clear. `_last_msg` replaces by message ID; `DeletedMessage` (`{id, is_deleted: true}`) removes it. |
-| `directive` | `Directive`: `room`, `type` (`conversation_changed`, `app_files_changed`, `branch_deleted`, `imported_git_changed`, `imported_pull_request_changed`), optional `branch_id`. A re-read signal with no payload. |
-| `queue_update` | `QueueUpdate`: `room`, `app_id`, `items`, `is_paused`, optional `branch_id` and `processed_item_id`. Replaces the entire queue. |
-| `task_update` | `TaskUpdate`: `event_type` (`task_started`, `task_progress`, `task_completed`, `task_failed`, `task_cancelled`), optional `tool_call_id`, `message_id`, `branch_id`, numeric `progress`. |
-| `image_ready` | `ImageReady`: `placeholder_url`, `status` (`pending`, `completed`, `failed`), optional nullable `image_url`. |
+| `message.updated` | `MessageUpdated`: the whole `message`, optional `conversation_id`. Replace the message with the same `id`. |
+| `message.removed` | `MessageRemoved`: `message_id`, optional `conversation_id`. Sent when a message is deleted or hidden; an unknown ID is a no-op. |
+| `app.status_changed` | `AppStatusChanged`: `status` (`AppStatus`), null clears it. |
+| `preview.reload_requested` | Reload the app preview. |
+| `preview.navigation_requested` | `PreviewNavigationRequested`: `path`, and `force` to navigate even when the user moved away. |
+| `queue.updated` | `QueueUpdated`: `items`, `is_paused`, optional `processed_item_id`. Replaces the entire queue. |
+| `task.progressed` | `TaskProgressed`: optional `tool_call_id`, `message_id`, `event_type`, numeric `progress`. |
+| `image.resolved` | `ImageResolved`: `placeholder_url`, `status` (`pending`, `completed`, `failed`), nullable `image_url`. Replace the placeholder wherever it appears. |
+| `conversation.changed` | The conversation was rewritten. On main, a fresh snapshot follows. |
+| `files.changed`, `branch.deleted`, `repository.changed`, `pull_request.changed` | Re-read signals with no content. |
 
 `ChatMessage` has optional `id`, `role` (`user`/`assistant`), text/null `content`,
 `tool_calls`, timestamp-only `metadata.created_date`, `checkpoint_id`, and scalar
 `additional_message_params` (`client_creation_id`, `plan_mode`, `plan_approved`,
 `skip_ai_response`, `system_message_type`). `ToolCall` has optional `id`, `name`,
-`status`, `requires_user_input`, `auto_approved`, `mutation_applied`, and the existing
-nested `waiting_on.kind` (`approval`/`choice`/`input`/null). Its optional reviewed
-extensions are:
+`status`, `requires_user_input`, `auto_approved`, `mutation_applied` and
+`waiting_on.kind` (`approval`/`choice`/`input`). Each builder tool and guard declares
+which of its parts are public; a tool with no declaration shows only these fields.
 
-| Field | Exact public contract |
+| Field | Public contract |
 | --- | --- |
-| `display_projection` | File activity has `file_paths` and optional `content_empty`; execution activity has optional `summary` and `writes_entities`; entity activity has optional `entity_name` and `record_count`. |
-| `arguments_string` | JSON for one of `ToolQuestionArguments`, `ToolSecretArguments`, `ToolPackageArguments`, `ToolPlanArguments`, `ToolPrdArguments` (`generate_prd`, the plan in plan mode) or `ToolMediaArguments`. It is absent for all other tools. |
+| `arguments` | One of `ToolQuestionArguments`, `ToolSecretArguments`, `ToolPackageArguments`, `ToolPlanArguments`, `ToolPrdArguments` (`generate_prd`, the plan in plan mode) or `ToolMediaArguments`, narrowed by the tool's `name`. Absent for other tools and partial streaming arguments. |
+| `display` | File activity has `file_paths` and optional `content_empty`; execution activity has `summary` and `writes_entities`; entity activity has `entity_name` and `record_count`. |
 | `user_input` | `ToolQuestionInput` only, for clarifying-question answers. Secret-form values are never exposed. |
-| `results` | A fixed `ToolOutcome` success string, a `ToolMediaResult`, or, while a call waits for approval, a safety guard's `ToolGuardApproval` (`guard`, `reason`, reviewed `details`; shell-command approvals carry only `guard`). |
+| `results` | `ToolMediaResult` for image, game-image and video generation, once the call is not waiting on a guard. |
+| `approval` | While a call waits on a safety guard: `ToolGuardApproval` with `guard`, and `reason` and `details` where the guard declares them (shell-command approvals carry only `guard`). |
 
 In plan mode the message `content` beside a `generate_prd` call can be empty; render the
 plan from its arguments. Approving a plan, answering a question and approving a
@@ -149,7 +157,7 @@ exceptions, payloads and credentials are never attached.
 | `snapshot_unavailable` | Joined, but the snapshot failed. Live events still flow; the subscription stays active. |
 | `subscription_limit` | Release a subscription before adding another. |
 | `delivery_overflow` | 1,000 deliveries queued for the app; subscribe again for a fresh snapshot. |
-| `protocol_error` | Invalid routing, envelope or JSON. Stop and investigate. |
+| `protocol_error` | Invalid routing or envelope. Stop and investigate. |
 | `handler_failed` | An application callback failed; fix it and subscribe again. |
 | `client_closed` | The builder session was explicitly closed; initialize another session. |
 
