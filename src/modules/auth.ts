@@ -1,4 +1,6 @@
 import { AxiosInstance } from "axios";
+
+import { removeAccessToken } from "../utils/auth-utils.js";
 import {
   AuthModuleOptions,
   InternalAuthModule,
@@ -75,6 +77,12 @@ function loginViaPopup(
   }, 500);
 
   window.addEventListener("message", onMessage);
+}
+
+// "token" is the key the platform-v2 built-in SDK wrote.
+function removeStoredAccessTokens() {
+  removeAccessToken({});
+  removeAccessToken({ storageKey: "token" });
 }
 
 /**
@@ -155,7 +163,9 @@ export function createAuthModule(
       // Build the login URL
       const loginUrl = `${options.appBaseUrl}/login?from_url=${encodeURIComponent(redirectUrl)}`;
 
-      // Redirect to the login page
+      // The login page must not boot with the token that just got us here,
+      // or a rejected token redirects to /login forever.
+      removeStoredAccessTokens();
       window.location.href = loginUrl;
     },
 
@@ -202,16 +212,7 @@ export function createAuthModule(
 
       // Only do the rest if in a browser environment
       if (typeof window !== "undefined") {
-        // Remove token from localStorage
-        if (window.localStorage) {
-          try {
-            window.localStorage.removeItem("base44_access_token");
-            // Remove "token" that is set by the built-in SDK of platform version 2
-            window.localStorage.removeItem("token");
-          } catch (e) {
-            console.error("Failed to remove token from localStorage:", e);
-          }
-        }
+        removeStoredAccessTokens();
 
         // Determine the from_url parameter
         const fromUrl = redirectUrl || window.location.href;
