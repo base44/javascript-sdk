@@ -54,9 +54,9 @@ export interface AiGatewayModuleConfig {
  * against the provider directly, no separate account, API key, or billing
  * setup with the underlying model provider required.
  *
- * By default, `connection()` uses the OpenAI-compatible provider. Pass
- * `{ provider: "typesafe" }` to connect to TypeSafe for structured evaluations
- * with `@ai-sdk/typesafe-ai`.
+ * By default, `connection()` uses the OpenAI-compatible provider, which serves
+ * chat, images, and videos. Pass `{ provider: "typesafe" }` for
+ * structured evaluations.
  *
  * Call `connection()` from a backend function rather than the browser. This
  * keeps your instructions, tools, and business logic server-side, and lets
@@ -78,6 +78,26 @@ export interface AiGatewayModuleConfig {
  * `'automatic'` to let Base44 choose one, or pin a model such as
  * `'gemini_3_1_flash_image'` or `'gpt_image_2'`. For request options, the
  * full model list, and limits, see [Generate images with the AI Gateway](/developers/references/sdk/getting-started/ai-gateway-images).
+ *
+ * ## Videos
+ *
+ * The gateway serves OpenAI's asynchronous video endpoints through the
+ * `openai` SDK's `videos` client. `videos.create()` starts a job and returns
+ * its `id` right away; call `videos.retrieve(id)` until `status` is
+ * `completed` or `failed`. A completed job exposes the stored video at `url`.
+ * A backend function is a bounded HTTP call, so don't poll inside one: return
+ * the `id`, then retrieve it from a later call or scheduled run. Video
+ * requests need a specific model, such as `'veo_3_1_fast'` or
+ * `'seedance_2_fast'`; there's no `'automatic'` option.
+ *
+ * ## Structured evaluations
+ *
+ * The `typesafe` provider runs the `jev` evaluation model through
+ * `@ai-sdk/typesafe-ai` and the `ai` package's `experimental_evaluate`. Give
+ * it some app state and a set of questions, each a `choice`, `score`, or
+ * `boolean`, and it returns each answer with its probabilities. Use it
+ * to classify, score, or route records, then apply your own thresholds and
+ * actions in code.
  *
  * ## Authentication Modes
  *
@@ -189,6 +209,70 @@ export interface AiGatewayModule {
    *
    * const file = new File([image.uint8Array], "lighthouse.png", { type: image.mediaType });
    * const { file_url } = await base44.integrations.Core.UploadFile({ file });
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Start a video job, then check on it from a later call
+   * import { createClientFromRequest } from "@base44/sdk";
+   * import OpenAI from "openai";
+   *
+   * // Runs inside a backend function
+   * const base44 = createClientFromRequest(request);
+   * const { baseURL, token, headers } = base44.aiGateway.connection();
+   * const { videos } = new OpenAI({ baseURL, apiKey: token, defaultHeaders: headers });
+   *
+   * const { videoId } = await request.json();
+   * if (!videoId) {
+   *   // Avoid automatic replays of billed requests
+   *   const job = await videos.create(
+   *     { model: "veo_3_1_fast", prompt: "A paper boat drifting down a rainy street", seconds: "4" },
+   *     { maxRetries: 0 },
+   *   );
+   *   return Response.json({ videoId: job.id, status: job.status }, { status: 202 });
+   * }
+   *
+   * const video = await videos.retrieve(videoId);
+   * // `queued` and `in_progress` mean unfinished; `url` is set once `completed`
+   * return Response.json(video);
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Route a support ticket with a structured evaluation
+   * import { createClientFromRequest } from "@base44/sdk";
+   * import { experimental_evaluate as evaluate } from "ai";
+   * import { createTypeSafeAi } from "@ai-sdk/typesafe-ai";
+   *
+   * // Runs inside a backend function
+   * const base44 = createClientFromRequest(request);
+   * const { baseURL, token, headers } = base44.aiGateway.connection({ provider: "typesafe" });
+   * const typesafe = createTypeSafeAi({ baseURL, apiKey: token, headers });
+   *
+   * const { answers } = await evaluate({
+   *   model: typesafe.evaluationModel("jev"),
+   *   maxRetries: 0,
+   *   state: { message: "Please refund today's duplicate charge." },
+   *   questions: {
+   *     department: {
+   *       type: "choice",
+   *       instructions: "Which team should handle this?",
+   *       criteria: { billing: "Payments and refunds", support: "Other requests" },
+   *     },
+   *     urgency: {
+   *       type: "score",
+   *       instructions: "How urgent is this?",
+   *       criteria: ["No deadline", "Requested today", "Immediate emergency"],
+   *     },
+   *     refund: { type: "boolean", instructions: "Is a refund explicitly requested?" },
+   *   },
+   * });
+   *
+   * // answers.department → { type: "choice", choice: "billing", probabilities: { billing: 0.97, support: 0.03 } }
+   * // answers.urgency    → { type: "score", score: 1.2, probabilities: { 0: 0.1, 1: 0.6, 2: 0.3 } }
+   * // answers.refund     → { type: "boolean", probability: 0.99 }
+   * // Pick your own thresholds and act on them in code
+   * const autoRefund = answers.department.choice === "billing" && answers.refund.probability > 0.9;
    * ```
    */
   connection(options?: AiGatewayConnectionOptions): AiGatewayConnection;
