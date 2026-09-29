@@ -159,3 +159,5 @@ export type {
   RemoveAccessTokenOptions,
   GetLoginUrlOptions,
 } from "./utils/auth-utils.types.js";
+
+export type { MfaChallenge, MfaModule, MfaProof, LoginResult, MfaEnrollmentResult } from "./modules/mfa.js";

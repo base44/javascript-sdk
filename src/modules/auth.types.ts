@@ -1,3 +1,4 @@
+import type { LoginResult, MfaModule } from "./mfa.js";
 import { AxiosInstance } from "axios";
 
 /**
@@ -40,6 +41,7 @@ export interface User {
  * Response from login endpoints containing user information and access token.
  */
 export interface LoginResponse {
+  mfa_required?: false;
   /** JWT access token for authentication. */
   access_token: string;
   /** User information. */
@@ -126,6 +128,8 @@ export interface AuthModuleOptions {
  * The auth module is only available in user authentication mode (`base44.auth`).
  */
 export interface AuthModule {
+  /** Multi-factor enrollment and login for this app. */
+  mfa: MfaModule;
   /**
    * Gets the current authenticated user's information.
    *
@@ -233,7 +237,7 @@ export interface AuthModule {
    * ```
    *
    */
-  loginWithProvider(provider: string, fromUrl?: string): void;
+  loginWithProvider(provider: string, fromUrl?: string): Promise<void>;
 
   /**
    * Logs out the current user.
@@ -323,7 +327,7 @@ export interface AuthModule {
     email: string,
     password: string,
     turnstileToken?: string
-  ): Promise<LoginResponse>;
+  ): Promise<LoginResult>;
 
   /**
    * Checks if the current user is authenticated.
@@ -452,7 +456,7 @@ export interface AuthModule {
    * );
    * ```
    */
-  verifyOtp(params: VerifyOtpParams): Promise<any>;
+  verifyOtp(params: VerifyOtpParams): Promise<LoginResult>;
 
   /**
    * Resends an OTP code to the user's email address.
