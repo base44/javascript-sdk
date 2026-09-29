@@ -143,7 +143,7 @@ export interface UploadPrivateFileResult {
 export interface CreateFileSignedUrlParams {
   /** URI of the uploaded private file. */
   file_uri: string;
-  /** How long the signed URL should be valid for, in seconds.
+  /** How long the signed URL should be valid for, in seconds. Must be between `60` (1 minute) and `3600` (1 hour).
    * @default 300 (5 minutes)
    */
   expires_in?: number;
@@ -380,7 +380,7 @@ export interface CoreIntegrations {
    * // Create a signed URL for a private file
    * const { signed_url } = await base44.integrations.Core.CreateFileSignedUrl({
    *   file_uri: "private/user123/document.pdf",
-   *   expires_in: 7200 // URL expires in 2 hours
+   *   expires_in: 1800 // URL expires in 30 minutes
    * });
    * console.log(signed_url); // https://...?signature=...
    * ```
