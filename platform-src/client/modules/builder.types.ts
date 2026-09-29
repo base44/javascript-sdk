@@ -32,7 +32,7 @@ export interface BuilderSession {
 /** One app subscription; at most eight may be active per builder session. */
 export interface SubscriptionOptions {
   /** Replace this app's state. Arrives after every join and rejoin, and after a main-conversation
-   * rewrite (undo, restore, sync). Live events may precede it; merge its messages by `id`.
+   * rewrite (undo, restore, sync). Live events follow it; it holds only the last 50 messages.
    */
   onSnapshot: (snapshot: Snapshot) => void | Promise<void>;
   /** Apply each live event. Delivery is serial per app; a rejection ends this subscription. */

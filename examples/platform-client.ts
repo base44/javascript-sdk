@@ -16,7 +16,7 @@ const builder = client.builder.init({
 
 const subscription = builder.subscribe("0123456789abcdef01234567", {
   onSnapshot(snapshot) {
-    // Replace this app's state; merge messages by id so a newer live update is not lost.
+    // Replace this app's state; merge messages by id to keep history older than the last 50.
     console.log(snapshot.status?.state, snapshot.messages.length);
   },
   async onEvent(event: PlatformEvent) {

@@ -139,7 +139,9 @@ export interface ToolMediaResult {
 export interface ToolQuestionAnswer {
   /** Zero-based question index. */
   question_index?: number;
-  /** Labels selected by the user. */
+  /** Label selected for a single-select question. */
+  selected_label?: string;
+  /** Labels selected for a multi-select question. */
   selected_labels?: string[];
   /** User-provided free-text answer. Structural filtering does not redact prose. */
   custom_text?: string;
@@ -201,8 +203,9 @@ export interface ToolCall {
   display?: ToolDisplay;
   /** Clarifying-question answers. */
   user_input?: ToolQuestionInput;
-  /** Generated-media state, once the call is not waiting on a guard. */
-  results?: ToolMediaResult;
+  /** Generated media, once the call is not waiting on a guard: the image tool's state, or a URL alone
+   * (a game asset's placeholder, which `image.resolved` replaces, or a finished video). */
+  results?: ToolMediaResult | string;
   /** A parked call's guard, and its reason and details where the guard declares them. */
   approval?: ToolGuardApproval;
 }

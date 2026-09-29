@@ -79,9 +79,9 @@ There is no replay cursor. Every join, including each rejoin after a reconnect, 
 answered with a `Snapshot`: the app's current `status` and its last 50 public
 messages. After a main-conversation rewrite (undo, restore, sync), the SDK delivers
 `conversation.changed` and rejoins the room, so a fresh snapshot follows. Treat a
-snapshot as the app's current state.
-Live events can arrive just before it; merge its messages by `id` rather than
-discarding newer ones.
+snapshot as the app's current state. The app's live events follow it, including
+those that landed while it was read. It holds only the last 50 messages, so merge
+by `id` if you keep longer history.
 
 Delivery is serialized **per app**, snapshots included; a slow app does not block
 others. Callbacks must settle; they cannot be forcibly cancelled. The client bounds
@@ -132,8 +132,8 @@ which of its parts are public; a tool with no declaration shows only these field
 | --- | --- |
 | `arguments` | One of `ToolQuestionArguments`, `ToolSecretArguments`, `ToolPackageArguments`, `ToolPlanArguments`, `ToolPrdArguments` (`generate_prd`, the plan in plan mode) or `ToolMediaArguments`, narrowed by the tool's `name`. Absent for other tools and partial streaming arguments. |
 | `display` | File activity has `file_paths` and optional `content_empty`; execution activity has `summary` and `writes_entities`; entity activity has `entity_name` and `record_count`. |
-| `user_input` | `ToolQuestionInput` only, for clarifying-question answers. Secret-form values are never exposed. |
-| `results` | `ToolMediaResult` for image, game-image and video generation, once the call is not waiting on a guard. |
+| `user_input` | `ToolQuestionInput` only, for clarifying-question answers (`selected_label` for single-select, `selected_labels` for multi-select). Secret-form values are never exposed. |
+| `results` | Once the call is not waiting on a guard: `ToolMediaResult` for image generation, or a URL string for game images and backgrounds (the placeholder `image.resolved` replaces) and videos (the finished video). |
 | `approval` | While a call waits on a safety guard: `ToolGuardApproval` with `guard`, and `reason` and `details` where the guard declares them (shell-command approvals carry only `guard`). |
 
 In plan mode the message `content` beside a `generate_prd` call can be empty; render the
