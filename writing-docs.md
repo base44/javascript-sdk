@@ -56,3 +56,11 @@ After generating and reviewing the docs, you can push them to the `base44/mintli
 1. In the terminal, run `npm run push-docs -- --branch <choose-a-branch-name>`. If the branch already exists, your changes are added to the ones already on the branch. Otherwise, the script creates a new branch with the chosen name.
 1. Open the [docs repo](https://github.com/base44-dev/mintlify-docs) and created a PR for your branch.
 1. Preview your docs using the [Mintlify dashboard](https://dashboard.mintlify.com/base44/base44?section=previews).
+
+## Platform server reference
+
+Run `npm run docs:platform` to generate the separate platform reference under
+`docs/platform` from `platform-src/server/index.ts`. All public shapes have field-level
+JSDoc; the platform documentation check and TypeDoc validation enforce coverage.
+The hand-written guide, API contract, and token lifecycle live in `platform-docs`.
+This target does not change the runtime Mintlify output or publish either reference.

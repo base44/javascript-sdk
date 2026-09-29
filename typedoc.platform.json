@@ -1,0 +1,28 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "./platform-src/server/index.ts"
+  ],
+  "tsconfig": "./tsconfig.platform.json",
+  "out": "docs/platform",
+  "plugin": [
+    "typedoc-plugin-markdown"
+  ],
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "excludeInternal": true,
+  "excludeExternals": true,
+  "readme": "none",
+  "validation": {
+    "notDocumented": true
+  },
+  "requiredToBeDocumented": [
+    "Class",
+    "Interface",
+    "Property",
+    "Method",
+    "Function",
+    "TypeAlias"
+  ],
+  "treatWarningsAsErrors": true
+}

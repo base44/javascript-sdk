@@ -1,8 +1,21 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "@base44/sdk/platform/server": [
+        "./platform-src/server/index.ts"
+      ]
+    }
   },
-  "include": ["src/**/*", "tests/types/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src/**/*",
+    "tests/types/**/*.ts",
+    "platform-src/**/*.ts",
+    "examples/platform-server.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }
