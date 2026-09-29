@@ -21,8 +21,10 @@ const subscription = builder.subscribe("0123456789abcdef01234567", {
   },
   async onEvent(event: PlatformEvent) {
     if (event.type === "update_model") {
-      // Apply omitted keys as unchanged and _last_msg as a replacement by id.
-      console.log(event.data._last_msg?.content);
+      // Apply omitted keys as unchanged and _last_msg as a replacement or removal by id.
+      const message = event.data._last_msg;
+      if (message && "is_deleted" in message) console.log("removed", message.id);
+      else console.log(message?.content);
     }
   },
   onError(error) {

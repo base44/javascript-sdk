@@ -78,7 +78,8 @@ platform.builder.init({ onError() {} }).subscribe("a".repeat(24), {
   onSnapshot(snapshot) { void snapshot.messages; },
   onEvent(event: PlatformEvent) {
     if (event.type === "update_model") {
-      const text: string | null | undefined = event.data._last_msg?.content;
+      const message = event.data._last_msg;
+      const text: string | null | undefined = message && !("is_deleted" in message) ? message.content : undefined;
       void text;
     }
   },

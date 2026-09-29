@@ -9,8 +9,11 @@ const subscription = builder.subscribe("a".repeat(24), {
   },
   onEvent(event: PlatformEvent) {
     if (event.type === "update_model") {
-      const content: string | null | undefined = event.data._last_msg?.content;
-      void content;
+      const message = event.data._last_msg;
+      if (message && !("is_deleted" in message)) {
+        const content: string | null | undefined = message.content;
+        void content;
+      }
       // @ts-expect-error Private billing fields are not a public contract.
       void event.data.credits;
     }

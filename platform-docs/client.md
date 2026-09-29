@@ -107,7 +107,7 @@ filtering are the server's responsibility. Unknown event names are not forwarded
 
 | Event | Data contract |
 | --- | --- |
-| `update_model` | `AppUpdate`: optional `status`, `_last_msg`, `_last_msg_conversation_id`, `_scope_branch_id`, `sandbox_should_reload`, `navigate_preview_to`, `navigate_preview_force_to`. Omission means unchanged; null means clear. `_last_msg` replaces by message ID. |
+| `update_model` | `AppUpdate`: optional `status`, `_last_msg`, `_last_msg_conversation_id`, `_scope_branch_id`, `sandbox_should_reload`, `navigate_preview_to`, `navigate_preview_force_to`. Omission means unchanged; null means clear. `_last_msg` replaces by message ID; `DeletedMessage` (`{id, is_deleted: true}`) removes it. |
 | `directive` | `Directive`: `room`, `type` (`conversation_changed`, `app_files_changed`, `branch_deleted`, `imported_git_changed`, `imported_pull_request_changed`), optional `branch_id`. A re-read signal with no payload. |
 | `queue_update` | `QueueUpdate`: `room`, `app_id`, `items`, `is_paused`, optional `branch_id` and `processed_item_id`. Replaces the entire queue. |
 | `task_update` | `TaskUpdate`: `event_type` (`task_started`, `task_progress`, `task_completed`, `task_failed`, `task_cancelled`), optional `tool_call_id`, `message_id`, `branch_id`, numeric `progress`. |

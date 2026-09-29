@@ -257,12 +257,20 @@ export interface AppStatus {
   last_updated_date?: string | null;
 }
 
+/** Removes the message with this identifier. */
+export interface DeletedMessage {
+  /** Message identifier. */
+  id: string;
+  /** Always true. */
+  is_deleted: true;
+}
+
 /** Partial app update. Omitted keys mean unchanged; explicit null means clear. */
 export interface AppUpdate {
   /** Public builder state. */
   status?: AppStatus | null;
-  /** Whole-message replacement by identifier, not a recursive message patch. */
-  _last_msg?: ChatMessage | null;
+  /** Whole-message replacement or removal by identifier, not a recursive message patch. */
+  _last_msg?: ChatMessage | DeletedMessage | null;
   /** Conversation containing the replacement message. */
   _last_msg_conversation_id?: string | null;
   /** Existing branch scope, if supplied by the producer. */
