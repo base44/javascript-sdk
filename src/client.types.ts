@@ -11,6 +11,7 @@ import type { AgentsModule } from "./modules/agents.types.js";
 import type { AiGatewayModule } from "./modules/ai-gateway.types.js";
 import type { AppLogsModule } from "./modules/app-logs.types.js";
 import type { AppModule } from "./modules/app.types.js";
+import type { McpModule } from "./modules/mcp.types.js";
 import type { AnalyticsModule } from "./modules/analytics.types.js";
 import type { ActorsModule } from "./modules/actors.types.js";
 import type { FetchWithAuthInit } from "./utils/fetch-with-auth.js";
@@ -145,6 +146,8 @@ export interface Base44Client {
   functions: FunctionsModule;
   /** {@link IntegrationsModule | Integrations module} for calling pre-built integration endpoints. */
   integrations: IntegrationsModule;
+  /** {@link McpModule | MCP module} for the app's MCP consent page. */
+  mcp: McpModule;
   /** Cleanup function to disconnect WebSocket connections. Call when you're done with the client. */
   cleanup: () => void;
 
