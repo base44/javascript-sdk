@@ -92,6 +92,13 @@ export interface ResetPasswordParams {
   newPassword: string;
 }
 
+/** @internal */
+export type AuthState =
+  | { status: "pending" }
+  | { status: "anonymous" }
+  | { status: "authenticated"; userId: string }
+  | { status: "error" };
+
 /**
  * Configuration options for the auth module.
  */
@@ -106,6 +113,8 @@ export interface AuthModuleOptions {
    * which is how the server-side SDK reports a token it never sets explicitly.
    */
   token?: string;
+  /** @internal */
+  onAuthStateChange?: (state: AuthState) => void;
 }
 
 /**
