@@ -124,6 +124,14 @@ export type {
 } from "./modules/app.types.js";
 
 export type {
+  McpModule,
+  McpConsentInfo,
+  McpConsentTool,
+  McpConsentAction,
+  McpAuthorizeGrantResponse,
+} from "./modules/mcp.types.js";
+
+export type {
   ActorsModule,
   ActorClient,
   ActorRef,
