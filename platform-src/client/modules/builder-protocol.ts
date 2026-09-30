@@ -31,5 +31,6 @@ export function decodeSnapshot(raw: unknown): Snapshot {
   if (!appFromRoom(frame.room) || !Array.isArray(data.messages) || (data.status !== null && typeof data.status !== "object")) {
     throw new Error("Invalid snapshot");
   }
-  return { room: frame.room, status: data.status, messages: data.messages } as Snapshot;
+  const queue = data.queue !== null && typeof data.queue === "object" ? { queue: data.queue } : {};
+  return { room: frame.room, status: data.status, messages: data.messages, ...queue } as Snapshot;
 }

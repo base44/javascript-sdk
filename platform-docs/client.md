@@ -139,8 +139,10 @@ which of its parts are public; a tool with no declaration shows only these field
 In plan mode the message `content` beside a `generate_prd` call can be empty; render the
 plan from its arguments. Approving a plan, answering a question and approving a
 guarded call are HTTP actions of your backend. `Snapshot` contains `room`, `status`
-(`AppStatus`: optional `state` of `ready`/`processing`/`error` and nullable
-`last_updated_date`) and `messages`. Dates remain wire strings. Structural filtering
+(`AppStatus`: optional `state` of `ready`/`processing`/`error`, nullable
+`last_updated_date`, and nullable `turn_id`, the user message that started the turn),
+`messages`, and `queue` (`SnapshotQueue`: the main branch's `items` and `is_paused`;
+absent from older servers). Dates remain wire strings. Structural filtering
 does not promise redaction of generated prose or user content.
 
 `PlatformSocketError` extends `Error` with `code` and optional `appId`. Original

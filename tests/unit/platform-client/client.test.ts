@@ -183,6 +183,17 @@ describe("platform client", () => {
     expect(joins()).toEqual([["join", room], ["join", room]]);
   });
 
+  test("a snapshot passes its queue through when the server sends one", async () => {
+    const { client } = setup(); const onSnapshot = vi.fn();
+    client.subscribe(app, { onSnapshot, onEvent: vi.fn(), onError: vi.fn() });
+    await connected(client);
+    const queue = { items: [{ id: "q1", content: "next" }], is_paused: false };
+    fake.handlers["app.snapshot"]({ room, data: { status: { state: "ready", turn_id: "m1" }, messages: [], queue } });
+    snapshot(); await settle();
+    expect(onSnapshot.mock.calls[0][0]).toEqual({ room, status: { state: "ready", turn_id: "m1" }, messages: [], queue });
+    expect(onSnapshot.mock.calls[1][0]).not.toHaveProperty("queue");
+  });
+
   test("async callbacks are serialized per app", async () => {
     const { client } = setup(); let finish!: () => void; const order: string[] = [];
     client.subscribe(app, {

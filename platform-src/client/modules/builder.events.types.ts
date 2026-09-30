@@ -257,6 +257,8 @@ export interface AppStatus {
   state?: "ready" | "processing" | "error";
   /** State timestamp. */
   last_updated_date?: string | null;
+  /** The user message that started the turn, when a turn set this state. Quote it to Base44 support. */
+  turn_id?: string | null;
 }
 
 /** Branch scope carried by app events. Null or absent is the main branch. */
@@ -389,4 +391,14 @@ export interface Snapshot {
   status: AppStatus | null;
   /** The last 50 public messages, oldest first. */
   messages: ChatMessage[];
+  /** The main branch's prompt queue. Replace it, as with `queue.updated`. Absent from older servers. */
+  queue?: SnapshotQueue;
+}
+
+/** The prompt queue in a snapshot. */
+export interface SnapshotQueue {
+  /** Pending items. */
+  items: QueueItem[];
+  /** Whether queue processing is paused. */
+  is_paused: boolean;
 }
