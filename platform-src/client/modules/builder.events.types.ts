@@ -120,10 +120,16 @@ export interface ToolMediaArguments {
   aspect_ratio?: string;
 }
 
+/** `update_entities` and `delete_entities` arguments; the entity is in `display.entity_name`. */
+export interface ToolEntityMutationArguments {
+  /** The agent's summary of the change. Queries and record values are never included. */
+  summary?: string;
+}
+
 /** The public arguments of a tool that declares them; narrow by the tool call's `name`. */
 export type ToolArguments =
   | ToolQuestionArguments | ToolSecretArguments | ToolPackageArguments
-  | ToolPlanArguments | ToolPrdArguments | ToolMediaArguments;
+  | ToolPlanArguments | ToolPrdArguments | ToolMediaArguments | ToolEntityMutationArguments;
 
 /** Generated-media state. Raw generation prompts and IDs are never included. */
 export interface ToolMediaResult {

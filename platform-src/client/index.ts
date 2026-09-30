@@ -7,7 +7,7 @@ export type { BuilderModule, BuilderInitOptions, BuilderSession, PlatformSubscri
 export type {
   AppStatus, AppStatusChanged, BranchScoped, ChatMessage, ImageResolved, MessageParams, MessageRemoved, MessageUpdated,
   PlatformEvent, PlatformEventMap, PreviewNavigationRequested, QueueItem, QueueUpdated, Snapshot, TaskProgressed,
-  ToolArguments, ToolCall, ToolDisplay, ToolGuardApproval, ToolMediaArguments, ToolMediaResult, ToolPackageArguments,
+  ToolArguments, ToolCall, ToolDisplay, ToolEntityMutationArguments, ToolGuardApproval, ToolMediaArguments, ToolMediaResult, ToolPackageArguments,
   ToolPackageOperation, ToolPlanArguments, ToolPlanUpdate, ToolPrdArguments, ToolQuestion, ToolQuestionAnswer,
   ToolQuestionArguments, ToolQuestionInput, ToolQuestionOption, ToolSecretArguments, ToolSecretField,
 } from "./modules/builder.events.types.js";
