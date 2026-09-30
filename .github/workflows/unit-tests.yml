@@ -31,3 +31,9 @@ jobs:
 
       - name: Run unit tests
         run: npm run test:unit
+
+      - name: Check lint and public platform documentation
+        run: npm run lint && npm run docs:platform-client
+
+      - name: Verify packed entry points
+        run: npm run test:package

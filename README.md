@@ -151,3 +151,13 @@ npm run create-docs
 cd docs
 mintlify dev
 ```
+
+### Platform browser subscriptions
+
+The separate `@base44/sdk/platform/client` entry point watches public builder
+updates for up to eight apps over the platform socket. It supports typed events,
+a snapshot on every join and bounded delivery, using a socket-session token your
+backend opens with its workspace key.
+See [setup, public contract and recovery](platform-docs/client.md) and the
+[TypeScript example](examples/platform-client.ts). White-label sockets must be enabled
+for the workspace; never use an API key in the browser.
