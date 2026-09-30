@@ -127,6 +127,16 @@ describe("platform client", () => {
     expect(onError.mock.calls[0][0].code).toBe("session_replaced");
   });
 
+  test("a revoked session stops without asking for a new one", async () => {
+    const { client, getSessionToken, onError } = setup();
+    await auth(); await connected(client); fake.socket.connect.mockClear(); getSessionToken.mockClear();
+    notice("session.ended", { reason: "revoked" }, null);
+    fake.handlers.disconnect("io server disconnect");
+    expect(fake.socket.connect).not.toHaveBeenCalled();
+    expect(getSessionToken).not.toHaveBeenCalled();
+    expect(onError.mock.calls[0][0].code).toBe("session_revoked");
+  });
+
   test("shares concurrent connects; session-token failures never reach Socket.IO", async () => {
     const { client, onError } = setup(vi.fn(async () => { throw new Error("secret"); }));
     const a = client.connect(), b = client.connect(); expect(a).toBe(b);

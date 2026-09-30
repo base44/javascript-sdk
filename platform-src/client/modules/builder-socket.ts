@@ -16,7 +16,7 @@ export class BuilderSocket implements BuilderSession {
   // The session token outlives reconnects; it is replaced only when the server rejects or expires it.
   private token?: string;
   private tokenFresh = false;
-  private ending?: "session_expired" | "session_replaced";
+  private ending?: "session_expired" | "session_revoked" | "session_replaced";
   private denialRetries = 0;
   private retryTimer?: ReturnType<typeof setTimeout>;
   private authAttempt = 0;
@@ -46,7 +46,7 @@ export class BuilderSocket implements BuilderSession {
       const ending = this.ending;
       this.ending = undefined;
       if (ending === "session_expired") this.socket.connect(); // Renew through getSessionToken.
-      else this.connectionError(new PlatformSocketError(ending === "session_replaced" ? "session_replaced" : "connection_failed"));
+      else this.connectionError(new PlatformSocketError(ending ?? "connection_failed"));
     });
     this.socket.on("connect_error", (error) => this.refused(error as Error & { data?: { retryable?: boolean } }));
     this.socket.io.on("reconnect_failed", () => this.connectionError(new PlatformSocketError("connection_failed")));
@@ -188,10 +188,13 @@ export class BuilderSocket implements BuilderSession {
   private sessionEnded(raw: unknown): void {
     try {
       const reason = object(object(raw).data).reason;
-      if (reason !== "expired" && reason !== "replaced") throw new Error("Unknown reason");
+      const ending = reason === "expired" ? "session_expired"
+        : reason === "revoked" ? "session_revoked"
+        : reason === "replaced" ? "session_replaced" : undefined;
+      if (!ending) throw new Error("Unknown reason");
       // The server disconnects next; the disconnect handler renews or stops.
       this.token = undefined;
-      this.ending = reason === "expired" ? "session_expired" : "session_replaced";
+      this.ending = ending;
     } catch { this.protocolError(raw); }
   }
 
