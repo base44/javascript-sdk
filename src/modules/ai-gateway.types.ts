@@ -94,8 +94,8 @@ export interface AiGatewayModuleConfig {
  *
  * The mode determines which token `connection()` returns:
  *
- * - **Service role authentication** (`base44.asServiceRole.aiGateway`): Returns the service-role token. Use this from backend functions, including scheduled automations with no signed-in user. Every call spends the app's credits, so check the caller with `base44.auth.me()` first when a user triggers the function.
- * - **User authentication** (`base44.aiGateway`): Returns the signed-in app user's token. When an app restricts Core integrations, which is the default for new apps, public apps reject gateway calls made with a user token unless the AI Gateway is allowed.
+ * - **User authentication** (`base44.aiGateway`): Returns the signed-in app user's token.
+ * - **Service role authentication** (`base44.asServiceRole.aiGateway`): Returns the service-role token instead. Use it from backend functions: apps that restrict Core integrations, the default for new apps, reject user-token gateway calls on public apps. It also works when there's no signed-in user, such as from a scheduled automation.
  *
  * ## Billing and limits
  *
