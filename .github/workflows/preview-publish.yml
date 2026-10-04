@@ -45,9 +45,10 @@ jobs:
         run: npm ci
 
       - name: Build package
-        run: npm run build
+        run: npm run build -w @base44/sdk
 
       - name: Generate preview package name and version
+        working-directory: packages/sdk
         id: preview_info
         run: |
           PR_NUMBER="${{ github.event.number }}"
@@ -70,6 +71,7 @@ jobs:
           echo "full_package=@base44-preview/sdk@$PREVIEW_VERSION" >> $GITHUB_OUTPUT
 
       - name: Update package.json for preview
+        working-directory: packages/sdk
         run: |
           # Create a backup of original package.json
           cp package.json package.json.bak
@@ -103,6 +105,7 @@ jobs:
           echo "✅ Package.json updated successfully"
 
       - name: Final safety check before publish
+        working-directory: packages/sdk
         run: |
           # Double-check package name one more time before publishing
           CURRENT_PACKAGE_NAME=$(node -p "require('./package.json').name")
@@ -119,6 +122,7 @@ jobs:
           echo "✅ Safety check passed. Package name is safe to publish."
 
       - name: Publish preview package
+        working-directory: packages/sdk
         # Authenticates via npm trusted publishing (OIDC), so no NPM_TOKEN reaches
         # the build. Needs a trusted publisher for `@base44-preview/sdk` on
         # npmjs.com registered against this repo and this workflow filename — the
@@ -133,6 +137,7 @@ jobs:
           fi
 
       - name: Restore original package.json
+        working-directory: packages/sdk
         if: always()
         run: |
           if [ -f package.json.bak ]; then

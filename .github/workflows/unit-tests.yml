@@ -27,7 +27,8 @@ jobs:
         run: npm ci
 
       - name: Run type tests
-        run: npm run test:types
+        run: npm run test:types -w @base44/sdk
 
       - name: Run unit tests
-        run: npm run test:unit
+        run: npm run test:unit -w @base44/sdk
+

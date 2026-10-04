@@ -17,10 +17,10 @@ You write JSDoc. The tooling produces the final pages.
 
 | File pattern | Role |
 |---|---|
-| `src/modules/*.types.ts` | **Public API surface** — JSDoc here becomes the published docs |
-| `src/modules/*.ts` | Implementation — mark with `@internal` to hide from docs |
-| `src/client.types.ts` | Client factory types |
-| `src/types.ts` | Shared types |
+| `packages/sdk/src/modules/*.types.ts` | **Public API surface** — JSDoc here becomes the published docs |
+| `packages/sdk/src/modules/*.ts` | Implementation — mark with `@internal` to hide from docs |
+| `packages/sdk/src/client.types.ts` | Client factory types |
+| `packages/sdk/src/types.ts` | Shared types |
 
 Only types and functions **not** marked `@internal` appear in the generated docs. Implementation files should mark their exports `@internal`.
 
@@ -93,4 +93,4 @@ Every public method needs: description, `@param` tags, `@returns`, and at least 
 2. **`@internal` on implementation:** Factory functions, config interfaces, and helpers are marked `@internal`.
 3. **Examples work:** Code examples are syntactically valid TypeScript and use the `base44.` call path.
 4. **Pipeline config:** New public types are in `types-to-expose.json`. Helper types that belong on another page are in `appended-articles.json`.
-5. **Generate and review:** Run `npm run create-docs` and check the output renders correctly.
+5. **Generate and review:** Run `npm run create-docs -w @base44/sdk` and check the output renders correctly.
