@@ -158,17 +158,17 @@ function createEntityHandler<T = any>(
 
     // Get entity by ID
     async get(id: string): Promise<T> {
-      return axios.get(`${baseURL}/${id}`);
+      return axios.get(`${baseURL}/${id}`) as Promise<T>;
     },
 
     // Create new entity
     async create(data: Partial<T>): Promise<T> {
-      return axios.post(baseURL, data);
+      return axios.post(baseURL, data) as Promise<T>;
     },
 
     // Update entity by ID
     async update(id: string, data: Partial<T>): Promise<T> {
-      return axios.put(`${baseURL}/${id}`, data);
+      return axios.put(`${baseURL}/${id}`, data) as Promise<T>;
     },
 
     // Delete entity by ID
