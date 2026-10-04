@@ -1,0 +1,49 @@
+{
+  "name": "@base44/platform",
+  "version": "0.1.0",
+  "description": "Browser client for building on the Base44 platform",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc",
+    "docs": "typedoc",
+    "test": "npm run test:types && npm run test:unit && npm run docs && npm run test:package",
+    "test:types": "tsc --noEmit -p tsconfig.type-tests.json",
+    "test:unit": "vitest run",
+    "test:package": "npm run build && node --test tests/package.test.mjs",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "socket.io-client": "^4.8.3"
+  },
+  "keywords": [
+    "base44",
+    "platform",
+    "white-label"
+  ],
+  "author": "Base44",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/base44/javascript-sdk.git",
+    "directory": "packages/platform"
+  },
+  "bugs": {
+    "url": "https://github.com/base44/javascript-sdk/issues"
+  },
+  "homepage": "https://github.com/base44/javascript-sdk/tree/main/packages/platform#readme"
+}

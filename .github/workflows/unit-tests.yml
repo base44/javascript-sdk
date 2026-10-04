@@ -32,3 +32,5 @@ jobs:
       - name: Run unit tests
         run: npm run test:unit -w @base44/sdk
 
+      - name: Test the Platform SDK
+        run: npm test -w @base44/platform
