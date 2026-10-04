@@ -3,6 +3,14 @@ name: Manual Package Publish
 on:
   workflow_dispatch:
     inputs:
+      package:
+        description: "Package to publish"
+        required: true
+        default: "sdk"
+        type: choice
+        options:
+          - sdk
+          - platform
       version:
         description: "Version to publish (e.g., 1.0.0, patch, minor, major)"
         required: true
@@ -34,7 +42,8 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     env:
-      PACKAGE_DIR: packages/sdk
+      PACKAGE_DIR: packages/${{ github.event.inputs.package }}
+      TAG_PREFIX: ${{ github.event.inputs.package == 'sdk' && 'v' || 'platform-v' }}
     permissions:
       # contents: write for the version-bump commit, tag, and GitHub Release.
       # id-token: write for npm trusted publishing (OIDC).
@@ -111,9 +120,10 @@ jobs:
 
       - name: Publish to NPM
         # Authenticates via npm trusted publishing (OIDC), so no NPM_TOKEN reaches
-        # the build. Needs a trusted publisher for `@base44/sdk` on npmjs.com
-        # registered against this repo and this workflow filename — the registry
-        # keys on the filename, so each publish workflow needs its own entry.
+        # the build. Needs a trusted publisher for `@base44/sdk` and for
+        # `@base44/platform` on npmjs.com registered against this repo and this
+        # workflow filename — the registry keys on the filename, so each publish
+        # workflow needs its own entry.
         working-directory: ${{ env.PACKAGE_DIR }}
         if: github.event.inputs.dry_run == 'false'
         run: |
@@ -131,10 +141,10 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add ${{ env.PACKAGE_DIR }}/package.json package-lock.json
-          git commit -m "chore: bump version to ${{ env.NEW_VERSION }}"
-          git tag v${{ env.NEW_VERSION }}
+          git commit -m "chore(${{ github.event.inputs.package }}): bump version to ${{ env.NEW_VERSION }}"
+          git tag ${{ env.TAG_PREFIX }}${{ env.NEW_VERSION }}
           git push origin HEAD:${{ github.ref }}
-          git push origin v${{ env.NEW_VERSION }}
+          git push origin ${{ env.TAG_PREFIX }}${{ env.NEW_VERSION }}
 
       - name: Create Release
         if: github.event.inputs.dry_run == 'false'
@@ -142,8 +152,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ env.NEW_VERSION }}
-          release_name: Release v${{ env.NEW_VERSION }}
+          tag_name: ${{ env.TAG_PREFIX }}${{ env.NEW_VERSION }}
+          release_name: Release ${{ env.TAG_PREFIX }}${{ env.NEW_VERSION }}
           body: |
             ## What's Changed
 
@@ -152,7 +162,7 @@ jobs:
             ### Installation
 
             ```bash
-            npm install @base44/sdk@${{ github.event.inputs.npm_tag }}
+            npm install @base44/${{ github.event.inputs.package }}@${{ github.event.inputs.npm_tag }}
             ```
 
             ### Version: ${{ env.NEW_VERSION }}
@@ -161,7 +171,7 @@ jobs:
           prerelease: false
 
       - name: Notify skills repo
-        if: github.event.inputs.dry_run == 'false' && github.event.inputs.notify_skills_repo == 'true'
+        if: github.event.inputs.dry_run == 'false' && github.event.inputs.notify_skills_repo == 'true' && github.event.inputs.package == 'sdk'
         uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4
         with:
           token: ${{ steps.generate-token.outputs.token }}
