@@ -1,35 +1,14 @@
 {
-  "name": "@base44/sdk",
-  "version": "0.8.52",
-  "description": "JavaScript SDK for Base44 API",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "name": "base44-javascript-sdk",
+  "private": true,
   "type": "module",
-  "files": [
-    "dist"
+  "workspaces": [
+    "packages/*"
   ],
   "scripts": {
-    "build": "tsc",
-    "lint": "eslint src",
-    "test": "npm run test:types && vitest run",
-    "test:types": "tsc --noEmit -p tsconfig.type-tests.json",
-    "test:unit": "vitest run tests/unit",
-    "test:e2e": "vitest run tests/e2e",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "docs": "typedoc",
-    "prepublishOnly": "npm run build",
-    "create-docs": "npm run create-docs:generate && npm run create-docs:process",
-    "create-docs-local": "npm run create-docs && npm run copy-docs-local",
-    "copy-docs-local": "node scripts/mintlify-post-processing/copy-to-local-docs.js",
-    "create-docs:generate": "typedoc",
-    "create-docs:process": "node scripts/mintlify-post-processing/file-processing/file-processing.js"
-  },
-  "dependencies": {
-    "axios": "^1.20.0",
-    "partysocket": "^0.0.23",
-    "socket.io-client": "^4.8.3",
-    "uuid": "^13.0.2"
+    "build": "npm run build --workspaces",
+    "lint": "eslint .",
+    "test": "npm test --workspaces"
   },
   "devDependencies": {
     "@types/hast": "^3.0.4",
@@ -48,20 +27,5 @@
     "typescript": "^5.3.2",
     "typescript-eslint": "^8.51.0",
     "vitest": "^4.1.9"
-  },
-  "keywords": [
-    "base44",
-    "api",
-    "sdk"
-  ],
-  "author": "Base44",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/base44/javascript-sdk.git"
-  },
-  "bugs": {
-    "url": "https://github.com/base44/javascript-sdk/issues"
-  },
-  "homepage": "https://github.com/base44/javascript-sdk#readme"
+  }
 }

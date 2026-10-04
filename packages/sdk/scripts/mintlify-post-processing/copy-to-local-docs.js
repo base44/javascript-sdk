@@ -27,7 +27,7 @@ const CATEGORY_MAP_PATH = path.join(import.meta.dirname, "./category-map.json");
 
 // Default: assume mintlify-docs is a sibling directory to javascript-sdk
 const SDK_ROOT = path.join(import.meta.dirname, "../..");
-const DEFAULT_TARGET = path.join(SDK_ROOT, "../mintlify-docs");
+const DEFAULT_TARGET = path.join(SDK_ROOT, "../../../mintlify-docs");
 
 function parseArgs() {
   const args = process.argv.slice(2);
