@@ -4,9 +4,9 @@ on:
   pull_request:
     types: [opened, synchronize]
     paths:
-      - "src/modules/**"
-      - "src/client.types.ts"
-      - "src/types.ts"
+      - "packages/sdk/src/modules/**"
+      - "packages/sdk/src/client.types.ts"
+      - "packages/sdk/src/types.ts"
 
 jobs:
   claude-docs-draft:
@@ -50,9 +50,9 @@ jobs:
             ## Your task
 
             1. Read the documentation skill file at `.claude/skills/sdk-docs-writing/SKILL.md`. Follow its rules exactly.
-            2. Look at the changes in this PR (the diff of files under `src/modules/`, `src/client.types.ts`, and `src/types.ts`).
+            2. Look at the changes in this PR (the diff of files under `packages/sdk/src/modules/`, `packages/sdk/src/client.types.ts`, and `packages/sdk/src/types.ts`).
             3. Identify any **new or modified public APIs** (interfaces, types, methods, properties) that are missing JSDoc or have incomplete JSDoc according to the skill's rules.
-            4. Check the existing `.types.ts` files in `src/modules/` and the generated docs in `docs/content/` to understand the established patterns and voice. Your suggestions must match these patterns.
+            4. Check the existing `.types.ts` files in `packages/sdk/src/modules/` and the generated docs in `packages/sdk/docs/content/` to understand the established patterns and voice. Your suggestions must match these patterns.
 
             ## How to report
 
@@ -68,7 +68,7 @@ jobs:
 
             ---
 
-            #### `src/modules/example.types.ts`
+            #### `packages/sdk/src/modules/example.types.ts`
 
             **`ExampleModule.myMethod`** — *New method, missing JSDoc entirely.*
 
