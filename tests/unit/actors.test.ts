@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
-import nock from "nock";
+import { platform } from "../mocks/platform";
 
 // Mock ReconnectingWebSocket (partysocket's `WebSocket` export) with a
 // controllable fake. It records the async URL provider so tests can drive
@@ -23,11 +23,21 @@ const { sockets, FakeSocket } = vi.hoisted(() => {
     addEventListener(type: string, fn: (ev: any) => void) {
       (this.handlers[type] ??= []).push(fn);
     }
-    send(data: string) { this.sent.push(data); }
-    close() { this.closed = true; }
-    reconnect() { this.reconnects++; }
-    emit(type: string, ev: any) { (this.handlers[type] ?? []).forEach((h) => h(ev)); }
-    message(obj: unknown) { this.emit("message", { data: JSON.stringify(obj) }); }
+    send(data: string) {
+      this.sent.push(data);
+    }
+    close() {
+      this.closed = true;
+    }
+    reconnect() {
+      this.reconnects++;
+    }
+    emit(type: string, ev: any) {
+      (this.handlers[type] ?? []).forEach((h) => h(ev));
+    }
+    message(obj: unknown) {
+      this.emit("message", { data: JSON.stringify(obj) });
+    }
   }
   const sockets: InstanceType<typeof FakeSocket>[] = [];
   return { sockets, FakeSocket };
@@ -67,7 +77,9 @@ describe("Actors Module — connection API", () => {
   // The module (Proxy of actor names). closeAll is separate — see its own tests.
   const mod = (c = makeConfig()) => createActorsModule(c).module;
 
-  beforeEach(() => { sockets.length = 0; });
+  beforeEach(() => {
+    sockets.length = 0;
+  });
 
   test("connect() opens exactly one socket that dials the minted direct URL", async () => {
     const config = makeConfig();
@@ -78,7 +90,9 @@ describe("Actors Module — connection API", () => {
       `${DIRECT_URL}&token=jwt.abc.def`,
     );
     expect(config.mintConnectionToken).toHaveBeenCalledWith(
-      "GameRoom", "room-1", "conn-1",
+      "GameRoom",
+      "room-1",
+      "conn-1",
     );
   });
 
@@ -120,8 +134,12 @@ describe("Actors Module — connection API", () => {
       .mockResolvedValueOnce({ websocket_url: DIRECT_URL, token: "first" })
       .mockResolvedValueOnce({ websocket_url: DIRECT_URL, token: "second" });
     mod(config).GameRoom("r").connect();
-    await expect(sockets[0].urlProvider()).resolves.toBe(`${DIRECT_URL}&token=first`);
-    await expect(sockets[0].urlProvider()).resolves.toBe(`${DIRECT_URL}&token=second`);
+    await expect(sockets[0].urlProvider()).resolves.toBe(
+      `${DIRECT_URL}&token=first`,
+    );
+    await expect(sockets[0].urlProvider()).resolves.toBe(
+      `${DIRECT_URL}&token=second`,
+    );
     expect(config.mintConnectionToken).toHaveBeenCalledTimes(2);
   });
 
@@ -132,12 +150,17 @@ describe("Actors Module — connection API", () => {
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
     );
     await sockets[0].urlProvider();
-    expect(config.mintConnectionToken).toHaveBeenCalledWith("GameRoom", "r", conn.id);
+    expect(config.mintConnectionToken).toHaveBeenCalledWith(
+      "GameRoom",
+      "r",
+      conn.id,
+    );
   });
 
   test("multiple listeners all receive; unsubscribe removes only its own", () => {
     const conn = mod().GameRoom("r").connect();
-    const a: unknown[] = [], b: unknown[] = [];
+    const a: unknown[] = [],
+      b: unknown[] = [];
     const subA = conn.subscribe((m) => a.push(m));
     conn.subscribe((m) => b.push(m));
 
@@ -164,7 +187,9 @@ describe("Actors Module — connection API", () => {
   test("send serializes onto the socket", () => {
     const conn = mod().GameRoom("r").connect();
     conn.send({ type: "join", name: "alice" });
-    expect(sockets[0].sent).toContain(JSON.stringify({ type: "join", name: "alice" }));
+    expect(sockets[0].sent).toContain(
+      JSON.stringify({ type: "join", name: "alice" }),
+    );
   });
 
   test("close() tears down socket and all listeners", () => {
@@ -253,7 +278,9 @@ describe("Actors Module — connection API", () => {
 describe("Actors Module — proxy fallback", () => {
   const mod = (c = makeConfig()) => createActorsModule(c).module;
 
-  beforeEach(() => { sockets.length = 0; });
+  beforeEach(() => {
+    sockets.length = 0;
+  });
 
   test("mint 409 (legacy actor) falls back to the exact legacy proxy URL", async () => {
     const config = makeConfig();
@@ -264,14 +291,17 @@ describe("Actors Module — proxy fallback", () => {
     );
   });
 
-  test.each([503, 422, 405])("mint %i falls back to the proxy", async (status) => {
-    const config = makeConfig();
-    config.mintConnectionToken.mockRejectedValueOnce(httpError(status));
-    mod(config).GameRoom("r").connect({ id: "c" });
-    await expect(sockets[0].urlProvider()).resolves.toContain(
-      "wss://app.example/parties/GameRoom/r?_pk=c",
-    );
-  });
+  test.each([503, 422, 405])(
+    "mint %i falls back to the proxy",
+    async (status) => {
+      const config = makeConfig();
+      config.mintConnectionToken.mockRejectedValueOnce(httpError(status));
+      mod(config).GameRoom("r").connect({ id: "c" });
+      await expect(sockets[0].urlProvider()).resolves.toContain(
+        "wss://app.example/parties/GameRoom/r?_pk=c",
+      );
+    },
+  );
 
   test("fallback is sticky per connection; a fresh connect() probes direct again", async () => {
     const config = makeConfig();
@@ -320,7 +350,9 @@ describe("Actors Module — proxy fallback", () => {
     const config = makeConfig();
     config.transport = "proxy";
     mod(config).GameRoom("r").connect({ id: "c" });
-    await expect(sockets[0].urlProvider()).resolves.toContain("/parties/GameRoom/r");
+    await expect(sockets[0].urlProvider()).resolves.toContain(
+      "/parties/GameRoom/r",
+    );
     expect(config.mintConnectionToken).not.toHaveBeenCalled();
   });
 
@@ -337,7 +369,9 @@ describe("Actors Module — proxy fallback", () => {
 describe("Actors Module — terminal mint failures", () => {
   const mod = (c = makeConfig()) => createActorsModule(c).module;
 
-  beforeEach(() => { sockets.length = 0; });
+  beforeEach(() => {
+    sockets.length = 0;
+  });
 
   test.each([400, 403, 404])(
     "mint %i closes the connection permanently",
@@ -415,7 +449,9 @@ describe("Actors Module — terminal mint failures", () => {
 describe("Actors Module — mint error reporting", () => {
   const mod = (c = makeConfig()) => createActorsModule(c).module;
 
-  beforeEach(() => { sockets.length = 0; });
+  beforeEach(() => {
+    sockets.length = 0;
+  });
 
   test("a retryable mint error reaches onMintError once, unmodified", async () => {
     const config = makeConfig();
@@ -515,24 +551,35 @@ describe("buildProxyActorUrl", () => {
   });
 
   test("token and fv are omitted when absent", () => {
-    const u = buildProxyActorUrl("https://h.example", "A", "r", "c", "app", null);
+    const u = buildProxyActorUrl(
+      "https://h.example",
+      "A",
+      "r",
+      "c",
+      "app",
+      null,
+    );
     expect(u).toBe("wss://h.example/parties/A/r?_pk=c&app_id=app&handler=A");
   });
 });
 
 describe("resolveActorsHost", () => {
   test("absolute serverUrl is used as-is", () => {
-    expect(resolveActorsHost("https://api.example", "https://tab.example")).toBe(
-      "https://api.example",
-    );
+    expect(
+      resolveActorsHost("https://api.example", "https://tab.example"),
+    ).toBe("https://api.example");
   });
 
   test("empty serverUrl falls back to the browser origin", () => {
-    expect(resolveActorsHost("", "https://tab.example")).toBe("https://tab.example");
+    expect(resolveActorsHost("", "https://tab.example")).toBe(
+      "https://tab.example",
+    );
   });
 
   test("relative serverUrl (/api) falls back to the browser origin", () => {
-    expect(resolveActorsHost("/api", "https://tab.example")).toBe("https://tab.example");
+    expect(resolveActorsHost("/api", "https://tab.example")).toBe(
+      "https://tab.example",
+    );
   });
 
   test("no origin available (non-browser) returns the serverUrl unchanged", () => {
@@ -544,30 +591,21 @@ describe("Actors Module — client wiring", () => {
   const serverUrl = "https://base44.app";
   const appId = "app-1";
 
-  beforeEach(() => { sockets.length = 0; });
+  beforeEach(() => {
+    sockets.length = 0;
+  });
   afterEach(() => {
-    nock.cleanAll();
     vi.unstubAllGlobals();
   });
 
   test("mints via POST /connection-token with app, auth, and version headers", async () => {
-    const scope = nock(serverUrl, {
-      reqheaders: {
-        "x-app-id": appId,
-        authorization: "Bearer tok",
-        "base44-functions-version": "draft",
-      },
-    })
-      .post(`/api/apps/${appId}/actors/PongGame/connection-token`, {
-        room: "r1",
-        connection_id: "c1",
-      })
-      .reply(200, {
-        websocket_url: "wss://actors.example/v1/actors/scr_1/rooms/r1?_pk=c1",
-        token: "jwt.min.ted",
-        expires_at: "2026-01-01T00:00:00Z",
-        mode: "preview",
-      });
+    platform.given.app(appId).actors.deployed("PongGame", {
+      websocketHost: "wss://actors.example",
+      scriptId: "scr_1",
+      issuedToken: "jwt.min.ted",
+      tokenExpiresAt: "2026-01-01T00:00:00Z",
+      mode: "preview",
+    });
 
     const base44 = createClient({
       serverUrl,
@@ -579,17 +617,27 @@ describe("Actors Module — client wiring", () => {
     await expect(sockets[0].urlProvider()).resolves.toBe(
       "wss://actors.example/v1/actors/scr_1/rooms/r1?_pk=c1&token=jwt.min.ted",
     );
-    expect(scope.isDone()).toBe(true);
+    expect(platform.requests.last("actors.mintConnectionToken")).toMatchObject({
+      headers: {
+        "x-app-id": appId,
+        authorization: "Bearer tok",
+        "base44-functions-version": "draft",
+      },
+      body: { room: "r1", connection_id: "c1" },
+    });
     base44.cleanup();
   });
 
   test("a 409 mint reply falls back to the legacy proxy URL without calling onError", async () => {
-    nock(serverUrl)
-      .post(`/api/apps/${appId}/actors/PongGame/connection-token`)
-      .reply(409, { message: "Actor must be migrated before connecting directly" });
+    platform.given.app(appId).actors.fault("PongGame", "legacy-conflict");
 
     const onError = vi.fn();
-    const base44 = createClient({ serverUrl, appId, token: "tok", options: { onError } });
+    const base44 = createClient({
+      serverUrl,
+      appId,
+      token: "tok",
+      options: { onError },
+    });
     base44.actors.PongGame("r1").connect({ id: "c1" });
     await expect(sockets[0].urlProvider()).resolves.toBe(
       "wss://base44.app/parties/PongGame/r1?_pk=c1&app_id=app-1&handler=PongGame&token=tok",
@@ -602,16 +650,15 @@ describe("Actors Module — client wiring", () => {
   test("a 405 mint reply (backend without the endpoint) falls back to the proxy", async () => {
     // What a pre-direct backend actually answers: its actor deploy routes
     // match the path via `{handler_name:path}` but not the POST method.
-    nock(serverUrl)
-      .post(`/api/apps/${appId}/actors/PongGame/connection-token`)
-      .reply(405, {
-        error_type: "HTTPException",
-        message: "Method Not Allowed",
-        detail: "Method Not Allowed",
-      });
+    platform.given.app(appId).actors.fault("PongGame", "endpoint-unsupported");
 
     const onError = vi.fn();
-    const base44 = createClient({ serverUrl, appId, token: "tok", options: { onError } });
+    const base44 = createClient({
+      serverUrl,
+      appId,
+      token: "tok",
+      options: { onError },
+    });
     base44.actors.PongGame("r1").connect({ id: "c1" });
     await expect(sockets[0].urlProvider()).resolves.toBe(
       "wss://base44.app/parties/PongGame/r1?_pk=c1&app_id=app-1&handler=PongGame&token=tok",
@@ -621,12 +668,15 @@ describe("Actors Module — client wiring", () => {
   });
 
   test("a non-fallback mint failure reaches the client's onError as a Base44Error", async () => {
-    nock(serverUrl)
-      .post(`/api/apps/${appId}/actors/PongGame/connection-token`)
-      .reply(500, { message: "mint exploded" });
+    platform.given.app(appId).actors.fault("PongGame", "mint-failed");
 
     const onError = vi.fn();
-    const base44 = createClient({ serverUrl, appId, token: "tok", options: { onError } });
+    const base44 = createClient({
+      serverUrl,
+      appId,
+      token: "tok",
+      options: { onError },
+    });
     base44.actors.PongGame("r1").connect({ id: "c1" });
     await expect(sockets[0].urlProvider()).rejects.toThrow("mint exploded");
     expect(onError).toHaveBeenCalledTimes(1);
@@ -647,29 +697,29 @@ describe("Actors Module — client wiring", () => {
     vi.stubGlobal("document", undefined);
     vi.stubGlobal("localStorage", undefined);
 
-    const seen: unknown[] = [];
-    nock(serverUrl)
-      .post(`/api/apps/${appId}/actors/PongGame/connection-token`)
-      .times(2)
-      .reply(function () {
-        seen.push(this.req.headers["x-base44-anonymous-id"]);
-        return [
-          200,
-          {
-            websocket_url: "wss://actors.example/v1/actors/scr_1/rooms/r1?_pk=c1",
-            token: "jwt.min.ted",
-          },
-        ];
-      });
+    platform.given.app(appId).actors.deployed("PongGame", {
+      websocketHost: "wss://actors.example",
+      scriptId: "scr_1",
+      issuedToken: "jwt.min.ted",
+      tokenExpiresAt: "2026-01-01T00:00:00Z",
+      mode: "preview",
+    });
 
     const base44 = createClient({ serverUrl, appId });
     base44.actors.PongGame("r1").connect({ id: "c1" });
     await sockets[0].urlProvider();
     await sockets[0].urlProvider(); // a reconnect mints again
+    const seen = platform.requests
+      .all("actors.mintConnectionToken")
+      .map((request) => request.headers["x-base44-anonymous-id"]);
     expect(seen).toHaveLength(2);
     expect(typeof seen[0]).toBe("string");
     expect(seen[0]).toBeTruthy();
     expect(seen[0]).toBe(seen[1]); // stable across reconnects, not a fresh id per call
+    expect(
+      (platform.requests.last("analytics.trackBatch").body as any).events[0]
+        .event_name,
+    ).toBe("__initialization_event__");
     base44.cleanup();
   });
 
@@ -681,25 +731,27 @@ describe("Actors Module — client wiring", () => {
     vi.stubGlobal("document", undefined);
     vi.stubGlobal("localStorage", undefined);
 
-    const scope = nock(serverUrl, {
-      reqheaders: { authorization: "Bearer tok" },
-      badheaders: ["x-base44-anonymous-id"],
-    })
-      .post(`/api/apps/${appId}/actors/PongGame/connection-token`)
-      .reply(200, {
-        websocket_url: "wss://actors.example/v1/actors/scr_1/rooms/r1?_pk=c1",
-        token: "jwt.min.ted",
-      });
+    platform.given.app(appId).actors.deployed("PongGame", {
+      websocketHost: "wss://actors.example",
+      scriptId: "scr_1",
+      issuedToken: "jwt.min.ted",
+      tokenExpiresAt: "2026-01-01T00:00:00Z",
+      mode: "preview",
+    });
 
     const base44 = createClient({ serverUrl, appId, token: "tok" });
     base44.actors.PongGame("r1").connect({ id: "c1" });
-    await expect(sockets[0].urlProvider()).resolves.toContain("token=jwt.min.ted");
-    expect(scope.isDone()).toBe(true);
+    await expect(sockets[0].urlProvider()).resolves.toContain(
+      "token=jwt.min.ted",
+    );
+    const request = platform.requests.last("actors.mintConnectionToken");
+    expect(request.headers.authorization).toBe("Bearer tok");
+    expect(request.headers["x-base44-anonymous-id"]).toBeUndefined();
     base44.cleanup();
   });
 
   test('actorsTransport: "proxy" dials the proxy without minting', async () => {
-    // no nock intercept: any HTTP call would throw
+    // no HTTP handler: any HTTP call would throw
     const base44 = createClient({
       serverUrl,
       appId,
