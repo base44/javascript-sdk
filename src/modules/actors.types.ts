@@ -8,14 +8,15 @@
  *
  * To generate types from deployed actors instead, use the
  * [`types generate`](/developers/references/cli/commands/types-generate) CLI command.
- * See [Typing messages in the client](/developers/backend/resources/actors/overview#typing-messages-in-the-client)
- * for how to define your message types.
+ * To learn how incoming and outgoing messages work, see
+ * [message types](/developers/backend/resources/actors/overview#message-types).
  *
  * @example
  * ```typescript
+ * // Type messages for an actor
  * declare module "@base44/sdk" {
  *   interface ActorRegistry {
- *     ChatRoom: {
+ *     chatRoom: {
  *       toClient: { type: "joined" | "left" | "message"; userId?: string; from?: string; text?: string };
  *       toServer: { type: "message"; text: string };
  *     };
@@ -49,28 +50,35 @@ type ToServerFor<N extends string> = N extends keyof ActorRegistry
   : unknown;
 
 /**
- * Options for [ActorRef.connect](#connect).
+ * Configures the connection that [ActorRef.connect](#connect) opens.
  */
 export interface ActorConnectOptions {
   /**
    * Connection ID that the actor receives as `conn.id`.
    *
-   * Use a stable value, such as one stored per browser tab, so the actor
-   * can recognize the same client if it reconnects. If omitted, the SDK generates one.
+   * To let the actor recognize the same client if it reconnects, use a stable
+   * value, such as an ID stored per browser tab. If you omit this property, the
+   * SDK generates a connection ID.
    *
-   * See [Connection ID](/developers/backend/resources/actors/overview#connection-id)
-   * for more details.
+   * For more about connection IDs, see
+   * [connections](/developers/backend/resources/actors/reference#connections).
    */
   id?: string;
 }
 
 /**
- * Represents an outgoing-message listener registered with
+ * Represents a listener for messages from the actor, registered with
  * [Connection.subscribe](#subscribe).
  */
 export interface ActorSubscription {
   /**
    * Removes this listener. Other listeners and the socket stay open.
+   *
+   * @example
+   * ```typescript
+   * // Remove a listener
+   * sub.unsubscribe();
+   * ```
    */
   unsubscribe(): void;
 }
@@ -78,44 +86,68 @@ export interface ActorSubscription {
 /**
  * Represents a client's WebSocket connection to an actor session.
  *
- * [ActorRef.connect](#connect) returns this object while the socket connects.
- * The socket buffers messages sent during connection setup until it opens.
+ * [ActorRef.connect](#connect) returns this object. The socket buffers messages
+ * you send before it opens.
  */
 export interface Connection<N extends string = string> {
   /** Connection ID that the actor receives as `conn.id`. */
   readonly id: string;
 
   /**
-   * Registers a listener for outgoing messages from the actor.
+   * Registers a listener for messages from the actor.
    *
    * You can register multiple listeners on the same connection.
    *
-   * @param callback - Called with each outgoing message sent to this connection.
-   * @returns A handle you can use to remove this listener without closing the socket.
+   * @param callback - Callback that runs for each message the actor sends to this connection.
+   * @returns A subscription handle. Call `unsubscribe()` on it to remove this listener without closing the socket.
+   *
+   * @example
+   * ```typescript
+   * // Listen for messages from the actor
+   * const sub = conn.subscribe((msg) => {
+   *   console.log(msg);
+   * });
+   *
+   * // Stop listening without closing the socket.
+   * sub.unsubscribe();
+   * ```
    */
   subscribe(callback: (data: ToClientFor<N>) => void): ActorSubscription;
 
   /**
-   * Sends an incoming message to the actor.
+   * Sends a message to the actor.
    *
-   * The socket buffers messages until it opens. After [close](#close), the socket
-   * drops further sends.
+   * The socket buffers messages until it opens. After you call [close](#close),
+   * the socket drops further sends.
    *
-   * @param data - Incoming message to send. Typed through [ActorRegistry](#actorregistry) when configured.
+   * @param data - Message to send to the actor. The type comes from [ActorRegistry](#actorregistry) when you register the actor there.
+   *
+   * @example
+   * ```typescript
+   * // Send a message to the actor
+   * conn.send({ type: "message", text: "Hello" });
+   * ```
    */
   send(data: ToServerFor<N>): void;
 
   /**
    * Closes the connection and removes all listeners.
    *
-   * Safe to call more than once. A connection also closes itself when it fails
-   * permanently. See [ActorRef.connect](#connect) for how to open a fresh connection.
+   * You can call this method more than once. A connection also closes itself
+   * when it fails permanently. To open a new connection, call
+   * [ActorRef.connect](#connect) again.
+   *
+   * @example
+   * ```typescript
+   * // Close the connection
+   * conn.close();
+   * ```
    */
   close(): void;
 }
 
 /**
- * Represents an actor session selected by actor name and session ID.
+ * Represents a reference to an actor session, identified by actor name and session ID.
  *
  * Call [connect](#connect) to open the WebSocket and get a [Connection](#connection).
  */
@@ -123,15 +155,22 @@ export interface ActorRef<N extends string = string> {
   /**
    * Creates or returns the [Connection](#connection) for this session.
    *
-   * Repeated calls return the same connection until it closes. After a permanent
-   * failure, such as a missing actor or denied connection, fix the cause and call
-   * `connect()` again. Add subscriptions to the new connection.
+   * Repeated calls return the same connection until it closes. If the connection
+   * fails permanently, for example because the actor doesn't exist or the actor
+   * denies the connection, fix the cause and call `connect()` again. Then
+   * subscribe again on the new connection.
    *
-   * See [Connect a client to a session](/developers/backend/resources/actors/samples#connect-a-client-to-a-session)
-   * for a sample flow.
+   * For a sample flow, see
+   * [connect a client to a session](/developers/backend/resources/actors/sample-flows#connect-a-client-to-a-session).
    *
    * @param options - Optional connection settings, such as a stable connection ID.
    * @returns The [Connection](#connection) for this actor session.
+   *
+   * @example
+   * ```typescript
+   * // Connect to a session
+   * const conn = base44.actors.chatRoom("session-1").connect({ id: "tab-1" });
+   * ```
    */
   connect(options?: ActorConnectOptions): Connection<N>;
 }
@@ -139,8 +178,9 @@ export interface ActorRef<N extends string = string> {
 /**
  * Selects a session for a named actor.
  *
- * Typed automatically when the actor is registered in [ActorRegistry](#actorregistry) or
- * [ActorNameRegistry](#actornameregistry).
+ * TypeScript infers message types when you register the actor in
+ * [ActorRegistry](#actorregistry). [ActorNameRegistry](#actornameregistry)
+ * provides autocomplete for actor names only.
  */
 export interface ActorClient<N extends string = string> {
   /**
@@ -150,41 +190,39 @@ export interface ActorClient<N extends string = string> {
    *
    * @param instanceId - Session ID that identifies which session to connect to.
    * @returns A reference to the actor session.
+   *
+   * @example
+   * ```typescript
+   * // Select a session
+   * const session = base44.actors.chatRoom("session-1");
+   * ```
    */
   (instanceId: string): ActorRef<N>;
 }
 
 /**
- * Use `base44.actors` to connect your frontend to [actor sessions](/developers/backend/resources/actors/overview),
+ * Connects your frontend to [actor sessions](/developers/backend/resources/actors/overview),
  * shared live backend processes where clients can exchange messages in realtime.
- * 
- * With the Actors SDK module you can: 
  *
- * - Connect to a session with `base44.actors.<ActorName>(sessionId).connect()`.
- * - Subscribe to messages the actor sends using [Connection.subscribe](#subscribe),
- *   either broadcast to all clients or sent directly to your client.
- * - Send messages to the actor with [Connection.send](#send).
- * - Share a session across multiple clients: any clients with the same actor
- *   name and session ID connect to the same session.
- * - Type your messages using [ActorRegistry](#actorregistry) for autocomplete
- *   and compile-time safety.
+ * The following table lists what you can do with the actors module:
  *
- * Learn more about [actors](/developers/backend/resources/actors/overview).
+ * | Member | Purpose |
+ * |---|---|
+ * | [`connect()`](#connect) | Opens a connection to a session. Clients that use the same actor name and session ID join the same session. |
+ * | [`subscribe()`](#subscribe) | Receives messages from an actor. |
+ * | [`send()`](#send) | Sends a message to an actor. |
+ * | [`ActorRegistry`](#actorregistry) | Defines message types for autocomplete and compile-time safety. |
  *
  * ## Authentication modes
  *
- * This module is available in anonymous or user authentication mode. 
+ * This module is available in anonymous and user authentication modes.
  * Apps that require login can reject anonymous connections in the actor's `handleConnect()` method.
- * Learn more about [managing client connections](/developers/backend/resources/actors/samples#manage-client-connections). 
-
-
+ * To learn more, see [manage client connections](/developers/backend/resources/actors/sample-flows#manage-client-connections).
+ *
  * @example
- * 
- * The following example displays the general lifecycle of a client connected to an actor named `Chat`:  
- *  
  * ```typescript
- * Example 
- * const conn = base44.actors.Chat("session-1").connect({ id: "tab-1" });
+ * // Connect, subscribe, send, and close
+ * const conn = base44.actors.chatRoom("session-1").connect({ id: "tab-1" });
  * const sub = conn.subscribe((msg) => console.log(msg));
  * conn.send({ type: "message", text: "hi" });
  * sub.unsubscribe();

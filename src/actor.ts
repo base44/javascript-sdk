@@ -28,8 +28,8 @@ export interface Storage {
   get<T>(key: string): Promise<T | undefined>;
   put(key: string, value: unknown): Promise<void>;
   delete(key: string): Promise<boolean>;
-  /** Wipe the session's entire persisted storage. A later connection starts
-   *  with the same empty storage as a new session. */
+  /** Deletes all persisted storage for the session. A later connection starts
+   *  with empty storage, the same as a new session. */
   deleteAll(): Promise<void>;
 }
 
