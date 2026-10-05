@@ -56,7 +56,7 @@ export interface AiGatewayModuleConfig {
  *
  * `connection()` takes an optional `provider`, and each provider serves a different API:
  *
- * - `openai` (default): OpenAI-compatible chat completions and image endpoints.
+ * - `openai` (default): OpenAI-compatible chat completions, image, and video endpoints.
  * - `typesafe`: structured evaluations with the `jev` model.
  *
  * Call `connection()` from a backend function rather than the browser. This
@@ -78,6 +78,17 @@ export interface AiGatewayModuleConfig {
  * `'automatic'` to let Base44 choose one, or pin a model such as
  * `'gemini_3_1_flash_image'` or `'gpt_image_2'`. For request options, the
  * full model list, and limits, see [Generate images with the AI Gateway](/developers/references/sdk/getting-started/ai-gateway-images).
+ *
+ * ## Video
+ *
+ * The gateway also serves OpenAI's video endpoints, `/videos`, so you can
+ * generate video from a prompt, from a still image, or from existing media.
+ * Video generation is asynchronous: `POST /videos` returns a job, and you poll
+ * `GET /videos/{id}` until its status is `completed` or `failed`, which can
+ * take minutes. Video models are their own set, and there's no `automatic`
+ * option, so pin a model such as `'veo_3_1_fast'` or `'seedance_2'`. For
+ * request options, the full model list, and limits, see
+ * [Generate video with the AI Gateway](/developers/references/sdk/getting-started/ai-gateway-video).
  *
  * ## Structured evaluations
  *
@@ -199,6 +210,30 @@ export interface AiGatewayModule {
    *
    * const file = new File([image.uint8Array], "lighthouse.png", { type: image.mediaType });
    * const { file_url } = await base44.integrations.Core.UploadFile({ file });
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Start a video and record the job to poll later
+   * import { createClientFromRequest } from "@base44/sdk";
+   *
+   * // Runs inside a backend function
+   * const base44 = createClientFromRequest(request);
+   * const { baseURL, token, headers } = base44.asServiceRole.aiGateway.connection();
+   *
+   * const response = await fetch(`${baseURL}/videos`, {
+   *   method: "POST",
+   *   headers: { ...headers, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+   *   body: JSON.stringify({
+   *     model: "veo_3_1_fast",
+   *     prompt: "A lighthouse beam sweeping across a calm sea at dawn",
+   *     seconds: 8,
+   *   }),
+   * });
+   *
+   * // Video generation takes minutes, so store the id and poll it from a later request
+   * const { id } = await response.json();
+   * await base44.asServiceRole.entities.Clip.update(clipId, { video_id: id });
    * ```
    *
    * @example
