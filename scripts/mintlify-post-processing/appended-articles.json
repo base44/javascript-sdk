@@ -2,10 +2,7 @@
   "interfaces/ConnectorsModule": [
     "type-aliases/ConnectorIntegrationType",
     "interfaces/ConnectorIntegrationTypeRegistry",
-    "interfaces/UserConnectorsModule",
-    "interfaces/ConnectorApiRequest",
-    "interfaces/ConnectorApiResponse",
-    "type-aliases/ConnectorApiResponsePhase"
+    "interfaces/UserConnectorsModule"
   ],
   "type-aliases/EntitiesModule": [
     "interfaces/EntityHandler",
