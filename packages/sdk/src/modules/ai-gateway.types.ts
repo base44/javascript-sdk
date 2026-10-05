@@ -56,7 +56,7 @@ export interface AiGatewayModuleConfig {
  *
  * The optional `provider` picks the API you connect to:
  *
- * - `openai`, the default: OpenAI-compatible chat completions, image, and video endpoints.
+ * - `openai` (default): OpenAI-compatible chat completions, image, and video endpoints.
  * - `typesafe`: structured evaluations with the `jev` model.
  *
  * Call `connection()` from a backend function rather than the browser. This
@@ -99,15 +99,27 @@ export interface AiGatewayModuleConfig {
  * state and a set of questions, each a `choice`, `score`, or `boolean`. Choice
  * and score answers come back with `probabilities` per option, and boolean
  * answers with a single `probability` of `true`. Use it to classify, score, or
- * route records, then
- * apply your own thresholds and actions in code.
+ * route records, then apply your own thresholds and actions in code.
  *
  * ## Authentication Modes
  *
  * The mode determines which token `connection()` returns:
  *
  * - **User authentication** (`base44.aiGateway`): Returns the signed-in app user's token.
- * - **Service role authentication** (`base44.asServiceRole.aiGateway`): Returns the service-role token instead. Use it from backend functions, because apps that restrict Core integrations, the default for new apps, reject user-token gateway calls on public apps. It also works when there's no signed-in user, such as from a scheduled automation.
+ * - **Service role authentication** (`base44.asServiceRole.aiGateway`): Returns the service-role token instead.
+ *
+ * Use service role, as every example here does. An app that restricts Core
+ * integrations rejects user-token gateway calls unless it's shared privately
+ * or with your workspace, and most new apps have that restriction on from the
+ * start. A user-token call therefore works while you're building and starts
+ * failing the moment you share the app publicly. Service role also works when
+ * there's no signed-in user at all, such as from a scheduled automation.
+ *
+ * The mode changes which token you get and nothing else. It grants the model
+ * no extra reach, because the gateway runs a model and never touches your
+ * data. Access to your app's data comes from the `base44.entities` calls you
+ * write around the gateway call, so pick the mode for those on their own
+ * merits rather than matching this one.
  *
  * ## Billing and limits
  *
