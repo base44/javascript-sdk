@@ -270,8 +270,32 @@ function trackInitializationEvent(track: (params: TrackEventParams) => void) {
     eventName: ANALYTICS_INITIALIZATION_EVENT_NAME,
     properties: {
       referrer: document?.referrer,
+      ...getAttributionParams(),
     },
   });
+}
+
+// Allowlist, never the whole query string: landing URLs carry PII
+// (e.g. `utm_email`) and tokens.
+const ATTRIBUTION_PARAM_KEYS = [
+  "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "utm_id",
+  "gclid", "gbraid", "wbraid", "gad_source", "gad_campaignid",
+  "fbclid", "msclkid", "ttclid", "li_fat_id",
+];
+
+function getAttributionParams(): Record<string, string> {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const out: Record<string, string> = {};
+    for (const key of ATTRIBUTION_PARAM_KEYS) {
+      const value = params.get(key);
+      if (value) out[key] = value.slice(0, 500);
+    }
+    return out;
+  } catch {
+    // React Native has no `window.location`.
+    return {};
+  }
 }
 
 function setSessionDurationTimerStart() {
