@@ -45,7 +45,7 @@ export interface AiGatewayModuleConfig {
 /**
  * AI Gateway module for calling Base44's managed AI models from your own code.
  *
- * `connection()` hands you a `baseURL`, `token`, and `headers` that
+ * Call `connection()` to get a `baseURL`, `token`, and `headers` that
  * authenticate as your Base44 app. An OpenAI-compatible client is any library, such as the `openai`
  * SDK or the Vercel AI SDK, that has the same request and response format
  * as OpenAI's API and lets you point it at a custom `baseURL`
@@ -54,9 +54,9 @@ export interface AiGatewayModuleConfig {
  * against the provider directly, no separate account, API key, or billing
  * setup with the underlying model provider required.
  *
- * `connection()` takes an optional `provider`, and each provider serves a different API:
+ * The optional `provider` picks the API you connect to:
  *
- * - `openai` (default): OpenAI-compatible chat completions, image, and video endpoints.
+ * - `openai`, the default: OpenAI-compatible chat completions, image, and video endpoints.
  * - `typesafe`: structured evaluations with the `jev` model.
  *
  * Call `connection()` from a backend function rather than the browser. This
@@ -74,7 +74,7 @@ export interface AiGatewayModuleConfig {
  *
  * The gateway also serves OpenAI's image endpoints, `/images/generations`
  * and `/images/edits`, so you can generate images and edit them using
- * reference images. Image requests use their own set of models: pass
+ * reference images. Image requests use their own set of models. Pass
  * `'automatic'` to let Base44 choose one, or pin a model such as
  * `'gemini_3_1_flash_image'` or `'gpt_image_2'`. For request options, the
  * full model list, and limits, see [Generate images with the AI Gateway](/developers/references/sdk/getting-started/ai-gateway-images).
@@ -83,7 +83,7 @@ export interface AiGatewayModuleConfig {
  *
  * The gateway also serves OpenAI's video endpoints, `/videos`, so you can
  * generate video from a prompt, from a still image, or from existing media.
- * Video generation is asynchronous: `POST /videos` returns a job, and you poll
+ * Video generation is asynchronous. `POST /videos` returns a job, and you poll
  * `GET /videos/{id}` until its status is `completed` or `failed`, which can
  * take minutes. Video models are their own set, and there's no `automatic`
  * option, so pin a model such as `'veo_3_1_fast'` or `'seedance_2'`. For
@@ -94,11 +94,12 @@ export interface AiGatewayModuleConfig {
  *
  * The `typesafe` provider runs the `jev` evaluation model through
  * `@ai-sdk/typesafe-ai` and `experimental_evaluate` from the `ai` package,
- * version 7.0.105 or later. Pass `evaluationModel("jev")`; the gateway rejects
- * other model IDs, such as `"jev-latest"`. Give it some app state and a set of
- * questions, each a `choice`, `score`, or `boolean`. Choice and score answers
- * come back with `probabilities` per option; boolean answers with a single
- * `probability` of `true`. Use it to classify, score, or route records, then
+ * version 7.0.105 or later. Pass `evaluationModel("jev")`, and note that the
+ * gateway rejects other model IDs, such as `"jev-latest"`. Give it some app
+ * state and a set of questions, each a `choice`, `score`, or `boolean`. Choice
+ * and score answers come back with `probabilities` per option, and boolean
+ * answers with a single `probability` of `true`. Use it to classify, score, or
+ * route records, then
  * apply your own thresholds and actions in code.
  *
  * ## Authentication Modes
@@ -106,7 +107,7 @@ export interface AiGatewayModuleConfig {
  * The mode determines which token `connection()` returns:
  *
  * - **User authentication** (`base44.aiGateway`): Returns the signed-in app user's token.
- * - **Service role authentication** (`base44.asServiceRole.aiGateway`): Returns the service-role token instead. Use it from backend functions: apps that restrict Core integrations, the default for new apps, reject user-token gateway calls on public apps. It also works when there's no signed-in user, such as from a scheduled automation.
+ * - **Service role authentication** (`base44.asServiceRole.aiGateway`): Returns the service-role token instead. Use it from backend functions, because apps that restrict Core integrations, the default for new apps, reject user-token gateway calls on public apps. It also works when there's no signed-in user, such as from a scheduled automation.
  *
  * ## Billing and limits
  *
