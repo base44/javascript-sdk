@@ -345,6 +345,21 @@ export interface AuthModule {
   isAuthenticated(): Promise<boolean>;
 
   /**
+   * Checks whether an access token is currently set on the client.
+   *
+   * Reports only that a token is present, not that it's valid: an expired or revoked token still returns `true`. Use it to skip requests that can't succeed without a session, such as {@linkcode me | me()} for an anonymous visitor, and use {@linkcode isAuthenticated | isAuthenticated()} to confirm a session with the server. The token is the one passed to {@linkcode createClient | createClient()} or set with {@linkcode setToken | setToken()}, and {@linkcode logout | logout()} clears it. A session held only in an HTTP-only cookie isn't visible to the client and returns `false`.
+   *
+   * @returns `true` if the client has an access token, `false` otherwise.
+   *
+   * @example
+   * ```typescript
+   * // Skip the user lookup for anonymous visitors
+   * const user = base44.auth.hasToken() ? await base44.auth.me() : null;
+   * ```
+   */
+  hasToken(): boolean;
+
+  /**
    * Invites a user to the app.
    *
    * Sends an invitation email to a potential user with a specific role.
@@ -551,22 +566,4 @@ export interface AuthModule {
    * ```
    */
   changePassword(params: ChangePasswordParams): Promise<any>;
-}
-
-/**
- * The auth module as constructed internally, before it is narrowed to
- * {@link AuthModule} on the public client. Not exported from the package
- * index — SDK consumers see only {@link AuthModule}.
- *
- * @internal
- */
-export interface InternalAuthModule extends AuthModule {
-  /**
-   * Whether an access token is currently set on the client.
-   *
-   * Reports only the presence of a token, never its validity — an expired or
-   * revoked token still reads as `true`. Callers use this to skip requests that
-   * could not succeed without a session, not to decide that one is valid.
-   */
-  hasToken(): boolean;
 }
