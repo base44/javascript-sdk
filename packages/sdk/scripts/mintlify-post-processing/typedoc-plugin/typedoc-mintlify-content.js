@@ -18,7 +18,7 @@ export function addHeadingsToCodeGroups(content) {
       let hasHeading = false;
       for (let j = Math.max(0, i - 3); j < i; j++) {
         const prevLine = lines[j].trim();
-        if (/^#{2,4}\s+/.test(prevLine)) {
+        if (/^#{2,5}\s+/.test(prevLine)) {
           hasHeading = true;
           break;
         }
@@ -41,8 +41,10 @@ export function addHeadingsToCodeGroups(content) {
  * Convert code examples to Mintlify CodeGroup
  */
 export function convertExamplesToCodeGroup(content) {
-  // Match Example/Examples headings from level 2-4 and capture their content until next section
-  const exampleSectionRegex = /^(#{2,4})\s+(Example|Examples)\s*$([\s\S]*?)(?=^#{2,4}\s|\n<\/ResponseField>|\n\*\*\*|$(?!\n))/gm;
+  // Match Example/Examples headings from level 2-5 and capture their content until next section.
+  // Level 5 shows up for overloaded methods, where each "#### Call Signature" pushes its own
+  // "##### Examples" one level deeper than a plain method's "#### Examples".
+  const exampleSectionRegex = /^(#{2,5})\s+(Example|Examples)\s*$([\s\S]*?)(?=^#{2,5}\s|\n<\/ResponseField>|\n\*\*\*|$(?!\n))/gm;
 
   return content.replace(exampleSectionRegex, (match, headingLevel, exampleHeading, exampleContent) => {
     const codeBlockRegex = /```([\w-]*)\s*([^\n]*)\n([\s\S]*?)```/g;
@@ -86,7 +88,14 @@ export function convertExamplesToCodeGroup(content) {
       codeGroup += '```\n\n';
     }
 
-    codeGroup += '</CodeGroup>\n';
+    // Two newlines, not one: the regex above uses a lookahead so whatever
+    // heading/content follows is preserved untouched. Most of the time that
+    // content is already cushioned by a blank line, but when an Examples
+    // section sits right before the next overload's "#### Call Signature"
+    // (only possible for overloaded methods, e.g. list()/filter()), there's
+    // nothing else providing that gap — without it, MDX glues a closing JSX
+    // tag directly to the next line and the heading after it breaks.
+    codeGroup += '</CodeGroup>\n\n';
 
     return codeGroup;
   });
