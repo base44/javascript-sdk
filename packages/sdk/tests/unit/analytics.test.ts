@@ -7,7 +7,7 @@ import {
 } from "../../src/index.ts";
 import { getSharedInstance } from "../../src/utils/sharedInstance.ts";
 import { resetAnalyticsSessionContext } from "../../src/modules/analytics.ts";
-import { InternalAuthModule, User } from "../../src/modules/auth.types.ts";
+import { User } from "../../src/modules/auth.types.ts";
 import { AxiosInstance } from "axios";
 
 describe("Analytics Module", () => {
@@ -246,9 +246,7 @@ describe("Analytics Module", () => {
 
   test("should report token presence across identity changes", () => {
     const client = createClient({ serverUrl, appId });
-    // `hasToken` lives on the internal auth surface only; the public client
-    // narrows to AuthModule, so reach past the narrowing deliberately here.
-    const auth = client.auth as InternalAuthModule;
+    const auth = client.auth;
 
     expect(auth.hasToken()).toBe(false);
 
