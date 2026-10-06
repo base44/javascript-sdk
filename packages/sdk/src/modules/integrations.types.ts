@@ -1,0 +1,473 @@
+import { CustomIntegrationsModule } from "./custom-integrations.types.js";
+
+/**
+ * Function signature for calling an integration endpoint.
+ *
+ * If any parameter is a `File` object, the request will automatically be
+ * sent as `multipart/form-data`. Otherwise, it will be sent as JSON.
+ *
+ * @param data - An object containing named parameters for the integration endpoint.
+ * @returns Promise resolving to the integration endpoint's response.
+ */
+export type IntegrationEndpointFunction = (
+  data: Record<string, any>,
+) => Promise<any>;
+
+/**
+ * A package containing integration endpoints.
+ *
+ * An integration package is a collection of endpoint functions indexed by endpoint name.
+ * Both `Core` and `custom` are integration packages that implement this structure.
+ *
+ * @example **Core package**
+ * ```typescript
+ * await base44.integrations.Core.InvokeLLM({
+ *   prompt: 'Explain quantum computing',
+ *   model: 'gpt_5'
+ * });
+ * ```
+ *
+ * @example **custom package**
+ * ```typescript
+ * await base44.integrations.custom.call(
+ *   'github',
+ *   'get:/repos/{owner}/{repo}',
+ *   { pathParams: { owner: 'myorg', repo: 'myrepo' } }
+ * );
+ * ```
+ */
+export type IntegrationPackage = {
+  [endpointName: string]: IntegrationEndpointFunction;
+};
+
+/**
+ * Parameters for the InvokeLLM function.
+ */
+export interface InvokeLLMParams {
+  /** The prompt text to send to the model */
+  prompt: string;
+  /** Optionally specify a model to override the app-level model setting for this specific call.
+   *
+   * Options: `"gpt_5_mini"`, `"gemini_3_flash"`, `"gpt_5_4"`, `"gpt_5_6_sol"`, `"gpt_5_6_luna"`, `"gemini_3_1_pro"`, `"claude_sonnet_4_6"`, `"claude_opus_4_6"`, `"claude_opus_4_7"`, `"claude_opus_4_8"`, `"claude-sonnet-5"`
+   */
+  model?: 'gpt_5_mini' | 'gemini_3_flash' | 'gpt_5_4' | 'gpt_5_6_sol' | 'gpt_5_6_luna' | 'gemini_3_1_pro' | 'claude_sonnet_4_6' | 'claude_opus_4_6' | 'claude_opus_4_7' | 'claude_opus_4_8' | 'claude-sonnet-5';
+  /** If set to `true`, the LLM will use Google Search, Maps, and News to gather real-time context before answering.
+   * @default false
+   */
+  add_context_from_internet?: boolean;
+  /** If you want structured data back, provide a [JSON schema object](https://json-schema.org/understanding-json-schema/reference/object) here. If provided, the function returns a JSON object; otherwise, it returns a string. */
+  response_json_schema?: object;
+  /** A list of file URLs (uploaded via UploadFile) to provide as context/attachments to the LLM. Do not use this together with `add_context_from_internet`. */
+  file_urls?: string[];
+}
+
+/**
+ * Parameters for the GenerateImage function.
+ */
+export interface GenerateImageParams {
+  /**
+   * Description of the image to generate. When you pass `existing_image_urls`,
+   * describe what to do with the reference images instead.
+   */
+  prompt: string;
+  /**
+   * URLs of images to use as references, for example to edit an existing
+   * image, match a style, or add visual context. Images that can't be read are
+   * skipped. If none of them can be read, the request fails.
+   */
+  existing_image_urls?: string[];
+}
+
+export interface GenerateImageResult {
+  /** URL of the generated image. */
+  url: string;
+}
+
+/**
+ * Parameters for the UploadFile function.
+ */
+export interface UploadFileParams {
+  /** The file object to upload. */
+  file: File;
+}
+
+export interface UploadFileResult {
+  /** URL of the uploaded file. */
+  file_url: string;
+}
+
+/**
+ * Parameters for the SendEmail function.
+ */
+export interface SendEmailParams {
+  /** Recipient email address. */
+  to: string;
+  /** Email subject line. */
+  subject: string;
+  /** Plain text email body content. */
+  body: string;
+  /** The name of the sender. If omitted, the app's name will be used. */
+  from_name?: string;
+}
+
+export type SendEmailResult = any;
+
+/**
+ * Parameters for the ExtractDataFromUploadedFile function.
+ */
+export interface ExtractDataFromUploadedFileParams {
+  /** The URL of the uploaded file to extract data from. */
+  file_url: string;
+  /** A [JSON schema object](https://json-schema.org/understanding-json-schema/reference/object) defining what data fields you want to extract. */
+  json_schema: object;
+}
+
+export type ExtractDataFromUploadedFileResult = object;
+
+/**
+ * Parameters for the UploadPrivateFile function.
+ */
+export interface UploadPrivateFileParams {
+  /** The file object to upload. */
+  file: File;
+}
+
+export interface UploadPrivateFileResult {
+  /** URI of the uploaded private file, used to create a signed URL. */
+  file_uri: string;
+}
+
+/**
+ * Parameters for the CreateFileSignedUrl function.
+ */
+export interface CreateFileSignedUrlParams {
+  /** URI of the uploaded private file. */
+  file_uri: string;
+  /** How long the signed URL should be valid for, in seconds. Must be between `60` (1 minute) and `3600` (1 hour).
+   * @default 300 (5 minutes)
+   */
+  expires_in?: number;
+}
+
+export interface CreateFileSignedUrlResult {
+  /** Temporary signed URL to access the private file. */
+  signed_url: string;
+}
+
+/**
+ * Core package containing built-in Base44 integration functions.
+ */
+export interface CoreIntegrations {
+  /**
+   * Generate text or structured JSON data using AI models.
+   *
+   * @param params - Parameters for the LLM invocation
+   * @returns Promise resolving to a string (when no schema provided) or an object (when schema provided).
+   *
+   * @example
+   * ```typescript
+   * // Basic prompt
+   * const response = await base44.integrations.Core.InvokeLLM({
+   *   prompt: "Write a haiku about coding."
+   * });
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Prompt with internet context
+   * const response = await base44.integrations.Core.InvokeLLM({
+   *   prompt: "What is the current stock price of Wix and what was the latest major news about it?",
+   *   add_context_from_internet: true
+   * });
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Structured JSON response
+   * const response = await base44.integrations.Core.InvokeLLM({
+   *   prompt: "Analyze the sentiment of this review: 'The service was slow but the food was amazing.'",
+   *   response_json_schema: {
+   *     type: "object",
+   *     properties: {
+   *       sentiment: { type: "string", enum: ["positive", "negative", "mixed"] },
+   *       score: { type: "number", description: "Score from 1-10" },
+   *       key_points: { type: "array", items: { type: "string" } }
+   *     }
+   *   }
+   * });
+   * // Returns object: { sentiment: "mixed", score: 7, key_points: ["slow service", "amazing food"] }
+   * ```
+   */
+  InvokeLLM(params: InvokeLLMParams): Promise<string | object>;
+
+  /**
+   * Create AI-generated images from text prompts, optionally guided by reference images.
+   *
+   * Images are generated as PNG files at approximately 1024px on the shorter side. The
+   * exact dimensions vary by aspect ratio.
+   *
+   * Pass `existing_image_urls` to edit an existing image or to guide the result
+   * with reference images. To choose the model, aspect ratio, resolution, or
+   * quality, use the [AI Gateway image endpoints](/developers/references/sdk/getting-started/ai-gateway-images)
+   * instead.
+   *
+   * Prompts that violate the AI provider's content policy are refused.
+   *
+   * @param params - Parameters for image generation
+   * @returns Promise resolving to an object containing the URL of the generated PNG image.
+   *
+   * @example
+   * ```typescript
+   * // Generate an image from a text prompt
+   * const {url} = await base44.integrations.Core.GenerateImage({
+   *   prompt: "A serene mountain landscape with a lake in the foreground"
+   * });
+   * console.log(url); // https://...generated_image.png
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Edit an existing image
+   * const {url} = await base44.integrations.Core.GenerateImage({
+   *   prompt: "Replace the background with a sunset beach",
+   *   existing_image_urls: [productPhotoUrl]
+   * });
+   * ```
+   */
+  GenerateImage(params: GenerateImageParams): Promise<GenerateImageResult>;
+
+  /**
+   * Upload files to public storage and get a URL.
+   *
+   * @param params - Parameters for file upload
+   * @returns Promise resolving to an object containing the uploaded file URL.
+   *
+   * @example
+   * ```typescript
+   * // Upload a file in React
+   * const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+   *   const file = event.target.files?.[0];
+   *   if (!file) return;
+   *
+   *   const { file_url } = await base44.integrations.Core.UploadFile({ file });
+   *   console.log(file_url); // https://...uploaded_file.pdf
+   * };
+   * ```
+   */
+  UploadFile(params: UploadFileParams): Promise<UploadFileResult>;
+
+  /**
+   * Send emails to registered users of your app.
+   *
+   * @param params - Parameters for sending email
+   * @returns Promise resolving when the email is sent.
+   */
+  SendEmail(params: SendEmailParams): Promise<SendEmailResult>;
+
+  /**
+   * Extract structured data from uploaded files based on the specified schema.
+   *
+   * Start by uploading the file to public storage using the {@linkcode UploadFile | UploadFile()} function. Then, use the `file_url` parameter to extract structured data from the uploaded file.
+   *
+   * @param params - Parameters for data extraction
+   * @returns Promise resolving to the extracted data.
+   *
+   * @example
+   * ```typescript
+   * // Extract data from an already uploaded file
+   * const result = await base44.integrations.Core.ExtractDataFromUploadedFile({
+   *   file_url: "https://example.com/files/invoice.pdf",
+   *   json_schema: {
+   *     type: "object",
+   *     properties: {
+   *       invoice_number: { type: "string" },
+   *       total_amount: { type: "number" },
+   *       date: { type: "string" },
+   *       vendor_name: { type: "string" }
+   *     }
+   *   }
+   * });
+   * console.log(result); // { invoice_number: "INV-12345", total_amount: 1250.00, ... }
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Upload a file and extract data in React
+   * const handleFileExtraction = async (event: React.ChangeEvent<HTMLInputElement>) => {
+   *   const file = event.target.files?.[0];
+   *   if (!file) return;
+   *
+   *   // First, upload the file
+   *   const { file_url } = await base44.integrations.Core.UploadFile({ file });
+   *
+   *   // Then extract structured data from it
+   *   const result = await base44.integrations.Core.ExtractDataFromUploadedFile({
+   *     file_url,
+   *     json_schema: {
+   *       type: "object",
+   *       properties: {
+   *         summary: {
+   *           type: "string",
+   *           description: "A brief summary of the file content"
+   *         },
+   *         keywords: {
+   *           type: "array",
+   *           items: { type: "string" }
+   *         },
+   *         document_type: {
+   *           type: "string"
+   *         }
+   *       }
+   *     }
+   *   });
+   *   console.log(result); // { summary: "...", keywords: [...], document_type: "..." }
+   * };
+   * ```
+   */
+  ExtractDataFromUploadedFile(
+    params: ExtractDataFromUploadedFileParams,
+  ): Promise<ExtractDataFromUploadedFileResult>;
+
+  /**
+   * Upload files to private storage that requires a signed URL to access.
+   *
+   * Create a signed URL to access uploaded files using the {@linkcode CreateFileSignedUrl | CreateFileSignedUrl()} function.
+   *
+   * @param params - Parameters for private file upload
+   * @returns Promise resolving to an object with a `file_uri` used to create a signed URL to access the uploaded file.
+   *
+   * @example
+   * ```typescript
+   * // Upload a private file
+   * const { file_uri } = await base44.integrations.Core.UploadPrivateFile({ file });
+   * console.log(file_uri); // "private/user123/document.pdf"
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Upload a private file and create a signed URL
+   * const handlePrivateUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+   *   const file = event.target.files?.[0];
+   *   if (!file) return;
+   *
+   *   // Upload to private storage
+   *   const { file_uri } = await base44.integrations.Core.UploadPrivateFile({ file });
+   *
+   *   // Create a signed URL that expires in 1 hour (3600 seconds)
+   *   const { signed_url } = await base44.integrations.Core.CreateFileSignedUrl({
+   *     file_uri,
+   *     expires_in: 3600
+   *   });
+   *
+   *   console.log(signed_url); // Temporary URL to access the private file
+   * };
+   * ```
+   */
+  UploadPrivateFile(
+    params: UploadPrivateFileParams,
+  ): Promise<UploadPrivateFileResult>;
+
+  /**
+   * Generate temporary access links for private files.
+   *
+   * Start by uploading the file to private storage using the {@linkcode UploadPrivateFile | UploadPrivateFile()} function. Then, use the `file_uri` parameter to create a signed URL to access the uploaded file.
+   *
+   * @param params - Parameters for creating signed URL
+   * @returns Promise resolving to an object with a temporary `signed_url`.
+   *
+   * @example
+   * ```typescript
+   * // Create a signed URL for a private file
+   * const { signed_url } = await base44.integrations.Core.CreateFileSignedUrl({
+   *   file_uri: "private/user123/document.pdf",
+   *   expires_in: 1800 // URL expires in 30 minutes
+   * });
+   * console.log(signed_url); // https://...?signature=...
+   * ```
+   */
+  CreateFileSignedUrl(
+    params: CreateFileSignedUrlParams,
+  ): Promise<CreateFileSignedUrlResult>;
+}
+
+/**
+ * Integrations module for calling integration methods.
+ *
+ * This module provides access to integration methods for interacting with external services. Unlike the connectors module that gives you raw OAuth tokens, integrations provide pre-built functions that Base44 executes on your behalf.
+ *
+ * ## Integration Types
+ *
+ * There are two types of integrations:
+ *
+ * - **Built-in integrations** (`Core`): Pre-built functions provided by Base44 for common tasks such as AI-powered text generation, image creation, file uploads, and email. Access core integration methods using:
+ *   ```
+ *   base44.integrations.Core.FunctionName(params)
+ *   ```
+ *
+ * - **Custom workspace integrations** (`custom`): Pre-configured external APIs set up by workspace administrators. Workspace integration calls are proxied through Base44's backend, so credentials are never exposed to the frontend. Access custom workspace integration methods using:
+ *   ```
+ *   base44.integrations.custom.call(slug, operationId, params)
+ *   ```
+ *
+ *   <Info>To call a custom workspace integration, it must be pre-configured by a workspace administrator who imports an OpenAPI specification. Learn more about [custom workspace integrations](/documentation/integrations/managing-workspace-integrations).</Info>
+ *
+ * ## Authentication Modes
+ *
+ * This module is available to use with a client in all authentication modes:
+ *
+ * - **Anonymous or User authentication** (`base44.integrations`): Integration methods are invoked with the current user's permissions. Anonymous users invoke methods without authentication, while authenticated users invoke methods with their authentication context.
+ * - **Service role authentication** (`base44.asServiceRole.integrations`): Integration methods are invoked with the service role for backend code that needs elevated permissions.
+ */
+export type IntegrationsModule = {
+  /**
+   * Core package containing built-in Base44 integration functions.
+   *
+   * @example
+   * ```typescript
+   * const response = await base44.integrations.Core.InvokeLLM({
+   *   prompt: 'Explain quantum computing',
+   *   model: 'gpt_5'
+   * });
+   * ```
+   */
+  Core: CoreIntegrations;
+
+  /**
+   * Workspace integrations module for calling pre-configured external APIs.
+   *
+   * @example
+   * ```typescript
+   * const result = await base44.integrations.custom.call(
+   *   'github',
+   *   'get:/repos/{owner}/{repo}',
+   *   { pathParams: { owner: 'myorg', repo: 'myrepo' } }
+   * );
+   * ```
+   */
+  custom: CustomIntegrationsModule;
+} & {
+  /**
+   * Access to additional integration packages.
+   *
+   * Allows accessing integration packages as properties. This enables both `Core` and `custom` packages,
+   * as well as any future integration packages that may be added.
+   *
+   * @example **Use Core integrations**
+   * ```typescript
+   * const response = await base44.integrations.Core.InvokeLLM({
+   *   prompt: 'Explain quantum computing',
+   *   model: 'gpt_5'
+   * });
+   * ```
+   *
+   * @example **Use custom integrations**
+   * ```typescript
+   * const result = await base44.integrations.custom.call(
+   *   'github',
+   *   'get:/repos/{owner}/{repo}',
+   *   { pathParams: { owner: 'myorg', repo: 'myrepo' } }
+   * );
+   * ```
+   */
+  [packageName: string]: IntegrationPackage;
+};
