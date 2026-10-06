@@ -31,6 +31,11 @@ const APPENDED_ARTICLES_PATH = path.join(
   "../appended-articles.json"
 );
 const METHOD_ORDER_PATH = path.join(__dirname, "..", "method-order.json");
+const OVERLOAD_PRESENTATION_PATH = path.join(
+  __dirname,
+  "..",
+  "overload-presentation.json"
+);
 
 // Controlled via env var so we can re-enable Panel injection when needed.
 const PANELS_ENABLED = process.env.MINTLIFY_INCLUDE_PANELS === "true";
@@ -391,7 +396,13 @@ function generateDocsJson(docsContent) {
 
     if (existingGroup) {
       existingGroup.pages.push(...docsContent.typeAliases);
-      existingGroup.pages.sort(); // Sort combined pages alphabetically
+      // Sort by basename, not full path: a plain .sort() would group all
+      // "interfaces/..." entries before "type-aliases/..." entries (since
+      // "i" < "t"), instead of interleaving both kinds alphabetically by
+      // module name.
+      existingGroup.pages.sort((a, b) =>
+        a.split("/").pop().localeCompare(b.split("/").pop())
+      );
     } else {
       groups.push({
         group: groupName,
@@ -700,12 +711,14 @@ function applyAppendedArticles(appendedArticles) {
     let hostContent = fs.readFileSync(hostPath, "utf-8");
     let combinedSections = "";
     const collectedHeadings = PANELS_ENABLED ? [] : null;
+    const mergedTypeNames = [];
 
     for (const appendKey of appendList) {
       // Check if appended file was renamed (derives rename automatically for *Module names)
       let effectiveAppendKey = appendKey;
       const appendParts = appendKey.split("/");
       const appendName = appendParts[appendParts.length - 1];
+      mergedTypeNames.push(appendName);
       const appendModuleRename = getModuleRename(appendName);
       if (appendModuleRename) {
         appendParts[appendParts.length - 1] = appendModuleRename;
@@ -765,6 +778,25 @@ function applyAppendedArticles(appendedArticles) {
 
     hostContent = hostContent.trimEnd() + combinedSections + "\n";
     hostContent = updatePanelWithHeadings(hostContent, collectedHeadings);
+
+    // Types merged onto this page no longer have their own file, so any link
+    // that still points at one — a `{@link Type.member}` cross-reference
+    // TypeDoc resolved to `.../Type.mdx#member`, or a plain `{@link Type}`
+    // resolved to `.../Type` with no fragment at all — now 404s. Rewrite
+    // every such link to a same-page anchor: `#member` when TypeDoc kept a
+    // fragment, otherwise `#<lowercased type name>` (Mintlify's own heading
+    // slug for a single-word PascalCase heading has no inserted hyphens).
+    for (const typeName of mergedTypeNames) {
+      const linkRegex = new RegExp(
+        `\\]\\((?:\\.\\./(?:interfaces|type-aliases|classes|functions)/)?${typeName}(?:\\.mdx|\\.md)?(#[\\w-]*)?\\)`,
+        "g"
+      );
+      hostContent = hostContent.replace(
+        linkRegex,
+        (_match, anchor) => `](${anchor || `#${typeName.toLowerCase()}`})`
+      );
+    }
+
     fs.writeFileSync(hostPath, hostContent, "utf-8");
   }
 }
@@ -801,6 +833,118 @@ function cleanupSignatures(content) {
   // 7c: Replace type="K[]" with type="(keyof T)[]" in ParamField elements
   if (content.includes('type="K[]"')) {
     content = content.replace(/type="K\[\]"/g, 'type="(keyof T)[]"');
+    modified = true;
+  }
+
+  // 7d: Expand truncated `EntityPage`\<...\[...\]\> to `EntityPage`\<`T`\[`K`\]\>.
+  // Same class of bug as 7b (TypeDoc truncates a generic it can't fully render),
+  // but for an indexed access type (T[K], from the list()/filter() overload that
+  // returns distinct field values) instead of Pick<T, K>.
+  if (content.includes("EntityPage`\\<...\\[...\\]\\>")) {
+    // The link href can be the bare un-linked form, the original un-rewritten
+    // `(EntityPage)`, or the same-page `(#entitypage)` anchor the merged-link
+    // rewrite above produces — match any of them and leave the href alone.
+    content = content.replace(
+      /(`EntityPage`|\[`EntityPage`\]\([^)]*\))\\<\.\.\.\\\[\.\.\.\\\]\\>/g,
+      "$1\\<`T`\\[`K`\\]\\>"
+    );
+    modified = true;
+  }
+
+  // 7e: Expand truncated `(keyof T & string) | (keyof T & string)[]` (and the
+  // bare `keyof T & string` form). TypeDoc can't render this union-of-an-
+  // intersection-with-its-own-array-form and truncates it in both ParamField
+  // type attributes and inline property signatures.
+  if (content.includes('type="any & string | ... & ...[]"')) {
+    content = content.replace(
+      /type="any & string \| \.\.\. & \.\.\.\[\]"/g,
+      'type="(keyof T & string) | (keyof T & string)[]"'
+    );
+    modified = true;
+  }
+  if (content.includes('type="... & ..."')) {
+    content = content.replace(/type="\.\.\. & \.\.\."/g, 'type="keyof T & string"');
+    modified = true;
+  }
+  if (content.includes("keyof ... & `string` | ... & ...[]")) {
+    content = content.replace(
+      /keyof \.\.\. & `string` \| \.\.\. & \.\.\.\[\]/g,
+      "(keyof `T` & `string`) | (keyof `T` & `string`)[]"
+    );
+    modified = true;
+  }
+  if (content.includes("**field**: ... & ...")) {
+    content = content.replace(
+      /\*\*field\*\*: \.\.\. & \.\.\./g,
+      "**field**: keyof `T` & `string`"
+    );
+    modified = true;
+  }
+  if (content.includes("**countDistinct**: keyof ... & `string`")) {
+    content = content.replace(
+      /\*\*countDistinct\*\*: keyof \.\.\. & `string`/g,
+      "**countDistinct**: keyof `T` & `string`"
+    );
+    modified = true;
+  }
+
+  // 7f: Expand truncated EntityFilterQuery declaration and its $and/$or/$nor
+  // fields. TypeDoc can't fully render the mapped type `{ [K in keyof T]?:
+  // EntityFilterValue<T[K]> }` or the self-referential `EntityFilterQuery<T>[]`
+  // array fields, and truncates both to `(...)`.
+  if (content.includes("{ [K in keyof (...)]?: EntityFilterValue<(...)> }")) {
+    content = content.replace(
+      /\{ \[K in keyof \(\.\.\.\)\]\?: EntityFilterValue<\(\.\.\.\)> \}/g,
+      "{ [K in keyof T]?: EntityFilterValue<T[K]> }"
+    );
+    modified = true;
+  }
+  if (content.includes('**$and**: ...[]')) {
+    // Must stay inside backticks with escaped angle brackets, matching how
+    // every other generic shows up in these signature lines (e.g.
+    // `Record`\<`string`, `any`\>[]) — raw `<T>` outside a code span is
+    // unclosed JSX as far as the MDX parser is concerned and breaks the
+    // whole page.
+    content = content.replace(
+      /\*\*(\$and|\$or|\$nor)\*\*: \.\.\.\[\]/g,
+      "**$1**: `EntityFilterQuery`\\<`T`\\>[]"
+    );
+    modified = true;
+  }
+
+  // 7g: Fix nested inline property breakdowns (e.g. the Accordion under
+  // aggregate()'s "spec", or dateBucket's own nested properties). When an
+  // interface parameter's own properties get expanded inline this way, our
+  // parameters-parsing code re-parses the already-rendered markdown rather
+  // than reading the original comment, and for a `keyof T & string` field it
+  // drops any {@linkcode} link entirely and mis-resolves the type to
+  // `any & string`. Patch both symptoms directly rather than the parser.
+  if (content.includes("matching EntityFilterQuery. Defaults to all records.")) {
+    content = content.replace(
+      /matching EntityFilterQuery\. Defaults to all records\./g,
+      "matching [`EntityFilterQuery`](#entityfilterquery). Defaults to all records."
+    );
+    modified = true;
+  }
+  if (content.includes('type="any & string"')) {
+    content = content.replace(
+      /(<ParamField body="\w+" type=")any & string(")/g,
+      "$1keyof T & string$2"
+    );
+    modified = true;
+  }
+
+  // 7h: Expand `Promise<Pick<..., ...>[]>` (list()/filter()'s legacy array
+  // overload). The nested generic (Promise wrapping a Pick that TypeDoc
+  // already can't render fully) defeats extractSignatureInfo's single-level
+  // regex, which falls back to TypeDoc's own `Pick<..., ...>` truncation
+  // crammed into one code span instead of the usual per-identifier backtick
+  // style every other signature on the page uses.
+  if (content.includes("`Promise<Pick\\<..., ...\\>[]>`")) {
+    content = content.replace(
+      /`Promise<Pick\\<\.\.\., \.\.\.\\>\[\]>`/g,
+      "`Promise`\\<`Pick`\\<`T`, `K`\\>[]\\>"
+    );
     modified = true;
   }
 
@@ -881,17 +1025,18 @@ function cleanupSignatures(content) {
       continue;
     }
 
-    // Fix 4: Remove method-level #### Type Parameters sections.
+    // Fix 4: Remove method-level Type Parameters sections.
     // These are redundant — the info is already in the signature and parameter docs.
-    // Skip from "#### Type Parameters" until the next "#### " heading.
-    if (line.trim() === "#### Type Parameters") {
-      // Skip ahead past this section until the next #### heading or ### heading
+    // Matches "#### Type Parameters" for a plain method, or "##### Type
+    // Parameters" for one overload's own nested Call Signature block, and
+    // stops at the next heading at the same depth or shallower.
+    const typeParamsMatch = line.trim().match(/^(#{4,6}) Type Parameters$/);
+    if (typeParamsMatch) {
+      const ownLevel = typeParamsMatch[1].length;
       let j = i + 1;
       while (j < lines.length) {
-        const upcoming = lines[j].trim();
-        if (upcoming.startsWith("#### ") && upcoming !== "#### Type Parameters") break;
-        if (upcoming.startsWith("### ")) break;
-        if (upcoming.startsWith("## ")) break;
+        const headingMatch = lines[j].trim().match(/^(#+)\s/);
+        if (headingMatch && headingMatch[1].length <= ownLevel) break;
         j++;
       }
       // Also skip any trailing blank lines
@@ -1394,10 +1539,13 @@ function applyIntroSectionGrouping(dir) {
 }
 
 /**
- * Group type definition sections under a parent heading
- * For entities: EntityRecord, EntityTypeRegistry, SortField
- * For functions: FunctionName, FunctionNameRegistry
- * For agents: AgentName, AgentNameRegistry
+ * Group type definition sections under a parent heading.
+ *
+ * Each group below must list every entry from appended-articles.json for that
+ * module except the one that gets absorbed into the "## ... Methods" section
+ * (typically named `*Module` or `*Handler`, e.g. EntityHandler) — otherwise
+ * the appended type keeps its original `##` heading and renders as a sibling
+ * of "Type Definitions" instead of nested under it.
  */
 function groupTypeDefinitions(content) {
   let modified = false;
@@ -1411,7 +1559,12 @@ function groupTypeDefinitions(content) {
     },
     // Entities module
     {
-      types: ["EntityRecord", "EntityTypeRegistry", "SortField"],
+      types: [
+        "EntityRecord",
+        "EntityTypeRegistry",
+        "SortField",
+        "EntityFilterQuery"
+      ],
       indicator: "EntityRecord"
     },
     // Functions module
@@ -1455,8 +1608,15 @@ function groupTypeDefinitions(content) {
     const regex = new RegExp(`^## ${typeName}$`, "m");
     demotedSection = demotedSection.replace(regex, `### ${typeName}`);
   }
-  
-  const updatedContent = 
+
+  // Any "##" heading still left in this slice belongs to one of the types
+  // above it (e.g. "## Properties" from an appended interface with members,
+  // since normalizeHeadings() clamps an appended article's own headings to
+  // the same H2 floor as its title). Bump these so they nest under their
+  // now-H3 type heading instead of rendering as a sibling of it.
+  demotedSection = demotedSection.replace(/^## (.+)$/gm, "#### $1");
+
+  const updatedContent =
     beforeTypeDefinitions +
     "## Type Definitions\n\n" +
     demotedSection;
@@ -2201,6 +2361,158 @@ function applyMethodOrdering(dir) {
   }
 }
 
+/**
+ * Load overload-presentation.json config.
+ * Keys are MDX base filenames (e.g. "entities"), values map method name ->
+ * { intro, labels }. See that file for the format and when to add an entry:
+ * any method with more than one "#### Call Signature" block (i.e. TypeScript
+ * overloads) benefits from this, since TypeDoc renders overloads as bare,
+ * visually-identical signature blocks with no shared context between them.
+ */
+function loadOverloadPresentationConfig() {
+  if (!fs.existsSync(OVERLOAD_PRESENTATION_PATH)) return {};
+  return JSON.parse(fs.readFileSync(OVERLOAD_PRESENTATION_PATH, "utf-8"));
+}
+
+/**
+ * Slugify an overload label the same way Mintlify slugs a heading: lowercase,
+ * drop punctuation, collapse runs of non-alphanumerics to one hyphen.
+ */
+function slugifyOverloadLabel(text) {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/**
+ * For one method with multiple overloads, insert a lead-in sentence plus a
+ * bulleted summary (one bullet per overload, linking to it) right after its
+ * "### name()" heading, and replace each "#### Call Signature" heading with
+ * an anchor and a bold label from `overloads`, in source declaration order.
+ *
+ * "#### Call Signature" is demoted to an anchored bold label rather than
+ * relabeled in place: TypeDoc nests everything under an overload's own
+ * signature one heading level deeper than a plain method's ("##### Parameters"
+ * instead of "#### Parameters", etc., since it all sits inside that "####
+ * Call Signature"). Left alone, that one extra level of nesting makes an
+ * overloaded method's Parameters/Returns/Examples render at a visibly
+ * different (smaller) heading size than every other method's. Demoting
+ * "Call Signature" off the heading hierarchy entirely, and promoting
+ * everything under it back up by one level, makes them land on the exact
+ * same heading depth as a non-overloaded method — "#### Parameters" either
+ * way — while the anchored bold label still visually separates the
+ * overloads and gives the intro bullets something to link to.
+ */
+function presentOverloads(content, methodConfig) {
+  const lines = content.split("\n");
+  const result = [];
+  let modified = false;
+  let labelIndex = -1; // -1 = not currently inside the target method's block
+  let overloadsRemaining = [];
+  let methodName = "";
+  let inFence = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (/^### \w+\(\)$/.test(line.trim())) {
+      result.push(line);
+      methodName = line.trim().slice(4, -2);
+      if (methodConfig[methodName]) {
+        labelIndex = 0;
+        overloadsRemaining = methodConfig[methodName].overloads;
+        const bullets = overloadsRemaining
+          .map((o) => {
+            const anchor = `${methodName}-${slugifyOverloadLabel(o.label)}`;
+            return `- [**${o.label}**](#${anchor}): ${o.description}`;
+          })
+          .join("\n");
+        result.push("", methodConfig[methodName].leadIn, bullets);
+        modified = true;
+      } else {
+        labelIndex = -1;
+      }
+      continue;
+    }
+
+    if (labelIndex === -1) {
+      result.push(line);
+      continue;
+    }
+
+    // Leaving the method's block entirely (next method, or Type Definitions).
+    if (/^## /.test(line.trim())) {
+      labelIndex = -1;
+      result.push(line);
+      continue;
+    }
+
+    if (line.trim().startsWith("```")) inFence = !inFence;
+
+    if (!inFence && line.trim() === "#### Call Signature" && labelIndex < overloadsRemaining.length) {
+      const label = overloadsRemaining[labelIndex].label;
+      const anchor = `${methodName}-${slugifyOverloadLabel(label)}`;
+      result.push(`<a id="${anchor}" />`, "", `**${label}**`);
+      labelIndex++;
+      modified = true;
+      continue;
+    }
+
+    // Demote every other heading in this overload's block by one level, now
+    // that "Call Signature" no longer occupies a level of its own.
+    if (!inFence) {
+      const headingMatch = line.match(/^(#{3,})(\s.*)$/);
+      if (headingMatch && headingMatch[1].length >= 5) {
+        result.push(`${headingMatch[1].slice(1)}${headingMatch[2]}`);
+        modified = true;
+        continue;
+      }
+    }
+
+    result.push(line);
+  }
+
+  return { content: result.join("\n"), modified };
+}
+
+/**
+ * Apply overload presentation (intro + signature labels) to MDX files whose
+ * base name matches a key in overload-presentation.json.
+ */
+function applyOverloadPresentation(dir) {
+  const config = loadOverloadPresentationConfig();
+  if (Object.keys(config).length === 0) return;
+
+  if (!fs.existsSync(dir)) return;
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      applyOverloadPresentation(entryPath);
+    } else if (
+      entry.isFile() &&
+      (entry.name.endsWith(".mdx") || entry.name.endsWith(".md"))
+    ) {
+      const baseName = path.basename(entry.name, path.extname(entry.name));
+      const methodConfig = config[baseName];
+      if (!methodConfig) continue;
+
+      const content = fs.readFileSync(entryPath, "utf-8");
+      const { content: updated, modified } = presentOverloads(
+        content,
+        methodConfig
+      );
+      if (modified) {
+        fs.writeFileSync(entryPath, updated, "utf-8");
+        console.log(
+          `Presented overloads: ${path.relative(DOCS_DIR, entryPath)}`
+        );
+      }
+    }
+  }
+}
+
 function main() {
   console.log("Processing TypeDoc MDX files for Mintlify...\n");
 
@@ -2252,6 +2564,10 @@ function main() {
 
   // Reorder methods according to method-order.json
   applyMethodOrdering(DOCS_DIR);
+
+  // Add an intro blurb and distinguishing labels to overloaded methods
+  // listed in overload-presentation.json
+  applyOverloadPresentation(DOCS_DIR);
 
   // Link type names in Type Declarations sections to their corresponding headings
   applyTypeDeclarationLinking(DOCS_DIR);

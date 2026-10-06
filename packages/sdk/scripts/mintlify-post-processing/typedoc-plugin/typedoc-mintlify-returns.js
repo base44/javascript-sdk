@@ -127,11 +127,33 @@ export function extractSignatureInfo(
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+
+    // A signature can wrap across multiple lines when TypeDoc breaks a long
+    // parameter list onto its own lines (e.g. `list()`'s positional-args
+    // overload), putting the closing "): `ReturnType`" several lines below
+    // the opening "**name**(". Join continuation lines (also "> "-prefixed)
+    // until we see that closing pattern, or give up after a few lines, before
+    // trying to match — otherwise this signature is silently skipped here,
+    // and the Returns section below falls back to whatever an unrelated
+    // nearby signature happens to have registered.
+    let signatureText = line;
+    if (/^>\s*\*\*\w+\*\*/.test(line) && !/\):\s*`/.test(line)) {
+      for (let j = i + 1; j < Math.min(lines.length, i + 10); j++) {
+        if (!/^>/.test(lines[j])) break;
+        signatureText += " " + lines[j].replace(/^>\s*/, "").trim();
+        if (/\):\s*`/.test(signatureText)) break;
+      }
+    }
+
     // Match function signature: > **methodName**(...): `returnType` or `returnType`\<`generic`\>
     // Method-level generics appear between the bold name and arguments.
     // Handle both simple types and generic types like `Promise`\<`any`\> or `Promise`\<[`TypeName`](link)\>
-    const sigMatch = line.match(
-      /^>\s*\*\*(\w+)\*\*(?:\\<.*?\\>)?\([^)]*\):\s*`([^`]+)`(?:\\<(.+?)\\>)?/
+    // The trailing `\<(.+)\>` is greedy, not lazy: a return type can itself
+    // be a generic nested inside another (e.g. `Promise<Pick<T, K>[]>`), and
+    // a lazy match would stop at the FIRST inner `\>` instead of the line's
+    // last one, capturing a truncated, unbalanced fragment.
+    const sigMatch = signatureText.match(
+      /^>\s*\*\*(\w+)\*\*(?:\\<.*?\\>)?\([^)]*\):\s*`([^`]+)`(?:\\<(.+)\\>)?/
     );
     if (sigMatch) {
       const methodName = sigMatch[1];
@@ -255,10 +277,23 @@ export function convertInterfaceMethodReturns(
     page?.url
   );
 
-  return rewriteReturnSections(content, {
+  content = rewriteReturnSections(content, {
     heading: "#### Returns",
     fieldHeading: "#####",
     nestedHeading: "######",
+    stopOnLevel3: true,
+    signatureMap,
+    linkedTypeMap,
+    app,
+    page,
+  });
+  // Overloaded methods (multiple "#### Call Signature" blocks) render their
+  // own "##### Returns" one level deeper than a plain method's "#### Returns"
+  // — run the same conversion again at that depth.
+  return rewriteReturnSections(content, {
+    heading: "##### Returns",
+    fieldHeading: "######",
+    nestedHeading: "#######",
     stopOnLevel3: true,
     signatureMap,
     linkedTypeMap,
@@ -286,10 +321,20 @@ export function convertClassMethodReturns(
     page?.url
   );
 
-  return rewriteReturnSections(content, {
+  content = rewriteReturnSections(content, {
     heading: "#### Returns",
     fieldHeading: "#####",
     nestedHeading: "######",
+    stopOnLevel3: true,
+    signatureMap,
+    linkedTypeMap,
+    app,
+    page,
+  });
+  return rewriteReturnSections(content, {
+    heading: "##### Returns",
+    fieldHeading: "######",
+    nestedHeading: "#######",
     stopOnLevel3: true,
     signatureMap,
     linkedTypeMap,
@@ -332,10 +377,15 @@ function rewriteReturnSections(content, options) {
   const result = [];
   let i = 0;
 
+  // Derived from `heading` so this also catches a heading shallower than our
+  // own level — needed for an overloaded method's nested "##### Returns",
+  // which must stop at the next overload's "#### Call Signature" (4 < 5),
+  // something none of the specific checks below were written to expect.
+  const ownHeadingLevel = (heading.match(/^(#+)/) || [, "##"])[1].length;
   const isTerminatorLine = (line) => {
     const trimmed = line.trim();
     if (!trimmed) return false;
-    if (trimmed.match(/^#{2,4}\s+Examples?/i) || trimmed === "***") {
+    if (trimmed.match(/^#{2,7}\s+Examples?/i) || trimmed === "***") {
       return true;
     }
     if (heading !== "## Returns" && trimmed.startsWith("## ")) {
@@ -346,6 +396,10 @@ function rewriteReturnSections(content, options) {
       return true;
     }
     if (stopOnLevel3 && trimmed.startsWith("### ")) {
+      return true;
+    }
+    const headingMatch = trimmed.match(/^(#+)\s/);
+    if (headingMatch && headingMatch[1].length < ownHeadingLevel) {
       return true;
     }
     return false;

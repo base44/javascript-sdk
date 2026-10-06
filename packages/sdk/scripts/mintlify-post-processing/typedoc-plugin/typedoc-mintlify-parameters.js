@@ -136,11 +136,23 @@ export function convertInterfaceMethodParameters(
   writeLinkedTypesFile = null
 ) {
   const context = app && page ? { app, page, currentPagePath: page.url } : null;
-  return rewriteParameterSections(
+  content = rewriteParameterSections(
     content,
     "#### Parameters",
     "#####",
     "######",
+    context,
+    linkedTypeNames,
+    writeLinkedTypesFile
+  );
+  // Overloaded methods (multiple "#### Call Signature" blocks) render their
+  // own "##### Parameters" one level deeper than a plain method's "####
+  // Parameters" — run the same conversion again at that depth.
+  return rewriteParameterSections(
+    content,
+    "##### Parameters",
+    "######",
+    "#######",
     context,
     linkedTypeNames,
     writeLinkedTypesFile
@@ -158,11 +170,20 @@ export function convertClassMethodParameters(
   writeLinkedTypesFile = null
 ) {
   const context = app && page ? { app, page, currentPagePath: page.url } : null;
-  return rewriteParameterSections(
+  content = rewriteParameterSections(
     content,
     "#### Parameters",
     "#####",
     "######",
+    context,
+    linkedTypeNames,
+    writeLinkedTypesFile
+  );
+  return rewriteParameterSections(
+    content,
+    "##### Parameters",
+    "######",
+    "#######",
     context,
     linkedTypeNames,
     writeLinkedTypesFile
@@ -182,14 +203,21 @@ function rewriteParameterSections(
   const result = [];
   let i = 0;
 
+  // Derived from sectionHeading so this also works one level deeper, where
+  // an overloaded method's own "##### Parameters" sits nested under its
+  // "#### Call Signature" instead of a plain "#### Parameters" at the top
+  // of the method. Stop at the matching Returns/Example heading, "***", or
+  // anything shallower (a heading with fewer leading #'s) — which covers
+  // the next overload's own "#### Call Signature" for the nested case.
+  const ownLevel = (sectionHeading.match(/^(#+)/) || [, "####"])[1].length;
   const isTerminatorLine = (line) => {
-    return (
-      line.startsWith("#### Returns") ||
-      line.startsWith("#### Example") ||
-      line === "***" ||
-      line.startsWith("### ") ||
-      line.startsWith("## ")
-    );
+    const level = "#".repeat(ownLevel);
+    if (line.startsWith(`${level} Returns`)) return true;
+    if (line.startsWith(`${level} Example`)) return true;
+    if (line === "***") return true;
+    const headingMatch = line.match(/^(#+)\s/);
+    if (headingMatch && headingMatch[1].length < ownLevel) return true;
+    return false;
   };
 
   while (i < lines.length) {
@@ -266,15 +294,19 @@ function parseParametersWithExpansion(
   const isTerminator = (line) => {
     const trimmed = line.trim();
     if (!trimmed) return false;
+    // Derived from paramLevel so this also works one level deeper, for an
+    // overloaded method's own nested "##### Parameters"/"###### Parameters".
+    const ownLevel = paramLevel.length;
     if (
-      trimmed.startsWith("#### Returns") ||
-      trimmed.startsWith("#### Example") ||
+      trimmed.startsWith(`${"#".repeat(ownLevel)} Returns`) ||
+      trimmed.startsWith(`${"#".repeat(ownLevel)} Example`) ||
       trimmed === "***"
     ) {
       return true;
     }
     const nestedPrefix = nestedLevel ? nestedLevel + " " : null;
-    if (/^#{1,3}\s+/.test(trimmed)) {
+    const headingMatch = trimmed.match(/^(#+)\s+/);
+    if (headingMatch && headingMatch[1].length < ownLevel) {
       if (
         !trimmed.startsWith(paramLevel + " ") &&
         !(nestedPrefix && trimmed.startsWith(nestedPrefix))
@@ -565,15 +597,19 @@ function parseParameters(
   const isTerminator = (line) => {
     const trimmed = line.trim();
     if (!trimmed) return false;
+    // Derived from paramLevel so this also works one level deeper, for an
+    // overloaded method's own nested "##### Parameters"/"###### Parameters".
+    const ownLevel = paramLevel.length;
     if (
-      trimmed.startsWith("#### Returns") ||
-      trimmed.startsWith("#### Example") ||
+      trimmed.startsWith(`${"#".repeat(ownLevel)} Returns`) ||
+      trimmed.startsWith(`${"#".repeat(ownLevel)} Example`) ||
       trimmed === "***"
     ) {
       return true;
     }
     const nestedPrefix = nestedLevel ? nestedLevel + " " : null;
-    if (/^#{1,3}\s+/.test(trimmed)) {
+    const headingMatch = trimmed.match(/^(#+)\s+/);
+    if (headingMatch && headingMatch[1].length < ownLevel) {
       if (
         !trimmed.startsWith(paramLevel + " ") &&
         !(nestedPrefix && trimmed.startsWith(nestedPrefix))

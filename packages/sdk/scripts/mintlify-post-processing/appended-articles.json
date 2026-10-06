@@ -8,7 +8,8 @@
     "interfaces/EntityHandler",
     "type-aliases/EntityRecord",
     "interfaces/EntityTypeRegistry",
-    "type-aliases/SortField"
+    "type-aliases/SortField",
+    "type-aliases/EntityFilterQuery"
   ],
   "interfaces/FunctionsModule": [
     "type-aliases/FunctionName",

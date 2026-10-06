@@ -139,7 +139,12 @@ function updateDocsJson(repoDir, sdkFiles) {
     return Array.from(groupMap.entries()).map(([group, pages]) => ({
       group,
       expanded: true,
-      pages: pages.sort(),
+      // Sort by basename, not full path: a plain .sort() groups all
+      // "interfaces/..." entries before "type-aliases/..." entries (since
+      // "i" < "t"), instead of interleaving both kinds alphabetically by
+      // module name. Keep in sync with the same fix in
+      // file-processing/file-processing.js's generateDocsJson.
+      pages: pages.sort((a, b) => a.split("/").pop().localeCompare(b.split("/").pop())),
     }));
   };
 

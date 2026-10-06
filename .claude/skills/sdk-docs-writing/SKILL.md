@@ -80,6 +80,8 @@ Every public method needs: description, `@param` tags, `@returns`, and at least 
 - **State environment constraints** when a method is browser-only: "Requires a browser environment and can't be used in the backend."
 - **Document side effects** explicitly (e.g., "automatically sets the token for subsequent requests").
 - **Link method references.** When mentioning another SDK method or module by name in JSDoc prose, always use `{@link}` or `{@linkcode}` to create a cross-reference.
+- **Never use a colon as a sentence break.** Write "Use this when you sync data from another system. Name the field..." not "...another system: name the field...". Reserve colons for `label: description` bullet-list items, not prose sentences.
+- **Never start a sentence with a lowercase inline-code term.** If the natural phrasing would open with one (e.g., "`week` is only supported on..."), restructure so a capitalized word leads instead (e.g., "Every date field supports `day`, `month` and `year`. The `created_date` and `updated_date` fields also support `week`.").
 
 ## References
 
