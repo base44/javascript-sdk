@@ -122,6 +122,50 @@ describe("Analytics Module", () => {
     disabled.cleanup();
   });
 
+  describe("initialization event attribution", () => {
+    const trackInitWithSearch = (search: string) => {
+      vi.stubGlobal("document", { referrer: "https://google.com/", visibilityState: "visible" });
+      vi.stubGlobal("window", {
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        location: { origin: "https://example.com", pathname: "/landing", search },
+      });
+      const state = sharedState as unknown as { wasInitializationTracked: boolean };
+      state.wasInitializationTracked = false;
+      // Hold the queue so the init event can be read before it flushes.
+      sharedState!.isProcessing = true;
+      const client = createClient({ serverUrl, appId });
+      const initEvent = sharedState!.requestsQueue.find(
+        (e) => e.eventName === "__initialization_event__"
+      );
+      client.cleanup();
+      return initEvent?.properties;
+    };
+
+    test("captures allowlisted landing params next to referrer", () => {
+      const properties = trackInitWithSearch(
+        "?utm_source=test&utm_medium=cpc&gclid=abc&utm_email=a@b.com&token=secret&utm_term="
+      );
+
+      expect(properties).toEqual({
+        referrer: "https://google.com/",
+        utm_source: "test",
+        utm_medium: "cpc",
+        gclid: "abc",
+      });
+    });
+
+    test("caps each value at 500 characters", () => {
+      const properties = trackInitWithSearch(`?fbclid=${"x".repeat(600)}`);
+
+      expect(properties?.fbclid).toHaveLength(500);
+    });
+
+    test("sends only referrer when the landing URL has no params", () => {
+      expect(trackInitWithSearch("")).toEqual({ referrer: "https://google.com/" });
+    });
+  });
+
   test("should clear the memoized session context on reset", () => {
     expect(sharedState?.sessionContext).toEqual({ user_id: "test-user-id" });
 
