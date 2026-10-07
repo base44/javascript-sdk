@@ -2262,146 +2262,175 @@ function shiftHeadings(lines, delta) {
   });
 }
 
+// Types on the generated actors page, in the order they appear under "## Type Definitions".
+const ACTORS_TYPE_DEFINITION_ORDER = [
+  "Connection",
+  "ActorClient",
+  "ActorConnectOptions",
+  "ActorSubscription",
+  "ActorRegistry",
+  "ActorNameRegistry",
+];
+const ACTORS_TYPE_SECTIONS = ["Overview", ...ACTORS_TYPE_DEFINITION_ORDER];
+const ACTORS_CHILD_SECTIONS = ["Methods", "Properties", "Parameters", "Returns"];
+
+/**
+ * Group the page's `## ` sections under the type they belong to, so that a
+ * `## Methods` section follows the type it documents. Returns null if the page
+ * has a section that this restructuring does not know about.
+ */
+function groupActorsSections(content) {
+  const [preamble, ...sections] = splitH2Sections(content);
+  const groups = {};
+  let current = null;
+  for (const section of sections) {
+    if (ACTORS_TYPE_SECTIONS.includes(section.title)) {
+      current = groups[section.title] = { head: section, children: [] };
+    } else if (ACTORS_CHILD_SECTIONS.includes(section.title) && current) {
+      current.children.push(section);
+    } else {
+      return null;
+    }
+  }
+  return ACTORS_TYPE_SECTIONS.every((name) => groups[name]) ? { preamble, groups } : null;
+}
+
+/** Find the block with the given heading, or undefined. */
+function findBlock(blocks, heading) {
+  return blocks.find((block) => block.heading === heading);
+}
+
+/** All `### ` method blocks inside a group's `## Methods` sections. */
+function methodBlocksOf(group) {
+  return group.children
+    .filter((child) => child.title === "Methods")
+    .flatMap((child) => splitBlocksAt(child.lines.slice(1), "### "))
+    .filter((block) => block.heading);
+}
+
+/**
+ * Replace a method's "#### Returns" section. TypeDoc inlines the return type
+ * there (for example the whole Connection type), so this swaps it for a link.
+ */
+function replaceReturnsSection(lines, returnType, description) {
+  const start = lines.indexOf("#### Returns");
+  if (start === -1) return null;
+  const next = lines.findIndex((line, i) => i > start && line.startsWith("#### "));
+  const end = next === -1 ? lines.length : next;
+  const link = `[\`${returnType}\`](#${returnType.toLowerCase()})`;
+  return [...lines.slice(0, start), "#### Returns", "", link, "", description, "", ...lines.slice(end)];
+}
+
+/**
+ * TypeDoc renders ActorRef as a `### ActorRef` block inside Overview, with its
+ * methods in the first `## Methods` section. Returns the Overview without it,
+ * plus the ActorRef intro and the `connect()` block, or null if not found.
+ */
+function extractActorRef(overview) {
+  const blocks = splitBlocksAt(overview.head.lines, "### ");
+  const refBlock = findBlock(blocks, "ActorRef");
+  const methods = overview.children.filter((child) => child.title === "Methods");
+  const connect = methods.length === 1 && findBlock(splitBlocksAt(methods[0].lines.slice(1), "### "), "connect()");
+  if (!refBlock || !connect) return null;
+
+  const connectLines = replaceReturnsSection(
+    trimBlockLines(connect.lines),
+    "Connection",
+    "The connection for this actor session."
+  );
+  if (!connectLines) return null;
+  return {
+    overviewLines: trimBlockLines(blocks.filter((b) => b !== refBlock).flatMap((b) => b.lines)),
+    refIntro: trimBlockLines(refBlock.lines.slice(1)),
+    connectLines,
+  };
+}
+
+/**
+ * Build the Connection methods: subscribe(), send(), close(). TypeDoc inlines
+ * the ActorSubscription return type under subscribe(), which adds a duplicate
+ * unsubscribe() block and moves subscribe()'s example after it.
+ */
+function buildConnectionMethods(connection) {
+  const blocks = methodBlocksOf(connection);
+  const [subscribe, duplicate, send, close] = ["subscribe()", "unsubscribe()", "send()", "close()"].map((name) =>
+    findBlock(blocks, name)
+  );
+  if (!subscribe || !duplicate || !send || !close) return null;
+
+  const duplicateLines = trimBlockLines(duplicate.lines);
+  const exampleStart = duplicateLines.lastIndexOf("#### Example");
+  const subscribeLines = replaceReturnsSection(
+    trimBlockLines(subscribe.lines),
+    "ActorSubscription",
+    "A subscription handle. Call `unsubscribe()` on it to remove this listener without closing the socket."
+  );
+  if (exampleStart === -1 || !subscribeLines) return null;
+
+  return [[...subscribeLines, "", ...duplicateLines.slice(exampleStart)], send.lines, close.lines];
+}
+
+/**
+ * Render a type under "## Type Definitions": the type becomes `### Name`, and
+ * its child sections are folded in without repeating Methods/Properties headings.
+ */
+function buildActorsTypeDefinition({ head, children }, name) {
+  const out = [`### ${name}`, "", ...trimBlockLines(head.lines.slice(1)), ""];
+  for (const child of children) {
+    // Connection's methods are documented under "## Connection Methods".
+    if (name === "Connection" && child.title === "Methods") continue;
+    const body = trimBlockLines(child.lines.slice(1));
+    if (child.title === "Properties") out.push(...body, "");
+    else if (child.title === "Methods") out.push(...shiftHeadings(body, 1), "");
+    else out.push(`#### ${child.title}`, "", ...shiftHeadings(body, 1), "");
+  }
+  return out.join("\n").replace("[`ActorRef`](ActorRef)", "[`ActorRef`](#actorref-methods)");
+}
+
+/** Join method blocks with the `***` separators used between methods on other pages. */
+function joinMethodBlocks(blocks) {
+  return blocks.map((lines) => trimBlockLines(lines).join("\n")).join("\n\n***\n\n");
+}
+
 /**
  * Restructure the generated actors page so its table of contents matches the
  * other module pages: Overview, one methods section per documented interface,
  * then a single Type Definitions section.
  *
  * TypeDoc renders each appended interface (ActorRef, Connection, ActorClient,
- * and so on) as its own `## ` section with its own `## Methods`/`## Properties`,
+ * and so on) as its own `## ` section with its own `## Methods`/`## Properties`
  * and inlines return types, so the raw page repeats headings and nests
  * `unsubscribe()` under `subscribe()`. Returns { content, modified }. If the
  * page does not have the expected shape, it is left unchanged.
  */
 function restructureActorsPage(content) {
-  const TYPE_SECTIONS = [
-    "Overview",
-    "Connection",
-    "ActorConnectOptions",
-    "ActorSubscription",
-    "ActorClient",
-    "ActorRegistry",
-    "ActorNameRegistry",
-  ];
-  const CHILD_SECTIONS = ["Methods", "Properties", "Parameters", "Returns"];
+  const unchanged = { content, modified: false };
+  const grouped = groupActorsSections(content);
+  const actorRef = grouped && extractActorRef(grouped.groups.Overview);
+  const connectionMethods = grouped && buildConnectionMethods(grouped.groups.Connection);
+  if (!actorRef || !connectionMethods) return unchanged;
 
-  const sections = splitH2Sections(content);
-  const preamble = sections.shift();
-  const groups = {};
-  let context = null;
-  for (const section of sections) {
-    if (TYPE_SECTIONS.includes(section.title)) {
-      context = section.title;
-      groups[context] = { head: section, children: [] };
-    } else if (CHILD_SECTIONS.includes(section.title) && context) {
-      groups[context].children.push(section);
-    } else {
-      return { content, modified: false };
-    }
-  }
-  if (TYPE_SECTIONS.some((name) => !groups[name])) return { content, modified: false };
-
-  // ActorRef is rendered inside Overview as `### ActorRef`; its methods are the
-  // first `## Methods` section after Overview.
-  const overview = groups.Overview;
-  const overviewBlocks = splitBlocksAt(overview.head.lines, "### ");
-  const refIndex = overviewBlocks.findIndex((b) => b.heading === "ActorRef");
-  const refMethods = overview.children.filter((c) => c.title === "Methods");
-  if (refIndex === -1 || refMethods.length !== 1) return { content, modified: false };
-  const refIntro = trimBlockLines(overviewBlocks[refIndex].lines.slice(1));
-  overviewBlocks.splice(refIndex, 1);
-  const overviewLines = trimBlockLines(overviewBlocks.flatMap((b) => b.lines));
-
-  // connect(): replace the inlined Connection return type with a link.
-  const connectBlocks = splitBlocksAt(refMethods[0].lines.slice(1), "### ");
-  const connect = connectBlocks.find((b) => b.heading === "connect()");
-  if (!connect) return { content, modified: false };
-  const replaceReturns = (lines, replacement) => {
-    const start = lines.findIndex((l) => l === "#### Returns");
-    if (start === -1) return null;
-    let end = lines.findIndex((l, i) => i > start && /^#### /.test(l));
-    if (end === -1) end = lines.length;
-    return [...lines.slice(0, start), ...replacement, "", ...lines.slice(end)];
-  };
-  const connectLines = replaceReturns(trimBlockLines(connect.lines), [
-    "#### Returns",
-    "",
-    "[`Connection`](#connection)",
-    "",
-    "The connection for this actor session.",
-  ]);
-  if (!connectLines) return { content, modified: false };
-
-  // Connection methods: subscribe(), send(), close(). TypeDoc inlines the
-  // ActorSubscription return type, which adds a nested `## Methods` with
-  // unsubscribe() and moves subscribe()'s example after it.
-  const connection = groups.Connection;
-  const methodBlocks = connection.children
-    .filter((c) => c.title === "Methods")
-    .flatMap((c) => splitBlocksAt(c.lines.slice(1), "### ").filter((b) => b.heading));
-  const byName = (name) => methodBlocks.find((b) => b.heading === name);
-  const subscribe = byName("subscribe()");
-  const unsubscribeDup = byName("unsubscribe()");
-  const send = byName("send()");
-  const close = byName("close()");
-  if (!subscribe || !unsubscribeDup || !send || !close) return { content, modified: false };
-
-  const dupLines = trimBlockLines(unsubscribeDup.lines);
-  const lastExample = dupLines.map((l, i) => (l === "#### Example" ? i : -1)).filter((i) => i >= 0).pop();
-  if (lastExample === undefined) return { content, modified: false };
-  const subscribeExample = dupLines.slice(lastExample);
-  const subscribeLines = replaceReturns(trimBlockLines(subscribe.lines), [
-    "#### Returns",
-    "",
-    "[`ActorSubscription`](#actorsubscription)",
-    "",
-    "A subscription handle. Call `unsubscribe()` on it to remove this listener without closing the socket.",
-  ]);
-  if (!subscribeLines) return { content, modified: false };
-
-  // Type definitions: each type becomes `### Name`, and its child sections are
-  // folded in without repeating `Methods`/`Properties` headings.
-  const typeDefinition = (name) => {
-    const group = groups[name];
-    const out = [`### ${name}`, "", ...trimBlockLines(group.head.lines.slice(1)), ""];
-    for (const child of group.children) {
-      // Connection's methods are already documented under `## Connection Methods`.
-      if (name === "Connection" && child.title === "Methods") continue;
-      const body = trimBlockLines(child.lines.slice(1));
-      if (child.title === "Properties") {
-        out.push(...body, "");
-      } else if (child.title === "Methods") {
-        out.push(...shiftHeadings(body, 1), "");
-      } else {
-        out.push(`#### ${child.title}`, "", ...shiftHeadings(body, 1), "");
-      }
-    }
-    return out.join("\n").replace("[`ActorRef`](ActorRef)", "[`ActorRef`](#actorref-methods)");
-  };
-
-  const joinMethods = (blocks) => blocks.map((b) => trimBlockLines(b).join("\n")).join("\n\n***\n\n");
+  const { preamble, groups } = grouped;
   const output = [
     ...preamble.lines,
-    ...overviewLines,
+    ...actorRef.overviewLines,
     "",
     "## ActorRef Methods",
     "",
-    ...refIntro,
+    ...actorRef.refIntro,
     "",
-    joinMethods([connectLines]),
+    joinMethodBlocks([actorRef.connectLines]),
     "",
     "## Connection Methods",
     "",
-    joinMethods([[...subscribeLines, "", ...subscribeExample], send.lines, close.lines]),
+    joinMethodBlocks(connectionMethods),
     "",
     "## Type Definitions",
     "",
-    ["Connection", "ActorClient", "ActorConnectOptions", "ActorSubscription", "ActorRegistry", "ActorNameRegistry"]
-      .map(typeDefinition)
-      .join("\n"),
+    ACTORS_TYPE_DEFINITION_ORDER.map((name) => buildActorsTypeDefinition(groups[name], name)).join("\n"),
   ].join("\n");
 
-  return { content: output.replace(/\n{3,}/g, "\n\n").replace(/\s+$/, "") + "\n", modified: true };
+  return { content: output.replace(/\n{3,}/g, "\n\n").trimEnd() + "\n", modified: true };
 }
 
 /**
