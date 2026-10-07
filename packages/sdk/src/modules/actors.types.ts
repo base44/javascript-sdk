@@ -197,14 +197,14 @@ export interface ActorClient<N extends string = string> {
 }
 
 /**
- * Actors module for connecting a client to an [actor](/developers/backend/resources/actors/overview) session and exchanging messages.
+ * Actors module for connecting a client to an [actor](/developers/backend/resources/actors/overview) sessions, managing connections, and exchanging messages.
  *
  * An actor is a long-running backend process that multiple clients connect to simultaneously. A session
  * is a running instance of an actor, identified by the actor name and a session ID. Each
  * session manages its own state, storage, and client connections independently.
  *
- * The actors module supports the following functionality:
- *
+ * The actors module supports several objects with the following functionality:
+ * 
  * - {@linkcode ActorRef.connect | connect()}: Open a WebSocket connection to a session.
  * - {@linkcode Connection.subscribe | subscribe()}: Receive messages from the actor.
  * - {@linkcode ActorSubscription.unsubscribe | unsubscribe()}: Stop receiving messages from the actor without closing the connection.
