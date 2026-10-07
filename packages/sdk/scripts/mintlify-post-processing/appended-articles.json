@@ -22,5 +22,13 @@
   "type-aliases/integrations": [
     "interfaces/CoreIntegrations",
     "interfaces/CustomIntegrationsModule"
+  ],
+  "type-aliases/ActorsModule": [
+    "interfaces/ActorRef",
+    "interfaces/Connection",
+    "interfaces/ActorSubscription",
+    "interfaces/ActorClient",
+    "interfaces/ActorRegistry",
+    "interfaces/ActorNameRegistry"
   ]
 }

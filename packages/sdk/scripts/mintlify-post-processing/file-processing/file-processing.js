@@ -145,8 +145,9 @@ function processLinksInFile(filePath) {
   // Remove undesirable type-alias definition lines like:
   //   > **IntegrationsModule** = `object` & `object`
   //   > **EntitiesModule** = `TypedEntitiesModule` & `DynamicEntitiesModule`
+  //   > **ActorsModule** = `{ [K in AllActorNames]: ... }` & `Record`\<`string`, `ActorClient`\>
   // These appear in type alias files using intersection types and are not useful in docs.
-  const typeDefinitionRegex = /^> \*\*\w+\*\* = `\w+` & `\w+`\s*$/m;
+  const typeDefinitionRegex = /^> \*\*\w+Module\*\* = .+\s*$/m;
   if (typeDefinitionRegex.test(content)) {
     content = content.replace(typeDefinitionRegex, "");
     modified = true;
@@ -1430,6 +1431,20 @@ function applyTypeDeclarationLinking(dir) {
 }
 
 /**
+ * Interfaces that are appended to a module page and have methods of their own.
+ * Each keeps its own `## ` heading with its methods directly underneath, so the
+ * generic `## Methods` heading that follows it is dropped, along with any
+ * `## Properties` section. The value renames the heading, or is null to keep the
+ * interface name.
+ */
+const TYPES_WITH_OWN_METHODS = {
+  EntityHandler: "Entity Handler Methods",
+  ActorRef: "Actor methods",
+  Connection: "Connection methods",
+  ActorSubscription: "Subscription methods",
+};
+
+/**
  * Group intro sections (like "Built-in User Entity", "Generated Types") under an "Overview" heading
  * The Overview heading goes at the top of the page content, and intro paragraph becomes part of Overview
  */
@@ -1468,7 +1483,7 @@ function groupIntroSections(content) {
   
   // Find the first main section heading (Methods, EntityHandler, Properties, etc.)
   // These mark the end of intro/overview sections
-  const mainSectionNames = ["Methods", "EntityHandler", "Properties", "Type Definitions"];
+  const mainSectionNames = ["Methods", "Properties", "Type Definitions", ...Object.keys(TYPES_WITH_OWN_METHODS)];
   let mainSectionIndex = -1;
   
   for (let i = insertIndex; i < lines.length; i++) {
@@ -1576,6 +1591,11 @@ function groupTypeDefinitions(content) {
     {
       types: ["AgentName", "AgentNameRegistry"],
       indicator: "AgentName"
+    },
+    // Actors module
+    {
+      types: ["ActorClient", "ActorRegistry", "ActorNameRegistry"],
+      indicator: "ActorClient"
     }
   ];
   
@@ -1850,23 +1870,31 @@ function mergeSectionWithMethods(content, filePath) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     
-    // Handle EntityHandler + Methods → Entity Handler Methods
-    if (line === "## EntityHandler") {
-      // Look ahead to find the next ## Methods heading
+    // Handle interfaces with their own methods (see TYPES_WITH_OWN_METHODS): drop the
+    // generic ## Methods heading so the methods sit directly under the interface.
+    const typeName = line.startsWith("## ") ? line.slice(3) : "";
+    if (Object.hasOwn(TYPES_WITH_OWN_METHODS, typeName)) {
+      // Look ahead to the next ## Methods heading, noting a ## Properties heading on the way
       let methodsIndex = -1;
+      let propertiesIndex = -1;
       for (let j = i + 1; j < lines.length; j++) {
         const nextLine = lines[j].trim();
-        if (nextLine.startsWith("## ")) {
+        if (nextLine === "## Properties") {
+          propertiesIndex = j;
+        } else if (nextLine.startsWith("## ")) {
           if (nextLine === "## Methods") {
             methodsIndex = j;
           }
           break;
         }
       }
-      
+
       if (methodsIndex !== -1) {
-        lines[i] = "## Entity Handler Methods";
-        lines.splice(methodsIndex, 1);
+        lines[i] = `## ${TYPES_WITH_OWN_METHODS[typeName] ?? typeName}`;
+        // Drop the ## Properties section too: the heading and its content sit
+        // between the type heading and ## Methods.
+        const removeFrom = propertiesIndex !== -1 ? propertiesIndex : methodsIndex;
+        lines.splice(removeFrom, methodsIndex - removeFrom + 1);
         modified = true;
       }
     }
@@ -2513,6 +2541,29 @@ function applyOverloadPresentation(dir) {
   }
 }
 
+/**
+ * Tidy the generated actors page. TypeDoc inlines the ActorSubscription return
+ * type under `subscribe()`, which adds a duplicate `unsubscribe()` block. This
+ * drops the duplicate and points links to `ActorRef` at its renamed heading, Actor methods. A page
+ * without the expected shape is left unchanged.
+ */
+function restructureActorsPage() {
+  const file = path.join(DOCS_DIR, "content", "type-aliases", "actors.mdx");
+  if (!fs.existsSync(file)) return;
+
+  const duplicateUnsubscribe = /\n## Methods\n\n### unsubscribe\(\)[\s\S]*?<\/CodeGroup>\n/;
+  const content = fs.readFileSync(file, "utf-8");
+  if (!duplicateUnsubscribe.test(content)) {
+    console.warn("Warning: actors page has an unexpected structure and was left unchanged");
+    return;
+  }
+
+  const tidied = content
+    .replace(duplicateUnsubscribe, "\n")
+    .replace("](#actorref)", "](#actor-methods)");
+  fs.writeFileSync(file, tidied, "utf-8");
+}
+
 function main() {
   console.log("Processing TypeDoc MDX files for Mintlify...\n");
 
@@ -2568,6 +2619,9 @@ function main() {
   // Add an intro blurb and distinguishing labels to overloaded methods
   // listed in overload-presentation.json
   applyOverloadPresentation(DOCS_DIR);
+
+  // Restructure the actors page so its table of contents matches other module pages
+  restructureActorsPage();
 
   // Link type names in Type Declarations sections to their corresponding headings
   applyTypeDeclarationLinking(DOCS_DIR);

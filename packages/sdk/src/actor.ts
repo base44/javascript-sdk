@@ -28,8 +28,8 @@ export interface Storage {
   get<T>(key: string): Promise<T | undefined>;
   put(key: string, value: unknown): Promise<void>;
   delete(key: string): Promise<boolean>;
-  /** Wipe the room's entire persisted storage (match-end cleanup). Safe: a
-   *  later rejoin re-bootstraps exactly like a brand-new room. */
+  /** Deletes all persisted storage for the session. A later connection starts
+   *  with empty storage, the same as a new session. */
   deleteAll(): Promise<void>;
 }
 
