@@ -25,8 +25,8 @@
   "type-aliases/ActorsModule": [
     "interfaces/ActorRef",
     "interfaces/Connection",
-    "interfaces/ActorConnectOptions",
     "interfaces/ActorSubscription",
+    "interfaces/ActorConnectOptions",
     "interfaces/ActorClient",
     "interfaces/ActorRegistry",
     "interfaces/ActorNameRegistry"

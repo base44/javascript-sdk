@@ -1285,6 +1285,19 @@ function applyTypeDeclarationLinking(dir) {
 }
 
 /**
+ * Interfaces that are appended to a module page and have methods of their own.
+ * Each keeps its own `## ` heading with its methods directly underneath, so the
+ * generic `## Methods` heading that follows it is dropped. The value renames the
+ * heading, or is null to keep the interface name.
+ */
+const TYPES_WITH_OWN_METHODS = {
+  EntityHandler: "Entity Handler Methods",
+  ActorRef: null,
+  Connection: null,
+  ActorSubscription: null,
+};
+
+/**
  * Group intro sections (like "Built-in User Entity", "Generated Types") under an "Overview" heading
  * The Overview heading goes at the top of the page content, and intro paragraph becomes part of Overview
  */
@@ -1323,7 +1336,7 @@ function groupIntroSections(content) {
   
   // Find the first main section heading (Methods, EntityHandler, Properties, etc.)
   // These mark the end of intro/overview sections
-  const mainSectionNames = ["Methods", "EntityHandler", "Properties", "Type Definitions"];
+  const mainSectionNames = ["Methods", "Properties", "Type Definitions", ...Object.keys(TYPES_WITH_OWN_METHODS)];
   let mainSectionIndex = -1;
   
   for (let i = insertIndex; i < lines.length; i++) {
@@ -1423,6 +1436,11 @@ function groupTypeDefinitions(content) {
     {
       types: ["AgentName", "AgentNameRegistry"],
       indicator: "AgentName"
+    },
+    // Actors module
+    {
+      types: ["ActorConnectOptions", "ActorClient", "ActorRegistry", "ActorNameRegistry"],
+      indicator: "ActorConnectOptions"
     }
   ];
   
@@ -1690,22 +1708,30 @@ function mergeSectionWithMethods(content, filePath) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     
-    // Handle EntityHandler + Methods → Entity Handler Methods
-    if (line === "## EntityHandler") {
-      // Look ahead to find the next ## Methods heading
+    // Handle interfaces with their own methods (see TYPES_WITH_OWN_METHODS): drop the
+    // generic ## Methods heading so the methods sit directly under the interface.
+    const typeName = line.startsWith("## ") ? line.slice(3) : "";
+    if (Object.hasOwn(TYPES_WITH_OWN_METHODS, typeName)) {
+      // Look ahead to the next ## Methods heading, noting a ## Properties heading on the way
       let methodsIndex = -1;
+      let propertiesIndex = -1;
       for (let j = i + 1; j < lines.length; j++) {
         const nextLine = lines[j].trim();
-        if (nextLine.startsWith("## ")) {
+        if (nextLine === "## Properties") {
+          propertiesIndex = j;
+        } else if (nextLine.startsWith("## ")) {
           if (nextLine === "## Methods") {
             methodsIndex = j;
           }
           break;
         }
       }
-      
+
       if (methodsIndex !== -1) {
-        lines[i] = "## Entity Handler Methods";
+        lines[i] = `## ${TYPES_WITH_OWN_METHODS[typeName] ?? typeName}`;
+        if (propertiesIndex !== -1) {
+          lines[propertiesIndex] = "### Properties";
+        }
         lines.splice(methodsIndex, 1);
         modified = true;
       }
@@ -2202,257 +2228,29 @@ function applyMethodOrdering(dir) {
 }
 
 /**
- * Split MDX content into `## ` sections, ignoring headings inside code fences.
- * The first entry is the preamble (title: null) before the first `## ` heading.
+ * Tidy the generated actors page. TypeDoc inlines the ActorSubscription return
+ * type under `subscribe()`, which adds a duplicate `unsubscribe()` block, and the
+ * types under Type Definitions keep repeated `Properties`/`Parameters`/`Returns`
+ * headings. This drops the duplicate, folds those headings, and fixes the dead
+ * `ActorRef` link. A page without the expected shape is left unchanged.
  */
-function splitH2Sections(content) {
-  const sections = [];
-  let current = { title: null, lines: [] };
-  let inFence = false;
-  for (const line of content.split("\n")) {
-    if (line.startsWith("```")) inFence = !inFence;
-    const match = !inFence && line.match(/^## (.+)$/);
-    if (match) {
-      sections.push(current);
-      current = { title: match[1].trim(), lines: [line] };
-    } else {
-      current.lines.push(line);
-    }
+function restructureActorsPage() {
+  const file = path.join(DOCS_DIR, "content", "type-aliases", "actors.mdx");
+  if (!fs.existsSync(file)) return;
+
+  const duplicateUnsubscribe = /\n## Methods\n\n### unsubscribe\(\)[\s\S]*?<\/CodeGroup>\n/;
+  const [page, types] = fs.readFileSync(file, "utf-8").split("\n## Type Definitions\n");
+  if (types === undefined || !duplicateUnsubscribe.test(page)) {
+    console.warn("Warning: actors page has an unexpected structure and was left unchanged");
+    return;
   }
-  sections.push(current);
-  return sections;
-}
 
-/**
- * Split lines into blocks that start at a heading of the given prefix
- * (for example "### "), ignoring headings inside code fences.
- * The first entry holds any lines before the first matching heading.
- */
-function splitBlocksAt(lines, prefix) {
-  const blocks = [{ heading: null, lines: [] }];
-  let inFence = false;
-  for (const line of lines) {
-    if (line.startsWith("```")) inFence = !inFence;
-    if (!inFence && line.startsWith(prefix)) {
-      blocks.push({ heading: line.slice(prefix.length).trim(), lines: [line] });
-    } else {
-      blocks[blocks.length - 1].lines.push(line);
-    }
-  }
-  return blocks;
-}
+  const tidiedTypes = types
+    .replace(/^## Properties\n\n/gm, "")
+    .replace(/^## (Parameters|Returns)$/gm, "#### $1")
+    .replace("[`ActorRef`](ActorRef)", "[`ActorRef`](#actorref)");
 
-/** Trim leading/trailing blank lines and `***` separators. */
-function trimBlockLines(lines) {
-  const out = [...lines];
-  const isNoise = (l) => l.trim() === "" || l.trim() === "***";
-  while (out.length && isNoise(out[0])) out.shift();
-  while (out.length && isNoise(out[out.length - 1])) out.pop();
-  return out;
-}
-
-/** Shift ATX heading levels (outside code fences) by `delta`. */
-function shiftHeadings(lines, delta) {
-  let inFence = false;
-  return lines.map((line) => {
-    if (line.startsWith("```")) inFence = !inFence;
-    const match = !inFence && line.match(/^(#{1,6}) (.*)$/);
-    if (!match) return line;
-    return "#".repeat(Math.min(6, Math.max(1, match[1].length + delta))) + " " + match[2];
-  });
-}
-
-// Types on the generated actors page, in the order they appear under "## Type Definitions".
-const ACTORS_TYPE_DEFINITION_ORDER = [
-  "Connection",
-  "ActorClient",
-  "ActorConnectOptions",
-  "ActorSubscription",
-  "ActorRegistry",
-  "ActorNameRegistry",
-];
-const ACTORS_TYPE_SECTIONS = ["Overview", ...ACTORS_TYPE_DEFINITION_ORDER];
-const ACTORS_CHILD_SECTIONS = ["Methods", "Properties", "Parameters", "Returns"];
-
-/**
- * Group the page's `## ` sections under the type they belong to, so that a
- * `## Methods` section follows the type it documents. Returns null if the page
- * has a section that this restructuring does not know about.
- */
-function groupActorsSections(content) {
-  const [preamble, ...sections] = splitH2Sections(content);
-  const groups = {};
-  let current = null;
-  for (const section of sections) {
-    if (ACTORS_TYPE_SECTIONS.includes(section.title)) {
-      current = groups[section.title] = { head: section, children: [] };
-    } else if (ACTORS_CHILD_SECTIONS.includes(section.title) && current) {
-      current.children.push(section);
-    } else {
-      return null;
-    }
-  }
-  return ACTORS_TYPE_SECTIONS.every((name) => groups[name]) ? { preamble, groups } : null;
-}
-
-/** Find the block with the given heading, or undefined. */
-function findBlock(blocks, heading) {
-  return blocks.find((block) => block.heading === heading);
-}
-
-/** All `### ` method blocks inside a group's `## Methods` sections. */
-function methodBlocksOf(group) {
-  return group.children
-    .filter((child) => child.title === "Methods")
-    .flatMap((child) => splitBlocksAt(child.lines.slice(1), "### "))
-    .filter((block) => block.heading);
-}
-
-/**
- * Replace a method's "#### Returns" section. TypeDoc inlines the return type
- * there (for example the whole Connection type), so this swaps it for a link.
- */
-function replaceReturnsSection(lines, returnType, description) {
-  const start = lines.indexOf("#### Returns");
-  if (start === -1) return null;
-  const next = lines.findIndex((line, i) => i > start && line.startsWith("#### "));
-  const end = next === -1 ? lines.length : next;
-  const link = `[\`${returnType}\`](#${returnType.toLowerCase()})`;
-  return [...lines.slice(0, start), "#### Returns", "", link, "", description, "", ...lines.slice(end)];
-}
-
-/**
- * TypeDoc renders ActorRef as a `### ActorRef` block inside Overview, with its
- * methods in the first `## Methods` section. Returns the Overview without it,
- * plus the ActorRef intro and the `connect()` block, or null if not found.
- */
-function extractActorRef(overview) {
-  const blocks = splitBlocksAt(overview.head.lines, "### ");
-  const refBlock = findBlock(blocks, "ActorRef");
-  const methods = overview.children.filter((child) => child.title === "Methods");
-  const connect = methods.length === 1 && findBlock(splitBlocksAt(methods[0].lines.slice(1), "### "), "connect()");
-  if (!refBlock || !connect) return null;
-
-  const connectLines = replaceReturnsSection(
-    trimBlockLines(connect.lines),
-    "Connection",
-    "The connection for this actor session."
-  );
-  if (!connectLines) return null;
-  return {
-    overviewLines: trimBlockLines(blocks.filter((b) => b !== refBlock).flatMap((b) => b.lines)),
-    refIntro: trimBlockLines(refBlock.lines.slice(1)),
-    connectLines,
-  };
-}
-
-/**
- * Build the Connection methods: subscribe(), send(), close(). TypeDoc inlines
- * the ActorSubscription return type under subscribe(), which adds a duplicate
- * unsubscribe() block and moves subscribe()'s example after it.
- */
-function buildConnectionMethods(connection) {
-  const blocks = methodBlocksOf(connection);
-  const [subscribe, duplicate, send, close] = ["subscribe()", "unsubscribe()", "send()", "close()"].map((name) =>
-    findBlock(blocks, name)
-  );
-  if (!subscribe || !duplicate || !send || !close) return null;
-
-  const duplicateLines = trimBlockLines(duplicate.lines);
-  const exampleStart = duplicateLines.lastIndexOf("#### Example");
-  const subscribeLines = replaceReturnsSection(
-    trimBlockLines(subscribe.lines),
-    "ActorSubscription",
-    "A subscription handle. Call `unsubscribe()` on it to remove this listener without closing the socket."
-  );
-  if (exampleStart === -1 || !subscribeLines) return null;
-
-  return [[...subscribeLines, "", ...duplicateLines.slice(exampleStart)], send.lines, close.lines];
-}
-
-/**
- * Render a type under "## Type Definitions": the type becomes `### Name`, and
- * its child sections are folded in without repeating Methods/Properties headings.
- */
-function buildActorsTypeDefinition({ head, children }, name) {
-  const out = [`### ${name}`, "", ...trimBlockLines(head.lines.slice(1)), ""];
-  for (const child of children) {
-    // Connection's methods are documented under "## Connection Methods".
-    if (name === "Connection" && child.title === "Methods") continue;
-    const body = trimBlockLines(child.lines.slice(1));
-    if (child.title === "Properties") out.push(...body, "");
-    else if (child.title === "Methods") out.push(...shiftHeadings(body, 1), "");
-    else out.push(`#### ${child.title}`, "", ...shiftHeadings(body, 1), "");
-  }
-  return out.join("\n").replace("[`ActorRef`](ActorRef)", "[`ActorRef`](#actorref-methods)");
-}
-
-/** Join method blocks with the `***` separators used between methods on other pages. */
-function joinMethodBlocks(blocks) {
-  return blocks.map((lines) => trimBlockLines(lines).join("\n")).join("\n\n***\n\n");
-}
-
-/**
- * Restructure the generated actors page so its table of contents matches the
- * other module pages: Overview, one methods section per documented interface,
- * then a single Type Definitions section.
- *
- * TypeDoc renders each appended interface (ActorRef, Connection, ActorClient,
- * and so on) as its own `## ` section with its own `## Methods`/`## Properties`
- * and inlines return types, so the raw page repeats headings and nests
- * `unsubscribe()` under `subscribe()`. Returns { content, modified }. If the
- * page does not have the expected shape, it is left unchanged.
- */
-function restructureActorsPage(content) {
-  const unchanged = { content, modified: false };
-  const grouped = groupActorsSections(content);
-  const actorRef = grouped && extractActorRef(grouped.groups.Overview);
-  const connectionMethods = grouped && buildConnectionMethods(grouped.groups.Connection);
-  if (!actorRef || !connectionMethods) return unchanged;
-
-  const { preamble, groups } = grouped;
-  const output = [
-    ...preamble.lines,
-    ...actorRef.overviewLines,
-    "",
-    "## ActorRef Methods",
-    "",
-    ...actorRef.refIntro,
-    "",
-    joinMethodBlocks([actorRef.connectLines]),
-    "",
-    "## Connection Methods",
-    "",
-    joinMethodBlocks(connectionMethods),
-    "",
-    "## Type Definitions",
-    "",
-    ACTORS_TYPE_DEFINITION_ORDER.map((name) => buildActorsTypeDefinition(groups[name], name)).join("\n"),
-  ].join("\n");
-
-  return { content: output.replace(/\n{3,}/g, "\n\n").trimEnd() + "\n", modified: true };
-}
-
-/**
- * Apply the actors page restructuring to `type-aliases/actors.mdx`.
- */
-function applyActorsPageRestructuring(dir) {
-  if (!fs.existsSync(dir)) return;
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const entryPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      applyActorsPageRestructuring(entryPath);
-    } else if (entry.name === "actors.mdx" && path.basename(dir) === "type-aliases") {
-      const content = fs.readFileSync(entryPath, "utf-8");
-      const { content: updated, modified } = restructureActorsPage(content);
-      if (modified) {
-        fs.writeFileSync(entryPath, updated, "utf-8");
-        console.log(`Restructured actors page: ${path.relative(DOCS_DIR, entryPath)}`);
-      } else {
-        console.warn(`Warning: actors page has an unexpected structure and was left unchanged: ${path.relative(DOCS_DIR, entryPath)}`);
-      }
-    }
-  }
+  fs.writeFileSync(file, `${page.replace(duplicateUnsubscribe, "\n")}\n## Type Definitions\n${tidiedTypes}`, "utf-8");
 }
 
 function main() {
@@ -2508,7 +2306,7 @@ function main() {
   applyMethodOrdering(DOCS_DIR);
 
   // Restructure the actors page so its table of contents matches other module pages
-  applyActorsPageRestructuring(DOCS_DIR);
+  restructureActorsPage();
 
   // Link type names in Type Declarations sections to their corresponding headings
   applyTypeDeclarationLinking(DOCS_DIR);
