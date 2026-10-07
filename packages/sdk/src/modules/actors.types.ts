@@ -1,13 +1,14 @@
 /**
  * Maps actor names to their incoming and outgoing message types.
  *
- * Extend this interface through module augmentation when you want typed actor
- * messages without generating types with the CLI. For each actor, `toServer`
- * defines incoming messages that a client sends to the actor. `toClient` defines
- * outgoing messages that the actor sends to connected clients.
+ * Extend this interface when you want typed actor
+ * messages without generating types with the CLI: 
+ * -  `toServer`: Defines incoming messages that a client sends to the actor. 
+ * - `toClient`:  Defines outgoing messages that the actor sends to connected clients.
  *
- * To generate types from deployed actors instead, use the
+ * To generate types from deployed actors, use the
  * [`types generate`](/developers/references/cli/commands/types-generate) CLI command.
+ * 
  * To learn how incoming and outgoing messages work, see
  * [message types](/developers/backend/resources/actors/overview#message-types).
  *
@@ -56,11 +57,11 @@ export interface ActorConnectOptions {
   /**
    * Connection ID that the actor receives as `conn.id`.
    *
-   * To let the actor recognize the same client if it reconnects, use a stable
+   * To let the actor recognize a client when it reconnects, use a stable
    * value, such as an ID stored per browser tab. If you omit this property, the
-   * SDK generates a connection ID.
+   * SDK generates a new connection ID.
    *
-   * For more about connection IDs, see
+   * Learn more about
    * [connections](/developers/backend/resources/actors/reference#connections).
    */
   id?: string;
@@ -84,10 +85,11 @@ export interface ActorSubscription {
 }
 
 /**
- * Represents a client's WebSocket connection to an actor session.
- *
- * [`connect()`](#connect) returns this object. The socket buffers messages
- * you send before it opens.
+ * Represents a client's WebSocket connection to an actor session, returned after calling
+ * [`connect()`](#connect). The socket queues messages you send before it opens.
+ * 
+ * Learn more about
+ * [connections](/developers/backend/resources/actors/reference#connections).
  */
 export interface Connection<N extends string = string> {
   /** Connection ID that the actor receives as `conn.id`. */
@@ -117,8 +119,8 @@ export interface Connection<N extends string = string> {
   /**
    * Sends a message to the actor.
    *
-   * The socket buffers messages until it opens. After you call [`close()`](#close),
-   * the socket drops further sends.
+   * The socket queues messages until it opens. When you call [`close()`](#close),
+   * the socket drops any further sent messages.
    *
    * @param data - Message to send to the actor. The type comes from [ActorRegistry](#actorregistry) when you register the actor there.
    *
@@ -134,8 +136,7 @@ export interface Connection<N extends string = string> {
    * Closes the connection and removes all listeners.
    *
    * You can call this method more than once. A connection also closes itself
-   * when it fails permanently. To open a new connection, call
-   * [`connect()`](#connect) again.
+   * when it fails permanently.
    *
    * @example
    * ```typescript
@@ -149,22 +150,20 @@ export interface Connection<N extends string = string> {
 /**
  * Represents a reference to an actor session, identified by actor name and session ID.
  *
- * Call [`connect()`](#connect) to open the WebSocket and get a [Connection](#connection).
+ * Call [`connect()`](#connect) to open the WebSocket and get a [Connection](#returns).
  */
 export interface ActorRef<N extends string = string> {
   /**
-   * Creates or returns the [Connection](#connection) for this session.
+   * Creates or returns the [Connection](#returns) for this session.
    *
-   * Repeated calls return the same connection until it closes. If the connection
-   * fails permanently, for example because the actor doesn't exist or the actor
-   * denies the connection, fix the cause and call `connect()` again. Then
-   * subscribe again on the new connection.
+   * Calling `connect()` again on the same session reference returns the same
+   * connection until it closes.
    *
    * For a sample flow, see
    * [connect a client to a session](/developers/backend/resources/actors/sample-flows#connect-a-client-to-a-session).
    *
    * @param options - Optional connection settings, such as a stable connection ID.
-   * @returns The [Connection](#connection) for this actor session.
+   * @returns The [Connection](#returns) for this actor session.
    *
    * @example
    * ```typescript

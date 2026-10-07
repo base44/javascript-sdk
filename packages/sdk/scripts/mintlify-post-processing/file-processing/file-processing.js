@@ -1433,14 +1433,15 @@ function applyTypeDeclarationLinking(dir) {
 /**
  * Interfaces that are appended to a module page and have methods of their own.
  * Each keeps its own `## ` heading with its methods directly underneath, so the
- * generic `## Methods` heading that follows it is dropped. The value renames the
- * heading, or is null to keep the interface name.
+ * generic `## Methods` heading that follows it is dropped, along with any
+ * `## Properties` section. The value renames the heading, or is null to keep the
+ * interface name.
  */
 const TYPES_WITH_OWN_METHODS = {
   EntityHandler: "Entity Handler Methods",
-  ActorRef: null,
-  Connection: null,
-  ActorSubscription: null,
+  ActorRef: "ActorRef methods",
+  Connection: "Connection methods",
+  ActorSubscription: "ActorSubscription methods",
 };
 
 /**
@@ -1890,10 +1891,10 @@ function mergeSectionWithMethods(content, filePath) {
 
       if (methodsIndex !== -1) {
         lines[i] = `## ${TYPES_WITH_OWN_METHODS[typeName] ?? typeName}`;
-        if (propertiesIndex !== -1) {
-          lines[propertiesIndex] = "### Properties";
-        }
-        lines.splice(methodsIndex, 1);
+        // Drop the ## Properties section too: the heading and its content sit
+        // between the type heading and ## Methods.
+        const removeFrom = propertiesIndex !== -1 ? propertiesIndex : methodsIndex;
+        lines.splice(removeFrom, methodsIndex - removeFrom + 1);
         modified = true;
       }
     }
@@ -2543,8 +2544,8 @@ function applyOverloadPresentation(dir) {
 /**
  * Tidy the generated actors page. TypeDoc inlines the ActorSubscription return
  * type under `subscribe()`, which adds a duplicate `unsubscribe()` block. This
- * drops the duplicate and fixes the dead `ActorRef` link. A page without the
- * expected shape is left unchanged.
+ * drops the duplicate and points links to `ActorRef` at its renamed heading. A page
+ * without the expected shape is left unchanged.
  */
 function restructureActorsPage() {
   const file = path.join(DOCS_DIR, "content", "type-aliases", "actors.mdx");
@@ -2559,7 +2560,7 @@ function restructureActorsPage() {
 
   const tidied = content
     .replace(duplicateUnsubscribe, "\n")
-    .replace("[`ActorRef`](ActorRef)", "[`ActorRef`](#actorref)");
+    .replace("](#actorref)", "](#actorref-methods)");
   fs.writeFileSync(file, tidied, "utf-8");
 }
 
