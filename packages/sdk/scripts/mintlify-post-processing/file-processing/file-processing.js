@@ -140,8 +140,9 @@ function processLinksInFile(filePath) {
   // Remove undesirable type-alias definition lines like:
   //   > **IntegrationsModule** = `object` & `object`
   //   > **EntitiesModule** = `TypedEntitiesModule` & `DynamicEntitiesModule`
+  //   > **ActorsModule** = `{ [K in AllActorNames]: ... }` & `Record`\<`string`, `ActorClient`\>
   // These appear in type alias files using intersection types and are not useful in docs.
-  const typeDefinitionRegex = /^> \*\*\w+\*\* = `\w+` & `\w+`\s*$/m;
+  const typeDefinitionRegex = /^> \*\*\w+Module\*\* = .+\s*$/m;
   if (typeDefinitionRegex.test(content)) {
     content = content.replace(typeDefinitionRegex, "");
     modified = true;

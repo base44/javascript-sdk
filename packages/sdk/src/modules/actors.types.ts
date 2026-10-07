@@ -201,23 +201,32 @@ export interface ActorClient<N extends string = string> {
 }
 
 /**
- * Actors module for connecting your app to actors. An actor is a backend process that you define
- * in your project and that multiple clients connect to at the same time. Each client joins a
- * session, identified by the actor name and a session ID, and clients in the same session share
- * its state.
+ * Actors module for connecting a client to an [actor](/developers/backend/resources/actors/overview) session and exchanging messages.
  *
- * This module is the client side of an actor. Use it to join a session, send messages to the
- * actor, and receive the messages it sends back in realtime.
+ * An actor is a long-running backend process that multiple clients connect to simultaneously. A session
+ * is a running instance of an actor, identified by the actor name and a session ID. Each
+ * session manages its own state, storage, and client connections independently.
  *
- * To learn how actors work, see the [actors overview](/developers/backend/resources/actors/overview).
+ * The actors module supports the following functionality:
+ *
+ * - [`connect()`](#connect): Open a WebSocket connection to a session.
+ * - [`subscribe()`](#subscribe): Receive messages from the actor.
+ * - [`unsubscribe()`](#unsubscribe): Stop receiving messages from the actor without closing the connection.
+ * - [`send()`](#send): Send messages to the actor.
+ * - [`close()`](#close): Close the WebSocket connection to the actor.
+ *
  * For a sample flow, see
  * [connect a client to a session](/developers/backend/resources/actors/sample-flows#connect-a-client-to-a-session).
  *
  * ## Authentication modes
  *
- * This module is available in anonymous and user authentication modes.
- * Apps that require login can reject anonymous connections in the actor's `handleConnect()` method.
- * To learn more, see [manage client connections](/developers/backend/resources/actors/sample-flows#manage-client-connections).
+ * This module is available to use with a client in anonymous or user authentication mode. Access it
+ * through `base44.actors`. It isn't available in
+ * [service role authentication mode](/developers/references/sdk/getting-started/client#service-role).
+ *
+ * The actor receives each client's [identity](/developers/backend/resources/actors/reference#connections)
+ * when the client connects. A client that hasn't logged in connects as anonymous, and a client that
+ * has [logged in](/developers/references/sdk/docs/interfaces/auth) connects as authenticated.
  *
  * @example
  * ```typescript
