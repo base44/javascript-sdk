@@ -2201,6 +2201,231 @@ function applyMethodOrdering(dir) {
   }
 }
 
+/**
+ * Split MDX content into `## ` sections, ignoring headings inside code fences.
+ * The first entry is the preamble (title: null) before the first `## ` heading.
+ */
+function splitH2Sections(content) {
+  const sections = [];
+  let current = { title: null, lines: [] };
+  let inFence = false;
+  for (const line of content.split("\n")) {
+    if (line.startsWith("```")) inFence = !inFence;
+    const match = !inFence && line.match(/^## (.+)$/);
+    if (match) {
+      sections.push(current);
+      current = { title: match[1].trim(), lines: [line] };
+    } else {
+      current.lines.push(line);
+    }
+  }
+  sections.push(current);
+  return sections;
+}
+
+/**
+ * Split lines into blocks that start at a heading of the given prefix
+ * (for example "### "), ignoring headings inside code fences.
+ * The first entry holds any lines before the first matching heading.
+ */
+function splitBlocksAt(lines, prefix) {
+  const blocks = [{ heading: null, lines: [] }];
+  let inFence = false;
+  for (const line of lines) {
+    if (line.startsWith("```")) inFence = !inFence;
+    if (!inFence && line.startsWith(prefix)) {
+      blocks.push({ heading: line.slice(prefix.length).trim(), lines: [line] });
+    } else {
+      blocks[blocks.length - 1].lines.push(line);
+    }
+  }
+  return blocks;
+}
+
+/** Trim leading/trailing blank lines and `***` separators. */
+function trimBlockLines(lines) {
+  const out = [...lines];
+  const isNoise = (l) => l.trim() === "" || l.trim() === "***";
+  while (out.length && isNoise(out[0])) out.shift();
+  while (out.length && isNoise(out[out.length - 1])) out.pop();
+  return out;
+}
+
+/** Shift ATX heading levels (outside code fences) by `delta`. */
+function shiftHeadings(lines, delta) {
+  let inFence = false;
+  return lines.map((line) => {
+    if (line.startsWith("```")) inFence = !inFence;
+    const match = !inFence && line.match(/^(#{1,6}) (.*)$/);
+    if (!match) return line;
+    return "#".repeat(Math.min(6, Math.max(1, match[1].length + delta))) + " " + match[2];
+  });
+}
+
+/**
+ * Restructure the generated actors page so its table of contents matches the
+ * other module pages: Overview, one methods section per documented interface,
+ * then a single Type Definitions section.
+ *
+ * TypeDoc renders each appended interface (ActorRef, Connection, ActorClient,
+ * and so on) as its own `## ` section with its own `## Methods`/`## Properties`,
+ * and inlines return types, so the raw page repeats headings and nests
+ * `unsubscribe()` under `subscribe()`. Returns { content, modified }. If the
+ * page does not have the expected shape, it is left unchanged.
+ */
+function restructureActorsPage(content) {
+  const TYPE_SECTIONS = [
+    "Overview",
+    "Connection",
+    "ActorConnectOptions",
+    "ActorSubscription",
+    "ActorClient",
+    "ActorRegistry",
+    "ActorNameRegistry",
+  ];
+  const CHILD_SECTIONS = ["Methods", "Properties", "Parameters", "Returns"];
+
+  const sections = splitH2Sections(content);
+  const preamble = sections.shift();
+  const groups = {};
+  let context = null;
+  for (const section of sections) {
+    if (TYPE_SECTIONS.includes(section.title)) {
+      context = section.title;
+      groups[context] = { head: section, children: [] };
+    } else if (CHILD_SECTIONS.includes(section.title) && context) {
+      groups[context].children.push(section);
+    } else {
+      return { content, modified: false };
+    }
+  }
+  if (TYPE_SECTIONS.some((name) => !groups[name])) return { content, modified: false };
+
+  // ActorRef is rendered inside Overview as `### ActorRef`; its methods are the
+  // first `## Methods` section after Overview.
+  const overview = groups.Overview;
+  const overviewBlocks = splitBlocksAt(overview.head.lines, "### ");
+  const refIndex = overviewBlocks.findIndex((b) => b.heading === "ActorRef");
+  const refMethods = overview.children.filter((c) => c.title === "Methods");
+  if (refIndex === -1 || refMethods.length !== 1) return { content, modified: false };
+  const refIntro = trimBlockLines(overviewBlocks[refIndex].lines.slice(1));
+  overviewBlocks.splice(refIndex, 1);
+  const overviewLines = trimBlockLines(overviewBlocks.flatMap((b) => b.lines));
+
+  // connect(): replace the inlined Connection return type with a link.
+  const connectBlocks = splitBlocksAt(refMethods[0].lines.slice(1), "### ");
+  const connect = connectBlocks.find((b) => b.heading === "connect()");
+  if (!connect) return { content, modified: false };
+  const replaceReturns = (lines, replacement) => {
+    const start = lines.findIndex((l) => l === "#### Returns");
+    if (start === -1) return null;
+    let end = lines.findIndex((l, i) => i > start && /^#### /.test(l));
+    if (end === -1) end = lines.length;
+    return [...lines.slice(0, start), ...replacement, "", ...lines.slice(end)];
+  };
+  const connectLines = replaceReturns(trimBlockLines(connect.lines), [
+    "#### Returns",
+    "",
+    "[`Connection`](#connection)",
+    "",
+    "The connection for this actor session.",
+  ]);
+  if (!connectLines) return { content, modified: false };
+
+  // Connection methods: subscribe(), send(), close(). TypeDoc inlines the
+  // ActorSubscription return type, which adds a nested `## Methods` with
+  // unsubscribe() and moves subscribe()'s example after it.
+  const connection = groups.Connection;
+  const methodBlocks = connection.children
+    .filter((c) => c.title === "Methods")
+    .flatMap((c) => splitBlocksAt(c.lines.slice(1), "### ").filter((b) => b.heading));
+  const byName = (name) => methodBlocks.find((b) => b.heading === name);
+  const subscribe = byName("subscribe()");
+  const unsubscribeDup = byName("unsubscribe()");
+  const send = byName("send()");
+  const close = byName("close()");
+  if (!subscribe || !unsubscribeDup || !send || !close) return { content, modified: false };
+
+  const dupLines = trimBlockLines(unsubscribeDup.lines);
+  const lastExample = dupLines.map((l, i) => (l === "#### Example" ? i : -1)).filter((i) => i >= 0).pop();
+  if (lastExample === undefined) return { content, modified: false };
+  const subscribeExample = dupLines.slice(lastExample);
+  const subscribeLines = replaceReturns(trimBlockLines(subscribe.lines), [
+    "#### Returns",
+    "",
+    "[`ActorSubscription`](#actorsubscription)",
+    "",
+    "A subscription handle. Call `unsubscribe()` on it to remove this listener without closing the socket.",
+  ]);
+  if (!subscribeLines) return { content, modified: false };
+
+  // Type definitions: each type becomes `### Name`, and its child sections are
+  // folded in without repeating `Methods`/`Properties` headings.
+  const typeDefinition = (name) => {
+    const group = groups[name];
+    const out = [`### ${name}`, "", ...trimBlockLines(group.head.lines.slice(1)), ""];
+    for (const child of group.children) {
+      // Connection's methods are already documented under `## Connection Methods`.
+      if (name === "Connection" && child.title === "Methods") continue;
+      const body = trimBlockLines(child.lines.slice(1));
+      if (child.title === "Properties") {
+        out.push(...body, "");
+      } else if (child.title === "Methods") {
+        out.push(...shiftHeadings(body, 1), "");
+      } else {
+        out.push(`#### ${child.title}`, "", ...shiftHeadings(body, 1), "");
+      }
+    }
+    return out.join("\n").replace("[`ActorRef`](ActorRef)", "[`ActorRef`](#actorref-methods)");
+  };
+
+  const joinMethods = (blocks) => blocks.map((b) => trimBlockLines(b).join("\n")).join("\n\n***\n\n");
+  const output = [
+    ...preamble.lines,
+    ...overviewLines,
+    "",
+    "## ActorRef Methods",
+    "",
+    ...refIntro,
+    "",
+    joinMethods([connectLines]),
+    "",
+    "## Connection Methods",
+    "",
+    joinMethods([[...subscribeLines, "", ...subscribeExample], send.lines, close.lines]),
+    "",
+    "## Type Definitions",
+    "",
+    ["Connection", "ActorClient", "ActorConnectOptions", "ActorSubscription", "ActorRegistry", "ActorNameRegistry"]
+      .map(typeDefinition)
+      .join("\n"),
+  ].join("\n");
+
+  return { content: output.replace(/\n{3,}/g, "\n\n").replace(/\s+$/, "") + "\n", modified: true };
+}
+
+/**
+ * Apply the actors page restructuring to `type-aliases/actors.mdx`.
+ */
+function applyActorsPageRestructuring(dir) {
+  if (!fs.existsSync(dir)) return;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      applyActorsPageRestructuring(entryPath);
+    } else if (entry.name === "actors.mdx" && path.basename(dir) === "type-aliases") {
+      const content = fs.readFileSync(entryPath, "utf-8");
+      const { content: updated, modified } = restructureActorsPage(content);
+      if (modified) {
+        fs.writeFileSync(entryPath, updated, "utf-8");
+        console.log(`Restructured actors page: ${path.relative(DOCS_DIR, entryPath)}`);
+      } else {
+        console.warn(`Warning: actors page has an unexpected structure and was left unchanged: ${path.relative(DOCS_DIR, entryPath)}`);
+      }
+    }
+  }
+}
+
 function main() {
   console.log("Processing TypeDoc MDX files for Mintlify...\n");
 
@@ -2252,6 +2477,9 @@ function main() {
 
   // Reorder methods according to method-order.json
   applyMethodOrdering(DOCS_DIR);
+
+  // Restructure the actors page so its table of contents matches other module pages
+  applyActorsPageRestructuring(DOCS_DIR);
 
   // Link type names in Type Declarations sections to their corresponding headings
   applyTypeDeclarationLinking(DOCS_DIR);
