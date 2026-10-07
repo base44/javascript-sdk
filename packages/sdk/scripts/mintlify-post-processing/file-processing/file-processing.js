@@ -1439,7 +1439,7 @@ function applyTypeDeclarationLinking(dir) {
  */
 const TYPES_WITH_OWN_METHODS = {
   EntityHandler: "Entity Handler Methods",
-  ActorRef: "ActorRef methods",
+  ActorRef: "Actor methods",
   Connection: "Connection methods",
   ActorSubscription: "ActorSubscription methods",
 };
@@ -2544,7 +2544,7 @@ function applyOverloadPresentation(dir) {
 /**
  * Tidy the generated actors page. TypeDoc inlines the ActorSubscription return
  * type under `subscribe()`, which adds a duplicate `unsubscribe()` block. This
- * drops the duplicate and points links to `ActorRef` at its renamed heading. A page
+ * drops the duplicate and points links to `ActorRef` at its renamed heading, Actor methods. A page
  * without the expected shape is left unchanged.
  */
 function restructureActorsPage() {
@@ -2560,7 +2560,7 @@ function restructureActorsPage() {
 
   const tidied = content
     .replace(duplicateUnsubscribe, "\n")
-    .replace("](#actorref)", "](#actorref-methods)");
+    .replace("](#actorref)", "](#actor-methods)");
   fs.writeFileSync(file, tidied, "utf-8");
 }
 

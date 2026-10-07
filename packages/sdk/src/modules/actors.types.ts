@@ -32,7 +32,7 @@ export interface ActorRegistry {}
  * with [`types generate`](/developers/references/cli/commands/types-generate).
  *
  * The generated names provide autocomplete for deployed actors. To define
- * incoming and outgoing message types manually, augment [ActorRegistry](#actorregistry).
+ * incoming and outgoing message types manually, augment {@linkcode ActorRegistry}.
  */
 export interface ActorNameRegistry {}
 
@@ -51,7 +51,7 @@ type ToServerFor<N extends string> = N extends keyof ActorRegistry
   : unknown;
 
 /**
- * Configures the connection that [`connect()`](#connect) opens.
+ * Configures the connection that {@linkcode ActorRef.connect | connect()} opens.
  */
 export interface ActorConnectOptions {
   /**
@@ -60,16 +60,13 @@ export interface ActorConnectOptions {
    * To let the actor recognize a client when it reconnects, use a stable
    * value, such as an ID stored per browser tab. If you omit this property, the
    * SDK generates a new connection ID.
-   *
-   * Learn more about
-   * [connections](/developers/backend/resources/actors/reference#connections).
    */
   id?: string;
 }
 
 /**
  * Represents a listener for messages from the actor, registered with
- * [`subscribe()`](#subscribe).
+ * {@linkcode Connection.subscribe | subscribe()}.
  */
 export interface ActorSubscription {
   /**
@@ -119,10 +116,10 @@ export interface Connection<N extends string = string> {
   /**
    * Sends a message to the actor.
    *
-   * The socket queues messages until it opens. When you call [`close()`](#close),
+   * The socket queues messages until it opens. When you call {@linkcode Connection.close | close()},
    * the socket drops any further sent messages.
    *
-   * @param data - Message to send to the actor. The type comes from [ActorRegistry](#actorregistry) when you register the actor there.
+   * @param data - Message to send to the actor. The type comes from {@linkcode ActorRegistry} when you register the actor there.
    *
    * @example
    * ```typescript
@@ -150,7 +147,7 @@ export interface Connection<N extends string = string> {
 /**
  * Represents a reference to an actor session, identified by actor name and session ID.
  *
- * Call [`connect()`](#connect) to open the WebSocket and get a [Connection](#returns).
+ * Call {@linkcode ActorRef.connect | connect()} to open the WebSocket and get a [Connection](#returns).
  */
 export interface ActorRef<N extends string = string> {
   /**
@@ -178,7 +175,7 @@ export interface ActorRef<N extends string = string> {
  * Selects a session for a named actor.
  *
  * TypeScript infers message types when you register the actor in
- * [ActorRegistry](#actorregistry). [ActorNameRegistry](#actornameregistry)
+ * {@linkcode ActorRegistry}. {@linkcode ActorNameRegistry}
  * provides autocomplete for actor names only.
  */
 export interface ActorClient<N extends string = string> {
@@ -208,11 +205,11 @@ export interface ActorClient<N extends string = string> {
  *
  * The actors module supports the following functionality:
  *
- * - [`connect()`](#connect): Open a WebSocket connection to a session.
- * - [`subscribe()`](#subscribe): Receive messages from the actor.
- * - [`unsubscribe()`](#unsubscribe): Stop receiving messages from the actor without closing the connection.
- * - [`send()`](#send): Send messages to the actor.
- * - [`close()`](#close): Close the WebSocket connection to the actor.
+ * - {@linkcode ActorRef.connect | connect()}: Open a WebSocket connection to a session.
+ * - {@linkcode Connection.subscribe | subscribe()}: Receive messages from the actor.
+ * - {@linkcode ActorSubscription.unsubscribe | unsubscribe()}: Stop receiving messages from the actor without closing the connection.
+ * - {@linkcode Connection.send | send()}: Send messages to the actor.
+ * - {@linkcode Connection.close | close()}: Close the WebSocket connection to the actor.
  *
  * For a sample flow, see
  * [connect a client to a session](/developers/backend/resources/actors/sample-flows#connect-a-client-to-a-session).
