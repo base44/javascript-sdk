@@ -41,7 +41,7 @@ export type {
   EntitiesModule,
   EntityAggregateResult,
   EntityAggregateSpec,
-  EntityDateBucketUnit,
+  EntityDateBucket,
   EntityDistinctOptions,
   EntityFilterOperators,
   EntityFilterQuery,

@@ -1,0 +1,38 @@
+{
+  "entities": {
+    "list": {
+      "leadIn": "The `list()` method has three forms:",
+      "overloads": [
+        {
+          "label": "Records (cursor)",
+          "description": "Returns one cursor page of records. Use this for loops, or any time you want pagination that's unaffected by records added or deleted mid-walk."
+        },
+        {
+          "label": "Distinct values (cursor)",
+          "description": "Returns one cursor page of a single field's distinct values, always in ascending order. Use it to list the unique values of a field, for example to populate filter options or autocomplete."
+        },
+        {
+          "label": "Records (skip)",
+          "description": "Returns an array of records. Kept for existing code. Prefer a cursor for pagination instead."
+        }
+      ]
+    },
+    "filter": {
+      "leadIn": "The `filter()` method has three forms. The query is always the first argument.",
+      "overloads": [
+        {
+          "label": "Records (cursor)",
+          "description": "Returns one cursor page of matching records. Use this for loops, or any time you want pagination that's unaffected by records added or deleted mid-walk."
+        },
+        {
+          "label": "Distinct values (cursor)",
+          "description": "Returns one cursor page of a single field's distinct values among matching records, always in ascending order. Use it to list the unique values of a field among matching records, for example to populate filter options or autocomplete."
+        },
+        {
+          "label": "Records (skip)",
+          "description": "Returns an array of matching records. Kept for existing code. Prefer a cursor for pagination instead."
+        }
+      ]
+    }
+  }
+}
