@@ -201,17 +201,17 @@ export interface ActorClient<N extends string = string> {
 }
 
 /**
- * Connects your frontend to [actor sessions](/developers/backend/resources/actors/overview),
- * shared live backend processes where clients can exchange messages in realtime.
+ * Actors module for connecting your app to actors. An actor is a backend process that you define
+ * in your project and that multiple clients connect to at the same time. Each client joins a
+ * session, identified by the actor name and a session ID, and clients in the same session share
+ * its state.
  *
- * The following table lists what you can do with the actors module:
+ * This module is the client side of an actor. Use it to join a session, send messages to the
+ * actor, and receive the messages it sends back in realtime.
  *
- * | Member | Purpose |
- * |---|---|
- * | [`connect()`](#connect) | Opens a connection to a session. Clients that use the same actor name and session ID join the same session. |
- * | [`subscribe()`](#subscribe) | Receives messages from an actor. |
- * | [`send()`](#send) | Sends a message to an actor. |
- * | [`ActorRegistry`](#actorregistry) | Defines message types for autocomplete and compile-time safety. |
+ * To learn how actors work, see the [actors overview](/developers/backend/resources/actors/overview).
+ * For a sample flow, see
+ * [connect a client to a session](/developers/backend/resources/actors/sample-flows#connect-a-client-to-a-session).
  *
  * ## Authentication modes
  *
