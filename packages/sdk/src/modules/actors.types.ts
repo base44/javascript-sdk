@@ -197,7 +197,7 @@ export interface ActorClient<N extends string = string> {
 }
 
 /**
- * Actors module for connecting a client to an [actor](/developers/backend/resources/actors/overview) sessions, managing connections, and exchanging messages.
+ * Actors module for connecting a client to [actor](/developers/backend/resources/actors/overview) sessions, managing connections, and exchanging messages.
  *
  * An actor is a long-running backend process that multiple clients connect to simultaneously. A session
  * is a running instance of an actor, identified by the actor name and a session ID. Each
