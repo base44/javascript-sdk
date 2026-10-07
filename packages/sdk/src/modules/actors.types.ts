@@ -50,7 +50,7 @@ type ToServerFor<N extends string> = N extends keyof ActorRegistry
   : unknown;
 
 /**
- * Configures the connection that [ActorRef.connect](#connect) opens.
+ * Configures the connection that [`connect()`](#connect) opens.
  */
 export interface ActorConnectOptions {
   /**
@@ -68,7 +68,7 @@ export interface ActorConnectOptions {
 
 /**
  * Represents a listener for messages from the actor, registered with
- * [Connection.subscribe](#subscribe).
+ * [`subscribe()`](#subscribe).
  */
 export interface ActorSubscription {
   /**
@@ -86,7 +86,7 @@ export interface ActorSubscription {
 /**
  * Represents a client's WebSocket connection to an actor session.
  *
- * [ActorRef.connect](#connect) returns this object. The socket buffers messages
+ * [`connect()`](#connect) returns this object. The socket buffers messages
  * you send before it opens.
  */
 export interface Connection<N extends string = string> {
@@ -117,7 +117,7 @@ export interface Connection<N extends string = string> {
   /**
    * Sends a message to the actor.
    *
-   * The socket buffers messages until it opens. After you call [close](#close),
+   * The socket buffers messages until it opens. After you call [`close()`](#close),
    * the socket drops further sends.
    *
    * @param data - Message to send to the actor. The type comes from [ActorRegistry](#actorregistry) when you register the actor there.
@@ -135,7 +135,7 @@ export interface Connection<N extends string = string> {
    *
    * You can call this method more than once. A connection also closes itself
    * when it fails permanently. To open a new connection, call
-   * [ActorRef.connect](#connect) again.
+   * [`connect()`](#connect) again.
    *
    * @example
    * ```typescript
@@ -149,7 +149,7 @@ export interface Connection<N extends string = string> {
 /**
  * Represents a reference to an actor session, identified by actor name and session ID.
  *
- * Call [connect](#connect) to open the WebSocket and get a [Connection](#connection).
+ * Call [`connect()`](#connect) to open the WebSocket and get a [Connection](#connection).
  */
 export interface ActorRef<N extends string = string> {
   /**

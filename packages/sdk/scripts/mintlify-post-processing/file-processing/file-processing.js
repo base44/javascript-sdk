@@ -1593,8 +1593,8 @@ function groupTypeDefinitions(content) {
     },
     // Actors module
     {
-      types: ["ActorConnectOptions", "ActorClient", "ActorRegistry", "ActorNameRegistry"],
-      indicator: "ActorConnectOptions"
+      types: ["ActorClient", "ActorRegistry", "ActorNameRegistry"],
+      indicator: "ActorClient"
     }
   ];
   

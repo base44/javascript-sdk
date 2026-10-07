@@ -27,7 +27,6 @@
     "interfaces/ActorRef",
     "interfaces/Connection",
     "interfaces/ActorSubscription",
-    "interfaces/ActorConnectOptions",
     "interfaces/ActorClient",
     "interfaces/ActorRegistry",
     "interfaces/ActorNameRegistry"
