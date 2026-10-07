@@ -227,16 +227,6 @@ export interface ActorClient<N extends string = string> {
  * The actor receives each client's [identity](/developers/backend/resources/actors/reference#connections)
  * when the client connects. A client that hasn't logged in connects as anonymous, and a client that
  * has [logged in](/developers/references/sdk/docs/interfaces/auth) connects as authenticated.
- *
- * @example
- * ```typescript
- * // Connect, subscribe, send, and close
- * const conn = base44.actors.chatRoom("session-1").connect({ id: "tab-1" });
- * const sub = conn.subscribe((msg) => console.log(msg));
- * conn.send({ type: "message", text: "hi" });
- * sub.unsubscribe();
- * conn.close();
- * ```
  */
 export type ActorsModule = {
   [K in AllActorNames]: K extends keyof ActorRegistry
