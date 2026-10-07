@@ -1441,7 +1441,7 @@ const TYPES_WITH_OWN_METHODS = {
   EntityHandler: "Entity Handler Methods",
   ActorRef: "Actor methods",
   Connection: "Connection methods",
-  ActorSubscription: "ActorSubscription methods",
+  ActorSubscription: "Subscription methods",
 };
 
 /**

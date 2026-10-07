@@ -82,8 +82,8 @@ export interface ActorSubscription {
 }
 
 /**
- * Represents a client's WebSocket connection to an actor session, returned after calling
- * [`connect()`](#connect). The socket queues messages you send before it opens.
+ * Represents a client's [WebSocket](https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API) connection to an actor session, returned after calling
+ * [`connect()`](#connect). The WebSocket queues messages you send before it opens.
  * 
  * Learn more about
  * [connections](/developers/backend/resources/actors/reference#connections).
@@ -116,8 +116,8 @@ export interface Connection<N extends string = string> {
   /**
    * Sends a message to the actor.
    *
-   * The socket queues messages until it opens. When you call {@linkcode Connection.close | close()},
-   * the socket drops any further sent messages.
+   * The WebSocket queues messages until it opens. When you call {@linkcode Connection.close | close()},
+   * the WebSocket drops any messages you send afterward.
    *
    * @param data - Message to send to the actor. The type comes from {@linkcode ActorRegistry} when you register the actor there.
    *
@@ -147,11 +147,11 @@ export interface Connection<N extends string = string> {
 /**
  * Represents a reference to an actor session, identified by actor name and session ID.
  *
- * Call {@linkcode ActorRef.connect | connect()} to open the WebSocket and get a [Connection](#returns).
+ * Call {@linkcode ActorRef.connect | connect()} to open the WebSocket and get a [connection](/developers/backend/resources/actors/overview#connections).
  */
 export interface ActorRef<N extends string = string> {
   /**
-   * Creates or returns the [Connection](#returns) for this session.
+   * Creates or returns the connection for this session.
    *
    * Calling `connect()` again on the same session reference returns the same
    * connection until it closes.
@@ -160,7 +160,7 @@ export interface ActorRef<N extends string = string> {
    * [connect a client to a session](/developers/backend/resources/actors/sample-flows#connect-a-client-to-a-session).
    *
    * @param options - Optional connection settings, such as a stable connection ID.
-   * @returns The [Connection](#returns) for this actor session.
+   * @returns The connection for this actor session.
    *
    * @example
    * ```typescript
@@ -197,19 +197,17 @@ export interface ActorClient<N extends string = string> {
 }
 
 /**
- * Actors module for connecting a client to [actor](/developers/backend/resources/actors/overview) sessions, managing connections, and exchanging messages.
+ * Actors module for interacting with [actors](/developers/backend/resources/actors/overview) from your app.
  *
  * An actor is a long-running backend process that multiple clients connect to simultaneously. A session
  * is a running instance of an actor, identified by the actor name and a session ID. Each
  * session manages its own state, storage, and client connections independently.
  *
- * The actors module supports several objects with the following functionality:
- * 
- * - {@linkcode ActorRef.connect | connect()}: Open a WebSocket connection to a session.
- * - {@linkcode Connection.subscribe | subscribe()}: Receive messages from the actor.
- * - {@linkcode ActorSubscription.unsubscribe | unsubscribe()}: Stop receiving messages from the actor without closing the connection.
- * - {@linkcode Connection.send | send()}: Send messages to the actor.
- * - {@linkcode Connection.close | close()}: Close the WebSocket connection to the actor.
+ * The actors module provides the functionality to:  
+ *
+ * - Manage connections: {@link ActorRef.connect | Open} and {@link Connection.close | close} a WebSocket connection to a session.
+ * - Exchange messages: {@link Connection.send | Send} and {@link Connection.subscribe | listen} for messages to and from an actor.
+ * - Manage subscriptions: {@link Connection.subscribe | Subscribe} and {@link ActorSubscription.unsubscribe | unsubscribe} from actor messages without closing the connection.
  *
  * For a sample flow, see
  * [connect a client to a session](/developers/backend/resources/actors/sample-flows#connect-a-client-to-a-session).
