@@ -2542,28 +2542,25 @@ function applyOverloadPresentation(dir) {
 
 /**
  * Tidy the generated actors page. TypeDoc inlines the ActorSubscription return
- * type under `subscribe()`, which adds a duplicate `unsubscribe()` block, and the
- * types under Type Definitions keep repeated `Properties`/`Parameters`/`Returns`
- * headings. This drops the duplicate, folds those headings, and fixes the dead
- * `ActorRef` link. A page without the expected shape is left unchanged.
+ * type under `subscribe()`, which adds a duplicate `unsubscribe()` block. This
+ * drops the duplicate and fixes the dead `ActorRef` link. A page without the
+ * expected shape is left unchanged.
  */
 function restructureActorsPage() {
   const file = path.join(DOCS_DIR, "content", "type-aliases", "actors.mdx");
   if (!fs.existsSync(file)) return;
 
   const duplicateUnsubscribe = /\n## Methods\n\n### unsubscribe\(\)[\s\S]*?<\/CodeGroup>\n/;
-  const [page, types] = fs.readFileSync(file, "utf-8").split("\n## Type Definitions\n");
-  if (types === undefined || !duplicateUnsubscribe.test(page)) {
+  const content = fs.readFileSync(file, "utf-8");
+  if (!duplicateUnsubscribe.test(content)) {
     console.warn("Warning: actors page has an unexpected structure and was left unchanged");
     return;
   }
 
-  const tidiedTypes = types
-    .replace(/^## Properties\n\n/gm, "")
-    .replace(/^## (Parameters|Returns)$/gm, "#### $1")
+  const tidied = content
+    .replace(duplicateUnsubscribe, "\n")
     .replace("[`ActorRef`](ActorRef)", "[`ActorRef`](#actorref)");
-
-  fs.writeFileSync(file, `${page.replace(duplicateUnsubscribe, "\n")}\n## Type Definitions\n${tidiedTypes}`, "utf-8");
+  fs.writeFileSync(file, tidied, "utf-8");
 }
 
 function main() {
