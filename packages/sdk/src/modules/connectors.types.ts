@@ -500,7 +500,7 @@ export interface UserConnectorsModule {
    * authenticate with the external service. The scopes and integration type are
    * derived from the connector configuration in the backend.
    *
-   * @param connectorId - The ID of the app user connector configured in your workspace. The AI builder inserts this ID into generated code when it sets up the connector flow. You can also retrieve it from the workspace connectors API.
+   * @param connectorId - The ID of the app user connector configured in your workspace. The AI inserts this ID into generated code when it sets up the connector flow. You can also retrieve it from the workspace connectors API.
    * @returns Promise resolving to the redirect URL string.
    *
    * @example
@@ -520,7 +520,7 @@ export interface UserConnectorsModule {
    * Removes the stored OAuth credentials for the currently authenticated app user's
    * connection to the specified connector.
    *
-   * @param connectorId - The ID of the app user connector configured in your workspace. The AI builder inserts this ID into generated code when it sets up the connector flow. You can also retrieve it from the workspace connectors API.
+   * @param connectorId - The ID of the app user connector configured in your workspace. The AI inserts this ID into generated code when it sets up the connector flow. You can also retrieve it from the workspace connectors API.
    * @returns Promise resolving when the connection has been removed.
    *
    * @example

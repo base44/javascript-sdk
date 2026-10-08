@@ -82,6 +82,7 @@ Every public method needs: description, `@param` tags, `@returns`, and at least 
 - **Link method references.** When mentioning another SDK method or module by name in JSDoc prose, always use `{@link}` or `{@linkcode}` to create a cross-reference.
 - **Never use a colon as a sentence break.** Write "Use this when you sync data from another system. Name the field..." not "...another system: name the field...". Reserve colons for `label: description` bullet-list items, not prose sentences.
 - **Never start a sentence with a lowercase inline-code term.** If the natural phrasing would open with one (e.g., "`week` is only supported on..."), restructure so a capitalized word leads instead (e.g., "Every date field supports `day`, `month` and `year`. The `created_date` and `updated_date` fields also support `week`.").
+- **Name the place and the AI correctly.** Write "app editor" (lowercase) for the place where you build, and "the AI" or "the AI chat" for the assistant doing the work ("The AI inserts this ID", "ask the AI chat to fix it"). Never use "builder" for either. It stays only for the Builder plan, the Base44 Builder GitHub App, people who build apps ("builders", "app builders"), and exact UI labels or code names.
 
 ## References
 
