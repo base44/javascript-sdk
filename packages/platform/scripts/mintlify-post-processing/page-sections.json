@@ -2,5 +2,8 @@
   "typesWithOwnMethods": {
     "BuilderSession": "Session methods"
   },
-  "typeDefinitionGroups": [["PlatformEvent"], ["SessionErrorCode", "AppErrorCode"]]
+  "typeDefinitionGroups": [
+    ["PlatformEvent"],
+    { "title": "Error codes", "types": ["SessionErrorCode", "AppErrorCode"] }
+  ]
 }

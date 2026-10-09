@@ -1433,7 +1433,8 @@ function applyTypeDeclarationLinking(dir) {
  * interface name.
  */
 // Appended types whose methods get their own section, by section title, and groups of appended
-// types nested under "## Type Definitions" (the first type of a group starts the section).
+// types nested under "## Type Definitions" (the first type of a group starts the section). A group
+// is a list of type names, or `{ "title": "...", "types": [...] }` for another section heading.
 const { typesWithOwnMethods: TYPES_WITH_OWN_METHODS = {}, typeDefinitionGroups: TYPE_DEFINITION_GROUPS = [] } =
   fs.existsSync(PAGE_SECTIONS_PATH) ? JSON.parse(fs.readFileSync(PAGE_SECTIONS_PATH, "utf-8")) : {};
 
@@ -1558,7 +1559,10 @@ function applyIntroSectionGrouping(dir) {
 function groupTypeDefinitions(content) {
   let modified = false;
   
-  const typeGroups = TYPE_DEFINITION_GROUPS.map((types) => ({ types, indicator: types[0] }));
+  const typeGroups = TYPE_DEFINITION_GROUPS.map((group) => {
+    const { title = "Type Definitions", types } = Array.isArray(group) ? { types: group } : group;
+    return { types, indicator: types[0], title };
+  });
   
   // Find which type group exists in this file
   let matchedGroup = null;
@@ -1599,7 +1603,7 @@ function groupTypeDefinitions(content) {
 
   const updatedContent =
     beforeTypeDefinitions +
-    "## Type Definitions\n\n" +
+    `## ${matchedGroup.title}\n\n` +
     demotedSection;
   
   return { content: updatedContent, modified: true };

@@ -30,7 +30,7 @@ export interface BuilderModule {
    * Each session is independent, with its own socket, token and subscriptions.
    *
    * @param options - Session options.
-   * @returns The new session.
+   * @returns The new session. Use its [session methods](#session-methods) to connect and subscribe.
    *
    * @example
    * ```typescript
@@ -132,7 +132,7 @@ export interface SubscriptionOptions {
    */
   onSnapshot: (snapshot: PlatformSnapshot) => void | Promise<void>;
   /**
-   * Called with each live event. Events for an app arrive one at a time, in order. If the callback
+   * Called with each live event, a [`PlatformEvent`](#platformevent). Events for an app arrive one at a time, in order. If the callback
    * throws or rejects, the subscription ends with `handler_failed`. New event types can be added at
    * any time, so ignore types you don't handle. For every event and its payload,
    * see the [events reference](/developers/references/platform-sdk/live-updates/events).
