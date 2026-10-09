@@ -2525,6 +2525,37 @@ function restructureActorsPage() {
   fs.writeFileSync(file, tidied, "utf-8");
 }
 
+/**
+ * On class pages, the constructor's Returns shows the instance like a function's Returns shows its
+ * result. Drop what repeats it: the class description inside Returns, and the ## Properties section.
+ */
+function cleanupClassPage(content) {
+  const lines = content.split("\n");
+  const returnsIndex = lines.indexOf("#### Returns");
+  if (returnsIndex !== -1) {
+    const typeIndex = lines.findIndex((line, i) => i > returnsIndex && line.trim() !== "");
+    const accordionIndex = lines.findIndex((line, i) => i > typeIndex && (line.startsWith("<Accordion") || line.startsWith("#")));
+    if (accordionIndex !== -1 && lines[accordionIndex].startsWith("<Accordion")) {
+      lines.splice(typeIndex + 1, accordionIndex - typeIndex - 1, "");
+    }
+  }
+  const propertiesIndex = lines.indexOf("## Properties");
+  if (propertiesIndex !== -1) {
+    const next = lines.findIndex((line, i) => i > propertiesIndex && line.startsWith("## "));
+    lines.splice(propertiesIndex, (next === -1 ? lines.length : next) - propertiesIndex);
+  }
+  return lines.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
+}
+
+function applyClassPageCleanup(dir) {
+  const classesDir = path.join(dir, "content", "classes");
+  if (!fs.existsSync(classesDir)) return;
+  for (const file of fs.readdirSync(classesDir).filter((name) => name.endsWith(".mdx"))) {
+    const filePath = path.join(classesDir, file);
+    fs.writeFileSync(filePath, cleanupClassPage(fs.readFileSync(filePath, "utf-8")), "utf-8");
+  }
+}
+
 function main() {
   console.log("Processing TypeDoc MDX files for Mintlify...\n");
 
@@ -2573,6 +2604,9 @@ function main() {
 
   // Group type definitions under a parent heading
   applyTypeDefinitionGrouping(DOCS_DIR);
+
+  // Class pages: the constructor's Returns already lists the instance's properties
+  applyClassPageCleanup(DOCS_DIR);
 
   // Reorder methods according to method-order.json
   applyMethodOrdering(DOCS_DIR);
