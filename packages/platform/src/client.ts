@@ -27,7 +27,8 @@ import type { BuilderModule } from "./modules/builder.types.js";
  */
 export class Base44PlatformClient {
   /**
-   * Live builder updates. Call [`init()`](/developers/references/platform-sdk/docs/interfaces/builder#init) to create a session.
+   * [Builder module](/developers/references/platform-sdk/docs/interfaces/builder) for following the AI chat in your users' apps live.
+   * Call [`init()`](/developers/references/platform-sdk/docs/interfaces/builder#init) to create a session.
    */
   readonly builder: BuilderModule;
 
