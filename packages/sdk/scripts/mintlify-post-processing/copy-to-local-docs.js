@@ -130,14 +130,10 @@ function updateDocsJson(repoDir, sdkFiles) {
     };
     const p = (kind, file) => `${prefix}${basePath}/${kind}/${file}`;
 
-    if (sdkFiles.functions?.length > 0 && categoryMap.functions)
-      addToGroup(categoryMap.functions, sdkFiles.functions.map((f) => p("functions", f)));
-    if (sdkFiles.interfaces?.length > 0 && categoryMap.interfaces)
-      addToGroup(categoryMap.interfaces, sdkFiles.interfaces.map((f) => p("interfaces", f)));
-    if (sdkFiles.classes?.length > 0 && categoryMap.classes)
-      addToGroup(categoryMap.classes, sdkFiles.classes.map((f) => p("classes", f)));
-    if (sdkFiles["type-aliases"]?.length > 0 && categoryMap["type-aliases"])
-      addToGroup(categoryMap["type-aliases"], sdkFiles["type-aliases"].map((f) => p("type-aliases", f)));
+    // Groups follow the category map's key order.
+    for (const [kind, group] of Object.entries(categoryMap)) {
+      if (sdkFiles[kind]?.length > 0) addToGroup(group, sdkFiles[kind].map((f) => p(kind, f)));
+    }
 
     return Array.from(groupMap.entries()).map(([group, pages]) => ({
       group,
