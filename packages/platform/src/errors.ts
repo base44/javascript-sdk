@@ -1,25 +1,39 @@
 import type { PlatformSocketErrorCode } from "./errors.types.js";
 
 /**
- * An error from a builder session or subscription.
+ * The error the SDK reports when something goes wrong in a builder session.
  *
- * Check `code` to decide what to do. The error never carries the session token, a callback's
- * exception, or the server's exception text.
+ * You don't create it. The SDK passes it to your `onError` callbacks, `connect()` rejects with it,
+ * and `subscribe()` throws it. Check `code` to see what happened, then look the code up below:
+ * - [Session error codes](#sessionerrorcode) go to the `onError` you pass to `init()`. The whole
+ *   session is affected, and `appId` isn't set.
+ * - [App error codes](#apperrorcode) go to the subscription's `onError`. Only that app is affected,
+ *   and `appId` says which one.
+ *
+ * The error never carries the session token, a callback's exception, or the server's exception text.
  *
  * @example
  * ```typescript
- * // Handle a session error
+ * // Handle session and app errors
  * const builder = client.builder.init({
  *   onError(error) {
  *     if (error.code === 'session_revoked') showSignedOut();
  *   },
  * });
+ *
+ * builder.subscribe(appId, {
+ *   onSnapshot: renderChat,
+ *   onEvent: applyEvent,
+ *   onError(error) {
+ *     if (error.code === 'access_revoked') hideLiveUpdates(error.appId);
+ *   },
+ * });
  * ```
  */
 export class PlatformSocketError extends Error {
-  /** The error code. See [session error codes](#sessionerrorcode) and [app error codes](#apperrorcode). */
+  /** What happened. One of the [session error codes](#sessionerrorcode) or [app error codes](#apperrorcode). */
   readonly code: PlatformSocketErrorCode;
-  /** ID of the app the error is about, when it concerns one subscription. */
+  /** ID of the app the error is about. Set for app error codes, and not set for session error codes. */
   readonly appId?: string;
 
   /**
