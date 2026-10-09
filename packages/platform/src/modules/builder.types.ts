@@ -46,7 +46,10 @@ export interface BuilderModule {
   init(options: BuilderInitOptions): BuilderSession;
 }
 
-/** One builder session. It owns its socket, its subscriptions and its reconnection. */
+/**
+ * A `BuilderSession`: one socket with its app subscriptions and its reconnection. Use its methods
+ * to connect, follow apps and close.
+ */
 export interface BuilderSession {
   /**
    * Connects the session's socket.
