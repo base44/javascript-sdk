@@ -1,9 +1,12 @@
-import { Base44PlatformClient, type PlatformEvent, type Snapshot, type ToolCall } from "@base44/platform";
+import { Base44PlatformClient, type PlatformEvent, type PlatformEventMap, type PlatformSnapshot, type ToolCall, type GuardApproval, type Message, type StatusObject } from "@base44/platform";
 const client = new Base44PlatformClient({ serverUrl: "https://example.test", getSessionToken: async () => "session-token" });
 const builder = client.builder.init({ onError: error => { void error.code; } });
 const subscription = builder.subscribe("a".repeat(24), {
-  onSnapshot(snapshot: Snapshot) {
-    const state: "ready" | "processing" | "error" | undefined = snapshot.status?.state;
+  onSnapshot(snapshot: PlatformSnapshot) {
+    const state: "ready" | "processing" | "error" | null | undefined = snapshot.status?.state;
+    const room: string = snapshot.room;
+    void room;
+    void snapshot.queue.items;
     void state;
     void snapshot.messages[0]?.additional_message_params?.plan_mode;
   },
@@ -19,7 +22,7 @@ const subscription = builder.subscribe("a".repeat(24), {
       void id;
     }
     if (event.type === "image.resolved") {
-      const status: "pending" | "completed" | "failed" | undefined = event.data.status;
+      const status: "pending" | "completed" | "failed" | null | undefined = event.data.status;
       void status;
     }
     // @ts-expect-error Payload must be narrowed by event.type.
@@ -44,26 +47,38 @@ client.connect();
 new Base44PlatformClient({ serverUrl: "https://example.test", refreshToken: async () => "token" });
 
 const tool: ToolCall = {
-  display: { file_paths: ["src/App.tsx"] },
+  name: "ask_clarifying_questions",
   arguments: { questions: [{ question: "Which layout?", options: [{ label: "Cards" }] }] },
   user_input: { answers: [{ question_index: 0, selected_labels: ["Cards"] }] },
 };
 void tool;
+const write: ToolCall = { name: "write_file", display: { file_paths: ["src/App.tsx"] } };
+void write;
+function describe(call: ToolCall) {
+  if (call.name === "generate_image" && "results" in call) void call.results;
+  // @ts-expect-error Narrowing by name leaves only that tool's fields (and the catch-all call's).
+  if (call.name === "bash") void call.display;
+}
+void describe;
 const guarded: ToolCall = {
+  name: "update_entities",
   status: "waiting_for_user_input",
   waiting_on: { kind: "approval" },
-  approval: { guard: "entity_rls_guard", reason: "RLS rules on entity 'Order' will be modified", details: { entity_name: "Order", changed_ops: ["read"] } },
+  approval: { guard: "entity_rls_guard", details: { entity_name: "Order", changed_ops: ["read"] } },
 };
 void guarded;
-const generatedMedia: ToolCall = {
-  results: {
-    placeholder_url: "/__generating__/hero.png",
-    status: "completed",
-    image_url: "https://images.example/hero.png",
-  },
-};
-void generatedMedia;
-// @ts-expect-error Raw command text is not part of the public display.
-void tool.display?.command;
+const approval: GuardApproval = { guard: "some_new_guard" };
+void approval;
+// @ts-expect-error Every tool call names its tool.
+const unnamed: ToolCall = { status: "running" };
+void unnamed;
 // @ts-expect-error Raw arguments are never delivered.
 void tool.arguments_string;
+const message: Message = { id: "m1", role: "assistant", content: "Done", tool_calls: [tool] };
+void message;
+const status: StatusObject = { state: "processing", turn_id: "m1" };
+void status;
+// @ts-expect-error Session events are handled by the client, not delivered to onEvent.
+type NoSnapshot = PlatformEventMap["app.snapshot"];
+// @ts-expect-error Room notices arrive through onError.
+type NoNotice = PlatformEventMap["room.access_denied"];

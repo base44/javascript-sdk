@@ -1,4 +1,4 @@
-import type { PlatformEvent, Snapshot } from "./builder.events.types.js";
+import type { PlatformEvent, PlatformSnapshot } from "./builder.events.types.js";
 import type { PlatformSocketError } from "../errors.js";
 
 /** Options for an independent builder socket session. */
@@ -34,7 +34,7 @@ export interface SubscriptionOptions {
   /** Replace this app's state. Arrives after every join and rejoin, and after a main-conversation
    * rewrite (undo, restore, sync). Live events follow it; it holds only the last 50 messages.
    */
-  onSnapshot: (snapshot: Snapshot) => void | Promise<void>;
+  onSnapshot: (snapshot: PlatformSnapshot) => void | Promise<void>;
   /** Apply each live event. Delivery is serial per app; a rejection ends this subscription. */
   onEvent: (event: PlatformEvent) => void | Promise<void>;
   /** Subscription errors. Only `snapshot_unavailable` leaves the subscription active. */

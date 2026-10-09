@@ -20,6 +20,9 @@
   },
   "scripts": {
     "build": "tsc",
+    "gen:events": "node scripts/gen-events.mjs",
+    "check:events": "node scripts/gen-events.mjs --check",
+    "sync:asyncapi": "node scripts/sync-asyncapi.mjs",
     "docs": "typedoc",
     "test": "npm run test:types && npm run test:unit && npm run docs && npm run test:package",
     "test:types": "tsc --noEmit -p tsconfig.type-tests.json",
@@ -45,5 +48,8 @@
   "bugs": {
     "url": "https://github.com/base44/javascript-sdk/issues"
   },
-  "homepage": "https://github.com/base44/javascript-sdk/tree/main/packages/platform#readme"
+  "homepage": "https://github.com/base44/javascript-sdk/tree/main/packages/platform#readme",
+  "devDependencies": {
+    "json-schema-to-typescript": "16.0.0"
+  }
 }

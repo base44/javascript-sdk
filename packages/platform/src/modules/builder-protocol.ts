@@ -1,10 +1,11 @@
-import type { PlatformEvent, PlatformEventMap, Snapshot } from "./builder.events.types.js";
+import { serverEventNames } from "./builder.events.generated.js";
+import type { PlatformEvent, PlatformEventMap, PlatformSnapshot } from "./builder.events.types.js";
 
-export const eventNames = [
-  "message.updated", "message.removed", "app.status_changed", "preview.reload_requested",
-  "preview.navigation_requested", "queue.updated", "task.progressed", "image.resolved",
-  "conversation.changed", "files.changed", "branch.deleted", "repository.changed", "pull_request.changed",
-] as const satisfies readonly (keyof PlatformEventMap)[];
+const sessionEvents: readonly string[] = ["app.snapshot", "session.ended"];
+/** App events delivered to `onEvent`: every server event except the session events the socket handles. */
+export const eventNames = serverEventNames.filter(
+  (name): name is keyof PlatformEventMap & typeof name => !sessionEvents.includes(name) && !name.startsWith("room."),
+);
 /** Notices that name an app room, by the error code each one reports. */
 export const roomNotices = {
   "room.access_denied": "access_denied",
@@ -25,12 +26,12 @@ export function appFromRoom(value: unknown): string | undefined {
 export function decode(type: keyof PlatformEventMap, appId: string, raw: unknown): PlatformEvent {
   return { type, appId, data: object(object(raw).data) } as PlatformEvent;
 }
-export function decodeSnapshot(raw: unknown): Snapshot {
+export function decodeSnapshot(raw: unknown): PlatformSnapshot {
   const frame = object(raw);
   const data = object(frame.data);
   if (!appFromRoom(frame.room) || !Array.isArray(data.messages) || (data.status !== null && typeof data.status !== "object")) {
     throw new Error("Invalid snapshot");
   }
   const queue = data.queue !== null && typeof data.queue === "object" ? { queue: data.queue } : {};
-  return { room: frame.room, status: data.status, messages: data.messages, ...queue } as Snapshot;
+  return { room: frame.room, status: data.status, messages: data.messages, ...queue } as PlatformSnapshot;
 }
