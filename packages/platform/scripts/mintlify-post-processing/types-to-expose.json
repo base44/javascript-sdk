@@ -1,8 +1,9 @@
 [
+  "AppErrorCode",
   "Base44PlatformClient",
   "BuilderModule",
   "BuilderSession",
   "PlatformEvent",
   "PlatformSocketError",
-  "PlatformSocketErrorCode"
+  "SessionErrorCode"
 ]

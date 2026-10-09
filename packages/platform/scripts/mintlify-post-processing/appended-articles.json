@@ -4,6 +4,7 @@
     "type-aliases/PlatformEvent"
   ],
   "classes/PlatformSocketError": [
-    "type-aliases/PlatformSocketErrorCode"
+    "type-aliases/SessionErrorCode",
+    "type-aliases/AppErrorCode"
   ]
 }

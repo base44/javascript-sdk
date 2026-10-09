@@ -269,7 +269,9 @@ function appendUnionValueFields(content, type) {
   if (!summaries || !type.types.every((t) => t.type === "literal")) return content;
   const fields = type.types.map((t, i) => {
     const text = (summaries[i] ?? []).map((part) => part.text).join("").trim();
-    return `<ResponseField name="${t.value}" type="${typeof t.value}">\n\n${text}\n\n</ResponseField>`;
+    return `<ResponseField name="${t.value}">\n\n${text}\n\n</ResponseField>`;
   });
-  return `${content.trimEnd()}\n\n${fields.join("\n\n")}\n`;
+  // Each value is listed below with its comment, so the one-line union signature only repeats them.
+  const withoutSignature = content.replace(/^> \*\*\w+\*\* = .*\n+/m, "");
+  return `${withoutSignature.trimEnd()}\n\n${fields.join("\n\n")}\n`;
 }

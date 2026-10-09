@@ -3,7 +3,7 @@ import type { PlatformSocketErrorCode } from "./errors.types.js";
 /**
  * An error from a builder session or subscription.
  *
- * Check `code` to decide what to do. Each code is listed under [`PlatformSocketErrorCode`](#platformsocketerrorcode). The error never carries the session token, a callback's
+ * Check `code` to decide what to do. The error never carries the session token, a callback's
  * exception, or the server's exception text.
  *
  * @example
@@ -17,16 +17,17 @@ import type { PlatformSocketErrorCode } from "./errors.types.js";
  * ```
  */
 export class PlatformSocketError extends Error {
-  /** Machine-readable error code. */
+  /** The error code. See [session error codes](#sessionerrorcode) and [app error codes](#apperrorcode). */
   readonly code: PlatformSocketErrorCode;
   /** ID of the app the error is about, when it concerns one subscription. */
   readonly appId?: string;
 
   /**
-   * Creates an error.
+   * Creates an error. The SDK creates these; you don't need to.
    *
    * @param code - Error code.
    * @param appId - ID of the app the error is about.
+   * @internal
    */
   constructor(code: PlatformSocketErrorCode, appId?: string) {
     super(`Platform socket: ${code}`);
