@@ -14,28 +14,22 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { packagePaths } from "../package-paths.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DOCS_DIR = path.join(__dirname, "..", "..", "..", "docs");
+const { docsDir: DOCS_DIR, configDir: CONFIG_DIR } = packagePaths();
 const CONTENT_DIR = path.join(DOCS_DIR, "content");
 const LINKED_TYPES_FILE = path.join(CONTENT_DIR, ".linked-types.json");
 const TEMPLATE_PATH = path.join(__dirname, "docs-json-template.json");
 const STYLING_CSS_PATH = path.join(__dirname, "styling.css");
-const CATEGORY_MAP_PATH = path.join(__dirname, "../category-map.json");
-const TYPES_TO_EXPOSE_PATH = path.join(__dirname, "..", "types-to-expose.json");
-const TYPES_TO_DELETE_PATH = path.join(__dirname, "..", "types-to-delete-after-processing.json");
-const APPENDED_ARTICLES_PATH = path.join(
-  __dirname,
-  "../appended-articles.json"
-);
-const METHOD_ORDER_PATH = path.join(__dirname, "..", "method-order.json");
-const OVERLOAD_PRESENTATION_PATH = path.join(
-  __dirname,
-  "..",
-  "overload-presentation.json"
-);
+const CATEGORY_MAP_PATH = path.join(CONFIG_DIR, "category-map.json");
+const TYPES_TO_EXPOSE_PATH = path.join(CONFIG_DIR, "types-to-expose.json");
+const TYPES_TO_DELETE_PATH = path.join(CONFIG_DIR, "types-to-delete-after-processing.json");
+const APPENDED_ARTICLES_PATH = path.join(CONFIG_DIR, "appended-articles.json");
+const METHOD_ORDER_PATH = path.join(CONFIG_DIR, "method-order.json");
+const OVERLOAD_PRESENTATION_PATH = path.join(CONFIG_DIR, "overload-presentation.json");
 
 // Controlled via env var so we can re-enable Panel injection when needed.
 const PANELS_ENABLED = process.env.MINTLIFY_INCLUDE_PANELS === "true";

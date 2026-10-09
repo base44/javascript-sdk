@@ -1,0 +1,17 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "extends": ["./typedoc.json"],
+  "out": "docs/content",
+  "plugin": [
+    "typedoc-plugin-markdown",
+    "../sdk/scripts/mintlify-post-processing/typedoc-plugin/typedoc-mintlify-plugin.js"
+  ],
+  "fileExtension": ".mdx",
+  "gitRevision": "main",
+  "sort": ["source-order"],
+  "entryFileName": "README.mdx",
+  "maxTypeConversionDepth": 2,
+  "hideBreadcrumbs": true,
+  "disableSources": true,
+  "hidePageTitle": true
+}

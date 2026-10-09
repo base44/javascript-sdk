@@ -57,7 +57,11 @@ After generating and reviewing the docs, you can push them to the `base44/mintli
 1. Open the [docs repo](https://github.com/base44-dev/mintlify-docs) and created a PR for your branch.
 1. Preview your docs using the [Mintlify dashboard](https://dashboard.mintlify.com/base44/base44?section=previews).
 
-The Platform SDK (`packages/platform`) is documented separately. Add field-level
-JSDoc to all exports in `packages/platform/src`, update `packages/platform/README.md`,
-and run `npm run docs -w @base44/platform`. TypeDoc treats missing public
-documentation as an error and emits its reference under `packages/platform/docs`.
+## Platform SDK docs
+
+The same pipeline documents the Platform SDK (`packages/platform`). Pass `--package-dir <dir>` to `file-processing.js` and `copy-to-local-docs.js` to run them for another package. They then read that package's `docs` folder and its config files under `<dir>/scripts/mintlify-post-processing/`. A `mintlify-target.json` there sets where the reference lands in mintlify-docs and which nav dropdown it belongs to. Without one, the scripts keep the SDK's defaults.
+
+From `packages/platform`:
+* `npm run docs` validates that every export has JSDoc. Its output in `docs` is not published.
+* `npm run create-docs` generates the Mintlify reference into `docs/content`.
+* `npm run copy-docs-local -- --target <path-to-mintlify-docs>` copies it into `developers/references/platform-sdk/docs` and updates the **Platform SDK** dropdown in `docs.json`.
