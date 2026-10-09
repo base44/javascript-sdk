@@ -133,7 +133,8 @@ export interface SubscriptionOptions {
   onSnapshot: (snapshot: PlatformSnapshot) => void | Promise<void>;
   /**
    * Called with each live event. Events for an app arrive one at a time, in order. If the callback
-   * throws or rejects, the subscription ends with `handler_failed`. For every event and its payload,
+   * throws or rejects, the subscription ends with `handler_failed`. New event types can be added at
+   * any time, so ignore types you don't handle. For every event and its payload,
    * see the [events reference](/developers/references/platform-sdk/live-updates/events).
    */
   onEvent: (event: PlatformEvent) => void | Promise<void>;
