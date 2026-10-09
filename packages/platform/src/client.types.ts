@@ -6,7 +6,7 @@
  */
 export interface PlatformClientOptions {
   /**
-   * Origin of the platform socket, such as `https://app.base44.com`.
+   * Origin of the platform socket.
    *
    * Use the `socket_url` your server receives from `POST /api/service/socket-sessions`. It must be
    * an origin with no path, query, fragment, or credentials.

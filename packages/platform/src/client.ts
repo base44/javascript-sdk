@@ -17,7 +17,7 @@ import type { BuilderModule } from "./modules/builder.types.js";
  * const client = new Base44PlatformClient({
  *   serverUrl: socketUrl,
  *   async getSessionToken() {
- *     const response = await fetch('/api/builder-session', { method: 'POST' });
+ *     const response = await fetch('/api/builder-socket-session', { method: 'POST' });
  *     const { session_token } = await response.json();
  *     return session_token;
  *   },
