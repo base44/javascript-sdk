@@ -2560,6 +2560,33 @@ function applyClassPageCleanup(dir) {
   }
 }
 
+/**
+ * A Returns type line such as `BuilderSession` becomes a link when the same page documents that type:
+ * its methods section (page-sections.json `typesWithOwnMethods`) or its own ### heading.
+ */
+function linkReturnTypes(content) {
+  const slug = (heading) => heading.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const anchors = new Map();
+  for (const [type, title] of Object.entries(TYPES_WITH_OWN_METHODS)) {
+    if (content.includes(`\n## ${title}\n`)) anchors.set(type, slug(title));
+  }
+  for (const [, type] of content.matchAll(/^### (\w+)$/gm)) anchors.set(type, slug(type));
+  return content.replace(/(^#{4,5} Returns\n\n)`(\w+)`$/gm, (match, heading, type) =>
+    anchors.has(type) ? `${heading}[\`${type}\`](#${anchors.get(type)})` : match);
+}
+
+function applyReturnTypeLinks(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) applyReturnTypeLinks(entryPath);
+    else if (entry.name.endsWith(".mdx")) {
+      const content = fs.readFileSync(entryPath, "utf-8");
+      const linked = linkReturnTypes(content);
+      if (linked !== content) fs.writeFileSync(entryPath, linked, "utf-8");
+    }
+  }
+}
+
 function main() {
   console.log("Processing TypeDoc MDX files for Mintlify...\n");
 
@@ -2611,6 +2638,9 @@ function main() {
 
   // Class pages: the constructor's Returns already lists the instance's properties
   applyClassPageCleanup(DOCS_DIR);
+
+  // Link a Returns type to where the same page documents it
+  applyReturnTypeLinks(DOCS_DIR);
 
   // Reorder methods according to method-order.json
   applyMethodOrdering(DOCS_DIR);
