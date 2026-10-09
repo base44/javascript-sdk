@@ -1,4 +1,5 @@
-import { serverEventNames } from "./builder.events.generated.js";
+import { serverEventNames, type ServerEventMap, type SessionEnded } from "./builder.events.generated.js";
+import type { PlatformSocketErrorCode } from "../errors.types.js";
 import type { PlatformEvent, PlatformEventMap, PlatformSnapshot } from "./builder.events.types.js";
 
 const sessionEvents: readonly string[] = ["app.snapshot", "session.ended"];
@@ -6,12 +7,18 @@ const sessionEvents: readonly string[] = ["app.snapshot", "session.ended"];
 export const eventNames = serverEventNames.filter(
   (name): name is keyof PlatformEventMap & typeof name => !sessionEvents.includes(name) && !name.startsWith("room."),
 );
-/** Notices that name an app room, by the error code each one reports. */
+/** Notices that name an app room, by the error code each one reports. A new notice fails to compile until it has one. */
 export const roomNotices = {
   "room.access_denied": "access_denied",
   "room.access_revoked": "access_revoked",
   "room.snapshot_unavailable": "snapshot_unavailable",
-} as const;
+} as const satisfies Record<Extract<keyof ServerEventMap, `room.${string}`>, PlatformSocketErrorCode>;
+// `expired` never reaches the partner: the session renews its token.
+export const sessionEndings = {
+  expired: "session_expired",
+  revoked: "session_revoked",
+  replaced: "session_replaced",
+} as const satisfies Record<SessionEnded["reason"], PlatformSocketErrorCode | "session_expired">;
 export const appPattern = /^[a-f0-9]{24}$/;
 export const roomFor = (appId: string) => `/apps/${appId}`;
 

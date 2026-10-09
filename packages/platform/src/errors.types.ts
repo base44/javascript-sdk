@@ -1,4 +1,7 @@
-/** Codes a {@link PlatformSocketError} reports. Session codes go to the session's `onError`, app codes to the subscription's. */
+/**
+ * Codes a {@link PlatformSocketError} reports. Session codes go to the session's `onError`, app codes to
+ * the subscription's. Retryable means the same call can succeed again without changing anything.
+ */
 export type PlatformSocketErrorCode =
   /** Session. `getSessionToken` threw, took longer than 20 seconds or returned no token. Check the endpoint that opens sessions, then call `connect()` again. Retryable. */
   | "session_unavailable"
@@ -6,19 +9,19 @@ export type PlatformSocketErrorCode =
   | "connection_denied"
   /** Session. The socket couldn't connect after five retries, or the server closed it. Call `connect()` again, for example when the tab next gets focus. Retryable. */
   | "connection_failed"
-  /** Session. Your server ended the session, or its key was disabled, deleted or lost the **Watch app builder updates** permission. Open a new session if the page should still follow apps. Not retryable. */
+  /** Session. Reported for [`session.ended`](/developers/references/platform-sdk/live-updates/events#session-ended) with `revoked`. Open a new session from your server if the page should still follow apps. Not retryable. */
   | "session_revoked"
-  /** Session. Another socket connected with the same session token. Use one session per tab, or call `connect()` to take the session back. Not retryable. */
+  /** Session. Reported for [`session.ended`](/developers/references/platform-sdk/live-updates/events#session-ended) with `replaced`. Use one session per tab. Don't reconnect automatically; call `connect()` only to take the session back on purpose. Not retryable. */
   | "session_replaced"
   /** Session or app. A frame didn't match the protocol. Update the SDK, then reconnect or subscribe again. Not retryable. */
   | "protocol_error"
   /** Session or app. You called `connect()` or `subscribe()` after `close()`. Create a new session with `init()`. Not retryable. */
   | "client_closed"
-  /** App. The app isn't on the session's allowlist, the key can't watch it, or the socket joins too often. Add the app to the session from your server first. Not retryable. */
+  /** App. Reported for [`room.access_denied`](/developers/references/platform-sdk/live-updates/events#room-access_denied). Add the app to the session from your server, then subscribe again. Not retryable. */
   | "access_denied"
-  /** App. The app left the session's allowlist or moved to another workspace. Stop showing its live updates. Not retryable. */
+  /** App. Reported for [`room.access_revoked`](/developers/references/platform-sdk/live-updates/events#room-access_revoked). Stop showing the app's live updates. Not retryable. */
   | "access_revoked"
-  /** App. The subscription is active but its snapshot failed. Events still arrive, and the subscription doesn't end. Load the app's messages over the Apps API instead. */
+  /** App. Reported for [`room.snapshot_unavailable`](/developers/references/platform-sdk/live-updates/events#room-snapshot_unavailable). The subscription stays active and events keep arriving. Load the app's messages over the Apps API instead. */
   | "snapshot_unavailable"
   /** App. The session already has eight subscriptions. Unsubscribe from an app, or open another session. Not retryable. */
   | "subscription_limit"
