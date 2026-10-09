@@ -25,19 +25,6 @@ export interface PlatformClientOptions {
    * `session_unavailable`. Never return a workspace API key or any other server credential.
    *
    * @returns The session token, or a promise resolving to it.
-   *
-   * @example
-   * ```typescript
-   * // Fetch a session token from your server
-   * const client = new Base44PlatformClient({
-   *   serverUrl: socketUrl,
-   *   async getSessionToken() {
-   *     const response = await fetch('/api/builder-session', { method: 'POST' });
-   *     const { session_token } = await response.json();
-   *     return session_token;
-   *   },
-   * });
-   * ```
    */
   getSessionToken: () => string | Promise<string>;
 }

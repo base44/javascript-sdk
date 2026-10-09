@@ -30,6 +30,7 @@ const TYPES_TO_DELETE_PATH = path.join(CONFIG_DIR, "types-to-delete-after-proces
 const APPENDED_ARTICLES_PATH = path.join(CONFIG_DIR, "appended-articles.json");
 const METHOD_ORDER_PATH = path.join(CONFIG_DIR, "method-order.json");
 const OVERLOAD_PRESENTATION_PATH = path.join(CONFIG_DIR, "overload-presentation.json");
+const PAGE_SECTIONS_PATH = path.join(CONFIG_DIR, "page-sections.json");
 
 // Controlled via env var so we can re-enable Panel injection when needed.
 const PANELS_ENABLED = process.env.MINTLIFY_INCLUDE_PANELS === "true";
@@ -1431,12 +1432,10 @@ function applyTypeDeclarationLinking(dir) {
  * `## Properties` section. The value renames the heading, or is null to keep the
  * interface name.
  */
-const TYPES_WITH_OWN_METHODS = {
-  EntityHandler: "Entity Handler Methods",
-  ActorRef: "Actor methods",
-  Connection: "Connection methods",
-  ActorSubscription: "Subscription methods",
-};
+// Appended types whose methods get their own section, by section title, and groups of appended
+// types nested under "## Type Definitions" (the first type of a group starts the section).
+const { typesWithOwnMethods: TYPES_WITH_OWN_METHODS = {}, typeDefinitionGroups: TYPE_DEFINITION_GROUPS = [] } =
+  fs.existsSync(PAGE_SECTIONS_PATH) ? JSON.parse(fs.readFileSync(PAGE_SECTIONS_PATH, "utf-8")) : {};
 
 /**
  * Group intro sections (like "Built-in User Entity", "Generated Types") under an "Overview" heading
@@ -1550,7 +1549,7 @@ function applyIntroSectionGrouping(dir) {
 /**
  * Group type definition sections under a parent heading.
  *
- * Each group below must list every entry from appended-articles.json for that
+ * Each group in page-sections.json must list every entry from appended-articles.json for that
  * module except the one that gets absorbed into the "## ... Methods" section
  * (typically named `*Module` or `*Handler`, e.g. EntityHandler) — otherwise
  * the appended type keeps its original `##` heading and renders as a sibling
@@ -1559,39 +1558,7 @@ function applyIntroSectionGrouping(dir) {
 function groupTypeDefinitions(content) {
   let modified = false;
   
-  // Define type definition patterns for different modules
-  const typeGroups = [
-    // Connectors module
-    {
-      types: ["ConnectorIntegrationType", "ConnectorIntegrationTypeRegistry"],
-      indicator: "ConnectorIntegrationType"
-    },
-    // Entities module
-    {
-      types: [
-        "EntityRecord",
-        "EntityTypeRegistry",
-        "SortField",
-        "EntityFilterQuery"
-      ],
-      indicator: "EntityRecord"
-    },
-    // Functions module
-    {
-      types: ["FunctionName", "FunctionNameRegistry"],
-      indicator: "FunctionName"
-    },
-    // Agents module
-    {
-      types: ["AgentName", "AgentNameRegistry"],
-      indicator: "AgentName"
-    },
-    // Actors module
-    {
-      types: ["ActorClient", "ActorRegistry", "ActorNameRegistry"],
-      indicator: "ActorClient"
-    }
-  ];
+  const typeGroups = TYPE_DEFINITION_GROUPS.map((types) => ({ types, indicator: types[0] }));
   
   // Find which type group exists in this file
   let matchedGroup = null;

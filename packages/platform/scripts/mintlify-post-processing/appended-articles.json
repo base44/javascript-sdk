@@ -1,8 +1,9 @@
 {
-  "classes/Base44PlatformClient": ["interfaces/PlatformClientOptions"],
   "interfaces/builder": [
     "interfaces/BuilderSession",
-    "interfaces/SubscriptionOptions",
     "type-aliases/PlatformEvent"
+  ],
+  "classes/PlatformSocketError": [
+    "type-aliases/PlatformSocketErrorCode"
   ]
 }

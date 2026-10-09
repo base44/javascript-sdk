@@ -2,8 +2,7 @@
   "Base44PlatformClient",
   "BuilderModule",
   "BuilderSession",
-  "PlatformClientOptions",
   "PlatformEvent",
   "PlatformSocketError",
-  "SubscriptionOptions"
+  "PlatformSocketErrorCode"
 ]

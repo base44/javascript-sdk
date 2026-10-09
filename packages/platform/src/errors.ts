@@ -3,7 +3,7 @@ import type { PlatformSocketErrorCode } from "./errors.types.js";
 /**
  * An error from a builder session or subscription.
  *
- * Check `code` to decide what to do. The error never carries the session token, a callback's
+ * Check `code` to decide what to do. Each code is listed under [`PlatformSocketErrorCode`](#platformsocketerrorcode). The error never carries the session token, a callback's
  * exception, or the server's exception text.
  *
  * @example

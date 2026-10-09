@@ -5,8 +5,8 @@ import type { PlatformSocketError } from "../errors.js";
 export interface BuilderInitOptions {
   /**
    * Called on errors that affect the whole session, such as a failed connection or an ended session.
-   * Errors for one app go to that subscription's `onError` instead. See
-   * [connection errors](/developers/references/platform-sdk/live-updates/errors#connection-errors).
+   * Errors for one app go to that subscription's `onError` instead. See the
+   * [error codes](/developers/references/platform-sdk/docs/classes/PlatformSocketError#platformsocketerrorcode).
    */
   onError: (error: PlatformSocketError) => void;
 }
@@ -57,6 +57,8 @@ export interface BuilderSession {
    * one attempt. Call it again after a failure or a `session_replaced` error.
    *
    * @returns Promise that resolves when the socket connects.
+   * @throws {PlatformSocketError} With `connection_denied`, `connection_failed` or `session_unavailable`
+   * when the session can't connect, or `client_closed` when the session is closed first.
    *
    * @example
    * ```typescript
@@ -137,7 +139,7 @@ export interface SubscriptionOptions {
   onEvent: (event: PlatformEvent) => void | Promise<void>;
   /**
    * Called on errors for this app. Every error ends the subscription except `snapshot_unavailable`.
-   * See [app errors](/developers/references/platform-sdk/live-updates/errors#app-errors).
+   * See the [error codes](/developers/references/platform-sdk/docs/classes/PlatformSocketError#platformsocketerrorcode).
    */
   onError: (error: PlatformSocketError) => void;
 }
