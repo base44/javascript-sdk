@@ -2532,12 +2532,12 @@ function restructureActorsPage() {
 /**
  * On class pages, the constructor's Returns shows the instance like a function's Returns shows its
  * result. Drop what repeats it: the class description inside Returns, and the ## Properties section.
- * A class without a documented constructor keeps its ## Properties.
+ * A class without a documented constructor keeps its ## Properties, as fields like a Returns.
  */
 function cleanupClassPage(content) {
   const lines = content.split("\n");
   const returnsIndex = lines.indexOf("#### Returns");
-  if (returnsIndex === -1) return content;
+  if (returnsIndex === -1) return propertiesAsFields(content);
   const typeIndex = lines.findIndex((line, i) => i > returnsIndex && line.trim() !== "");
   const accordionIndex = lines.findIndex((line, i) => i > typeIndex && (line.startsWith("<Accordion") || line.startsWith("#")));
   if (accordionIndex !== -1 && lines[accordionIndex].startsWith("<Accordion")) {
@@ -2549,6 +2549,22 @@ function cleanupClassPage(content) {
     lines.splice(propertiesIndex, (next === -1 ? lines.length : next) - propertiesIndex);
   }
   return lines.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
+}
+
+/** A class page's ## Properties as ResponseFields, the component its Returns and Parameters use. */
+function propertiesAsFields(content) {
+  return content.replace(/^## Properties\n([\s\S]*?)(?=^## |(?![\s\S]))/m, (section, body) => {
+    const fields = body.split(/^\*{3}$/m).map((block) => {
+      const signature = block.match(/^> (.*)$/m)?.[1] ?? "";
+      const name = block.match(/^#### (.+?)\??$/m)?.[1]?.replace(/\\/g, "");
+      if (!name) return "";
+      const type = signature.split(/\*\*: /)[1]?.replace(/`/g, "").trim() ?? "";
+      const description = block.replace(/^#### .*$/m, "").replace(/^> .*$/m, "").trim();
+      const required = signature.includes("`optional`") ? "" : " required";
+      return `<ResponseField name="${name}" type="${type}"${required}>\n\n${description}\n\n</ResponseField>`;
+    }).filter(Boolean);
+    return `## Properties\n\n${fields.join("\n\n")}\n\n`;
+  });
 }
 
 function applyClassPageCleanup(dir) {
