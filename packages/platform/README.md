@@ -13,7 +13,7 @@ The workspace must have white-label sockets enabled; this SDK does not open sess
 import { Base44PlatformClient } from "@base44/platform";
 
 const client = new Base44PlatformClient({
-  serverUrl: "https://base44.app",
+  serverUrl: socketUrl, // the session's socket_url, from POST /api/service/socket-sessions
   async getSessionToken() {
     const response = await fetch("/api/builder-socket-session", { method: "POST" });
     if (!response.ok) throw new Error("Session request failed");
@@ -39,7 +39,7 @@ builder.close();
 `/api/builder-socket-session` is your backend's route, not an SDK endpoint. It opens a
 socket session with its workspace key (`apps:watch` scope) through
 `POST /api/service/socket-sessions` with `{ app_ids }`, and returns only the
-`session_token` to the browser. Never pass the workspace key or any other server
+`session_token` and `socket_url` to the browser. Pass `socket_url` as `serverUrl`. Never pass the workspace key or any other server
 credential to this client. Subscribe only to apps on the session's allowlist; your
 backend adds or removes apps with `PUT`/`DELETE /api/service/socket-sessions/{session_id}/rooms/{app_id}`.
 
@@ -100,54 +100,46 @@ their exceptions are isolated so they cannot interrupt another app's delivery.
 - `BuilderSession`: `connect()`, `subscribe(appId, options)`, `close()`.
 - `SubscriptionOptions`: required `onSnapshot`, `onEvent` and `onError`.
 - `PlatformSubscription`: read-only `appId`, `active`, and `unsubscribe()`.
-- Event/message models live in `modules/builder.events.types.ts`; error codes in `errors.types.ts`.
+- `PlatformEvent`, `PlatformEventMap`, `PlatformSnapshot`, `ToolCall`, `GuardApproval`
+  (`modules/builder.events.types.ts`), derived from the generated event types.
+- Error codes in `errors.types.ts`.
 
-Every exported shape and field has JSDoc. Run `npm run docs` for
-validated reference pages in `docs`. `PlatformEvent` is a
-**discriminated union**: switch on `event.type` to narrow `event.data`. Each delivery
-contains `type`, `appId` and `data`. On the wire every event is `{room, data}`; the SDK
-routes by `room` and validates the envelope, while payload schemas and private-field
-filtering are the server's. Omitted keys mean unchanged and explicit null clears.
-Events carrying `branch_id` belong to that branch; null or absent is main. Unknown
-event names are not forwarded.
+`PlatformEvent` is a **discriminated union**: switch on `event.type` to narrow
+`event.data`. Each delivery contains `type`, `appId` and `data`. On the wire every
+event is `{room, data}`; the SDK routes by `room` and validates the envelope, while
+payload schemas and private-field filtering are the server's. Omitted keys mean
+unchanged and explicit null clears. Events carrying `branch_id` belong to that branch;
+null or absent is main. Unknown event names are not forwarded. `PlatformSnapshot` is
+the service's `Snapshot` plus the app's `room`. Structural filtering does not promise
+redaction of generated prose or user content.
 
-| Event | Data contract |
-| --- | --- |
-| `message.updated` | `MessageUpdated`: the whole `message`, optional `conversation_id`. Replace the message with the same `id`. |
-| `message.removed` | `MessageRemoved`: `message_id`, optional `conversation_id`. Sent when a message is deleted or hidden; an unknown ID is a no-op. |
-| `app.status_changed` | `AppStatusChanged`: `status` (`AppStatus`), null clears it. |
-| `preview.reload_requested` | Reload the app preview. |
-| `preview.navigation_requested` | `PreviewNavigationRequested`: `path`, and `force` to navigate even when the user moved away. |
-| `queue.updated` | `QueueUpdated`: `items`, `is_paused`, optional `processed_item_id`. Replaces the entire queue. |
-| `task.progressed` | `TaskProgressed`: optional `tool_call_id`, `message_id`, `event_type`, numeric `progress`. |
-| `image.resolved` | `ImageResolved`: `placeholder_url`, `status` (`pending`, `completed`, `failed`), nullable `image_url`. Replace the placeholder wherever it appears. |
-| `conversation.changed` | The conversation was rewritten. On main, a fresh snapshot follows. |
-| `files.changed`, `branch.deleted`, `repository.changed`, `pull_request.changed` | Re-read signals with no content. |
+## Event types
 
-`ChatMessage` has optional `id`, `role` (`user`/`assistant`), text/null `content`,
-`tool_calls`, timestamp-only `metadata.created_date`, `checkpoint_id`, and scalar
-`additional_message_params` (`client_creation_id`, `plan_mode`, `plan_approved`,
-`skip_ai_response`, `system_message_type`). `ToolCall` has optional `id`, `name`,
-`status`, `requires_user_input`, `auto_approved`, `mutation_applied` and
-`waiting_on.kind` (`approval`/`choice`/`input`). Each builder tool and guard declares
-which of its parts are public; a tool with no declaration shows only these fields.
+The socket protocol is defined by the service's AsyncAPI document, committed as
+`asyncapi.json`. `src/modules/builder.events.generated.ts` is generated from it with
+`json-schema-to-typescript`: one type per schema, named after the backend model
+(`Message`, `StatusObject`, `QueueState`, one `*Call` per tool, one `*Approval` per
+guard), plus `ServerEventMap` and `ClientMessageMap`. Never edit it by hand.
 
-| Field | Public contract |
-| --- | --- |
-| `arguments` | One of `ToolQuestionArguments`, `ToolSecretArguments`, `ToolPackageArguments`, `ToolPlanArguments`, `ToolPrdArguments` (`generate_prd`, the plan in plan mode) or `ToolMediaArguments`, narrowed by the tool's `name`. Absent for other tools and partial streaming arguments. |
-| `display` | File activity has `file_paths` and optional `content_empty`; execution activity has `summary` and `writes_entities`; entity activity has `entity_name` and `record_count`. |
-| `user_input` | `ToolQuestionInput` only, for clarifying-question answers (`selected_label` for single-select, `selected_labels` for multi-select). Secret-form values are never exposed. |
-| `results` | Once the call is not waiting on a guard: `ToolMediaResult` for image generation, or a URL string for game images and backgrounds (the placeholder `image.resolved` replaces) and videos (the finished video). |
-| `approval` | While a call waits on a safety guard: `ToolGuardApproval` with `guard`, and `reason` and `details` where the guard declares them (shell-command approvals carry only `guard`). |
+To pick up a protocol change:
 
-In plan mode the message `content` beside a `generate_prd` call can be empty; render the
-plan from its arguments. Approving a plan, answering a question and approving a
-guarded call are HTTP actions of your backend. `Snapshot` contains `room`, `status`
-(`AppStatus`: optional `state` of `ready`/`processing`/`error`, nullable
-`last_updated_date`, and nullable `turn_id`, the user message that started the turn),
-`messages`, and `queue` (`SnapshotQueue`: the main branch's `items` and `is_paused`;
-absent from older servers). Dates remain wire strings. Structural filtering
-does not promise redaction of generated prose or user content.
+```sh
+# Production serves only beta and GA events, so point at a dev backend while events are alpha.
+npm run sync:asyncapi -w @base44/platform -- http://localhost:8000/api/asyncapi.json
+npm run gen:events -w @base44/platform
+```
+
+`sync:asyncapi` also reads `ASYNCAPI_URL`, defaults to production, and refuses a
+document with no messages. CI runs `npm run check:events` and fails when the
+generated file differs from what `asyncapi.json` produces.
+
+## Reference docs
+
+Every exported shape and field has JSDoc. `npm run docs` validates it into `docs`.
+`npm run create-docs` runs the app SDK's TypeDoc and Mintlify pipeline for this package,
+and `npm run copy-docs-local -- --target <mintlify-docs>` copies the result into
+`developers/references/platform-sdk/docs`. The pipeline's config for this package lives
+in `scripts/mintlify-post-processing/`.
 
 `PlatformSocketError` extends `Error` with `code` and optional `appId`. Original
 exceptions, payloads and credentials are never attached.

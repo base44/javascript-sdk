@@ -1,12 +1,43 @@
-/** Shared configuration for browser platform modules. Never supply an API key. */
+/**
+ * Options for creating a {@link Base44PlatformClient}.
+ *
+ * The client runs in the browser and never sees your workspace API key. Your server opens a socket
+ * session with the key and hands the browser only the session's token and socket URL.
+ */
 export interface PlatformClientOptions {
-  /** Origin of the platform service, e.g. https://base44.app. No path/query/credentials. */
+  /**
+   * Origin of the platform socket, such as `https://app.base44.com`.
+   *
+   * Use the `socket_url` your server receives from `POST /api/service/socket-sessions`. It must be
+   * an origin with no path, query, fragment, or credentials.
+   */
   serverUrl: string;
   /**
-   * Return a socket-session token from your backend, which opens the session with its
-   * workspace key (`POST /api/service/socket-sessions`) for the apps this page watches.
-   * Called when a builder session first connects, and again only after the server
-   * rejects or expires the current session. Sessions last one hour.
+   * Returns a socket session token from your server.
+   *
+   * Your server opens a session with its workspace API key through
+   * `POST /api/service/socket-sessions`, for the apps this page shows, and returns the
+   * `session_token`. The client calls this when a builder session first connects, and again only
+   * after Base44 rejects or expires the current token. Sessions last one hour. Open a new session
+   * on every call instead of returning a cached token.
+   *
+   * It must settle within 20 seconds and return a non-empty token, or the session reports
+   * `session_unavailable`. Never return a workspace API key or any other server credential.
+   *
+   * @returns The session token, or a promise resolving to it.
+   *
+   * @example
+   * ```typescript
+   * // Fetch a session token from your server
+   * const client = new Base44PlatformClient({
+   *   serverUrl: socketUrl,
+   *   async getSessionToken() {
+   *     const response = await fetch('/api/builder-session', { method: 'POST' });
+   *     const { session_token } = await response.json();
+   *     return session_token;
+   *   },
+   * });
+   * ```
    */
   getSessionToken: () => string | Promise<string>;
 }

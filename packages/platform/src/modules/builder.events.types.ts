@@ -15,10 +15,12 @@ export type PlatformEventMap = {
  * One live event for a subscribed app.
  *
  * Check `type` to narrow `data` to that event's payload. A key missing from `data` means the value
- * is unchanged, and an explicit `null` clears it.
+ * is unchanged, and an explicit `null` clears it. For every event and its payload, see the
+ * [events reference](/developers/references/platform-sdk/live-updates/events).
  *
  * @example
  * ```typescript
+ * // Narrow an event by type
  * function onEvent(event: PlatformEvent) {
  *   if (event.type === "message.updated") {
  *     const { message } = event.data;
