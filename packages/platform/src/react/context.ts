@@ -1,3 +1,4 @@
+"use client";
 import { createContext, useContext } from "react";
 import type { ChatActions, ChatComponents, ChatState } from "./components.types.js";
 import { fallbackComponents } from "./fallbacks.js";

@@ -1,3 +1,4 @@
+"use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Base44PlatformClient } from "../client.js";
 import type { ChatMessage } from "../modules/builder.events.types.js";

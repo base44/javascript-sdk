@@ -1,3 +1,4 @@
+"use client";
 import type { MessageProps, QuestionProps } from "./components.types.js";
 import { useChatComponents } from "./context.js";
 

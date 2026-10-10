@@ -1,3 +1,4 @@
+"use client";
 import { useId, useState } from "react";
 import type { ChatComponents, StepProps, TextProps } from "./components.types.js";
 import type { ApprovalQuestion, ChoiceQuestion, InputQuestion, UnknownQuestion } from "./chat.types.js";

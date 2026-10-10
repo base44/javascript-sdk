@@ -1,3 +1,4 @@
+"use client";
 import { useMemo } from "react";
 import type { Base44ChatProviderProps, ChatComponents } from "./components.types.js";
 import { ActionsContext, ComponentsContext, StateContext } from "./context.js";

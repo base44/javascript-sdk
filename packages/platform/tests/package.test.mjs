@@ -41,6 +41,12 @@ test("the client resolves from the installed package without the runtime SDK", (
   `]);
 });
 
+test("the React modules that use hooks or context keep their \"use client\" directive", () => {
+  for (const file of ['dist/react/useBase44Chat.js', 'dist/react/context.js', 'dist/react/Base44ChatProvider.js', 'dist/react/Message.js', 'dist/react/fallbacks.js']) {
+    assert.match(readFileSync(path.join(installed, file), "utf8"), /^"use client";/, file);
+  }
+});
+
 test("react is an optional peer of the /react entry, never a dependency of the client", () => {
   assert.equal("react" in manifest.dependencies, false);
   assert.deepEqual(manifest.peerDependencies, { react: "^18.0.0 || ^19.0.0" });
