@@ -1,4 +1,4 @@
-import type { PlatformEvent, Snapshot } from "./builder.events.types.js";
+import type { PlatformEvent, PlatformSnapshot } from "./builder.events.types.js";
 import { PlatformSocketError } from "../errors.js";
 import type { PlatformSocketErrorCode } from "../errors.types.js";
 import type { PlatformSubscription, SubscriptionOptions } from "./builder.types.js";
@@ -29,7 +29,7 @@ export class Subscription implements PlatformSubscription {
     this.enqueue(() => this.options.onEvent(event));
   }
 
-  snapshot(snapshot: Snapshot): void {
+  snapshot(snapshot: PlatformSnapshot): void {
     this.enqueue(() => this.options.onSnapshot(snapshot));
   }
 

@@ -19,11 +19,13 @@
 
 import fs from "fs";
 import path from "path";
+import { packagePaths } from "./package-paths.js";
 
 console.debug = () => {}; // Disable debug logging. Comment this out to enable debug logging.
 
-const DOCS_SOURCE_PATH = path.join(import.meta.dirname, "../../docs/content");
-const CATEGORY_MAP_PATH = path.join(import.meta.dirname, "./category-map.json");
+const { docsDir, configDir, target: TARGET } = packagePaths();
+const DOCS_SOURCE_PATH = path.join(docsDir, "content");
+const CATEGORY_MAP_PATH = path.join(configDir, "category-map.json");
 
 // Default: assume mintlify-docs is a sibling directory to javascript-sdk
 const SDK_ROOT = path.join(import.meta.dirname, "../..");
@@ -56,6 +58,7 @@ Usage:
 Options:
   --target, -t <path>  Path to the mintlify-docs repo. 
                        Defaults to ../mintlify-docs (sibling directory)
+  --package-dir <dir>  Package to copy the docs of. Defaults to packages/sdk.
   --help, -h           Show this help message
 
 Examples:
@@ -71,8 +74,8 @@ Examples:
   return { target };
 }
 
-// Target location within mintlify-docs for SDK reference docs
-const SDK_DOCS_TARGET_PATH = "developers/references/sdk/docs";
+// Target location within mintlify-docs for the reference docs
+const SDK_DOCS_TARGET_PATH = TARGET.path;
 
 function scanSdkDocs(sdkDocsDir) {
   const result = {};
@@ -127,14 +130,10 @@ function updateDocsJson(repoDir, sdkFiles) {
     };
     const p = (kind, file) => `${prefix}${basePath}/${kind}/${file}`;
 
-    if (sdkFiles.functions?.length > 0 && categoryMap.functions)
-      addToGroup(categoryMap.functions, sdkFiles.functions.map((f) => p("functions", f)));
-    if (sdkFiles.interfaces?.length > 0 && categoryMap.interfaces)
-      addToGroup(categoryMap.interfaces, sdkFiles.interfaces.map((f) => p("interfaces", f)));
-    if (sdkFiles.classes?.length > 0 && categoryMap.classes)
-      addToGroup(categoryMap.classes, sdkFiles.classes.map((f) => p("classes", f)));
-    if (sdkFiles["type-aliases"]?.length > 0 && categoryMap["type-aliases"])
-      addToGroup(categoryMap["type-aliases"], sdkFiles["type-aliases"].map((f) => p("type-aliases", f)));
+    // Groups follow the category map's key order.
+    for (const [kind, group] of Object.entries(categoryMap)) {
+      if (sdkFiles[kind]?.length > 0) addToGroup(group, sdkFiles[kind].map((f) => p(kind, f)));
+    }
 
     return Array.from(groupMap.entries()).map(([group, pages]) => ({
       group,
@@ -177,11 +176,14 @@ function updateDocsJson(repoDir, sdkFiles) {
 
     for (const tab of tabs) {
       const sdkAnchor =
-        tab.dropdowns?.find((d) => d.dropdown === "SDK") ??
-        tab.anchors?.find((a) => a.anchor === "SDK");
+        tab.dropdowns?.find((d) => d.dropdown === TARGET.dropdown) ??
+        tab.anchors?.find((a) => a.anchor === TARGET.dropdown);
       if (!sdkAnchor?.groups) continue;
 
-      const sdkRefIndex = sdkAnchor.groups.findIndex(groupReferencesSdkDocs);
+      let sdkRefIndex = sdkAnchor.groups.findIndex(groupReferencesSdkDocs);
+      if (sdkRefIndex === -1 && TARGET.group) {
+        sdkRefIndex = sdkAnchor.groups.push({ group: TARGET.group, icon: TARGET.icon, pages: [] }) - 1;
+      }
       if (sdkRefIndex === -1) continue;
 
       const existing = sdkAnchor.groups[sdkRefIndex];

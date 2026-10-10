@@ -1,6 +1,6 @@
 import { io, type Socket } from "socket.io-client";
 import { PlatformSocketError } from "../errors.js";
-import { appFromRoom, appPattern, decode, decodeSnapshot, eventNames, object, roomFor, roomNotices } from "./builder-protocol.js";
+import { appFromRoom, appPattern, decode, decodeSnapshot, eventNames, object, roomFor, roomNotices, sessionEndings } from "./builder-protocol.js";
 import { notify, Subscription } from "./builder-subscription.js";
 import type { PlatformClientOptions } from "../client.types.js";
 import type { BuilderInitOptions, BuilderSession, PlatformSubscription, SubscriptionOptions } from "./builder.types.js";
@@ -16,7 +16,7 @@ export class BuilderSocket implements BuilderSession {
   // The session token outlives reconnects; it is replaced only when the server rejects or expires it.
   private token?: string;
   private tokenFresh = false;
-  private ending?: "session_expired" | "session_revoked" | "session_replaced";
+  private ending?: (typeof sessionEndings)[keyof typeof sessionEndings];
   private denialRetries = 0;
   private retryTimer?: ReturnType<typeof setTimeout>;
   private authAttempt = 0;
@@ -27,7 +27,7 @@ export class BuilderSocket implements BuilderSession {
 
   constructor(config: PlatformClientOptions, options: BuilderInitOptions) {
     this.options = { ...config, onError: options.onError };
-    this.socket = io(config.serverUrl, {
+    this.socket = io(config.socketUrl, {
       path: "/ws/socket.io/", transports: ["websocket"], autoConnect: false,
       forceNew: true, reconnectionAttempts: 5, reconnectionDelay: 1000, reconnectionDelayMax: 10000,
       timeout: 20000,
@@ -188,9 +188,8 @@ export class BuilderSocket implements BuilderSession {
   private sessionEnded(raw: unknown): void {
     try {
       const reason = object(object(raw).data).reason;
-      const ending = reason === "expired" ? "session_expired"
-        : reason === "revoked" ? "session_revoked"
-        : reason === "replaced" ? "session_replaced" : undefined;
+      const ending = typeof reason === "string" && Object.prototype.hasOwnProperty.call(sessionEndings, reason)
+        ? sessionEndings[reason as keyof typeof sessionEndings] : undefined;
       if (!ending) throw new Error("Unknown reason");
       // The server disconnects next; the disconnect handler renews or stops.
       this.token = undefined;

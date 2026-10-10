@@ -579,10 +579,11 @@ function rewriteReturnSections(content, options) {
       if (fields.length === 0 && !indexSignature) {
         result.push(...sectionLines);
       } else {
+        // The section's own leading type link is the fallback when the signature gave no type.
         const typeNameForDisplay = enrichTypeNameWithGenerics(
           extractedTypeName || returnTypeName,
           returnTypeFromSignature
-        );
+        ) || sectionContent.match(/^\[`([^`]+)`\]\(/)?.[1];
         if (typeNameForDisplay) {
           result.push("");
           result.push(`\`${typeNameForDisplay}\``);

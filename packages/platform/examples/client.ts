@@ -1,7 +1,9 @@
-import { Base44PlatformClient, type PlatformEvent } from "@base44/platform";
+import { createPlatformClient, type PlatformEvent } from "@base44/platform";
 
-const client = new Base44PlatformClient({
-  serverUrl: "https://base44.app",
+declare const socketUrl: string;
+
+const client = createPlatformClient({
+  socketUrl, // the session's socket_url, from POST /api/service/socket-sessions
   // Your backend opens the session with its workspace key and returns only the session token.
   async getSessionToken() {
     const response = await fetch("/api/builder-socket-session", { method: "POST" });

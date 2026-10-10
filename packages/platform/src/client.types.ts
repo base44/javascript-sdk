@@ -1,12 +1,38 @@
-/** Shared configuration for browser platform modules. Never supply an API key. */
+import type { BuilderModule } from "./modules/builder.types.js";
+
+/**
+ * Options for {@linkcode createPlatformClient | createPlatformClient()}.
+ *
+ * The client runs in the browser and never sees your workspace API key. Your server opens a socket
+ * session with the key and hands the browser only the session's token and socket URL.
+ */
 export interface PlatformClientOptions {
-  /** Origin of the platform service, e.g. https://base44.app. No path/query/credentials. */
-  serverUrl: string;
   /**
-   * Return a socket-session token from your backend, which opens the session with its
-   * workspace key (`POST /api/service/socket-sessions`) for the apps this page watches.
-   * Called when a builder session first connects, and again only after the server
-   * rejects or expires the current session. Sessions last one hour.
+   * Origin of the platform socket.
+   *
+   * Use the `socket_url` your server receives from `POST /api/service/socket-sessions`. It's the same
+   * for every session in an environment, so your server can pass it to the page once. It must be an
+   * origin with no path, query, fragment, or credentials.
+   */
+  socketUrl: string;
+  /**
+   * Returns a socket session token from your server.
+   *
+   * Your server opens a session with `POST /api/service/socket-sessions` and returns its
+   * `session_token`. The client calls this when it connects, and again when the token expires.
+   * Return a new token on every call.
+   *
+   * @returns The session token, or a promise resolving to it.
    */
   getSessionToken: () => string | Promise<string>;
+}
+
+/**
+ * The platform client.
+ *
+ * Provides access to the platform's modules.
+ */
+export interface PlatformClient {
+  /** [Builder module](/developers/references/platform-sdk/docs/interfaces/builder) for following the AI chat in your users' apps live. */
+  readonly builder: BuilderModule;
 }

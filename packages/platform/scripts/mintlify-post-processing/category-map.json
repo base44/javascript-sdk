@@ -1,0 +1,7 @@
+{
+  "functions": "Client",
+  "interfaces": "Modules",
+  "type-aliases": "Modules",
+  "classes": "Errors",
+  "events": "Events"
+}

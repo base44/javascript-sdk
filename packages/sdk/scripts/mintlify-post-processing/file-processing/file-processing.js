@@ -14,28 +14,23 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { packagePaths } from "../package-paths.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DOCS_DIR = path.join(__dirname, "..", "..", "..", "docs");
+const { docsDir: DOCS_DIR, configDir: CONFIG_DIR } = packagePaths();
 const CONTENT_DIR = path.join(DOCS_DIR, "content");
 const LINKED_TYPES_FILE = path.join(CONTENT_DIR, ".linked-types.json");
 const TEMPLATE_PATH = path.join(__dirname, "docs-json-template.json");
 const STYLING_CSS_PATH = path.join(__dirname, "styling.css");
-const CATEGORY_MAP_PATH = path.join(__dirname, "../category-map.json");
-const TYPES_TO_EXPOSE_PATH = path.join(__dirname, "..", "types-to-expose.json");
-const TYPES_TO_DELETE_PATH = path.join(__dirname, "..", "types-to-delete-after-processing.json");
-const APPENDED_ARTICLES_PATH = path.join(
-  __dirname,
-  "../appended-articles.json"
-);
-const METHOD_ORDER_PATH = path.join(__dirname, "..", "method-order.json");
-const OVERLOAD_PRESENTATION_PATH = path.join(
-  __dirname,
-  "..",
-  "overload-presentation.json"
-);
+const CATEGORY_MAP_PATH = path.join(CONFIG_DIR, "category-map.json");
+const TYPES_TO_EXPOSE_PATH = path.join(CONFIG_DIR, "types-to-expose.json");
+const TYPES_TO_DELETE_PATH = path.join(CONFIG_DIR, "types-to-delete-after-processing.json");
+const APPENDED_ARTICLES_PATH = path.join(CONFIG_DIR, "appended-articles.json");
+const METHOD_ORDER_PATH = path.join(CONFIG_DIR, "method-order.json");
+const OVERLOAD_PRESENTATION_PATH = path.join(CONFIG_DIR, "overload-presentation.json");
+const PAGE_SECTIONS_PATH = path.join(CONFIG_DIR, "page-sections.json");
 
 // Controlled via env var so we can re-enable Panel injection when needed.
 const PANELS_ENABLED = process.env.MINTLIFY_INCLUDE_PANELS === "true";
@@ -1437,12 +1432,11 @@ function applyTypeDeclarationLinking(dir) {
  * `## Properties` section. The value renames the heading, or is null to keep the
  * interface name.
  */
-const TYPES_WITH_OWN_METHODS = {
-  EntityHandler: "Entity Handler Methods",
-  ActorRef: "Actor methods",
-  Connection: "Connection methods",
-  ActorSubscription: "Subscription methods",
-};
+// Appended types whose methods get their own section, by section title, and groups of appended
+// types nested under "## Type Definitions" (the first type of a group starts the section). A group
+// is a list of type names, or `{ "title": "...", "types": [...] }` for another section heading.
+const { typesWithOwnMethods: TYPES_WITH_OWN_METHODS = {}, typeDefinitionGroups: TYPE_DEFINITION_GROUPS = [] } =
+  fs.existsSync(PAGE_SECTIONS_PATH) ? JSON.parse(fs.readFileSync(PAGE_SECTIONS_PATH, "utf-8")) : {};
 
 /**
  * Group intro sections (like "Built-in User Entity", "Generated Types") under an "Overview" heading
@@ -1556,7 +1550,7 @@ function applyIntroSectionGrouping(dir) {
 /**
  * Group type definition sections under a parent heading.
  *
- * Each group below must list every entry from appended-articles.json for that
+ * Each group in page-sections.json must list every entry from appended-articles.json for that
  * module except the one that gets absorbed into the "## ... Methods" section
  * (typically named `*Module` or `*Handler`, e.g. EntityHandler) — otherwise
  * the appended type keeps its original `##` heading and renders as a sibling
@@ -1565,39 +1559,10 @@ function applyIntroSectionGrouping(dir) {
 function groupTypeDefinitions(content) {
   let modified = false;
   
-  // Define type definition patterns for different modules
-  const typeGroups = [
-    // Connectors module
-    {
-      types: ["ConnectorIntegrationType", "ConnectorIntegrationTypeRegistry"],
-      indicator: "ConnectorIntegrationType"
-    },
-    // Entities module
-    {
-      types: [
-        "EntityRecord",
-        "EntityTypeRegistry",
-        "SortField",
-        "EntityFilterQuery"
-      ],
-      indicator: "EntityRecord"
-    },
-    // Functions module
-    {
-      types: ["FunctionName", "FunctionNameRegistry"],
-      indicator: "FunctionName"
-    },
-    // Agents module
-    {
-      types: ["AgentName", "AgentNameRegistry"],
-      indicator: "AgentName"
-    },
-    // Actors module
-    {
-      types: ["ActorClient", "ActorRegistry", "ActorNameRegistry"],
-      indicator: "ActorClient"
-    }
-  ];
+  const typeGroups = TYPE_DEFINITION_GROUPS.map((group) => {
+    const { title = "Type Definitions", types } = Array.isArray(group) ? { types: group } : group;
+    return { types, indicator: types[0], title };
+  });
   
   // Find which type group exists in this file
   let matchedGroup = null;
@@ -1638,7 +1603,7 @@ function groupTypeDefinitions(content) {
 
   const updatedContent =
     beforeTypeDefinitions +
-    "## Type Definitions\n\n" +
+    `## ${matchedGroup.title}\n\n` +
     demotedSection;
   
   return { content: updatedContent, modified: true };
@@ -2564,6 +2529,97 @@ function restructureActorsPage() {
   fs.writeFileSync(file, tidied, "utf-8");
 }
 
+/** Class pages: no "Extends Error", which tells a reader nothing. */
+function cleanupClassPage(content) {
+  return content.replace(/^### Extends\n\n(- .*\n)+\n?/m, "");
+}
+
+/**
+ * A class page's ## Properties, and any #### Properties (a type under Type Definitions), as
+ * ResponseFields, the component Returns and Parameters use, without TypeDoc's inheritance notes.
+ */
+function propertiesAsFields(content, classPage) {
+  const fieldsOf = (body) => body.split(/^\*{3}$/m).map((block) => {
+    const signature = block.match(/^> (.*)$/m)?.[1] ?? "";
+    const name = block.match(/^#### (.+?)\??$/m)?.[1]?.replace(/\\/g, "");
+    if (!name) return "";
+    const type = signature.split(/\*\*: /)[1]?.replace(/`/g, "").trim() ?? "";
+    const description = block.replace(/^#### .*$/m, "").replace(/^> .*$/m, "").trim();
+    const required = signature.includes("`optional`") ? "" : " required";
+    return `<ResponseField name="${name}" type="${type.replace(/"/g, "'")}"${required}>\n\n${description}\n\n</ResponseField>`;
+  }).filter(Boolean).join("\n\n");
+  return content
+    .replace(/^#### Inherited from\n\n.*\n\n?/gm, "")
+    .replace(/^#### Extends\n\n(- .*\n)+\n?/gm, "")
+    .replace(classPage ? /^## Properties\n([\s\S]*?)(?=^## |(?![\s\S]))/m : /(?!)/, (section, body) => `## Properties\n\n${fieldsOf(body)}\n\n`)
+    .replace(/^#### Properties\n([\s\S]*?)(?=^#{1,3} |(?![\s\S]))/gm, (section, body) => `${fieldsOf(body)}\n\n`);
+}
+
+function applyPropertiesAsFields(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) applyPropertiesAsFields(entryPath);
+    else if (entry.name.endsWith(".mdx")) {
+      const content = fs.readFileSync(entryPath, "utf-8");
+      const converted = propertiesAsFields(content, path.basename(dir) === "classes");
+      if (converted !== content) fs.writeFileSync(entryPath, converted, "utf-8");
+    }
+  }
+}
+
+function applyClassPageCleanup(dir) {
+  const classesDir = path.join(dir, "content", "classes");
+  if (!fs.existsSync(classesDir)) return;
+  for (const file of fs.readdirSync(classesDir).filter((name) => name.endsWith(".mdx"))) {
+    const filePath = path.join(classesDir, file);
+    fs.writeFileSync(filePath, cleanupClassPage(fs.readFileSync(filePath, "utf-8")), "utf-8");
+  }
+}
+
+/**
+ * A Returns type line such as `BuilderSession` becomes a link when the same page documents that type:
+ * its methods section (page-sections.json `typesWithOwnMethods`) or its own ### heading.
+ */
+function linkReturnTypes(content) {
+  const slug = (heading) => heading.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const anchors = new Map();
+  for (const [type, title] of Object.entries(TYPES_WITH_OWN_METHODS)) {
+    if (content.includes(`\n## ${title}\n`)) anchors.set(type, slug(title));
+  }
+  for (const [, type] of content.matchAll(/^### (\w+)$/gm)) anchors.set(type, slug(type));
+  // The section a type heads, with no separator under its heading, and its description.
+  const descriptions = new Map();
+  const headings = [...Object.entries(TYPES_WITH_OWN_METHODS).map(([type, title]) => [type, `## ${title}`]),
+    ...[...anchors.keys()].map((type) => [type, `### ${type}`])];
+  for (const [type, heading] of headings) {
+    const start = content.indexOf(`\n${heading}\n\n***\n\n`);
+    if (start === -1) continue;
+    content = content.replace(`\n${heading}\n\n***\n\n`, `\n${heading}\n\n`);
+    const body = content.slice(start + heading.length + 3);
+    descriptions.set(type, body.slice(0, body.search(/\n(#|> |<|```)/)).trim());
+  }
+  return content.replace(/(^#{4,5} Returns\n\n)`(\w+)`$/gm, (match, heading, type) =>
+    anchors.has(type) ? `${heading}[\`${type}\`](#${anchors.get(type)})` : match)
+    // A linked Returns points at the type's own description; don't repeat it there.
+    .replace(/(^#{4,5} Returns\n\n\[`(\w+)`\]\(#[^)]+\)\n\n)([\s\S]*?)(?=\n#|\n<)/gm, (match, head, type, rest) => {
+      const description = descriptions.get(type);
+      const text = rest.replace(/``/g, "`");
+      return description && text.includes(description) ? head + text.replace(description, "").trimStart() : match;
+    });
+}
+
+function applyReturnTypeLinks(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) applyReturnTypeLinks(entryPath);
+    else if (entry.name.endsWith(".mdx")) {
+      const content = fs.readFileSync(entryPath, "utf-8");
+      const linked = linkReturnTypes(content);
+      if (linked !== content) fs.writeFileSync(entryPath, linked, "utf-8");
+    }
+  }
+}
+
 function main() {
   console.log("Processing TypeDoc MDX files for Mintlify...\n");
 
@@ -2613,6 +2669,9 @@ function main() {
   // Group type definitions under a parent heading
   applyTypeDefinitionGrouping(DOCS_DIR);
 
+  applyClassPageCleanup(DOCS_DIR);
+  applyPropertiesAsFields(DOCS_DIR);
+
   // Reorder methods according to method-order.json
   applyMethodOrdering(DOCS_DIR);
 
@@ -2631,6 +2690,10 @@ function main() {
 
   // Delete types that should not appear in navigation but were needed for inline rendering
   deleteTypesAfterProcessing(DOCS_DIR);
+
+  // Link a Returns type to where the same page documents it. Last: it drops the *** separators
+  // that method ordering splits on.
+  applyReturnTypeLinks(DOCS_DIR);
 
   // Clean up the linked types file
   try {

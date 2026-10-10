@@ -34,16 +34,16 @@ test("the client resolves from the installed package without the runtime SDK", (
   assert.equal("@base44/sdk" in { ...manifest.dependencies, ...manifest.peerDependencies }, false);
   run(process.execPath, ["--input-type=module", "--eval", `
     import assert from "node:assert/strict";
-    import { Base44PlatformClient } from "@base44/platform";
-    const client = new Base44PlatformClient({ serverUrl: "https://example.test", getSessionToken: () => "session-token" });
+    import { createPlatformClient } from "@base44/platform";
+    const client = createPlatformClient({ socketUrl: "https://example.test", getSessionToken: () => "session-token" });
     assert.equal(typeof client.builder.init, "function");
     client.builder.init({ onError() {} }).close();
   `]);
 });
 
 const consumer = `
-import { Base44PlatformClient, type PlatformEvent } from "@base44/platform";
-const platform = new Base44PlatformClient({ serverUrl: "https://example.test", getSessionToken: async () => "token" });
+import { createPlatformClient, type PlatformEvent } from "@base44/platform";
+const platform = createPlatformClient({ socketUrl: "https://example.test", getSessionToken: async () => "token" });
 platform.builder.init({ onError() {} }).subscribe("a".repeat(24), {
   onSnapshot(snapshot) { void snapshot.messages; },
   onEvent(event: PlatformEvent) {
@@ -55,7 +55,7 @@ platform.builder.init({ onError() {} }).subscribe("a".repeat(24), {
   onError() {},
 });
 // @ts-expect-error No browser API key.
-new Base44PlatformClient({ apiKey: "private" });
+createPlatformClient({ apiKey: "private" });
 // @ts-expect-error No write channel.
 platform.send("write_file", {});
 `;
