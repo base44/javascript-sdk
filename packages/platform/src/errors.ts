@@ -16,6 +16,7 @@ import type { PlatformSocketErrorCode } from "./errors.types.js";
  * ```typescript
  * // Handle session and app errors
  * const builder = client.builder.init({
+ *   // Session error codes: the whole session is affected
  *   onError(error) {
  *     if (error.code === 'session_revoked') showSignedOut();
  *   },
@@ -24,6 +25,7 @@ import type { PlatformSocketErrorCode } from "./errors.types.js";
  * builder.subscribe(appId, {
  *   onSnapshot: renderChat,
  *   onEvent: applyEvent,
+ *   // App error codes: only this app is affected, and error.appId says which
  *   onError(error) {
  *     if (error.code === 'access_revoked') hideLiveUpdates(error.appId);
  *   },

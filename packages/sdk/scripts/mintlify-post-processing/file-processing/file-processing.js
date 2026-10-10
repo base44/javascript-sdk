@@ -2535,6 +2535,8 @@ function restructureActorsPage() {
  * A class without a documented constructor keeps its ## Properties, as fields like a Returns.
  */
 function cleanupClassPage(content) {
+  // "Extends Error" tells a reader nothing the overview doesn't.
+  content = content.replace(/^### Extends\n\n(- .*\n)+\n?/m, "");
   const lines = content.split("\n");
   const returnsIndex = lines.indexOf("#### Returns");
   if (returnsIndex === -1) return propertiesAsFields(content);
