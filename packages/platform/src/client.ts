@@ -6,8 +6,6 @@ import { createBuilder } from "./modules/builder.js";
  *
  * This is the entry point of the Platform SDK. The client gives your white-label app editor
  * access to the platform's modules, such as [`builder`](/developers/references/platform-sdk/docs/interfaces/builder).
- * Creating it opens no sockets, starts no timers and sends no requests. Each module sets up its own
- * resources when you initialize it.
  *
  * @param options - Configuration object for the client.
  * @returns A configured platform client with access to the platform's modules.
