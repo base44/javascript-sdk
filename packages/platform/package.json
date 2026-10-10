@@ -29,11 +29,12 @@
     "test:unit": "vitest run",
     "test:package": "npm run build && node --test tests/package.test.mjs",
     "prepublishOnly": "npm run build",
-    "create-docs": "npm run create-docs:generate && npm run create-docs:process",
+    "create-docs": "npm run create-docs:generate && npm run create-docs:process && npm run create-docs:events",
     "create-docs-local": "npm run create-docs && npm run copy-docs-local",
     "copy-docs-local": "node ../sdk/scripts/mintlify-post-processing/copy-to-local-docs.js --package-dir .",
     "create-docs:generate": "node -e \"fs.rmSync('docs',{recursive:true,force:true})\" && typedoc --options typedoc.mintlify.json",
-    "create-docs:process": "node ../sdk/scripts/mintlify-post-processing/file-processing/file-processing.js --package-dir ."
+    "create-docs:process": "node ../sdk/scripts/mintlify-post-processing/file-processing/file-processing.js --package-dir .",
+    "create-docs:events": "tsc && node scripts/events-to-mdx.mjs"
   },
   "dependencies": {
     "socket.io-client": "^4.8.3"

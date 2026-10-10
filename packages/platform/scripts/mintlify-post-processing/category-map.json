@@ -2,5 +2,6 @@
   "functions": "Client",
   "interfaces": "Modules",
   "type-aliases": "Modules",
-  "classes": "Errors"
+  "classes": "Errors",
+  "events": "Events"
 }

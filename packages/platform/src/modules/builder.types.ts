@@ -127,7 +127,7 @@ export interface BuilderSession {
 /** Callbacks for one app subscription. */
 export interface SubscriptionOptions {
   /**
-   * Called with the app's current state. Replace everything you hold for the app with it.
+   * Called with the app's current state, a [`PlatformSnapshot`](#platformsnapshot). Replace everything you hold for the app with it.
    *
    * Arrives after every join and rejoin, and after the main conversation is rewritten by an undo,
    * restore or sync. Live events follow it. It holds only the last 50 messages, so merge by message
@@ -138,7 +138,7 @@ export interface SubscriptionOptions {
    * Called with each live event, a [`PlatformEvent`](#platformevent). Events for an app arrive one at a time, in order. If the callback
    * throws or rejects, the subscription ends with `handler_failed`. New event types can be added at
    * any time, so ignore types you don't handle. For every event and its payload,
-   * see the [events reference](/developers/references/platform-sdk/live-updates/events).
+   * see the [events reference](/developers/references/platform-sdk/docs/events/builder-events).
    */
   onEvent: (event: PlatformEvent) => void | Promise<void>;
   /**

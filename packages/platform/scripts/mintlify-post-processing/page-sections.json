@@ -3,7 +3,7 @@
     "BuilderSession": "Session methods"
   },
   "typeDefinitionGroups": [
-    ["PlatformEvent"],
+    ["PlatformEvent", "PlatformSnapshot"],
     { "title": "Error codes", "types": ["SessionErrorCode", "AppErrorCode"] }
   ]
 }

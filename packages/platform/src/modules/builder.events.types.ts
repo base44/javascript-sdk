@@ -16,7 +16,7 @@ export type PlatformEventMap = {
  *
  * Check `type` to narrow `data` to that event's payload. A key missing from `data` means the value
  * is unchanged, and an explicit `null` clears it. For every event and its payload, see the
- * [events reference](/developers/references/platform-sdk/live-updates/events).
+ * [events reference](/developers/references/platform-sdk/docs/events/builder-events).
  *
  * @example
  * ```typescript

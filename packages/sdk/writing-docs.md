@@ -65,5 +65,5 @@ The same pipeline documents the Platform SDK (`packages/platform`). Pass `--pack
 
 From `packages/platform`:
 * `npm run docs` validates that every export has JSDoc. Its output in `docs` is not published.
-* `npm run create-docs` generates the Mintlify reference into `docs/content`.
+* `npm run create-docs` generates the Mintlify reference into `docs/content`, plus the builder events page (`docs/content/events`), rendered from `asyncapi.json` for the events that reach `onEvent`.
 * `npm run copy-docs-local -- --target <path-to-mintlify-docs>` copies it into `developers/references/platform-sdk/docs` and updates the **Platform SDK** dropdown in `docs.json`.

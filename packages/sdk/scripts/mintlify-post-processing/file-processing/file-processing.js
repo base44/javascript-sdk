@@ -2529,25 +2529,42 @@ function restructureActorsPage() {
   fs.writeFileSync(file, tidied, "utf-8");
 }
 
-/** Class pages: no "Extends Error", which tells a reader nothing, and properties as fields like a Returns. */
+/** Class pages: no "Extends Error", which tells a reader nothing. */
 function cleanupClassPage(content) {
-  return propertiesAsFields(content.replace(/^### Extends\n\n(- .*\n)+\n?/m, ""));
+  return content.replace(/^### Extends\n\n(- .*\n)+\n?/m, "");
 }
 
-/** A class page's ## Properties as ResponseFields, the component its Returns and Parameters use. */
-function propertiesAsFields(content) {
-  return content.replace(/^## Properties\n([\s\S]*?)(?=^## |(?![\s\S]))/m, (section, body) => {
-    const fields = body.split(/^\*{3}$/m).map((block) => {
-      const signature = block.match(/^> (.*)$/m)?.[1] ?? "";
-      const name = block.match(/^#### (.+?)\??$/m)?.[1]?.replace(/\\/g, "");
-      if (!name) return "";
-      const type = signature.split(/\*\*: /)[1]?.replace(/`/g, "").trim() ?? "";
-      const description = block.replace(/^#### .*$/m, "").replace(/^> .*$/m, "").trim();
-      const required = signature.includes("`optional`") ? "" : " required";
-      return `<ResponseField name="${name}" type="${type}"${required}>\n\n${description}\n\n</ResponseField>`;
-    }).filter(Boolean);
-    return `## Properties\n\n${fields.join("\n\n")}\n\n`;
-  });
+/**
+ * A class page's ## Properties, and any #### Properties (a type under Type Definitions), as
+ * ResponseFields, the component Returns and Parameters use, without TypeDoc's inheritance notes.
+ */
+function propertiesAsFields(content, classPage) {
+  const fieldsOf = (body) => body.split(/^\*{3}$/m).map((block) => {
+    const signature = block.match(/^> (.*)$/m)?.[1] ?? "";
+    const name = block.match(/^#### (.+?)\??$/m)?.[1]?.replace(/\\/g, "");
+    if (!name) return "";
+    const type = signature.split(/\*\*: /)[1]?.replace(/`/g, "").trim() ?? "";
+    const description = block.replace(/^#### .*$/m, "").replace(/^> .*$/m, "").trim();
+    const required = signature.includes("`optional`") ? "" : " required";
+    return `<ResponseField name="${name}" type="${type.replace(/"/g, "'")}"${required}>\n\n${description}\n\n</ResponseField>`;
+  }).filter(Boolean).join("\n\n");
+  return content
+    .replace(/^#### Inherited from\n\n.*\n\n?/gm, "")
+    .replace(/^#### Extends\n\n(- .*\n)+\n?/gm, "")
+    .replace(classPage ? /^## Properties\n([\s\S]*?)(?=^## |(?![\s\S]))/m : /(?!)/, (section, body) => `## Properties\n\n${fieldsOf(body)}\n\n`)
+    .replace(/^#### Properties\n([\s\S]*?)(?=^#{1,3} |(?![\s\S]))/gm, (section, body) => `${fieldsOf(body)}\n\n`);
+}
+
+function applyPropertiesAsFields(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) applyPropertiesAsFields(entryPath);
+    else if (entry.name.endsWith(".mdx")) {
+      const content = fs.readFileSync(entryPath, "utf-8");
+      const converted = propertiesAsFields(content, path.basename(dir) === "classes");
+      if (converted !== content) fs.writeFileSync(entryPath, converted, "utf-8");
+    }
+  }
 }
 
 function applyClassPageCleanup(dir) {
@@ -2653,6 +2670,7 @@ function main() {
   applyTypeDefinitionGrouping(DOCS_DIR);
 
   applyClassPageCleanup(DOCS_DIR);
+  applyPropertiesAsFields(DOCS_DIR);
 
   // Reorder methods according to method-order.json
   applyMethodOrdering(DOCS_DIR);

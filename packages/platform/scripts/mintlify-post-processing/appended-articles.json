@@ -1,7 +1,8 @@
 {
   "interfaces/builder": [
     "interfaces/BuilderSession",
-    "type-aliases/PlatformEvent"
+    "type-aliases/PlatformEvent",
+    "interfaces/PlatformSnapshot"
   ],
   "classes/PlatformSocketError": [
     "type-aliases/SessionErrorCode",

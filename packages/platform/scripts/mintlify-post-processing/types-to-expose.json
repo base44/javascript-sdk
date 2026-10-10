@@ -3,6 +3,7 @@
   "BuilderModule",
   "BuilderSession",
   "PlatformEvent",
+  "PlatformSnapshot",
   "PlatformSocketError",
   "SessionErrorCode"
 ]

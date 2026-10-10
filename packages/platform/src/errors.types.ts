@@ -22,13 +22,13 @@ export type SessionErrorCode =
    */
   | "connection_failed"
   /**
-   * Base44 sent [`session.ended`](/developers/references/platform-sdk/live-updates/events#session-ended) with `revoked`.
+   * Your server or an admin ended the session, or its key lost access.
    *
    * Open a new session from your server if the page should still follow apps. Not retryable.
    */
   | "session_revoked"
   /**
-   * Base44 sent [`session.ended`](/developers/references/platform-sdk/live-updates/events#session-ended) with `replaced`: another socket connected with the same token.
+   * Another socket connected with the same session token.
    *
    * Use one session per tab. Don't reconnect automatically; call `connect()` only to take the session back on purpose. Not retryable.
    */
@@ -52,19 +52,19 @@ export type SessionErrorCode =
  */
 export type AppErrorCode =
   /**
-   * Base44 sent [`room.access_denied`](/developers/references/platform-sdk/live-updates/events#room-access_denied).
+   * The app isn't on the session's allowlist, or the socket joins too often.
    *
    * Add the app to the session from your server, then subscribe again. Not retryable.
    */
   | "access_denied"
   /**
-   * Base44 sent [`room.access_revoked`](/developers/references/platform-sdk/live-updates/events#room-access_revoked).
+   * The app left the session's allowlist, or its workspace.
    *
    * Stop showing the app's live updates. Not retryable.
    */
   | "access_revoked"
   /**
-   * Base44 sent [`room.snapshot_unavailable`](/developers/references/platform-sdk/live-updates/events#room-snapshot_unavailable). The subscription stays active and events keep arriving.
+   * The subscription is active but its snapshot failed. Events keep arriving.
    *
    * Load the app's messages over the Apps API instead.
    */
