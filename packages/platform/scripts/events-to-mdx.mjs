@@ -1,19 +1,13 @@
 #!/usr/bin/env node
-// Renders two MDX pages from the committed asyncapi.json, with the ResponseField / Expandable
-// components the rest of the reference uses:
-// - protocol/socket-messages: every message on the connection, both directions, as it travels.
-// - events/builder-events: how the client delivers them, from its own mapping (eventNames,
-//   roomNotices, sessionEndings), so the page and the code come from one copy.
+// Renders protocol/socket-messages from the committed asyncapi.json: every message on the
+// connection, both directions, as it travels, with the ResponseField / Expandable components the
+// rest of the reference uses. It is the one catalog of events; how the client delivers them is
+// documented on its callbacks.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { eventNames, roomNotices, sessionEndings } from "../dist/modules/builder-protocol.js";
 
 const MAX_DEPTH = 8;
 const source = new URL("../asyncapi.json", import.meta.url);
 const doc = JSON.parse(readFileSync(source, "utf8"));
-const DOCS = "/developers/references/platform-sdk/docs";
-const PLATFORM_EVENT = `${DOCS}/interfaces/builder#platformevent`;
-const SOCKET_MESSAGES = `${DOCS}/protocol/socket-messages`;
-const SOCKET_ERROR = `${DOCS}/classes/PlatformSocketError`;
 
 function resolvePointer(ref) {
   if (!ref.startsWith("#/")) throw new Error(`Only local $refs are supported: ${ref}`);
@@ -201,7 +195,6 @@ function field(name, schema, required, depth, path) {
   return `<ResponseField ${attrs.join(" ")}>\n\n${body.join("\n\n")}\n\n</ResponseField>`;
 }
 
-const messages = Object.fromEntries(Object.values(doc.components.messages).map((m) => [m.name, m]));
 const byDirection = (action) =>
   Object.values(doc.operations).filter((op) => op.action === action).map((op) => deref(op.messages[0])[0]);
 
@@ -258,27 +251,4 @@ for (const message of clientMessages) {
 }
 write("protocol/socket-messages.mdx", protocol);
 
-const reasons = Object.entries(sessionEndings).map(([reason, code]) =>
-  code === "session_expired"
-    ? `\`${reason}\` renews the session through \`getSessionToken\` and reconnects`
-    : `\`${reason}\` reports \`${code}\` to \`onError\` in \`builder.init\``);
-const events = [
-  ...frontmatter("Builder events", "How a builder subscription delivers the socket's events to your callbacks."),
-  `Each event reaches your \`onEvent\` callback as a [\`PlatformEvent\`](${PLATFORM_EVENT}): \`{ type, appId, data }\`. ` +
-    `\`data\` is the message's \`data\`, with the fields listed in [Socket messages](${SOCKET_MESSAGES}). ` +
-    "Check `type` to narrow `data` to that event's payload.",
-  "",
-  "## Delivered to `onEvent`", "",
-  ...eventNames.map((name) => `- \`${name}\`: ${prose(messages[name].summary)}`), "",
-  "## Handled by the client", "",
-  "The client sends and receives the other messages itself:", "",
-  "- `app.snapshot`: Delivered to the subscription's `onSnapshot`.",
-  `- \`session.ended\`: ${reasons.join(", ")}.`,
-  ...Object.entries(roomNotices).map(([name, code]) =>
-    `- \`${name}\`: Reported to the subscription's \`onError\` as a [\`PlatformSocketError\`](${SOCKET_ERROR}) with the code \`${code}\`.`),
-  "- `join` and `leave`: Sent by `subscribe` and `unsubscribe`. The client sends `join` again for each subscription when it reconnects, " +
-    "and after a `conversation.changed` on the main branch, to get a fresh snapshot.",
-];
-write("events/builder-events.mdx", events);
-const total = serverMessages.length + clientMessages.length;
-console.log(`Wrote ${total} messages to protocol/socket-messages.mdx and ${eventNames.length} events to events/builder-events.mdx`);
+console.log(`Wrote ${serverMessages.length + clientMessages.length} messages to protocol/socket-messages.mdx`);

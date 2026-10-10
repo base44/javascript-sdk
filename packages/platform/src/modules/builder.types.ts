@@ -138,7 +138,7 @@ export interface SubscriptionOptions {
    * Called with each live event, a [`PlatformEvent`](#platformevent). Events for an app arrive one at a time, in order. If the callback
    * throws or rejects, the subscription ends with `handler_failed`. New event types can be added at
    * any time, so ignore types you don't handle. For every event and its payload,
-   * see the [events reference](/developers/references/platform-sdk/docs/events/builder-events).
+   * see [Socket messages](/developers/references/platform-sdk/docs/protocol/socket-messages).
    */
   onEvent: (event: PlatformEvent) => void | Promise<void>;
   /**

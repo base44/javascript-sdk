@@ -137,7 +137,7 @@ generated file differs from what `asyncapi.json` produces.
 
 Every exported shape and field has JSDoc. `npm run docs` validates it into `docs`.
 `npm run create-docs` runs the app SDK's TypeDoc and Mintlify pipeline for this package, then renders
-the builder events page from `asyncapi.json` with `scripts/events-to-mdx.mjs`,
+the Socket messages page from `asyncapi.json` with `scripts/events-to-mdx.mjs`,
 and `npm run copy-docs-local -- --target <mintlify-docs>` copies the result into
 `developers/references/platform-sdk/docs`. The pipeline's config for this package lives
 in `scripts/mintlify-post-processing/`.
