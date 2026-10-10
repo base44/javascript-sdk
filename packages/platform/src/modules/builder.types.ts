@@ -30,7 +30,7 @@ export interface BuilderModule {
    * Each session is independent, with its own socket, token and subscriptions.
    *
    * @param options - Session options.
-   * @returns The new session. Use its [session methods](#session-methods) to connect and subscribe.
+   * @returns The new session.
    *
    * @example
    * ```typescript

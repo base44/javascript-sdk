@@ -2587,8 +2587,25 @@ function linkReturnTypes(content) {
     if (content.includes(`\n## ${title}\n`)) anchors.set(type, slug(title));
   }
   for (const [, type] of content.matchAll(/^### (\w+)$/gm)) anchors.set(type, slug(type));
+  // The section a type heads, with no separator under its heading, and its description.
+  const descriptions = new Map();
+  const headings = [...Object.entries(TYPES_WITH_OWN_METHODS).map(([type, title]) => [type, `## ${title}`]),
+    ...[...anchors.keys()].map((type) => [type, `### ${type}`])];
+  for (const [type, heading] of headings) {
+    const start = content.indexOf(`\n${heading}\n\n***\n\n`);
+    if (start === -1) continue;
+    content = content.replace(`\n${heading}\n\n***\n\n`, `\n${heading}\n\n`);
+    const body = content.slice(start + heading.length + 3);
+    descriptions.set(type, body.slice(0, body.search(/\n(#|> |<|```)/)).trim());
+  }
   return content.replace(/(^#{4,5} Returns\n\n)`(\w+)`$/gm, (match, heading, type) =>
-    anchors.has(type) ? `${heading}[\`${type}\`](#${anchors.get(type)})` : match);
+    anchors.has(type) ? `${heading}[\`${type}\`](#${anchors.get(type)})` : match)
+    // A linked Returns points at the type's own description; don't repeat it there.
+    .replace(/(^#{4,5} Returns\n\n\[`(\w+)`\]\(#[^)]+\)\n\n)([\s\S]*?)(?=\n#|\n<)/gm, (match, head, type, rest) => {
+      const description = descriptions.get(type);
+      const text = rest.replace(/``/g, "`");
+      return description && text.includes(description) ? head + text.replace(description, "").trimStart() : match;
+    });
 }
 
 function applyReturnTypeLinks(dir) {
@@ -2655,9 +2672,6 @@ function main() {
   // Class pages: the constructor's Returns already lists the instance's properties
   applyClassPageCleanup(DOCS_DIR);
 
-  // Link a Returns type to where the same page documents it
-  applyReturnTypeLinks(DOCS_DIR);
-
   // Reorder methods according to method-order.json
   applyMethodOrdering(DOCS_DIR);
 
@@ -2676,6 +2690,10 @@ function main() {
 
   // Delete types that should not appear in navigation but were needed for inline rendering
   deleteTypesAfterProcessing(DOCS_DIR);
+
+  // Link a Returns type to where the same page documents it. Last: it drops the *** separators
+  // that method ordering splits on.
+  applyReturnTypeLinks(DOCS_DIR);
 
   // Clean up the linked types file
   try {
