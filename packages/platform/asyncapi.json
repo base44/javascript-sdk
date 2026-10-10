@@ -377,7 +377,20 @@
         "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nA chat message was removed or hidden. An `id` the viewer never saw is a no-op.",
         "payload": {
           "$ref": "#/components/schemas/MessageRemovedEvent"
-        }
+        },
+        "examples": [
+          {
+            "name": "message.removed",
+            "payload": {
+              "room": "/apps/6a2024af837c7a06c83021c1",
+              "data": {
+                "message_id": "c4f2a8e1-6b3d-4f9a-8e2c-1d7b5a9f3e60",
+                "conversation_id": "68f1c2d4e7b91d003c45a1f2",
+                "branch_id": null
+              }
+            }
+          }
+        ]
       },
       "AppStatusChangedEvent": {
         "name": "app.status_changed",
@@ -386,7 +399,23 @@
         "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nThe builder started, finished or failed a turn. Null status clears it.",
         "payload": {
           "$ref": "#/components/schemas/AppStatusChangedEvent"
-        }
+        },
+        "examples": [
+          {
+            "name": "app.status_changed",
+            "payload": {
+              "room": "/apps/6a2024af837c7a06c83021c1",
+              "data": {
+                "status": {
+                  "state": "processing",
+                  "turn_id": "c4f2a8e1-6b3d-4f9a-8e2c-1d7b5a9f3e60",
+                  "last_updated_date": "2026-10-10T09:23:41Z"
+                },
+                "branch_id": null
+              }
+            }
+          }
+        ]
       },
       "PreviewReloadRequestedEvent": {
         "name": "preview.reload_requested",
@@ -395,7 +424,18 @@
         "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nReload the app preview.",
         "payload": {
           "$ref": "#/components/schemas/PreviewReloadRequestedEvent"
-        }
+        },
+        "examples": [
+          {
+            "name": "preview.reload_requested",
+            "payload": {
+              "room": "/apps/6a2024af837c7a06c83021c1",
+              "data": {
+                "branch_id": null
+              }
+            }
+          }
+        ]
       },
       "PreviewNavigationRequestedEvent": {
         "name": "preview.navigation_requested",
@@ -404,7 +444,20 @@
         "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nShow this page of the app in the preview.",
         "payload": {
           "$ref": "#/components/schemas/PreviewNavigationRequestedEvent"
-        }
+        },
+        "examples": [
+          {
+            "name": "preview.navigation_requested",
+            "payload": {
+              "room": "/apps/6a2024af837c7a06c83021c1",
+              "data": {
+                "path": "/sign-in",
+                "force": false,
+                "branch_id": null
+              }
+            }
+          }
+        ]
       },
       "QueueUpdatedEvent": {
         "name": "queue.updated",
@@ -413,7 +466,27 @@
         "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nThe whole prompt queue, after any change.",
         "payload": {
           "$ref": "#/components/schemas/QueueUpdatedEvent"
-        }
+        },
+        "examples": [
+          {
+            "name": "queue.updated",
+            "payload": {
+              "room": "/apps/6a2024af837c7a06c83021c1",
+              "data": {
+                "items": [
+                  {
+                    "id": "q_7d1e9c",
+                    "content": "Add a dark mode toggle to the header.",
+                    "branch_id": null,
+                    "created_at": "2026-10-10T09:24:05+00:00"
+                  }
+                ],
+                "is_paused": false,
+                "branch_id": null
+              }
+            }
+          }
+        ]
       },
       "TaskProgressedEvent": {
         "name": "task.progressed",
@@ -422,7 +495,26 @@
         "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nProgress of a long-running tool, by `tool_call_id`.",
         "payload": {
           "$ref": "#/components/schemas/TaskProgressedEvent"
-        }
+        },
+        "examples": [
+          {
+            "name": "task.progressed",
+            "payload": {
+              "room": "/apps/6a2024af837c7a06c83021c1",
+              "data": {
+                "tool_call_id": "toolu_01HXq8",
+                "message_id": "c4f2a8e1-6b3d-4f9a-8e2c-1d7b5a9f3e60",
+                "event_type": "task_progress",
+                "progress": {
+                  "current": 250,
+                  "total": 1000,
+                  "percentage": 25
+                },
+                "branch_id": null
+              }
+            }
+          }
+        ]
       },
       "ImageResolvedEvent": {
         "name": "image.resolved",
@@ -431,7 +523,20 @@
         "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nA generated image finished or failed. Replace its `placeholder_url` wherever it appears.",
         "payload": {
           "$ref": "#/components/schemas/ImageResolvedEvent"
-        }
+        },
+        "examples": [
+          {
+            "name": "image.resolved",
+            "payload": {
+              "room": "/apps/6a2024af837c7a06c83021c1",
+              "data": {
+                "status": "completed",
+                "placeholder_url": "/__generating__/5e8b2f4a-1c3d-4e6f-9a7b-2d4c6e8f0a1b.png",
+                "image_url": "https://media.base44.com/images/public/6a2024af837c7a06c83021c1/hero.png"
+              }
+            }
+          }
+        ]
       },
       "ConversationChangedEvent": {
         "name": "conversation.changed",
@@ -440,7 +545,18 @@
         "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nThe conversation was rewritten (undo, restore, sync). Rejoin the room for a fresh snapshot.",
         "payload": {
           "$ref": "#/components/schemas/ConversationChangedEvent"
-        }
+        },
+        "examples": [
+          {
+            "name": "conversation.changed",
+            "payload": {
+              "room": "/apps/6a2024af837c7a06c83021c1",
+              "data": {
+                "branch_id": null
+              }
+            }
+          }
+        ]
       },
       "FilesChangedEvent": {
         "name": "files.changed",
@@ -449,7 +565,18 @@
         "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nThe app's files changed outside a chat turn.",
         "payload": {
           "$ref": "#/components/schemas/FilesChangedEvent"
-        }
+        },
+        "examples": [
+          {
+            "name": "files.changed",
+            "payload": {
+              "room": "/apps/6a2024af837c7a06c83021c1",
+              "data": {
+                "branch_id": null
+              }
+            }
+          }
+        ]
       },
       "BranchDeletedEvent": {
         "name": "branch.deleted",
@@ -458,7 +585,18 @@
         "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nA branch was deleted.",
         "payload": {
           "$ref": "#/components/schemas/BranchDeletedEvent"
-        }
+        },
+        "examples": [
+          {
+            "name": "branch.deleted",
+            "payload": {
+              "room": "/apps/6a2024af837c7a06c83021c1",
+              "data": {
+                "branch_id": "68f1c2d4e7b91d003c45a1fa"
+              }
+            }
+          }
+        ]
       },
       "RepositoryChangedEvent": {
         "name": "repository.changed",
@@ -467,7 +605,18 @@
         "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nThe imported app's repository changed.",
         "payload": {
           "$ref": "#/components/schemas/RepositoryChangedEvent"
-        }
+        },
+        "examples": [
+          {
+            "name": "repository.changed",
+            "payload": {
+              "room": "/apps/6a2024af837c7a06c83021c1",
+              "data": {
+                "branch_id": null
+              }
+            }
+          }
+        ]
       },
       "PullRequestChangedEvent": {
         "name": "pull_request.changed",
@@ -476,7 +625,18 @@
         "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nThe imported app's pull request changed.",
         "payload": {
           "$ref": "#/components/schemas/PullRequestChangedEvent"
-        }
+        },
+        "examples": [
+          {
+            "name": "pull_request.changed",
+            "payload": {
+              "room": "/apps/6a2024af837c7a06c83021c1",
+              "data": {
+                "branch_id": "68f1c2d4e7b91d003c45a1fa"
+              }
+            }
+          }
+        ]
       },
       "SessionEndedEvent": {
         "name": "session.ended",
@@ -505,7 +665,16 @@
         "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nA join was refused because the app is not on the session's allowlist, or the socket joins too often.",
         "payload": {
           "$ref": "#/components/schemas/RoomAccessDeniedEvent"
-        }
+        },
+        "examples": [
+          {
+            "name": "room.access_denied",
+            "payload": {
+              "room": "/apps/6a2024af837c7a06c83021c1",
+              "data": {}
+            }
+          }
+        ]
       },
       "RoomAccessRevokedEvent": {
         "name": "room.access_revoked",
@@ -514,7 +683,16 @@
         "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nThe app left the session's allowlist, or its workspace. Events for it stop. Do not rejoin.",
         "payload": {
           "$ref": "#/components/schemas/RoomAccessRevokedEvent"
-        }
+        },
+        "examples": [
+          {
+            "name": "room.access_revoked",
+            "payload": {
+              "room": "/apps/6a2024af837c7a06c83021c1",
+              "data": {}
+            }
+          }
+        ]
       },
       "RoomSnapshotUnavailableEvent": {
         "name": "room.snapshot_unavailable",
@@ -523,7 +701,16 @@
         "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nThe join held but its snapshot failed. Live events still arrive. Rejoin later for a snapshot.",
         "payload": {
           "$ref": "#/components/schemas/RoomSnapshotUnavailableEvent"
-        }
+        },
+        "examples": [
+          {
+            "name": "room.snapshot_unavailable",
+            "payload": {
+              "room": "/apps/6a2024af837c7a06c83021c1",
+              "data": {}
+            }
+          }
+        ]
       },
       "AppSnapshotEvent": {
         "name": "app.snapshot",
@@ -532,7 +719,59 @@
         "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nThe app's current status and its last 50 public messages, after every join. Replace the app's state with it.",
         "payload": {
           "$ref": "#/components/schemas/AppSnapshotEvent"
-        }
+        },
+        "examples": [
+          {
+            "name": "app.snapshot",
+            "payload": {
+              "room": "/apps/6a2024af837c7a06c83021c1",
+              "data": {
+                "status": {
+                  "state": "ready",
+                  "turn_id": "c4f2a8e1-6b3d-4f9a-8e2c-1d7b5a9f3e60",
+                  "last_updated_date": "2026-10-10T09:23:41Z"
+                },
+                "messages": [
+                  {
+                    "id": "c4f2a8e1-6b3d-4f9a-8e2c-1d7b5a9f3e60",
+                    "role": "assistant",
+                    "content": "I added a sign-in page with email and Google.",
+                    "tool_calls": [
+                      {
+                        "id": "toolu_01HXq8",
+                        "name": "write_file",
+                        "requires_user_input": false,
+                        "auto_approved": false,
+                        "status": "success",
+                        "mutation_applied": null,
+                        "display": {
+                          "file_paths": [
+                            "src/pages/SignIn.jsx"
+                          ]
+                        }
+                      }
+                    ],
+                    "checkpoint_id": "68f1c2d4e7b91d003c45a1f9",
+                    "metadata": {
+                      "created_date": "2026-10-10T09:23:41"
+                    }
+                  }
+                ],
+                "queue": {
+                  "items": [
+                    {
+                      "id": "q_7d1e9c",
+                      "content": "Add a dark mode toggle to the header.",
+                      "branch_id": null,
+                      "created_at": "2026-10-10T09:24:05+00:00"
+                    }
+                  ],
+                  "is_paused": false
+                }
+              }
+            }
+          }
+        ]
       },
       "JoinMessage": {
         "name": "join",
