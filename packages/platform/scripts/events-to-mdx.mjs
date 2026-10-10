@@ -224,26 +224,37 @@ function dataFields(message) {
   return fields.length ? fields.join("\n\n") : "`data` is empty.";
 }
 
+// The beta notice rides on every message; the page shows it once, above the messages.
+const NOTICE = /<Info>[\s\S]*?<\/Info>\s*/;
+const notice = Object.values(doc.components.messages).map((m) => m.description?.match(NOTICE)?.[0].trim()).find(Boolean);
+const describe = (message) => prose((message.description ?? message.summary ?? "").replace(NOTICE, ""));
 const serverMessages = byDirection("send");
 const clientMessages = byDirection("receive");
-const room = deref(serverMessages[0].payload)[0].properties.room;
+const [envelope] = deref(serverMessages[0].payload);
+const envelopeRequired = new Set(envelope.required ?? []);
+// The envelope's own fields only: what `data` holds is listed under each message.
+const envelopeFields = Object.entries(envelope.properties).map(([name, schema]) => field(name, schema, envelopeRequired.has(name), MAX_DEPTH, []));
+const examples = (message) =>
+  (message.examples ?? []).flatMap((example) => ["```json Example", JSON.stringify(example.payload, null, 2), "```", ""]);
 const protocol = [
   ...frontmatter("Socket messages", "Every message on a socket session's connection, in both directions, and its payload."),
+  ...(notice ? [notice, ""] : []),
   prose(doc.info.description), "",
   prose(doc.servers.platform.description), "",
   prose(doc.channels.platform.description), "",
   "## Sent by the server", "",
-  `Each message is \`{ room, data }\`. ${prose(deref(room)[0].description)}`.trim(), "",
+  "Every message the server sends is an object with these fields:", "",
+  envelopeFields.join("\n\n"), "",
 ];
 for (const message of serverMessages) {
-  protocol.push(`### \`${message.name}\``, "", prose(message.description ?? message.summary), "", dataFields(message), "");
+  protocol.push(`### \`${message.name}\``, "", describe(message), "", dataFields(message), "", ...examples(message));
 }
 protocol.push("## Sent by the browser", "");
 for (const message of clientMessages) {
   const [payload] = deref(message.payload);
-  protocol.push(`### \`${message.name}\``, "", prose(message.description ?? message.summary), "");
+  protocol.push(`### \`${message.name}\``, "", describe(message), "");
   protocol.push(`The payload is a \`${typeLabel(message.payload)}\`, not an object. ${constraints(payload).map(prose).join(" ")}`.trim(), "");
-  if (payload.examples?.length) protocol.push("```json", JSON.stringify(payload.examples[0]), "```", "");
+  protocol.push(...examples(message));
 }
 write("protocol/socket-messages.mdx", protocol);
 

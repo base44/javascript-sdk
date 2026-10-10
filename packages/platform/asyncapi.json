@@ -3,7 +3,7 @@
   "info": {
     "title": "Base44 Live Builder Updates",
     "version": "1.0.0",
-    "description": "Live updates of the builder chat for the apps a white-label session may watch. The connection is Socket.IO, not a raw WebSocket: connect with `io(socket_url, { path: socket_path, transports: [\"websocket\"], auth: { session_token } })`, using the values your server received from `POST /api/service/socket-sessions`. Then send `join` for each app, and receive its snapshot followed by live events."
+    "description": "Live updates of the builder chat for the apps a white-label session may watch. The connection is Socket.IO, not a raw WebSocket: connect with `io(socket_url, { path: socket_path, transports: [\"websocket\"], auth: { session_token } })`, using the values your server received from `POST /api/service/socket-sessions`. Then send `join` for each app, and receive its snapshot followed by live events.\n\nAvailable to white-label workspaces with live builder updates turned on. Your onboarding contact turns them on for your workspace."
   },
   "servers": {
     "platform": {
@@ -16,7 +16,7 @@
   "channels": {
     "platform": {
       "title": "Platform socket",
-      "description": "One connection per session. Every event carries the `room` it belongs to, `/apps/{app_id}`; `room` is null for `session.ended`. Omitted keys in `data` are unchanged; explicit null clears.",
+      "description": "One connection per session carries the events of every app it joins. In an event's `data`, a missing key is unchanged and an explicit `null` clears it. `app.snapshot` is the exception, since it replaces the app's state.",
       "messages": {
         "MessageUpdatedEvent": {
           "$ref": "#/components/messages/MessageUpdatedEvent"
@@ -260,7 +260,7 @@
           "$ref": "#/channels/platform/messages/RoomAccessDeniedEvent"
         }
       ],
-      "summary": "A join was refused: the app is not on the session's allowlist, or the socket joins too often."
+      "summary": "A join was refused because the app is not on the session's allowlist, or the socket joins too often."
     },
     "sendRoomAccessRevokedEvent": {
       "action": "send",
@@ -272,7 +272,7 @@
           "$ref": "#/channels/platform/messages/RoomAccessRevokedEvent"
         }
       ],
-      "summary": "The app left the session's allowlist, or its workspace. Events for it stop; do not rejoin."
+      "summary": "The app left the session's allowlist, or its workspace. Events for it stop. Do not rejoin."
     },
     "sendRoomSnapshotUnavailableEvent": {
       "action": "send",
@@ -284,7 +284,7 @@
           "$ref": "#/channels/platform/messages/RoomSnapshotUnavailableEvent"
         }
       ],
-      "summary": "The join held but its snapshot failed. Live events still arrive; rejoin later for a snapshot."
+      "summary": "The join held but its snapshot failed. Live events still arrive. Rejoin later for a snapshot."
     },
     "sendAppSnapshotEvent": {
       "action": "send",
@@ -329,16 +329,52 @@
         "name": "message.updated",
         "title": "message.updated",
         "summary": "A chat message was added or replaced. Replace the message with the same `id`.",
-        "description": "A chat message was added or replaced. Replace the message with the same `id`.",
+        "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nA chat message was added or replaced. Replace the message with the same `id`.",
         "payload": {
           "$ref": "#/components/schemas/MessageUpdatedEvent"
-        }
+        },
+        "examples": [
+          {
+            "name": "message.updated",
+            "payload": {
+              "room": "/apps/6a2024af837c7a06c83021c1",
+              "data": {
+                "message": {
+                  "id": "c4f2a8e1-6b3d-4f9a-8e2c-1d7b5a9f3e60",
+                  "role": "assistant",
+                  "content": "I added a sign-in page with email and Google.",
+                  "tool_calls": [
+                    {
+                      "id": "toolu_01HXq8",
+                      "name": "write_file",
+                      "requires_user_input": false,
+                      "auto_approved": false,
+                      "status": "success",
+                      "mutation_applied": null,
+                      "display": {
+                        "file_paths": [
+                          "src/pages/SignIn.jsx"
+                        ]
+                      }
+                    }
+                  ],
+                  "checkpoint_id": "68f1c2d4e7b91d003c45a1f9",
+                  "metadata": {
+                    "created_date": "2026-10-10T09:23:41"
+                  }
+                },
+                "conversation_id": "68f1c2d4e7b91d003c45a1f2",
+                "branch_id": null
+              }
+            }
+          }
+        ]
       },
       "MessageRemovedEvent": {
         "name": "message.removed",
         "title": "message.removed",
         "summary": "A chat message was removed or hidden. An `id` the viewer never saw is a no-op.",
-        "description": "A chat message was removed or hidden. An `id` the viewer never saw is a no-op.",
+        "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nA chat message was removed or hidden. An `id` the viewer never saw is a no-op.",
         "payload": {
           "$ref": "#/components/schemas/MessageRemovedEvent"
         }
@@ -347,7 +383,7 @@
         "name": "app.status_changed",
         "title": "app.status_changed",
         "summary": "The builder started, finished or failed a turn. Null status clears it.",
-        "description": "The builder started, finished or failed a turn. Null status clears it.",
+        "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nThe builder started, finished or failed a turn. Null status clears it.",
         "payload": {
           "$ref": "#/components/schemas/AppStatusChangedEvent"
         }
@@ -356,7 +392,7 @@
         "name": "preview.reload_requested",
         "title": "preview.reload_requested",
         "summary": "Reload the app preview.",
-        "description": "Reload the app preview.",
+        "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nReload the app preview.",
         "payload": {
           "$ref": "#/components/schemas/PreviewReloadRequestedEvent"
         }
@@ -365,7 +401,7 @@
         "name": "preview.navigation_requested",
         "title": "preview.navigation_requested",
         "summary": "Show this page of the app in the preview.",
-        "description": "Show this page of the app in the preview.",
+        "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nShow this page of the app in the preview.",
         "payload": {
           "$ref": "#/components/schemas/PreviewNavigationRequestedEvent"
         }
@@ -374,7 +410,7 @@
         "name": "queue.updated",
         "title": "queue.updated",
         "summary": "The whole prompt queue, after any change.",
-        "description": "The whole prompt queue, after any change.",
+        "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nThe whole prompt queue, after any change.",
         "payload": {
           "$ref": "#/components/schemas/QueueUpdatedEvent"
         }
@@ -383,7 +419,7 @@
         "name": "task.progressed",
         "title": "task.progressed",
         "summary": "Progress of a long-running tool, by `tool_call_id`.",
-        "description": "Progress of a long-running tool, by `tool_call_id`.",
+        "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nProgress of a long-running tool, by `tool_call_id`.",
         "payload": {
           "$ref": "#/components/schemas/TaskProgressedEvent"
         }
@@ -392,7 +428,7 @@
         "name": "image.resolved",
         "title": "image.resolved",
         "summary": "A generated image finished or failed. Replace its `placeholder_url` wherever it appears.",
-        "description": "A generated image finished or failed. Replace its `placeholder_url` wherever it appears.",
+        "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nA generated image finished or failed. Replace its `placeholder_url` wherever it appears.",
         "payload": {
           "$ref": "#/components/schemas/ImageResolvedEvent"
         }
@@ -401,7 +437,7 @@
         "name": "conversation.changed",
         "title": "conversation.changed",
         "summary": "The conversation was rewritten (undo, restore, sync). Rejoin the room for a fresh snapshot.",
-        "description": "The conversation was rewritten (undo, restore, sync). Rejoin the room for a fresh snapshot.",
+        "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nThe conversation was rewritten (undo, restore, sync). Rejoin the room for a fresh snapshot.",
         "payload": {
           "$ref": "#/components/schemas/ConversationChangedEvent"
         }
@@ -410,7 +446,7 @@
         "name": "files.changed",
         "title": "files.changed",
         "summary": "The app's files changed outside a chat turn.",
-        "description": "The app's files changed outside a chat turn.",
+        "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nThe app's files changed outside a chat turn.",
         "payload": {
           "$ref": "#/components/schemas/FilesChangedEvent"
         }
@@ -419,7 +455,7 @@
         "name": "branch.deleted",
         "title": "branch.deleted",
         "summary": "A branch was deleted.",
-        "description": "A branch was deleted.",
+        "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nA branch was deleted.",
         "payload": {
           "$ref": "#/components/schemas/BranchDeletedEvent"
         }
@@ -428,7 +464,7 @@
         "name": "repository.changed",
         "title": "repository.changed",
         "summary": "The imported app's repository changed.",
-        "description": "The imported app's repository changed.",
+        "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nThe imported app's repository changed.",
         "payload": {
           "$ref": "#/components/schemas/RepositoryChangedEvent"
         }
@@ -437,7 +473,7 @@
         "name": "pull_request.changed",
         "title": "pull_request.changed",
         "summary": "The imported app's pull request changed.",
-        "description": "The imported app's pull request changed.",
+        "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nThe imported app's pull request changed.",
         "payload": {
           "$ref": "#/components/schemas/PullRequestChangedEvent"
         }
@@ -446,16 +482,27 @@
         "name": "session.ended",
         "title": "session.ended",
         "summary": "The session ended (expired, revoked, or taken by a newer socket). The socket disconnects next.",
-        "description": "The session ended (expired, revoked, or taken by a newer socket). The socket disconnects next.",
+        "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nThe session ended (expired, revoked, or taken by a newer socket). The socket disconnects next.",
         "payload": {
           "$ref": "#/components/schemas/SessionEndedEvent"
-        }
+        },
+        "examples": [
+          {
+            "name": "session.ended",
+            "payload": {
+              "room": null,
+              "data": {
+                "reason": "revoked"
+              }
+            }
+          }
+        ]
       },
       "RoomAccessDeniedEvent": {
         "name": "room.access_denied",
         "title": "room.access_denied",
-        "summary": "A join was refused: the app is not on the session's allowlist, or the socket joins too often.",
-        "description": "A join was refused: the app is not on the session's allowlist, or the socket joins too often.",
+        "summary": "A join was refused because the app is not on the session's allowlist, or the socket joins too often.",
+        "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nA join was refused because the app is not on the session's allowlist, or the socket joins too often.",
         "payload": {
           "$ref": "#/components/schemas/RoomAccessDeniedEvent"
         }
@@ -463,8 +510,8 @@
       "RoomAccessRevokedEvent": {
         "name": "room.access_revoked",
         "title": "room.access_revoked",
-        "summary": "The app left the session's allowlist, or its workspace. Events for it stop; do not rejoin.",
-        "description": "The app left the session's allowlist, or its workspace. Events for it stop; do not rejoin.",
+        "summary": "The app left the session's allowlist, or its workspace. Events for it stop. Do not rejoin.",
+        "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nThe app left the session's allowlist, or its workspace. Events for it stop. Do not rejoin.",
         "payload": {
           "$ref": "#/components/schemas/RoomAccessRevokedEvent"
         }
@@ -472,8 +519,8 @@
       "RoomSnapshotUnavailableEvent": {
         "name": "room.snapshot_unavailable",
         "title": "room.snapshot_unavailable",
-        "summary": "The join held but its snapshot failed. Live events still arrive; rejoin later for a snapshot.",
-        "description": "The join held but its snapshot failed. Live events still arrive; rejoin later for a snapshot.",
+        "summary": "The join held but its snapshot failed. Live events still arrive. Rejoin later for a snapshot.",
+        "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nThe join held but its snapshot failed. Live events still arrive. Rejoin later for a snapshot.",
         "payload": {
           "$ref": "#/components/schemas/RoomSnapshotUnavailableEvent"
         }
@@ -482,7 +529,7 @@
         "name": "app.snapshot",
         "title": "app.snapshot",
         "summary": "The app's current status and its last 50 public messages, after every join. Replace the app's state with it.",
-        "description": "The app's current status and its last 50 public messages, after every join. Replace the app's state with it.",
+        "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nThe app's current status and its last 50 public messages, after every join. Replace the app's state with it.",
         "payload": {
           "$ref": "#/components/schemas/AppSnapshotEvent"
         }
@@ -491,19 +538,31 @@
         "name": "join",
         "title": "join",
         "summary": "Join an app's room, once per app after every connect. An `app.snapshot` follows, then its live events. Refused with `room.access_denied` when the app is not on the session's allowlist, or past 30 joins a minute.",
-        "description": "Join an app's room, once per app after every connect. An `app.snapshot` follows, then its live events. Refused with `room.access_denied` when the app is not on the session's allowlist, or past 30 joins a minute.",
+        "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nJoin an app's room, once per app after every connect. An `app.snapshot` follows, then its live events. Refused with `room.access_denied` when the app is not on the session's allowlist, or past 30 joins a minute.",
         "payload": {
           "$ref": "#/components/schemas/JoinMessage"
-        }
+        },
+        "examples": [
+          {
+            "name": "join",
+            "payload": "/apps/6a2024af837c7a06c83021c1"
+          }
+        ]
       },
       "LeaveMessage": {
         "name": "leave",
         "title": "leave",
         "summary": "Leave an app's room. Its events stop.",
-        "description": "Leave an app's room. Its events stop.",
+        "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nLeave an app's room. Its events stop.",
         "payload": {
           "$ref": "#/components/schemas/LeaveMessage"
-        }
+        },
+        "examples": [
+          {
+            "name": "leave",
+            "payload": "/apps/6a2024af837c7a06c83021c1"
+          }
+        ]
       }
     },
     "schemas": {
@@ -540,10 +599,12 @@
               "string",
               "null"
             ],
+            "description": "The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.",
             "title": "Room"
           },
           "data": {
-            "$ref": "#/components/schemas/Snapshot"
+            "$ref": "#/components/schemas/Snapshot",
+            "description": "The event's payload. Its fields depend on the event."
           }
         },
         "required": [
@@ -554,6 +615,7 @@
         "type": "object"
       },
       "AppStatusChanged": {
+        "description": "The app's build status changed, because a turn started, finished or failed.",
         "properties": {
           "status": {
             "anyOf": [
@@ -563,7 +625,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The new status, or `null` when the status was cleared."
           },
           "branch_id": {
             "type": [
@@ -571,6 +634,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the branch the change belongs to. Omitted or `null` means the main branch.",
             "title": "Branch Id"
           }
         },
@@ -588,10 +652,12 @@
               "string",
               "null"
             ],
+            "description": "The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.",
             "title": "Room"
           },
           "data": {
-            "$ref": "#/components/schemas/AppStatusChanged"
+            "$ref": "#/components/schemas/AppStatusChanged",
+            "description": "The event's payload. Its fields depend on the event."
           }
         },
         "required": [
@@ -602,10 +668,11 @@
         "type": "object"
       },
       "AskClarifyingQuestionsCall": {
-        "description": "A `ask_clarifying_questions` call.",
+        "description": "The AI asks the user questions before it goes on. The call waits until the user answers.",
         "properties": {
           "name": {
             "const": "ask_clarifying_questions",
+            "description": "The tool that was called.",
             "title": "Name",
             "type": "string"
           },
@@ -615,6 +682,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the call. Every update to the call carries the same ID.",
             "title": "Id"
           },
           "requires_user_input": {
@@ -623,6 +691,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -631,6 +700,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -650,6 +720,7 @@
               }
             ],
             "default": null,
+            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -658,6 +729,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.",
             "title": "Mutation Applied"
           },
           "waiting_on": {
@@ -670,7 +742,7 @@
               }
             ],
             "default": null,
-            "description": "What kind of answer a parked call waits for.",
+            "description": "What kind of answer the call waits for, while `status` is `waiting_for_user_input`.",
             "title": "Waiting On"
           },
           "approval": {
@@ -711,7 +783,7 @@
               }
             ],
             "default": null,
-            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "description": "Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.",
             "title": "Approval"
           },
           "arguments": {
@@ -723,7 +795,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the AI asked the tool to do, narrowed to what this tool publishes."
           },
           "user_input": {
             "anyOf": [
@@ -734,7 +807,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "The user's answer to the call, once given, for tools that take one."
           }
         },
         "required": [
@@ -744,10 +818,11 @@
         "type": "object"
       },
       "AskPlanQuestionsCall": {
-        "description": "A `ask_plan_questions` call.",
+        "description": "The AI asks the user questions that shape the plan, in plan mode. The call waits until the user answers.",
         "properties": {
           "name": {
             "const": "ask_plan_questions",
+            "description": "The tool that was called.",
             "title": "Name",
             "type": "string"
           },
@@ -757,6 +832,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the call. Every update to the call carries the same ID.",
             "title": "Id"
           },
           "requires_user_input": {
@@ -765,6 +841,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -773,6 +850,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -792,6 +870,7 @@
               }
             ],
             "default": null,
+            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -800,6 +879,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.",
             "title": "Mutation Applied"
           },
           "waiting_on": {
@@ -812,7 +892,7 @@
               }
             ],
             "default": null,
-            "description": "What kind of answer a parked call waits for.",
+            "description": "What kind of answer the call waits for, while `status` is `waiting_for_user_input`.",
             "title": "Waiting On"
           },
           "approval": {
@@ -853,7 +933,7 @@
               }
             ],
             "default": null,
-            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "description": "Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.",
             "title": "Approval"
           },
           "arguments": {
@@ -865,7 +945,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the AI asked the tool to do, narrowed to what this tool publishes."
           },
           "user_input": {
             "anyOf": [
@@ -876,7 +957,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "The user's answer to the call, once given, for tools that take one."
           }
         },
         "required": [
@@ -886,10 +968,11 @@
         "type": "object"
       },
       "BackendFunctionEntityDeleteApproval": {
-        "description": "Parked by the `backend_function_entity_delete` guard.",
+        "description": "Waiting for approval: testing a backend function would delete records from an entity.",
         "properties": {
           "guard": {
             "const": "backend_function_entity_delete",
+            "description": "The check that paused the call.",
             "title": "Guard",
             "type": "string"
           },
@@ -899,7 +982,7 @@
               "null"
             ],
             "default": null,
-            "description": "Why the guard parked the call.",
+            "description": "Why the call needs approval, as the check explained it.",
             "title": "Reason"
           },
           "details": {
@@ -911,7 +994,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the check found."
           }
         },
         "required": [
@@ -921,10 +1005,11 @@
         "type": "object"
       },
       "BashApproval": {
-        "description": "Parked by the `bash_approval` guard.",
+        "description": "Waiting for approval: the AI wants to run a shell command that needs a review first. The command itself is not published.",
         "properties": {
           "guard": {
             "const": "bash_approval",
+            "description": "The check that paused the call.",
             "title": "Guard",
             "type": "string"
           }
@@ -936,10 +1021,11 @@
         "type": "object"
       },
       "BashCall": {
-        "description": "A `bash` call.",
+        "description": "The AI runs a shell command in the app's sandbox.",
         "properties": {
           "name": {
             "const": "bash",
+            "description": "The tool that was called.",
             "title": "Name",
             "type": "string"
           },
@@ -949,6 +1035,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the call. Every update to the call carries the same ID.",
             "title": "Id"
           },
           "requires_user_input": {
@@ -957,6 +1044,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -965,6 +1053,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -984,6 +1073,7 @@
               }
             ],
             "default": null,
+            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -992,6 +1082,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.",
             "title": "Mutation Applied"
           },
           "waiting_on": {
@@ -1004,7 +1095,7 @@
               }
             ],
             "default": null,
-            "description": "What kind of answer a parked call waits for.",
+            "description": "What kind of answer the call waits for, while `status` is `waiting_for_user_input`.",
             "title": "Waiting On"
           },
           "approval": {
@@ -1045,7 +1136,7 @@
               }
             ],
             "default": null,
-            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "description": "Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.",
             "title": "Approval"
           },
           "display": {
@@ -1057,7 +1148,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the tool touched, for showing its progress. Never file contents or commands."
           }
         },
         "required": [
@@ -1067,7 +1159,7 @@
         "type": "object"
       },
       "BranchChange": {
-        "description": "Re-read what changed; the event carries no content.",
+        "description": "Something changed outside the chat. Re-read it, because the event carries no content.",
         "properties": {
           "branch_id": {
             "type": [
@@ -1075,6 +1167,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the branch the change belongs to. Omitted or `null` means the main branch.",
             "title": "Branch Id"
           }
         },
@@ -1089,10 +1182,12 @@
               "string",
               "null"
             ],
+            "description": "The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.",
             "title": "Room"
           },
           "data": {
-            "$ref": "#/components/schemas/BranchChange"
+            "$ref": "#/components/schemas/BranchChange",
+            "description": "The event's payload. Its fields depend on the event."
           }
         },
         "required": [
@@ -1110,10 +1205,12 @@
               "string",
               "null"
             ],
+            "description": "The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.",
             "title": "Room"
           },
           "data": {
-            "$ref": "#/components/schemas/BranchChange"
+            "$ref": "#/components/schemas/BranchChange",
+            "description": "The event's payload. Its fields depend on the event."
           }
         },
         "required": [
@@ -1124,10 +1221,11 @@
         "type": "object"
       },
       "CreateEntityRecordsCall": {
-        "description": "A `create_entity_records` call.",
+        "description": "The AI adds records to one of the app's entities.",
         "properties": {
           "name": {
             "const": "create_entity_records",
+            "description": "The tool that was called.",
             "title": "Name",
             "type": "string"
           },
@@ -1137,6 +1235,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the call. Every update to the call carries the same ID.",
             "title": "Id"
           },
           "requires_user_input": {
@@ -1145,6 +1244,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -1153,6 +1253,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -1172,6 +1273,7 @@
               }
             ],
             "default": null,
+            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -1180,6 +1282,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.",
             "title": "Mutation Applied"
           },
           "waiting_on": {
@@ -1192,7 +1295,7 @@
               }
             ],
             "default": null,
-            "description": "What kind of answer a parked call waits for.",
+            "description": "What kind of answer the call waits for, while `status` is `waiting_for_user_input`.",
             "title": "Waiting On"
           },
           "approval": {
@@ -1233,7 +1336,7 @@
               }
             ],
             "default": null,
-            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "description": "Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.",
             "title": "Approval"
           },
           "display": {
@@ -1245,7 +1348,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the tool touched, for showing its progress. Never file contents or commands."
           }
         },
         "required": [
@@ -1255,10 +1359,11 @@
         "type": "object"
       },
       "DeleteEntitiesCall": {
-        "description": "A `delete_entities` call.",
+        "description": "The AI deletes records from one of the app's entities.",
         "properties": {
           "name": {
             "const": "delete_entities",
+            "description": "The tool that was called.",
             "title": "Name",
             "type": "string"
           },
@@ -1268,6 +1373,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the call. Every update to the call carries the same ID.",
             "title": "Id"
           },
           "requires_user_input": {
@@ -1276,6 +1382,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -1284,6 +1391,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -1303,6 +1411,7 @@
               }
             ],
             "default": null,
+            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -1311,6 +1420,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.",
             "title": "Mutation Applied"
           },
           "waiting_on": {
@@ -1323,7 +1433,7 @@
               }
             ],
             "default": null,
-            "description": "What kind of answer a parked call waits for.",
+            "description": "What kind of answer the call waits for, while `status` is `waiting_for_user_input`.",
             "title": "Waiting On"
           },
           "approval": {
@@ -1364,7 +1474,7 @@
               }
             ],
             "default": null,
-            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "description": "Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.",
             "title": "Approval"
           },
           "arguments": {
@@ -1376,7 +1486,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the AI asked the tool to do, narrowed to what this tool publishes."
           },
           "display": {
             "anyOf": [
@@ -1387,7 +1498,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the tool touched, for showing its progress. Never file contents or commands."
           }
         },
         "required": [
@@ -1397,10 +1509,11 @@
         "type": "object"
       },
       "DeleteFileCall": {
-        "description": "A `delete_file` call.",
+        "description": "The AI deletes a file from the app.",
         "properties": {
           "name": {
             "const": "delete_file",
+            "description": "The tool that was called.",
             "title": "Name",
             "type": "string"
           },
@@ -1410,6 +1523,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the call. Every update to the call carries the same ID.",
             "title": "Id"
           },
           "requires_user_input": {
@@ -1418,6 +1532,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -1426,6 +1541,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -1445,6 +1561,7 @@
               }
             ],
             "default": null,
+            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -1453,6 +1570,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.",
             "title": "Mutation Applied"
           },
           "waiting_on": {
@@ -1465,7 +1583,7 @@
               }
             ],
             "default": null,
-            "description": "What kind of answer a parked call waits for.",
+            "description": "What kind of answer the call waits for, while `status` is `waiting_for_user_input`.",
             "title": "Waiting On"
           },
           "approval": {
@@ -1506,7 +1624,7 @@
               }
             ],
             "default": null,
-            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "description": "Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.",
             "title": "Approval"
           },
           "display": {
@@ -1518,7 +1636,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the tool touched, for showing its progress. Never file contents or commands."
           }
         },
         "required": [
@@ -1528,10 +1647,11 @@
         "type": "object"
       },
       "EditRepoFileCall": {
-        "description": "A `edit_repo_file` call.",
+        "description": "The AI edits a file in the imported repository.",
         "properties": {
           "name": {
             "const": "edit_repo_file",
+            "description": "The tool that was called.",
             "title": "Name",
             "type": "string"
           },
@@ -1541,6 +1661,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the call. Every update to the call carries the same ID.",
             "title": "Id"
           },
           "requires_user_input": {
@@ -1549,6 +1670,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -1557,6 +1679,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -1576,6 +1699,7 @@
               }
             ],
             "default": null,
+            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -1584,6 +1708,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.",
             "title": "Mutation Applied"
           },
           "waiting_on": {
@@ -1596,7 +1721,7 @@
               }
             ],
             "default": null,
-            "description": "What kind of answer a parked call waits for.",
+            "description": "What kind of answer the call waits for, while `status` is `waiting_for_user_input`.",
             "title": "Waiting On"
           },
           "approval": {
@@ -1637,7 +1762,7 @@
               }
             ],
             "default": null,
-            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "description": "Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.",
             "title": "Approval"
           },
           "display": {
@@ -1649,7 +1774,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the tool touched, for showing its progress. Never file contents or commands."
           }
         },
         "required": [
@@ -1659,7 +1785,7 @@
         "type": "object"
       },
       "EntityChangeArguments": {
-        "description": "An entity update or delete; the entity is in `display.entity_name`.",
+        "description": "An entity update or delete. The entity is in `display.entity_name`.",
         "properties": {
           "summary": {
             "description": "The agent's summary of the change. Queries and record values are never included.",
@@ -1683,7 +1809,7 @@
         "type": "object"
       },
       "EntityMutationDetails": {
-        "description": "What a parked entity mutation would do. Record data is never included.",
+        "description": "What the entity change waiting for approval would do. Record data is never included.",
         "properties": {
           "method": {
             "description": "Entity method the code calls, such as `delete`.",
@@ -1700,6 +1826,7 @@
         "type": "object"
       },
       "EntityRecordsDisplay": {
+        "description": "The entity an operation added records to.",
         "properties": {
           "entity_name": {
             "description": "Entity type. Records and query values are never included.",
@@ -1716,10 +1843,11 @@
         "type": "object"
       },
       "EntityRlsGuardApproval": {
-        "description": "Parked by the `entity_rls_guard` guard.",
+        "description": "Waiting for approval: the AI wants to change who can read or write an entity's records.",
         "properties": {
           "guard": {
             "const": "entity_rls_guard",
+            "description": "The check that paused the call.",
             "title": "Guard",
             "type": "string"
           },
@@ -1729,7 +1857,7 @@
               "null"
             ],
             "default": null,
-            "description": "Why the guard parked the call.",
+            "description": "Why the call needs approval, as the check explained it.",
             "title": "Reason"
           },
           "details": {
@@ -1741,7 +1869,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the check found."
           }
         },
         "required": [
@@ -1759,7 +1888,7 @@
             "type": "string"
           },
           "writes_entities": {
-            "description": "The code changed entity data: refresh the preview.",
+            "description": "The code changed entity data, so refresh the preview.",
             "title": "Writes Entities",
             "type": "boolean"
           }
@@ -1768,10 +1897,11 @@
         "type": "object"
       },
       "ExecToolCall": {
-        "description": "A `exec_tool` call.",
+        "description": "The AI runs code against the app's data and integrations.",
         "properties": {
           "name": {
             "const": "exec_tool",
+            "description": "The tool that was called.",
             "title": "Name",
             "type": "string"
           },
@@ -1781,6 +1911,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the call. Every update to the call carries the same ID.",
             "title": "Id"
           },
           "requires_user_input": {
@@ -1789,6 +1920,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -1797,6 +1929,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -1816,6 +1949,7 @@
               }
             ],
             "default": null,
+            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -1824,6 +1958,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.",
             "title": "Mutation Applied"
           },
           "waiting_on": {
@@ -1836,7 +1971,7 @@
               }
             ],
             "default": null,
-            "description": "What kind of answer a parked call waits for.",
+            "description": "What kind of answer the call waits for, while `status` is `waiting_for_user_input`.",
             "title": "Waiting On"
           },
           "approval": {
@@ -1877,7 +2012,7 @@
               }
             ],
             "default": null,
-            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "description": "Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.",
             "title": "Approval"
           },
           "display": {
@@ -1889,7 +2024,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the tool touched, for showing its progress. Never file contents or commands."
           }
         },
         "required": [
@@ -1899,10 +2035,11 @@
         "type": "object"
       },
       "ExecToolEntityMutationApproval": {
-        "description": "Parked by the `exec_tool_entity_mutation` guard.",
+        "description": "Waiting for approval: the AI's code would update or delete records in an entity.",
         "properties": {
           "guard": {
             "const": "exec_tool_entity_mutation",
+            "description": "The check that paused the call.",
             "title": "Guard",
             "type": "string"
           },
@@ -1912,7 +2049,7 @@
               "null"
             ],
             "default": null,
-            "description": "Why the guard parked the call.",
+            "description": "Why the call needs approval, as the check explained it.",
             "title": "Reason"
           },
           "details": {
@@ -1924,7 +2061,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the check found."
           }
         },
         "required": [
@@ -1934,10 +2072,11 @@
         "type": "object"
       },
       "ExecToolGithubRepoWriteApproval": {
-        "description": "Parked by the `exec_tool_github_repo_write` guard.",
+        "description": "Waiting for approval: the AI's code would write to a GitHub repository.",
         "properties": {
           "guard": {
             "const": "exec_tool_github_repo_write",
+            "description": "The check that paused the call.",
             "title": "Guard",
             "type": "string"
           },
@@ -1947,7 +2086,7 @@
               "null"
             ],
             "default": null,
-            "description": "Why the guard parked the call.",
+            "description": "Why the call needs approval, as the check explained it.",
             "title": "Reason"
           },
           "details": {
@@ -1959,7 +2098,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the check found."
           }
         },
         "required": [
@@ -1969,10 +2109,11 @@
         "type": "object"
       },
       "ExecToolInviteUserApproval": {
-        "description": "Parked by the `exec_tool_invite_user` guard.",
+        "description": "Waiting for approval: the AI's code would invite someone to the app by email.",
         "properties": {
           "guard": {
             "const": "exec_tool_invite_user",
+            "description": "The check that paused the call.",
             "title": "Guard",
             "type": "string"
           },
@@ -1982,7 +2123,7 @@
               "null"
             ],
             "default": null,
-            "description": "Why the guard parked the call.",
+            "description": "Why the call needs approval, as the check explained it.",
             "title": "Reason"
           },
           "details": {
@@ -1994,7 +2135,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the check found."
           }
         },
         "required": [
@@ -2004,10 +2146,11 @@
         "type": "object"
       },
       "ExecToolSendEmailApproval": {
-        "description": "Parked by the `exec_tool_send_email` guard.",
+        "description": "Waiting for approval: the AI's code would send an email.",
         "properties": {
           "guard": {
             "const": "exec_tool_send_email",
+            "description": "The check that paused the call.",
             "title": "Guard",
             "type": "string"
           },
@@ -2017,7 +2160,7 @@
               "null"
             ],
             "default": null,
-            "description": "Why the guard parked the call.",
+            "description": "Why the call needs approval, as the check explained it.",
             "title": "Reason"
           },
           "details": {
@@ -2029,7 +2172,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the check found."
           }
         },
         "required": [
@@ -2039,10 +2183,11 @@
         "type": "object"
       },
       "ExecToolSendSmsApproval": {
-        "description": "Parked by the `exec_tool_send_sms` guard.",
+        "description": "Waiting for approval: the AI's code would send a text message.",
         "properties": {
           "guard": {
             "const": "exec_tool_send_sms",
+            "description": "The check that paused the call.",
             "title": "Guard",
             "type": "string"
           },
@@ -2052,7 +2197,7 @@
               "null"
             ],
             "default": null,
-            "description": "Why the guard parked the call.",
+            "description": "Why the call needs approval, as the check explained it.",
             "title": "Reason"
           },
           "details": {
@@ -2064,7 +2209,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the check found."
           }
         },
         "required": [
@@ -2101,10 +2247,12 @@
               "string",
               "null"
             ],
+            "description": "The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.",
             "title": "Room"
           },
           "data": {
-            "$ref": "#/components/schemas/BranchChange"
+            "$ref": "#/components/schemas/BranchChange",
+            "description": "The event's payload. Its fields depend on the event."
           }
         },
         "required": [
@@ -2115,10 +2263,11 @@
         "type": "object"
       },
       "FindReplaceCall": {
-        "description": "A `find_replace` call.",
+        "description": "The AI edits files by replacing text in them.",
         "properties": {
           "name": {
             "const": "find_replace",
+            "description": "The tool that was called.",
             "title": "Name",
             "type": "string"
           },
@@ -2128,6 +2277,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the call. Every update to the call carries the same ID.",
             "title": "Id"
           },
           "requires_user_input": {
@@ -2136,6 +2286,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -2144,6 +2295,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -2163,6 +2315,7 @@
               }
             ],
             "default": null,
+            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -2171,6 +2324,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.",
             "title": "Mutation Applied"
           },
           "waiting_on": {
@@ -2183,7 +2337,7 @@
               }
             ],
             "default": null,
-            "description": "What kind of answer a parked call waits for.",
+            "description": "What kind of answer the call waits for, while `status` is `waiting_for_user_input`.",
             "title": "Waiting On"
           },
           "approval": {
@@ -2224,7 +2378,7 @@
               }
             ],
             "default": null,
-            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "description": "Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.",
             "title": "Approval"
           },
           "display": {
@@ -2236,7 +2390,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the tool touched, for showing its progress. Never file contents or commands."
           }
         },
         "required": [
@@ -2259,7 +2414,7 @@
             "type": "string"
           },
           "inspection_failed": {
-            "description": "The guard could not verify the function's source.",
+            "description": "The check could not verify the function's source.",
             "title": "Inspection Failed",
             "type": "boolean"
           }
@@ -2280,10 +2435,11 @@
         "type": "object"
       },
       "GenerateGameBackgroundCall": {
-        "description": "A `generate_game_background` call.",
+        "description": "The AI generates a background image for a game. An `image.resolved` event follows when it is ready.",
         "properties": {
           "name": {
             "const": "generate_game_background",
+            "description": "The tool that was called.",
             "title": "Name",
             "type": "string"
           },
@@ -2293,6 +2449,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the call. Every update to the call carries the same ID.",
             "title": "Id"
           },
           "requires_user_input": {
@@ -2301,6 +2458,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -2309,6 +2467,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -2328,6 +2487,7 @@
               }
             ],
             "default": null,
+            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -2336,6 +2496,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.",
             "title": "Mutation Applied"
           },
           "waiting_on": {
@@ -2348,7 +2509,7 @@
               }
             ],
             "default": null,
-            "description": "What kind of answer a parked call waits for.",
+            "description": "What kind of answer the call waits for, while `status` is `waiting_for_user_input`.",
             "title": "Waiting On"
           },
           "approval": {
@@ -2389,7 +2550,7 @@
               }
             ],
             "default": null,
-            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "description": "Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.",
             "title": "Approval"
           },
           "results": {
@@ -2398,6 +2559,7 @@
               "null"
             ],
             "default": null,
+            "description": "The tool's result, narrowed to what this tool publishes. Absent while the call waits for approval.",
             "title": "Results"
           }
         },
@@ -2408,10 +2570,11 @@
         "type": "object"
       },
       "GenerateGameImageCall": {
-        "description": "A `generate_game_image` call.",
+        "description": "The AI generates an image asset for a game. An `image.resolved` event follows when it is ready.",
         "properties": {
           "name": {
             "const": "generate_game_image",
+            "description": "The tool that was called.",
             "title": "Name",
             "type": "string"
           },
@@ -2421,6 +2584,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the call. Every update to the call carries the same ID.",
             "title": "Id"
           },
           "requires_user_input": {
@@ -2429,6 +2593,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -2437,6 +2602,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -2456,6 +2622,7 @@
               }
             ],
             "default": null,
+            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -2464,6 +2631,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.",
             "title": "Mutation Applied"
           },
           "waiting_on": {
@@ -2476,7 +2644,7 @@
               }
             ],
             "default": null,
-            "description": "What kind of answer a parked call waits for.",
+            "description": "What kind of answer the call waits for, while `status` is `waiting_for_user_input`.",
             "title": "Waiting On"
           },
           "approval": {
@@ -2517,7 +2685,7 @@
               }
             ],
             "default": null,
-            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "description": "Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.",
             "title": "Approval"
           },
           "arguments": {
@@ -2529,7 +2697,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the AI asked the tool to do, narrowed to what this tool publishes."
           },
           "results": {
             "type": [
@@ -2537,6 +2706,7 @@
               "null"
             ],
             "default": null,
+            "description": "The tool's result, narrowed to what this tool publishes. Absent while the call waits for approval.",
             "title": "Results"
           }
         },
@@ -2547,10 +2717,11 @@
         "type": "object"
       },
       "GenerateImageCall": {
-        "description": "A `generate_image` call.",
+        "description": "The AI generates an image for the app. An `image.resolved` event follows when it is ready.",
         "properties": {
           "name": {
             "const": "generate_image",
+            "description": "The tool that was called.",
             "title": "Name",
             "type": "string"
           },
@@ -2560,6 +2731,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the call. Every update to the call carries the same ID.",
             "title": "Id"
           },
           "requires_user_input": {
@@ -2568,6 +2740,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -2576,6 +2749,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -2595,6 +2769,7 @@
               }
             ],
             "default": null,
+            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -2603,6 +2778,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.",
             "title": "Mutation Applied"
           },
           "waiting_on": {
@@ -2615,7 +2791,7 @@
               }
             ],
             "default": null,
-            "description": "What kind of answer a parked call waits for.",
+            "description": "What kind of answer the call waits for, while `status` is `waiting_for_user_input`.",
             "title": "Waiting On"
           },
           "approval": {
@@ -2656,7 +2832,7 @@
               }
             ],
             "default": null,
-            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "description": "Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.",
             "title": "Approval"
           },
           "arguments": {
@@ -2668,7 +2844,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the AI asked the tool to do, narrowed to what this tool publishes."
           },
           "results": {
             "anyOf": [
@@ -2679,7 +2856,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "The tool's result, narrowed to what this tool publishes. Absent while the call waits for approval."
           }
         },
         "required": [
@@ -2689,10 +2867,11 @@
         "type": "object"
       },
       "GeneratePrdCall": {
-        "description": "A `generate_prd` call.",
+        "description": "The AI writes down the plan it settled with the user. In plan mode this call carries the plan itself.",
         "properties": {
           "name": {
             "const": "generate_prd",
+            "description": "The tool that was called.",
             "title": "Name",
             "type": "string"
           },
@@ -2702,6 +2881,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the call. Every update to the call carries the same ID.",
             "title": "Id"
           },
           "requires_user_input": {
@@ -2710,6 +2890,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -2718,6 +2899,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -2737,6 +2919,7 @@
               }
             ],
             "default": null,
+            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -2745,6 +2928,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.",
             "title": "Mutation Applied"
           },
           "waiting_on": {
@@ -2757,7 +2941,7 @@
               }
             ],
             "default": null,
-            "description": "What kind of answer a parked call waits for.",
+            "description": "What kind of answer the call waits for, while `status` is `waiting_for_user_input`.",
             "title": "Waiting On"
           },
           "approval": {
@@ -2798,7 +2982,7 @@
               }
             ],
             "default": null,
-            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "description": "Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.",
             "title": "Approval"
           },
           "arguments": {
@@ -2810,7 +2994,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the AI asked the tool to do, narrowed to what this tool publishes."
           }
         },
         "required": [
@@ -2820,10 +3005,11 @@
         "type": "object"
       },
       "GenerateVideoCall": {
-        "description": "A `generate_video` call.",
+        "description": "The AI generates a video for the app.",
         "properties": {
           "name": {
             "const": "generate_video",
+            "description": "The tool that was called.",
             "title": "Name",
             "type": "string"
           },
@@ -2833,6 +3019,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the call. Every update to the call carries the same ID.",
             "title": "Id"
           },
           "requires_user_input": {
@@ -2841,6 +3028,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -2849,6 +3037,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -2868,6 +3057,7 @@
               }
             ],
             "default": null,
+            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -2876,6 +3066,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.",
             "title": "Mutation Applied"
           },
           "waiting_on": {
@@ -2888,7 +3079,7 @@
               }
             ],
             "default": null,
-            "description": "What kind of answer a parked call waits for.",
+            "description": "What kind of answer the call waits for, while `status` is `waiting_for_user_input`.",
             "title": "Waiting On"
           },
           "approval": {
@@ -2929,7 +3120,7 @@
               }
             ],
             "default": null,
-            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "description": "Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.",
             "title": "Approval"
           },
           "arguments": {
@@ -2941,7 +3132,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the AI asked the tool to do, narrowed to what this tool publishes."
           },
           "results": {
             "type": [
@@ -2949,6 +3141,7 @@
               "null"
             ],
             "default": null,
+            "description": "The tool's result, narrowed to what this tool publishes. Absent while the call waits for approval.",
             "title": "Results"
           }
         },
@@ -2959,6 +3152,7 @@
         "type": "object"
       },
       "ImageResolved": {
+        "description": "A generated image finished or failed. Replace `placeholder_url` with `image_url` wherever the app shows it.",
         "properties": {
           "status": {
             "anyOf": [
@@ -2975,6 +3169,7 @@
               }
             ],
             "default": null,
+            "description": "`pending` while the image generates, `completed` once `image_url` is ready, `failed` when generation failed.",
             "title": "Status"
           },
           "placeholder_url": {
@@ -2983,6 +3178,7 @@
               "null"
             ],
             "default": null,
+            "description": "Placeholder URL the app shows while the image generates. Match it to find where the image appears.",
             "title": "Placeholder Url"
           },
           "image_url": {
@@ -2991,6 +3187,7 @@
               "null"
             ],
             "default": null,
+            "description": "URL of the finished image, or `null` while it is pending or after it failed.",
             "title": "Image Url"
           }
         },
@@ -3005,10 +3202,12 @@
               "string",
               "null"
             ],
+            "description": "The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.",
             "title": "Room"
           },
           "data": {
-            "$ref": "#/components/schemas/ImageResolved"
+            "$ref": "#/components/schemas/ImageResolved",
+            "description": "The event's payload. Its fields depend on the event."
           }
         },
         "required": [
@@ -3049,10 +3248,11 @@
         "type": "object"
       },
       "InstallNpmPackageCall": {
-        "description": "A `install_npm_package` call.",
+        "description": "The AI installs or removes npm packages in the app.",
         "properties": {
           "name": {
             "const": "install_npm_package",
+            "description": "The tool that was called.",
             "title": "Name",
             "type": "string"
           },
@@ -3062,6 +3262,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the call. Every update to the call carries the same ID.",
             "title": "Id"
           },
           "requires_user_input": {
@@ -3070,6 +3271,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -3078,6 +3280,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -3097,6 +3300,7 @@
               }
             ],
             "default": null,
+            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -3105,6 +3309,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.",
             "title": "Mutation Applied"
           },
           "waiting_on": {
@@ -3117,7 +3322,7 @@
               }
             ],
             "default": null,
-            "description": "What kind of answer a parked call waits for.",
+            "description": "What kind of answer the call waits for, while `status` is `waiting_for_user_input`.",
             "title": "Waiting On"
           },
           "approval": {
@@ -3158,7 +3363,7 @@
               }
             ],
             "default": null,
-            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "description": "Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.",
             "title": "Approval"
           },
           "arguments": {
@@ -3170,7 +3375,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the AI asked the tool to do, narrowed to what this tool publishes."
           }
         },
         "required": [
@@ -3232,6 +3438,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the message. An update carries the whole message again under the same ID.",
             "title": "Id"
           },
           "role": {
@@ -3249,6 +3456,7 @@
               }
             ],
             "default": null,
+            "description": "`user` for a message a person sent, `assistant` for the AI's reply. `system` messages are never sent.",
             "title": "Role"
           },
           "content": {
@@ -3257,6 +3465,7 @@
               "null"
             ],
             "default": null,
+            "description": "Text of the message. Attachments and structured content are left out.",
             "title": "Content"
           },
           "tool_calls": {
@@ -3347,6 +3556,7 @@
               "null"
             ],
             "default": null,
+            "description": "The tool calls the AI made in this message, in order. Each is updated in place as it progresses.",
             "title": "Tool Calls"
           },
           "checkpoint_id": {
@@ -3355,6 +3565,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the checkpoint tied to the message. On a message a person sent it holds the app before the turn, on the AI's final reply the app after it. Absent when the turn made no checkpoint.",
             "title": "Checkpoint Id"
           },
           "metadata": {
@@ -3366,7 +3577,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "When the message was created."
           },
           "additional_message_params": {
             "anyOf": [
@@ -3378,6 +3590,7 @@
               }
             ],
             "default": null,
+            "description": "Flags on the message, such as plan mode. Only the flags listed here are published.",
             "title": "Additional Message Params"
           }
         },
@@ -3394,6 +3607,7 @@
               "null"
             ],
             "default": null,
+            "description": "Time the message was created, as a UTC timestamp in ISO 8601 format.",
             "title": "Created Date"
           }
         },
@@ -3433,8 +3647,10 @@
         "type": "object"
       },
       "MessageRemoved": {
+        "description": "A chat message was removed or hidden. Drop the message with `message_id`.",
         "properties": {
           "message_id": {
+            "description": "ID of the removed message.",
             "title": "Message Id",
             "type": "string"
           },
@@ -3444,6 +3660,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the conversation the message belongs to. Each branch has its own conversation, so a viewer showing one branch can drop another branch's messages.",
             "title": "Conversation Id"
           },
           "branch_id": {
@@ -3452,6 +3669,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the branch the change belongs to. Omitted or `null` means the main branch.",
             "title": "Branch Id"
           }
         },
@@ -3469,10 +3687,12 @@
               "string",
               "null"
             ],
+            "description": "The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.",
             "title": "Room"
           },
           "data": {
-            "$ref": "#/components/schemas/MessageRemoved"
+            "$ref": "#/components/schemas/MessageRemoved",
+            "description": "The event's payload. Its fields depend on the event."
           }
         },
         "required": [
@@ -3483,9 +3703,11 @@
         "type": "object"
       },
       "MessageUpdated": {
+        "description": "A chat message was added or changed. Replace the message with the same `id`.",
         "properties": {
           "message": {
-            "$ref": "#/components/schemas/Message"
+            "$ref": "#/components/schemas/Message",
+            "description": "The message in full, as it now reads."
           },
           "conversation_id": {
             "type": [
@@ -3493,6 +3715,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the conversation the message belongs to. Each branch has its own conversation, so a viewer showing one branch can drop another branch's messages.",
             "title": "Conversation Id"
           },
           "branch_id": {
@@ -3501,6 +3724,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the branch the change belongs to. Omitted or `null` means the main branch.",
             "title": "Branch Id"
           }
         },
@@ -3518,10 +3742,12 @@
               "string",
               "null"
             ],
+            "description": "The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.",
             "title": "Room"
           },
           "data": {
-            "$ref": "#/components/schemas/MessageUpdated"
+            "$ref": "#/components/schemas/MessageUpdated",
+            "description": "The event's payload. Its fields depend on the event."
           }
         },
         "required": [
@@ -3532,9 +3758,10 @@
         "type": "object"
       },
       "OtherApproval": {
-        "description": "Parked by a guard that publishes only its name.",
+        "description": "Waiting for approval from a check that publishes only its name.",
         "properties": {
           "guard": {
+            "description": "The check that paused the call.",
             "not": {
               "enum": [
                 "backend_function_entity_delete",
@@ -3558,9 +3785,10 @@
         "type": "object"
       },
       "OtherToolCall": {
-        "description": "A call to a tool that publishes only its name and progress.",
+        "description": "A call to any other tool. Only its name and progress are published.",
         "properties": {
           "name": {
+            "description": "The tool that was called.",
             "not": {
               "enum": [
                 "ask_clarifying_questions",
@@ -3599,6 +3827,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the call. Every update to the call carries the same ID.",
             "title": "Id"
           },
           "requires_user_input": {
@@ -3607,6 +3836,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -3615,6 +3845,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -3634,6 +3865,7 @@
               }
             ],
             "default": null,
+            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -3642,6 +3874,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.",
             "title": "Mutation Applied"
           },
           "waiting_on": {
@@ -3654,7 +3887,7 @@
               }
             ],
             "default": null,
-            "description": "What kind of answer a parked call waits for.",
+            "description": "What kind of answer the call waits for, while `status` is `waiting_for_user_input`.",
             "title": "Waiting On"
           },
           "approval": {
@@ -3695,7 +3928,7 @@
               }
             ],
             "default": null,
-            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "description": "Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.",
             "title": "Approval"
           }
         },
@@ -3805,10 +4038,11 @@
         "type": "object"
       },
       "PreviewExecuteCodeCall": {
-        "description": "A `preview_execute_code` call.",
+        "description": "The AI runs code inside the app preview to inspect it.",
         "properties": {
           "name": {
             "const": "preview_execute_code",
+            "description": "The tool that was called.",
             "title": "Name",
             "type": "string"
           },
@@ -3818,6 +4052,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the call. Every update to the call carries the same ID.",
             "title": "Id"
           },
           "requires_user_input": {
@@ -3826,6 +4061,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -3834,6 +4070,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -3853,6 +4090,7 @@
               }
             ],
             "default": null,
+            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -3861,6 +4099,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.",
             "title": "Mutation Applied"
           },
           "waiting_on": {
@@ -3873,7 +4112,7 @@
               }
             ],
             "default": null,
-            "description": "What kind of answer a parked call waits for.",
+            "description": "What kind of answer the call waits for, while `status` is `waiting_for_user_input`.",
             "title": "Waiting On"
           },
           "approval": {
@@ -3914,7 +4153,7 @@
               }
             ],
             "default": null,
-            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "description": "Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.",
             "title": "Approval"
           },
           "display": {
@@ -3926,7 +4165,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the tool touched, for showing its progress. Never file contents or commands."
           }
         },
         "required": [
@@ -3936,8 +4176,10 @@
         "type": "object"
       },
       "PreviewNavigationRequested": {
+        "description": "The app preview should show a page of the app, usually one the AI just built.",
         "properties": {
           "path": {
+            "description": "Path of the page to show, relative to the app's root, such as `/settings`.",
             "title": "Path",
             "type": "string"
           },
@@ -3952,6 +4194,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the branch the change belongs to. Omitted or `null` means the main branch.",
             "title": "Branch Id"
           }
         },
@@ -3970,10 +4213,12 @@
               "string",
               "null"
             ],
+            "description": "The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.",
             "title": "Room"
           },
           "data": {
-            "$ref": "#/components/schemas/PreviewNavigationRequested"
+            "$ref": "#/components/schemas/PreviewNavigationRequested",
+            "description": "The event's payload. Its fields depend on the event."
           }
         },
         "required": [
@@ -3984,6 +4229,7 @@
         "type": "object"
       },
       "PreviewReloadRequested": {
+        "description": "The app preview should reload, because its files changed under it.",
         "properties": {
           "branch_id": {
             "type": [
@@ -3991,6 +4237,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the branch the change belongs to. Omitted or `null` means the main branch.",
             "title": "Branch Id"
           }
         },
@@ -4005,10 +4252,12 @@
               "string",
               "null"
             ],
+            "description": "The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.",
             "title": "Room"
           },
           "data": {
-            "$ref": "#/components/schemas/PreviewReloadRequested"
+            "$ref": "#/components/schemas/PreviewReloadRequested",
+            "description": "The event's payload. Its fields depend on the event."
           }
         },
         "required": [
@@ -4019,10 +4268,11 @@
         "type": "object"
       },
       "PreviewScreenshotCall": {
-        "description": "A `preview_screenshot` call.",
+        "description": "The AI takes a screenshot of the app preview to check its work.",
         "properties": {
           "name": {
             "const": "preview_screenshot",
+            "description": "The tool that was called.",
             "title": "Name",
             "type": "string"
           },
@@ -4032,6 +4282,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the call. Every update to the call carries the same ID.",
             "title": "Id"
           },
           "requires_user_input": {
@@ -4040,6 +4291,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -4048,6 +4300,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -4067,6 +4320,7 @@
               }
             ],
             "default": null,
+            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -4075,6 +4329,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.",
             "title": "Mutation Applied"
           },
           "waiting_on": {
@@ -4087,7 +4342,7 @@
               }
             ],
             "default": null,
-            "description": "What kind of answer a parked call waits for.",
+            "description": "What kind of answer the call waits for, while `status` is `waiting_for_user_input`.",
             "title": "Waiting On"
           },
           "approval": {
@@ -4128,7 +4383,7 @@
               }
             ],
             "default": null,
-            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "description": "Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.",
             "title": "Approval"
           },
           "display": {
@@ -4140,7 +4395,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the tool touched, for showing its progress. Never file contents or commands."
           }
         },
         "required": [
@@ -4157,10 +4413,12 @@
               "string",
               "null"
             ],
+            "description": "The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.",
             "title": "Room"
           },
           "data": {
-            "$ref": "#/components/schemas/BranchChange"
+            "$ref": "#/components/schemas/BranchChange",
+            "description": "The event's payload. Its fields depend on the event."
           }
         },
         "required": [
@@ -4199,7 +4457,7 @@
             "type": "string"
           },
           "options": {
-            "description": "Selectable options; a bare string is its label.",
+            "description": "Selectable options. A bare string is its label.",
             "items": {
               "anyOf": [
                 {
@@ -4298,6 +4556,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the queued prompt.",
             "title": "Id"
           },
           "content": {
@@ -4306,6 +4565,7 @@
               "null"
             ],
             "default": null,
+            "description": "Text of the prompt.",
             "title": "Content"
           },
           "branch_id": {
@@ -4314,6 +4574,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the branch the prompt runs on, or `null` for the main branch.",
             "title": "Branch Id"
           },
           "created_at": {
@@ -4322,6 +4583,7 @@
               "null"
             ],
             "default": null,
+            "description": "Time the prompt was queued, as a UTC timestamp in ISO 8601 format.",
             "title": "Created At"
           }
         },
@@ -4329,7 +4591,7 @@
         "type": "object"
       },
       "QueueState": {
-        "description": "The prompt queue: the prompts the builder runs next, in order.",
+        "description": "The prompts the builder runs next, in order.",
         "properties": {
           "items": {
             "items": {
@@ -4340,6 +4602,7 @@
               "null"
             ],
             "default": null,
+            "description": "Queued prompts, in the order they will run.",
             "title": "Items"
           },
           "is_paused": {
@@ -4348,6 +4611,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the queue is paused, so queued prompts wait. A person can pause it, and the builder pauses it while the AI waits for an answer.",
             "title": "Is Paused"
           }
         },
@@ -4355,6 +4619,7 @@
         "type": "object"
       },
       "QueueUpdated": {
+        "description": "The whole prompt queue after a change. Replace the queue with it.",
         "properties": {
           "items": {
             "items": {
@@ -4365,6 +4630,7 @@
               "null"
             ],
             "default": null,
+            "description": "Queued prompts, in the order they will run.",
             "title": "Items"
           },
           "is_paused": {
@@ -4373,6 +4639,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the queue is paused, so queued prompts wait. A person can pause it, and the builder pauses it while the AI waits for an answer.",
             "title": "Is Paused"
           },
           "processed_item_id": {
@@ -4381,6 +4648,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the queued prompt the builder just picked up to run. Absent when a prompt was added, removed or cleared.",
             "title": "Processed Item Id"
           },
           "branch_id": {
@@ -4389,6 +4657,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the branch the change belongs to. Omitted or `null` means the main branch.",
             "title": "Branch Id"
           }
         },
@@ -4403,10 +4672,12 @@
               "string",
               "null"
             ],
+            "description": "The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.",
             "title": "Room"
           },
           "data": {
-            "$ref": "#/components/schemas/QueueUpdated"
+            "$ref": "#/components/schemas/QueueUpdated",
+            "description": "The event's payload. Its fields depend on the event."
           }
         },
         "required": [
@@ -4417,10 +4688,11 @@
         "type": "object"
       },
       "ReadOnlyExecToolCall": {
-        "description": "A `read_only_exec_tool` call.",
+        "description": "The AI runs code that only reads the app's data.",
         "properties": {
           "name": {
             "const": "read_only_exec_tool",
+            "description": "The tool that was called.",
             "title": "Name",
             "type": "string"
           },
@@ -4430,6 +4702,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the call. Every update to the call carries the same ID.",
             "title": "Id"
           },
           "requires_user_input": {
@@ -4438,6 +4711,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -4446,6 +4720,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -4465,6 +4740,7 @@
               }
             ],
             "default": null,
+            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -4473,6 +4749,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.",
             "title": "Mutation Applied"
           },
           "waiting_on": {
@@ -4485,7 +4762,7 @@
               }
             ],
             "default": null,
-            "description": "What kind of answer a parked call waits for.",
+            "description": "What kind of answer the call waits for, while `status` is `waiting_for_user_input`.",
             "title": "Waiting On"
           },
           "approval": {
@@ -4526,7 +4803,7 @@
               }
             ],
             "default": null,
-            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "description": "Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.",
             "title": "Approval"
           },
           "display": {
@@ -4538,7 +4815,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the tool touched, for showing its progress. Never file contents or commands."
           }
         },
         "required": [
@@ -4548,10 +4826,11 @@
         "type": "object"
       },
       "ReadRepoFileCall": {
-        "description": "A `read_repo_file` call.",
+        "description": "The AI reads a file in the imported repository.",
         "properties": {
           "name": {
             "const": "read_repo_file",
+            "description": "The tool that was called.",
             "title": "Name",
             "type": "string"
           },
@@ -4561,6 +4840,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the call. Every update to the call carries the same ID.",
             "title": "Id"
           },
           "requires_user_input": {
@@ -4569,6 +4849,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -4577,6 +4858,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -4596,6 +4878,7 @@
               }
             ],
             "default": null,
+            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -4604,6 +4887,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.",
             "title": "Mutation Applied"
           },
           "waiting_on": {
@@ -4616,7 +4900,7 @@
               }
             ],
             "default": null,
-            "description": "What kind of answer a parked call waits for.",
+            "description": "What kind of answer the call waits for, while `status` is `waiting_for_user_input`.",
             "title": "Waiting On"
           },
           "approval": {
@@ -4657,7 +4941,7 @@
               }
             ],
             "default": null,
-            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "description": "Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.",
             "title": "Approval"
           },
           "display": {
@@ -4669,7 +4953,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the tool touched, for showing its progress. Never file contents or commands."
           }
         },
         "required": [
@@ -4686,10 +4971,12 @@
               "string",
               "null"
             ],
+            "description": "The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.",
             "title": "Room"
           },
           "data": {
-            "$ref": "#/components/schemas/BranchChange"
+            "$ref": "#/components/schemas/BranchChange",
+            "description": "The event's payload. Its fields depend on the event."
           }
         },
         "required": [
@@ -4700,17 +4987,19 @@
         "type": "object"
       },
       "RoomAccessDeniedEvent": {
-        "description": "A join was refused: the app is not on the session's allowlist, or the socket joins too often.",
+        "description": "A join was refused because the app is not on the session's allowlist, or the socket joins too often.",
         "properties": {
           "room": {
             "type": [
               "string",
               "null"
             ],
+            "description": "The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.",
             "title": "Room"
           },
           "data": {
-            "$ref": "#/components/schemas/RoomNotice"
+            "$ref": "#/components/schemas/RoomNotice",
+            "description": "The event's payload. Its fields depend on the event."
           }
         },
         "required": [
@@ -4721,17 +5010,19 @@
         "type": "object"
       },
       "RoomAccessRevokedEvent": {
-        "description": "The app left the session's allowlist, or its workspace. Events for it stop; do not rejoin.",
+        "description": "The app left the session's allowlist, or its workspace. Events for it stop. Do not rejoin.",
         "properties": {
           "room": {
             "type": [
               "string",
               "null"
             ],
+            "description": "The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.",
             "title": "Room"
           },
           "data": {
-            "$ref": "#/components/schemas/RoomNotice"
+            "$ref": "#/components/schemas/RoomNotice",
+            "description": "The event's payload. Its fields depend on the event."
           }
         },
         "required": [
@@ -4742,23 +5033,25 @@
         "type": "object"
       },
       "RoomNotice": {
-        "description": "The app is named by the event's room.",
+        "description": "An empty payload. The app concerned is the event's `room`.",
         "properties": {},
         "title": "RoomNotice",
         "type": "object"
       },
       "RoomSnapshotUnavailableEvent": {
-        "description": "The join held but its snapshot failed. Live events still arrive; rejoin later for a snapshot.",
+        "description": "The join held but its snapshot failed. Live events still arrive. Rejoin later for a snapshot.",
         "properties": {
           "room": {
             "type": [
               "string",
               "null"
             ],
+            "description": "The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.",
             "title": "Room"
           },
           "data": {
-            "$ref": "#/components/schemas/RoomNotice"
+            "$ref": "#/components/schemas/RoomNotice",
+            "description": "The event's payload. Its fields depend on the event."
           }
         },
         "required": [
@@ -4769,10 +5062,11 @@
         "type": "object"
       },
       "RunShellCommandCall": {
-        "description": "A `run_shell_command` call.",
+        "description": "The AI runs a shell command in the imported repository's sandbox.",
         "properties": {
           "name": {
             "const": "run_shell_command",
+            "description": "The tool that was called.",
             "title": "Name",
             "type": "string"
           },
@@ -4782,6 +5076,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the call. Every update to the call carries the same ID.",
             "title": "Id"
           },
           "requires_user_input": {
@@ -4790,6 +5085,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -4798,6 +5094,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -4817,6 +5114,7 @@
               }
             ],
             "default": null,
+            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -4825,6 +5123,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.",
             "title": "Mutation Applied"
           },
           "waiting_on": {
@@ -4837,7 +5136,7 @@
               }
             ],
             "default": null,
-            "description": "What kind of answer a parked call waits for.",
+            "description": "What kind of answer the call waits for, while `status` is `waiting_for_user_input`.",
             "title": "Waiting On"
           },
           "approval": {
@@ -4878,7 +5177,7 @@
               }
             ],
             "default": null,
-            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "description": "Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.",
             "title": "Approval"
           },
           "display": {
@@ -4890,7 +5189,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the tool touched, for showing its progress. Never file contents or commands."
           }
         },
         "required": [
@@ -4917,9 +5217,10 @@
         "type": "object"
       },
       "SessionEnded": {
+        "description": "The session is over. The socket disconnects right after this event.",
         "properties": {
           "reason": {
-            "description": "`expired`: ask the partner backend for a new session. `revoked`: the partner or an admin ended it; don't reconnect. `replaced`: another tab took it; stop.",
+            "description": "`expired`: ask the partner backend for a new session. `revoked`: the partner or an admin ended it, so do not reconnect. `replaced`: a newer socket took the session, so stop.",
             "enum": [
               "expired",
               "revoked",
@@ -4943,10 +5244,12 @@
               "string",
               "null"
             ],
+            "description": "The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.",
             "title": "Room"
           },
           "data": {
-            "$ref": "#/components/schemas/SessionEnded"
+            "$ref": "#/components/schemas/SessionEnded",
+            "description": "The event's payload. Its fields depend on the event."
           }
         },
         "required": [
@@ -4972,10 +5275,11 @@
         "type": "object"
       },
       "SetSecretsCall": {
-        "description": "A `set_secrets` call.",
+        "description": "The AI asks the user for secret values, such as API keys. The call waits until the user supplies them.",
         "properties": {
           "name": {
             "const": "set_secrets",
+            "description": "The tool that was called.",
             "title": "Name",
             "type": "string"
           },
@@ -4985,6 +5289,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the call. Every update to the call carries the same ID.",
             "title": "Id"
           },
           "requires_user_input": {
@@ -4993,6 +5298,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -5001,6 +5307,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -5020,6 +5327,7 @@
               }
             ],
             "default": null,
+            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -5028,6 +5336,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.",
             "title": "Mutation Applied"
           },
           "waiting_on": {
@@ -5040,7 +5349,7 @@
               }
             ],
             "default": null,
-            "description": "What kind of answer a parked call waits for.",
+            "description": "What kind of answer the call waits for, while `status` is `waiting_for_user_input`.",
             "title": "Waiting On"
           },
           "approval": {
@@ -5081,7 +5390,7 @@
               }
             ],
             "default": null,
-            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "description": "Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.",
             "title": "Approval"
           },
           "arguments": {
@@ -5093,7 +5402,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the AI asked the tool to do, narrowed to what this tool publishes."
           }
         },
         "required": [
@@ -5103,6 +5413,7 @@
         "type": "object"
       },
       "Snapshot": {
+        "description": "The app's current state, sent after every join. Replace what the viewer holds for the app with it.",
         "properties": {
           "status": {
             "anyOf": [
@@ -5112,9 +5423,11 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The app's build status, or `null` when none is recorded."
           },
           "messages": {
+            "description": "The last 50 messages visible to partners, oldest first.",
             "items": {
               "$ref": "#/components/schemas/Message"
             },
@@ -5135,7 +5448,7 @@
         "type": "object"
       },
       "StatusObject": {
-        "description": "Public builder state, without error diagnostics or billing context.",
+        "description": "The app's current build status.",
         "properties": {
           "state": {
             "anyOf": [
@@ -5152,6 +5465,7 @@
               }
             ],
             "default": null,
+            "description": "Where the app is in its build lifecycle. Ready means idle with no build in progress, processing means the app is being generated or modified, and error means the last build failed. This tracks building, not publishing.",
             "title": "State"
           },
           "turn_id": {
@@ -5160,6 +5474,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the user message whose turn the status belongs to.",
             "title": "Turn Id"
           },
           "last_updated_date": {
@@ -5169,6 +5484,7 @@
               "null"
             ],
             "default": null,
+            "description": "Time the status was last updated, as a UTC timestamp in ISO 8601 format.",
             "title": "Last Updated Date"
           }
         },
@@ -5176,7 +5492,7 @@
         "type": "object"
       },
       "SummaryDetails": {
-        "description": "What a parked code execution would do.",
+        "description": "What the code waiting for approval would do.",
         "properties": {
           "summary": {
             "description": "The agent's summary of what the code does.",
@@ -5200,21 +5516,24 @@
         "type": "object"
       },
       "TaskProgress": {
+        "description": "How far a long-running task has got.",
         "properties": {
           "current": {
             "type": [
-              "number",
+              "integer",
               "null"
             ],
             "default": null,
+            "description": "Items processed so far.",
             "title": "Current"
           },
           "total": {
             "type": [
-              "number",
+              "integer",
               "null"
             ],
             "default": null,
+            "description": "Items to process in all.",
             "title": "Total"
           },
           "percentage": {
@@ -5223,6 +5542,7 @@
               "null"
             ],
             "default": null,
+            "description": "Share of the work done, from 0 to 100.",
             "title": "Percentage"
           }
         },
@@ -5230,6 +5550,7 @@
         "type": "object"
       },
       "TaskProgressed": {
+        "description": "A long-running task, such as a data import, started, made progress, finished, failed or was cancelled.",
         "properties": {
           "tool_call_id": {
             "type": [
@@ -5237,6 +5558,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the tool call that started the task.",
             "title": "Tool Call Id"
           },
           "message_id": {
@@ -5245,14 +5567,27 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the message that holds that tool call.",
             "title": "Message Id"
           },
           "event_type": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "enum": [
+                  "task_started",
+                  "task_progress",
+                  "task_completed",
+                  "task_failed",
+                  "task_cancelled"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
             "default": null,
+            "description": "`task_started`, `task_progress`, `task_completed`, `task_failed` or `task_cancelled`.",
             "title": "Event Type"
           },
           "progress": {
@@ -5264,7 +5599,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Progress so far."
           },
           "branch_id": {
             "type": [
@@ -5272,6 +5608,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the branch the change belongs to. Omitted or `null` means the main branch.",
             "title": "Branch Id"
           }
         },
@@ -5286,10 +5623,12 @@
               "string",
               "null"
             ],
+            "description": "The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.",
             "title": "Room"
           },
           "data": {
-            "$ref": "#/components/schemas/TaskProgressed"
+            "$ref": "#/components/schemas/TaskProgressed",
+            "description": "The event's payload. Its fields depend on the event."
           }
         },
         "required": [
@@ -5300,10 +5639,11 @@
         "type": "object"
       },
       "UpdateEntitiesCall": {
-        "description": "A `update_entities` call.",
+        "description": "The AI updates records in one of the app's entities.",
         "properties": {
           "name": {
             "const": "update_entities",
+            "description": "The tool that was called.",
             "title": "Name",
             "type": "string"
           },
@@ -5313,6 +5653,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the call. Every update to the call carries the same ID.",
             "title": "Id"
           },
           "requires_user_input": {
@@ -5321,6 +5662,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -5329,6 +5671,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -5348,6 +5691,7 @@
               }
             ],
             "default": null,
+            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -5356,6 +5700,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.",
             "title": "Mutation Applied"
           },
           "waiting_on": {
@@ -5368,7 +5713,7 @@
               }
             ],
             "default": null,
-            "description": "What kind of answer a parked call waits for.",
+            "description": "What kind of answer the call waits for, while `status` is `waiting_for_user_input`.",
             "title": "Waiting On"
           },
           "approval": {
@@ -5409,7 +5754,7 @@
               }
             ],
             "default": null,
-            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "description": "Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.",
             "title": "Approval"
           },
           "arguments": {
@@ -5421,7 +5766,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the AI asked the tool to do, narrowed to what this tool publishes."
           },
           "display": {
             "anyOf": [
@@ -5432,7 +5778,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the tool touched, for showing its progress. Never file contents or commands."
           }
         },
         "required": [
@@ -5465,10 +5812,11 @@
         "type": "object"
       },
       "UpdatePlanCall": {
-        "description": "A `update_plan` call.",
+        "description": "The AI adds settled points to the plan.",
         "properties": {
           "name": {
             "const": "update_plan",
+            "description": "The tool that was called.",
             "title": "Name",
             "type": "string"
           },
@@ -5478,6 +5826,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the call. Every update to the call carries the same ID.",
             "title": "Id"
           },
           "requires_user_input": {
@@ -5486,6 +5835,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -5494,6 +5844,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -5513,6 +5864,7 @@
               }
             ],
             "default": null,
+            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -5521,6 +5873,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.",
             "title": "Mutation Applied"
           },
           "waiting_on": {
@@ -5533,7 +5886,7 @@
               }
             ],
             "default": null,
-            "description": "What kind of answer a parked call waits for.",
+            "description": "What kind of answer the call waits for, while `status` is `waiting_for_user_input`.",
             "title": "Waiting On"
           },
           "approval": {
@@ -5574,7 +5927,7 @@
               }
             ],
             "default": null,
-            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "description": "Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.",
             "title": "Approval"
           },
           "arguments": {
@@ -5586,7 +5939,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the AI asked the tool to do, narrowed to what this tool publishes."
           }
         },
         "required": [
@@ -5596,7 +5950,7 @@
         "type": "object"
       },
       "WaitingOn": {
-        "description": "What a parked call waits for. Render the widget by kind, not by tool name.",
+        "description": "What the call waits for. Render the widget by kind, not by tool name.",
         "properties": {
           "kind": {
             "description": "`choice`: pick among options. `input`: supply values. `approval`: approve or reject.",
@@ -5613,10 +5967,11 @@
         "type": "object"
       },
       "WriteFileCall": {
-        "description": "A `write_file` call.",
+        "description": "The AI writes a file in the app.",
         "properties": {
           "name": {
             "const": "write_file",
+            "description": "The tool that was called.",
             "title": "Name",
             "type": "string"
           },
@@ -5626,6 +5981,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the call. Every update to the call carries the same ID.",
             "title": "Id"
           },
           "requires_user_input": {
@@ -5634,6 +5990,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -5642,6 +5999,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -5661,6 +6019,7 @@
               }
             ],
             "default": null,
+            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -5669,6 +6028,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.",
             "title": "Mutation Applied"
           },
           "waiting_on": {
@@ -5681,7 +6041,7 @@
               }
             ],
             "default": null,
-            "description": "What kind of answer a parked call waits for.",
+            "description": "What kind of answer the call waits for, while `status` is `waiting_for_user_input`.",
             "title": "Waiting On"
           },
           "approval": {
@@ -5722,7 +6082,7 @@
               }
             ],
             "default": null,
-            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "description": "Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.",
             "title": "Approval"
           },
           "display": {
@@ -5734,7 +6094,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the tool touched, for showing its progress. Never file contents or commands."
           }
         },
         "required": [
@@ -5744,10 +6105,11 @@
         "type": "object"
       },
       "WriteRepoFileCall": {
-        "description": "A `write_repo_file` call.",
+        "description": "The AI writes a file in the imported repository.",
         "properties": {
           "name": {
             "const": "write_repo_file",
+            "description": "The tool that was called.",
             "title": "Name",
             "type": "string"
           },
@@ -5757,6 +6119,7 @@
               "null"
             ],
             "default": null,
+            "description": "ID of the call. Every update to the call carries the same ID.",
             "title": "Id"
           },
           "requires_user_input": {
@@ -5765,6 +6128,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -5773,6 +6137,7 @@
               "null"
             ],
             "default": null,
+            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -5792,6 +6157,7 @@
               }
             ],
             "default": null,
+            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -5800,6 +6166,7 @@
               "null"
             ],
             "default": null,
+            "description": "Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.",
             "title": "Mutation Applied"
           },
           "waiting_on": {
@@ -5812,7 +6179,7 @@
               }
             ],
             "default": null,
-            "description": "What kind of answer a parked call waits for.",
+            "description": "What kind of answer the call waits for, while `status` is `waiting_for_user_input`.",
             "title": "Waiting On"
           },
           "approval": {
@@ -5853,7 +6220,7 @@
               }
             ],
             "default": null,
-            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "description": "Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.",
             "title": "Approval"
           },
           "display": {
@@ -5865,7 +6232,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "What the tool touched, for showing its progress. Never file contents or commands."
           }
         },
         "required": [
