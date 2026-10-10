@@ -13,7 +13,7 @@ The workspace must have white-label sockets enabled; this SDK does not open sess
 import { createPlatformClient } from "@base44/platform";
 
 const client = createPlatformClient({
-  serverUrl: socketUrl, // the session's socket_url, from POST /api/service/socket-sessions
+  socketUrl, // the session's socket_url, from POST /api/service/socket-sessions
   async getSessionToken() {
     const response = await fetch("/api/builder-socket-session", { method: "POST" });
     if (!response.ok) throw new Error("Session request failed");
@@ -39,7 +39,7 @@ builder.close();
 `/api/builder-socket-session` is your backend's route, not an SDK endpoint. It opens a
 socket session with its workspace key (`apps:watch` scope) through
 `POST /api/service/socket-sessions` with `{ app_ids }`, and returns only the
-`session_token` and `socket_url` to the browser. Pass `socket_url` as `serverUrl`. Never pass the workspace key or any other server
+`session_token` and `socket_url` to the browser. Pass `socket_url` as `socketUrl`. Never pass the workspace key or any other server
 credential to this client. Subscribe only to apps on the session's allowlist; your
 backend adds or removes apps with `PUT`/`DELETE /api/service/socket-sessions/{session_id}/rooms/{app_id}`.
 
@@ -55,7 +55,7 @@ older one, which stops with `session_replaced`. Open one session per page.
 
 ## Lifecycle
 
-`createPlatformClient({ serverUrl, getSessionToken })` creates a lightweight module
+`createPlatformClient({ socketUrl, getSessionToken })` creates a lightweight module
 container: no Socket.IO instance, timers, token request or network activity. Its
 `builder` module follows the server SDK's module-factory pattern.
 
@@ -94,7 +94,7 @@ their exceptions are isolated so they cannot interrupt another app's delivery.
 
 ## Public shapes
 
-- `PlatformClientOptions` (`client.types.ts`): `serverUrl`, `getSessionToken`.
+- `PlatformClientOptions` (`client.types.ts`): `socketUrl`, `getSessionToken`.
 - `BuilderModule` (`modules/builder.types.ts`): lazy `init(options)` factory.
 - `BuilderInitOptions`: connection-level `onError` observer.
 - `BuilderSession`: `connect()`, `subscribe(appId, options)`, `close()`.

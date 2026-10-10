@@ -13,7 +13,7 @@ export interface PlatformClientOptions {
    * Use the `socket_url` your server receives from `POST /api/service/socket-sessions`. It must be
    * an origin with no path, query, fragment, or credentials.
    */
-  serverUrl: string;
+  socketUrl: string;
   /**
    * Returns a socket session token from your server.
    *

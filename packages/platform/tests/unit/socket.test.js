@@ -31,7 +31,7 @@ test("real Socket.IO handshake, join, snapshot, reconnect and session renewal", 
   });
   await new Promise(resolve => http.listen(0, "127.0.0.1", resolve));
   const client = createPlatformClient({
-    serverUrl: `http://127.0.0.1:${http.address().port}`,
+    socketUrl: `http://127.0.0.1:${http.address().port}`,
     getSessionToken: async () => `session-${++tokenCalls}`,
   });
   const builder = client.builder.init({ onError: error => errors.push(error) });

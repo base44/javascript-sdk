@@ -26,7 +26,7 @@ const auth = async () => {
 };
 function setup(getSessionToken = vi.fn(async () => "session-token")) {
   const onError = vi.fn();
-  const platform = createPlatformClient({ serverUrl: "https://api.example.test", getSessionToken });
+  const platform = createPlatformClient({ socketUrl: "https://api.example.test", getSessionToken });
   const client = platform.builder.init({ onError });
   clients.push(client);
   return { client, getSessionToken, onError };
@@ -41,7 +41,7 @@ afterEach(() => { clients.splice(0).forEach(client => client.close()); vi.useRea
 describe("platform client", () => {
   test("constructing the root client does not initialize sockets or fetch session tokens", () => {
     const getSessionToken = vi.fn(async () => "token");
-    const platform = createPlatformClient({ serverUrl: "https://api.example.test", getSessionToken });
+    const platform = createPlatformClient({ socketUrl: "https://api.example.test", getSessionToken });
     expect(fake.io).not.toHaveBeenCalled();
     const first = platform.builder.init({ onError: vi.fn() });
     const second = platform.builder.init({ onError: vi.fn() });
@@ -53,7 +53,7 @@ describe("platform client", () => {
   });
 
   test("closing one initialized builder does not close another or the root module", () => {
-    const platform = createPlatformClient({ serverUrl: "https://api.example.test", getSessionToken: async () => "token" });
+    const platform = createPlatformClient({ socketUrl: "https://api.example.test", getSessionToken: async () => "token" });
     const firstSocket = { ...fake.socket, disconnect: vi.fn() };
     const secondSocket = { ...fake.socket, disconnect: vi.fn() };
     fake.io.mockReturnValueOnce(firstSocket).mockReturnValueOnce(secondSocket);
@@ -290,8 +290,8 @@ describe("platform client", () => {
   });
 
   test("validates origins, app IDs, duplicate subscriptions and limits", () => {
-    for (const serverUrl of ["https://secret@example.test", "https://example.test?token=secret", "https://example.test/path", "ws://example.test"]) {
-      expect(() => createPlatformClient({ serverUrl, getSessionToken: () => "token" })).toThrow(TypeError);
+    for (const socketUrl of ["https://secret@example.test", "https://example.test?token=secret", "https://example.test/path", "ws://example.test"]) {
+      expect(() => createPlatformClient({ socketUrl, getSessionToken: () => "token" })).toThrow(TypeError);
     }
     const { client } = setup(); const options = { onSnapshot: vi.fn(), onEvent: vi.fn(), onError: vi.fn() };
     expect(() => client.subscribe("bad", options)).toThrow(TypeError);

@@ -3,7 +3,7 @@ import { createPlatformClient, type PlatformEvent } from "@base44/platform";
 declare const socketUrl: string;
 
 const client = createPlatformClient({
-  serverUrl: socketUrl, // the session's socket_url, from POST /api/service/socket-sessions
+  socketUrl, // the session's socket_url, from POST /api/service/socket-sessions
   // Your backend opens the session with its workspace key and returns only the session token.
   async getSessionToken() {
     const response = await fetch("/api/builder-socket-session", { method: "POST" });

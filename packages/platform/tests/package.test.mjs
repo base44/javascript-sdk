@@ -35,7 +35,7 @@ test("the client resolves from the installed package without the runtime SDK", (
   run(process.execPath, ["--input-type=module", "--eval", `
     import assert from "node:assert/strict";
     import { createPlatformClient } from "@base44/platform";
-    const client = createPlatformClient({ serverUrl: "https://example.test", getSessionToken: () => "session-token" });
+    const client = createPlatformClient({ socketUrl: "https://example.test", getSessionToken: () => "session-token" });
     assert.equal(typeof client.builder.init, "function");
     client.builder.init({ onError() {} }).close();
   `]);
@@ -43,7 +43,7 @@ test("the client resolves from the installed package without the runtime SDK", (
 
 const consumer = `
 import { createPlatformClient, type PlatformEvent } from "@base44/platform";
-const platform = createPlatformClient({ serverUrl: "https://example.test", getSessionToken: async () => "token" });
+const platform = createPlatformClient({ socketUrl: "https://example.test", getSessionToken: async () => "token" });
 platform.builder.init({ onError() {} }).subscribe("a".repeat(24), {
   onSnapshot(snapshot) { void snapshot.messages; },
   onEvent(event: PlatformEvent) {

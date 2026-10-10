@@ -11,7 +11,7 @@ import { createBuilder } from "./modules/builder.js";
  *
  * @param options - Configuration object for the client.
  * @returns A configured platform client with access to the platform's modules.
- * @throws {TypeError} When `serverUrl` isn't an HTTP or HTTPS origin.
+ * @throws {TypeError} When `socketUrl` isn't an HTTP or HTTPS origin.
  *
  * @example
  * ```typescript
@@ -19,7 +19,7 @@ import { createBuilder } from "./modules/builder.js";
  * import { createPlatformClient } from '@base44/platform';
  *
  * const client = createPlatformClient({
- *   serverUrl: socketUrl,
+ *   socketUrl,
  *   async getSessionToken() {
  *     const response = await fetch('/api/builder-socket-session', { method: 'POST' });
  *     const { session_token } = await response.json();
@@ -33,9 +33,9 @@ import { createBuilder } from "./modules/builder.js";
  * ```
  */
 export function createPlatformClient(options: PlatformClientOptions): PlatformClient {
-  const url = new URL(options.serverUrl);
+  const url = new URL(options.socketUrl);
   if (!["https:", "http:"].includes(url.protocol) || url.username || url.password || url.search || url.hash || url.pathname !== "/") {
-    throw new TypeError("serverUrl must be an HTTP(S) origin without credentials, path, query or fragment");
+    throw new TypeError("socketUrl must be an HTTP(S) origin without credentials, path, query or fragment");
   }
-  return Object.freeze({ builder: Object.freeze(createBuilder({ ...options, serverUrl: url.origin })) });
+  return Object.freeze({ builder: Object.freeze(createBuilder({ ...options, socketUrl: url.origin })) });
 }

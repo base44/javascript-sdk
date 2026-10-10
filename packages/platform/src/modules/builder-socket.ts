@@ -27,7 +27,7 @@ export class BuilderSocket implements BuilderSession {
 
   constructor(config: PlatformClientOptions, options: BuilderInitOptions) {
     this.options = { ...config, onError: options.onError };
-    this.socket = io(config.serverUrl, {
+    this.socket = io(config.socketUrl, {
       path: "/ws/socket.io/", transports: ["websocket"], autoConnect: false,
       forceNew: true, reconnectionAttempts: 5, reconnectionDelay: 1000, reconnectionDelayMax: 10000,
       timeout: 20000,

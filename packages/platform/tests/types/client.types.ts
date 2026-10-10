@@ -1,5 +1,5 @@
 import { createPlatformClient, type PlatformEvent, type PlatformEventMap, type PlatformSnapshot, type ToolCall, type GuardApproval, type Message, type StatusObject } from "@base44/platform";
-const client = createPlatformClient({ serverUrl: "https://example.test", getSessionToken: async () => "session-token" });
+const client = createPlatformClient({ socketUrl: "https://example.test", getSessionToken: async () => "session-token" });
 const builder = client.builder.init({ onError: error => { void error.code; } });
 const subscription = builder.subscribe("a".repeat(24), {
   onSnapshot(snapshot: PlatformSnapshot) {
@@ -44,7 +44,7 @@ createPlatformClient({ apiKey: "private" });
 // @ts-expect-error Socket methods belong to the builder session.
 client.connect();
 // @ts-expect-error The retired token callback is not accepted.
-createPlatformClient({ serverUrl: "https://example.test", refreshToken: async () => "token" });
+createPlatformClient({ socketUrl: "https://example.test", refreshToken: async () => "token" });
 
 const tool: ToolCall = {
   name: "ask_clarifying_questions",
