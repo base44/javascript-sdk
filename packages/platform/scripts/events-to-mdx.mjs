@@ -229,11 +229,8 @@ const envelopeRequired = new Set(envelope.required ?? []);
 const envelopeFields = Object.entries(envelope.properties).map(([name, schema]) => field(name, schema, envelopeRequired.has(name), MAX_DEPTH, []));
 // A short event, so the format section shows the envelope rather than a payload.
 const FORMAT_EXAMPLE = "preview.navigation_requested";
-// Mintlify's heading anchor: `room.access_revoked` becomes #room-access_revoked.
-const anchor = (name) => `#${name.replace(/\./g, "-")}`;
 const example = (message) =>
   (message.examples ?? []).slice(0, 1).flatMap((e) => ["```json Example", JSON.stringify(e.payload, null, 2), "```", ""]);
-const index = (list) => list.map((m) => `- [\`${m.name}\`](${anchor(m.name)}): ${prose(m.summary)}`);
 
 const protocol = [
   ...frontmatter("Socket messages", "Every message on a socket session's connection, in both directions, and its payload."),
@@ -241,21 +238,20 @@ const protocol = [
   prose(doc.info.description), "",
   prose(doc.servers.platform.description), "",
   prose(doc.channels.platform.description), "",
-  "## Message format", "",
+  "## Event format", "",
   "Every event the server sends is an object with two fields:", "",
   envelopeFields.join("\n\n"), "",
   ...example(serverMessages.find((m) => m.name === FORMAT_EXAMPLE) ?? serverMessages[0]),
   "## Events from the server", "",
-  ...index(serverMessages), "",
 ];
 for (const message of serverMessages) {
-  protocol.push(`### \`${message.name}\``, "", describe(message), "", ...example(message), "**`data` fields**", "", dataFields(message), "");
+  protocol.push(`### \`${message.name}\``, "", describe(message), "", "**`data` fields**", "", dataFields(message), "", ...example(message));
 }
-protocol.push("## Messages from the browser", "", ...index(clientMessages), "");
+protocol.push("## Messages from the browser", "");
 for (const message of clientMessages) {
   const [payload] = deref(message.payload);
-  protocol.push(`### \`${message.name}\``, "", describe(message), "", ...example(message));
-  protocol.push(`The payload is a \`${typeLabel(message.payload)}\`, not an object. ${constraints(payload).map(prose).join(" ")}`.trim(), "");
+  protocol.push(`### \`${message.name}\``, "", describe(message), "");
+  protocol.push(`The payload is a \`${typeLabel(message.payload)}\`, not an object. ${constraints(payload).map(prose).join(" ")}`.trim(), "", ...example(message));
 }
 write("protocol/socket-messages.mdx", protocol);
 
