@@ -10,9 +10,9 @@ shared socket. It is independent of the app SDK (`@base44/sdk`).
 The workspace must have white-label sockets enabled; this SDK does not open sessions.
 
 ```ts
-import { Base44PlatformClient } from "@base44/platform";
+import { createPlatformClient } from "@base44/platform";
 
-const client = new Base44PlatformClient({
+const client = createPlatformClient({
   serverUrl: socketUrl, // the session's socket_url, from POST /api/service/socket-sessions
   async getSessionToken() {
     const response = await fetch("/api/builder-socket-session", { method: "POST" });
@@ -55,7 +55,7 @@ older one, which stops with `session_replaced`. Open one session per page.
 
 ## Lifecycle
 
-`new Base44PlatformClient({ serverUrl, getSessionToken })` creates a lightweight module
+`createPlatformClient({ serverUrl, getSessionToken })` creates a lightweight module
 container: no Socket.IO instance, timers, token request or network activity. Its
 `builder` module follows the server SDK's module-factory pattern.
 

@@ -10,7 +10,7 @@
   "gitRevision": "main",
   "sort": ["source-order"],
   "entryFileName": "README.mdx",
-  "maxTypeConversionDepth": 2,
+  "maxTypeConversionDepth": 3,
   "hideBreadcrumbs": true,
   "disableSources": true,
   "hidePageTitle": true

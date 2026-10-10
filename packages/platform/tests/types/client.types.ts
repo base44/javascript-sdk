@@ -1,5 +1,5 @@
-import { Base44PlatformClient, type PlatformEvent, type PlatformEventMap, type PlatformSnapshot, type ToolCall, type GuardApproval, type Message, type StatusObject } from "@base44/platform";
-const client = new Base44PlatformClient({ serverUrl: "https://example.test", getSessionToken: async () => "session-token" });
+import { createPlatformClient, type PlatformEvent, type PlatformEventMap, type PlatformSnapshot, type ToolCall, type GuardApproval, type Message, type StatusObject } from "@base44/platform";
+const client = createPlatformClient({ serverUrl: "https://example.test", getSessionToken: async () => "session-token" });
 const builder = client.builder.init({ onError: error => { void error.code; } });
 const subscription = builder.subscribe("a".repeat(24), {
   onSnapshot(snapshot: PlatformSnapshot) {
@@ -40,11 +40,11 @@ builder.subscribe("a".repeat(24), { afterSeq: "saved", onSnapshot() {}, onEvent(
 // @ts-expect-error No browser mutation channel.
 client.send("write_file", {});
 // @ts-expect-error API keys are not browser credentials.
-new Base44PlatformClient({ apiKey: "private" });
+createPlatformClient({ apiKey: "private" });
 // @ts-expect-error Socket methods belong to the builder session.
 client.connect();
 // @ts-expect-error The retired token callback is not accepted.
-new Base44PlatformClient({ serverUrl: "https://example.test", refreshToken: async () => "token" });
+createPlatformClient({ serverUrl: "https://example.test", refreshToken: async () => "token" });
 
 const tool: ToolCall = {
   name: "ask_clarifying_questions",

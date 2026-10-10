@@ -1,20 +1,24 @@
-import type { PlatformClientOptions } from "./client.types.js";
+import type { PlatformClient, PlatformClientOptions } from "./client.types.js";
 import { createBuilder } from "./modules/builder.js";
-import type { BuilderModule } from "./modules/builder.types.js";
 
 /**
- * Browser client for the Base44 platform.
+ * Creates a platform client.
  *
- * Use it in a white-label app editor to follow what the AI chat does in your users' apps. Creating
- * the client opens no sockets, starts no timers and sends no requests. Each module sets up its own
+ * This is the entry point of the Platform SDK. The client gives your white-label app editor
+ * access to the platform's modules, such as [`builder`](/developers/references/platform-sdk/docs/interfaces/builder).
+ * Creating it opens no sockets, starts no timers and sends no requests. Each module sets up its own
  * resources when you initialize it.
+ *
+ * @param options - Configuration object for the client.
+ * @returns A configured platform client with access to the platform's modules.
+ * @throws {TypeError} When `serverUrl` isn't an HTTP or HTTPS origin.
  *
  * @example
  * ```typescript
- * // Create a client
- * import { Base44PlatformClient } from '@base44/platform';
+ * // Create a client for your app editor
+ * import { createPlatformClient } from '@base44/platform';
  *
- * const client = new Base44PlatformClient({
+ * const client = createPlatformClient({
  *   serverUrl: socketUrl,
  *   async getSessionToken() {
  *     const response = await fetch('/api/builder-socket-session', { method: 'POST' });
@@ -22,27 +26,16 @@ import type { BuilderModule } from "./modules/builder.types.js";
  *     return session_token;
  *   },
  * });
+ *
+ * // Use the client to follow the AI chat in an app
  * const builder = client.builder.init({ onError: (error) => console.error(error.code) });
+ * await builder.connect();
  * ```
  */
-export class Base44PlatformClient {
-  /**
-   * [Builder module](/developers/references/platform-sdk/docs/interfaces/builder) for following the AI chat in your users' apps live.
-   * Call [`init()`](/developers/references/platform-sdk/docs/interfaces/builder#init) to create a session.
-   */
-  readonly builder: BuilderModule;
-
-  /**
-   * Creates a platform client.
-   *
-   * @param options - Client options.
-   * @throws {TypeError} When `serverUrl` isn't an HTTP or HTTPS origin.
-   */
-  constructor(options: PlatformClientOptions) {
-    const url = new URL(options.serverUrl);
-    if (!["https:", "http:"].includes(url.protocol) || url.username || url.password || url.search || url.hash || url.pathname !== "/") {
-      throw new TypeError("serverUrl must be an HTTP(S) origin without credentials, path, query or fragment");
-    }
-    this.builder = Object.freeze(createBuilder({ ...options, serverUrl: url.origin }));
+export function createPlatformClient(options: PlatformClientOptions): PlatformClient {
+  const url = new URL(options.serverUrl);
+  if (!["https:", "http:"].includes(url.protocol) || url.username || url.password || url.search || url.hash || url.pathname !== "/") {
+    throw new TypeError("serverUrl must be an HTTP(S) origin without credentials, path, query or fragment");
   }
+  return Object.freeze({ builder: Object.freeze(createBuilder({ ...options, serverUrl: url.origin })) });
 }

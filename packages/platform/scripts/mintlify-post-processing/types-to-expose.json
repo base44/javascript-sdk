@@ -1,6 +1,5 @@
 [
   "AppErrorCode",
-  "Base44PlatformClient",
   "BuilderModule",
   "BuilderSession",
   "PlatformEvent",
