@@ -193,7 +193,7 @@ a `phase` (`idle`, `creating`, `loading`, `waiting`, `building`), an `error`, `c
 and the actions `send`, `create` and `clearError`. A question is a union on `kind`
 (`choice`, `input`, `approval`, `unknown`) and carries only the actions its kind allows;
 declining is always one of them. Every shape has JSDoc in `src/react/chat.types.ts`, and
-[`examples/react-chat.ts`](examples/react-chat.ts) shows a `fetch`-based `server`.
+[`examples/react-chat/`](examples/react-chat) shows Tiny Sunny's chat built on it, with its `server`.
 
 ### Provider and parts
 
