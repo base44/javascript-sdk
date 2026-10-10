@@ -194,3 +194,35 @@ and the actions `send`, `create` and `clearError`. A question is a union on `kin
 (`choice`, `input`, `approval`, `unknown`) and carries only the actions its kind allows;
 declining is always one of them. Every shape has JSDoc in `src/react/chat.types.ts`, and
 [`examples/react-chat.ts`](examples/react-chat.ts) shows a `fetch`-based `server`.
+
+### Provider and parts
+
+`<Base44ChatProvider>` calls the hook once and shares the chat with the tree below it, so
+components anywhere under it read the chat without props, and `<Message>` draws an item with
+parts you replace:
+
+```tsx
+import { Base44ChatProvider, Message, useChatActions, useChatState } from "@base44/platform/react";
+
+<Base44ChatProvider appId={appId} server={server} onAppCreated={selectApp} components={{ question: { Approval: MyApproval } }}>
+  <Messages />
+  <Composer />
+</Base44ChatProvider>;
+
+function Messages() {
+  const { items } = useChatState();
+  return items.map((item) => <div key={item.id}><Message item={item} /></div>);
+}
+```
+
+- `useChatState()` returns `items`, `phase`, `error`, `canSend` and `messages`, and re-renders
+  on every live event. `useChatActions()` returns `send`, `create` and `clearError`, which keep
+  their identity, so a component that reads only actions never re-renders for a message.
+- `components` is `{ message: { Text, Step }, question: { Choice, Input, Approval, Unknown } }`.
+  A question part receives the question itself, with its bound actions. A part you leave out
+  is drawn as plain HTML with no classes and a `data-base44` attribute, so the package has no
+  look of its own and a question is never missing.
+- `<Message>` adds no element of its own; wrap it to lay messages out. `<Question>` draws a
+  question elsewhere, such as above the composer. Both also work over the bare hook.
+- Put the provider as high as the components that need the chat: a header that shows the
+  phase and a preview that waits for the build can read the same chat as the message list.

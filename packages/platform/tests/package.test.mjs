@@ -47,25 +47,29 @@ test("react is an optional peer of the /react entry, never a dependency of the c
   assert.deepEqual(manifest.peerDependenciesMeta, { react: { optional: true } });
   run(process.execPath, ["--input-type=module", "--eval", `
     import assert from "node:assert/strict";
-    import { useBase44Chat } from "@base44/platform/react";
-    assert.equal(typeof useBase44Chat, "function");
+    import { Base44ChatProvider, Message, Question, useBase44Chat, useChatActions, useChatComponents, useChatState } from "@base44/platform/react";
+    for (const fn of [Base44ChatProvider, Message, Question, useBase44Chat, useChatActions, useChatComponents, useChatState]) assert.equal(typeof fn, "function");
   `]);
 });
 
 const consumer = `
 import { Base44PlatformClient, type PlatformEvent } from "@base44/platform";
-import { useBase44Chat, type Base44ChatServer, type Question } from "@base44/platform/react";
+import { Base44ChatProvider, Message, useBase44Chat, useChatActions, useChatState, type Base44ChatServer, type ChatComponentOverrides, type ChatQuestion } from "@base44/platform/react";
 const server: Base44ChatServer = {
   async createApp(prompt) { return { id: "a".repeat(24), name: prompt }; },
   async openLiveSession() { return { serverUrl: "https://example.test", sessionToken: "token" }; },
   async sendMessage() {},
   async submitToolCallInput() {},
 };
-declare const question: Question;
+declare const question: ChatQuestion;
 if (question.kind === "choice") void question.answer([["A"]]);
 // @ts-expect-error A choice is answered, not approved.
 if (question.kind === "choice") question.approve();
-void useBase44Chat; void server;
+// A question part receives the question itself, actions included.
+const parts: ChatComponentOverrides = { question: { Approval: ({ action, approve }) => { void action; void approve; return null; } } };
+// @ts-expect-error An approval part gets no answer action.
+const wrong: ChatComponentOverrides = { question: { Approval: ({ answer }) => { void answer; return null; } } };
+void useBase44Chat; void server; void parts; void wrong; void Base44ChatProvider; void Message; void useChatState; void useChatActions;
 const platform = new Base44PlatformClient({ serverUrl: "https://example.test", getSessionToken: async () => "token" });
 platform.builder.init({ onError() {} }).subscribe("a".repeat(24), {
   onSnapshot(snapshot) { void snapshot.messages; },

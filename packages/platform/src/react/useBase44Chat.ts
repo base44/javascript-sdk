@@ -59,11 +59,13 @@ export function useBase44Chat({ appId, server, onAppCreated }: Base44ChatOptions
     setAnswered([]);
   }
 
-  // The live session reads the server through a ref, kept current after every render, so an
-  // inline `server={{…}}` never reopens the socket. The actions below read it directly.
+  // The server and the callback are read through refs, kept current after every render, so an
+  // inline `server={{…}}` or arrow never reopens the socket and never changes an action's identity.
   const serverRef = useRef(server);
+  const onAppCreatedRef = useRef(onAppCreated);
   useEffect(() => {
     serverRef.current = server;
+    onAppCreatedRef.current = onAppCreated;
   });
 
   const fail = useCallback((e: { code?: string; message?: string }) => setError({ message: e.message || "Something went wrong", code: e.code }), []);
@@ -110,12 +112,12 @@ export function useBase44Chat({ appId, server, onAppCreated }: Base44ChatOptions
       if (!appId) return Promise.resolve();
       setError(null);
       setAnswered(ids => [...ids, toolCallId]);
-      return server.submitToolCallInput(appId, { toolCallId, messageId, approve, extraUserInput }).catch((e: Error) => {
+      return serverRef.current.submitToolCallInput(appId, { toolCallId, messageId, approve, extraUserInput }).catch((e: Error) => {
         setAnswered(ids => ids.filter(id => id !== toolCallId));
         fail(e);
       });
     },
-    [appId, server, fail],
+    [appId, fail],
   );
 
   const sorted = useMemo(() => sortMessages(messages), [messages]);
@@ -128,9 +130,9 @@ export function useBase44Chat({ appId, server, onAppCreated }: Base44ChatOptions
     (prompt: string) => {
       if (!appId) return Promise.resolve();
       setError(null);
-      return server.sendMessage(appId, prompt).catch(fail);
+      return serverRef.current.sendMessage(appId, prompt).catch(fail);
     },
-    [appId, server, fail],
+    [appId, fail],
   );
 
   const create = useCallback(
@@ -138,14 +140,14 @@ export function useBase44Chat({ appId, server, onAppCreated }: Base44ChatOptions
       setError(null);
       setCreating(true);
       try {
-        onAppCreated?.(await server.createApp(prompt));
+        onAppCreatedRef.current?.(await serverRef.current.createApp(prompt));
       } catch (e) {
         fail(e as Error);
       } finally {
         setCreating(false);
       }
     },
-    [server, onAppCreated, fail],
+    [fail],
   );
 
   const clearError = useCallback(() => setError(null), []);

@@ -1,5 +1,5 @@
 import type { ChatMessage } from "@base44/platform";
-import { useBase44Chat, type Base44Chat, type Base44ChatServer, type ChatItem, type Question } from "@base44/platform/react";
+import { useBase44Chat, type Base44Chat, type Base44ChatServer, type ChatItem, type ChatQuestion as Question } from "@base44/platform/react";
 
 const server: Base44ChatServer = {
   async createApp(prompt) { return { id: "a".repeat(24), name: prompt }; },

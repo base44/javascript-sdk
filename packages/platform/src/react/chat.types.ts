@@ -166,9 +166,9 @@ export interface ChatError {
 export interface Base44ChatOptions {
   /** The app to watch, or `null` when no app is selected yet and there is nothing to connect to. */
   appId: string | null;
-  /** Your backend's four calls. Read on every action, so an inline object is fine. */
+  /** Your backend's four calls. Read on every action, so an inline object is fine and never reopens the session. */
   server: Base44ChatServer;
-  /** Called with the new app after {@link Base44Chat.create} succeeds. */
+  /** Called with the new app after {@link Base44Chat.create} succeeds. The latest one is called, so an inline arrow is fine. */
   onAppCreated?: (app: Base44App) => void;
 }
 
