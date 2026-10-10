@@ -169,3 +169,28 @@ exceptions, payloads and credentials are never attached.
 
 No SDK dependency, package version or lockfile changes are required. Socket.IO
 remains the existing SDK dependency. Chat commands and HTTP APIs are outside this entry point.
+
+## React
+
+`@base44/platform/react` adds one hook, `useBase44Chat`, that runs a builder chat for one
+app on top of this client: it opens the live session, turns messages into items made for
+rendering, and binds every question the builder asks to the actions that answer it. It
+renders nothing. React is an optional peer dependency, loaded only by this entry; the root
+entry stays framework-free.
+
+```tsx
+import { useBase44Chat } from "@base44/platform/react";
+
+const chat = useBase44Chat({ appId, server, onAppCreated });
+chat.items.map((item) => item.question?.kind === "approval" && <button onClick={item.question.approve}>Allow</button>);
+```
+
+`server` is four functions your backend provides, in any language behind them: `createApp`,
+`openLiveSession`, `sendMessage` and `submitToolCallInput`, each wrapping one Base44 REST
+call with your credentials, so the browser never holds a key. The hook returns `items`,
+a `phase` (`idle`, `creating`, `loading`, `waiting`, `building`), an `error`, `canSend`
+(false while a question is open, because Base44 drops a message sent into a stopped turn),
+and the actions `send`, `create` and `clearError`. A question is a union on `kind`
+(`choice`, `input`, `approval`, `unknown`) and carries only the actions its kind allows;
+declining is always one of them. Every shape has JSDoc in `src/react/chat.types.ts`, and
+[`examples/react-chat.ts`](examples/react-chat.ts) shows a `fetch`-based `server`.
