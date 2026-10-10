@@ -1,6 +1,6 @@
 {
   "functions": "Client",
-  "classes": "Client",
   "interfaces": "Modules",
-  "type-aliases": "Modules"
+  "type-aliases": "Modules",
+  "classes": "Errors"
 }

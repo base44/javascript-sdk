@@ -130,17 +130,12 @@ function updateDocsJson(repoDir, sdkFiles) {
     };
     const p = (kind, file) => `${prefix}${basePath}/${kind}/${file}`;
 
-    // Groups follow the category map's key order. The target's `groups` moves single pages, such
-    // as `"classes/MyError": "Errors"`, into groups placed after the category map's.
+    // Groups follow the category map's key order.
     for (const [kind, group] of Object.entries(categoryMap)) {
-      for (const file of sdkFiles[kind] ?? []) {
-        addToGroup(TARGET.groups?.[`${kind}/${file}`] ?? group, [p(kind, file)]);
-      }
+      if (sdkFiles[kind]?.length > 0) addToGroup(group, sdkFiles[kind].map((f) => p(kind, f)));
     }
-    const order = [...new Set(Object.values(categoryMap))];
-    const rank = (group) => (order.includes(group) ? order.indexOf(group) : order.length);
 
-    return Array.from(groupMap.entries()).sort(([a], [b]) => rank(a) - rank(b)).map(([group, pages]) => ({
+    return Array.from(groupMap.entries()).map(([group, pages]) => ({
       group,
       expanded: true,
       // Sort by basename, not full path: a plain .sort() groups all

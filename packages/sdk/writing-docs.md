@@ -61,9 +61,7 @@ After generating and reviewing the docs, you can push them to the `base44/mintli
 
 The same pipeline documents the Platform SDK (`packages/platform`). Pass `--package-dir <dir>` to `file-processing.js` and `copy-to-local-docs.js` to run them for another package. They then read that package's `docs` folder and its config files under `<dir>/scripts/mintlify-post-processing/`. A `mintlify-target.json` there sets where the reference lands in mintlify-docs and which nav dropdown it belongs to. Without one, the scripts keep the SDK's defaults.
 
-Two config files control page shape and nav, for both packages:
-* `page-sections.json`: appended types whose methods get their own section (`typesWithOwnMethods`, by section title), and groups of appended types nested under **Type Definitions** (`typeDefinitionGroups`).
-* `mintlify-target.json` `groups`: moves a single page into another nav group, for example `{"classes/PlatformSocketError": "Errors"}`.
+`page-sections.json` sets the page shape, for both packages: appended types whose methods get their own section (`typesWithOwnMethods`, by section title), and groups of appended types nested under **Type Definitions** or a `title` you give the group (`typeDefinitionGroups`).
 
 From `packages/platform`:
 * `npm run docs` validates that every export has JSDoc. Its output in `docs` is not published.

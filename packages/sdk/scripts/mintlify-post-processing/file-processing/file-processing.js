@@ -2529,28 +2529,9 @@ function restructureActorsPage() {
   fs.writeFileSync(file, tidied, "utf-8");
 }
 
-/**
- * On class pages, the constructor's Returns shows the instance like a function's Returns shows its
- * result. Drop what repeats it: the class description inside Returns, and the ## Properties section.
- * A class without a documented constructor keeps its ## Properties, as fields like a Returns.
- */
+/** Class pages: no "Extends Error", which tells a reader nothing, and properties as fields like a Returns. */
 function cleanupClassPage(content) {
-  // "Extends Error" tells a reader nothing the overview doesn't.
-  content = content.replace(/^### Extends\n\n(- .*\n)+\n?/m, "");
-  const lines = content.split("\n");
-  const returnsIndex = lines.indexOf("#### Returns");
-  if (returnsIndex === -1) return propertiesAsFields(content);
-  const typeIndex = lines.findIndex((line, i) => i > returnsIndex && line.trim() !== "");
-  const accordionIndex = lines.findIndex((line, i) => i > typeIndex && (line.startsWith("<Accordion") || line.startsWith("#")));
-  if (accordionIndex !== -1 && lines[accordionIndex].startsWith("<Accordion")) {
-    lines.splice(typeIndex + 1, accordionIndex - typeIndex - 1, "");
-  }
-  const propertiesIndex = lines.indexOf("## Properties");
-  if (propertiesIndex !== -1) {
-    const next = lines.findIndex((line, i) => i > propertiesIndex && line.startsWith("## "));
-    lines.splice(propertiesIndex, (next === -1 ? lines.length : next) - propertiesIndex);
-  }
-  return lines.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
+  return propertiesAsFields(content.replace(/^### Extends\n\n(- .*\n)+\n?/m, ""));
 }
 
 /** A class page's ## Properties as ResponseFields, the component its Returns and Parameters use. */
@@ -2671,7 +2652,6 @@ function main() {
   // Group type definitions under a parent heading
   applyTypeDefinitionGrouping(DOCS_DIR);
 
-  // Class pages: the constructor's Returns already lists the instance's properties
   applyClassPageCleanup(DOCS_DIR);
 
   // Reorder methods according to method-order.json
