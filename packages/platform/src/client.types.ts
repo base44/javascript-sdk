@@ -10,7 +10,7 @@ export interface PlatformClientOptions {
   /**
    * Origin of the platform socket.
    *
-   * Use the `socket_url` your server receives from `POST /api/service/socket-sessions`. It's the same
+   * Use the `socket_url` your server receives from [Create socket session](/api-reference/create-socket-session). It's the same
    * for every session in an environment, so your server can pass it to the page once. It must be an
    * origin with no path, query, fragment, or credentials.
    */
@@ -18,7 +18,7 @@ export interface PlatformClientOptions {
   /**
    * Returns a socket session token from your server.
    *
-   * Your server opens a session with `POST /api/service/socket-sessions` and returns its
+   * Your server opens a session with [Create socket session](/api-reference/create-socket-session) and returns its
    * `session_token`. The client calls this when it connects, and again when the token expires.
    * Return a new token on every call.
    *

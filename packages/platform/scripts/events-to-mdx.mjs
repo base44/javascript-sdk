@@ -1,15 +1,13 @@
 #!/usr/bin/env node
-// Renders the events that reach onEvent as an MDX page beside the TypeDoc pages, from the committed
-// asyncapi.json, with the ResponseField / Expandable components the rest of the reference uses.
-// The event list is the SDK's own (eventNames), so the page and the types come from one copy.
+// Renders protocol/socket-messages from the committed asyncapi.json: every message on the
+// connection, both directions, as it travels, with the ResponseField / Expandable components the
+// rest of the reference uses. It is the one catalog of events; how the client delivers them is
+// documented on its callbacks.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { eventNames } from "../dist/modules/builder-protocol.js";
 
 const MAX_DEPTH = 8;
 const source = new URL("../asyncapi.json", import.meta.url);
-const target = new URL("../docs/content/events/builder-events.mdx", import.meta.url);
 const doc = JSON.parse(readFileSync(source, "utf8"));
-const PLATFORM_EVENT = "/developers/references/platform-sdk/docs/interfaces/builder#platformevent";
 
 function resolvePointer(ref) {
   if (!ref.startsWith("#/")) throw new Error(`Only local $refs are supported: ${ref}`);
@@ -197,29 +195,64 @@ function field(name, schema, required, depth, path) {
   return `<ResponseField ${attrs.join(" ")}>\n\n${body.join("\n\n")}\n\n</ResponseField>`;
 }
 
-const messages = Object.fromEntries(Object.values(doc.components.messages).map((m) => [m.name, m]));
-const lines = [
-  "---",
-  'title: "Builder events"',
-  'description: "Every live event a builder subscription delivers to onEvent, and its payload."',
-  'sidebarTitle: "Builder events"',
-  "---",
-  "",
-  "{/* Generated from packages/platform/asyncapi.json by scripts/events-to-mdx.mjs in base44/javascript-sdk. */}",
-  "",
-  `Each event reaches your \`onEvent\` callback as a [\`PlatformEvent\`](${PLATFORM_EVENT}): \`{ type, appId, data }\`. ` +
-    "Check `type` to narrow `data` to that event's payload, listed below. A key missing from `data` means " +
-    "the value is unchanged, and an explicit `null` clears it.",
-  "",
-];
-for (const name of eventNames) {
-  const message = messages[name];
-  const [frame] = deref(message.payload);
-  const data = frame.properties.data;
-  lines.push(`## \`${name}\``, "", prose(message.description ?? message.summary), "");
-  const fields = deref(data)[0].properties ? fieldsOf(data, 0, deref(data)[1]) : [];
-  lines.push(fields.length ? fields.join("\n\n") : "`data` is empty.", "");
+const byDirection = (action) =>
+  Object.values(doc.operations).filter((op) => op.action === action).map((op) => deref(op.messages[0])[0]);
+
+function write(path, lines) {
+  const target = new URL(`../docs/content/${path}`, import.meta.url);
+  mkdirSync(new URL(".", target), { recursive: true });
+  writeFileSync(target, lines.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n");
 }
-mkdirSync(new URL(".", target), { recursive: true });
-writeFileSync(target, lines.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n");
-console.log(`Wrote ${eventNames.length} events to docs/content/events/builder-events.mdx`);
+
+function frontmatter(title, description) {
+  return [
+    "---", `title: "${title}"`, `description: "${description}"`, `sidebarTitle: "${title}"`, "---", "",
+    "{/* Generated from packages/platform/asyncapi.json by scripts/events-to-mdx.mjs in base44/javascript-sdk. */}", "",
+  ];
+}
+
+function dataFields(message) {
+  const data = deref(message.payload)[0].properties.data;
+  const fields = deref(data)[0].properties ? fieldsOf(data, 0, deref(data)[1]) : [];
+  return fields.length ? fields.join("\n\n") : "`data` is empty.";
+}
+
+// The beta notice rides on every message; the page shows it once, above the messages.
+const NOTICE = /<Info>[\s\S]*?<\/Info>\s*/;
+const notice = Object.values(doc.components.messages).map((m) => m.description?.match(NOTICE)?.[0].trim()).find(Boolean);
+const describe = (message) => prose((message.description ?? message.summary ?? "").replace(NOTICE, ""));
+const serverMessages = byDirection("send");
+const clientMessages = byDirection("receive");
+const [envelope] = deref(serverMessages[0].payload);
+const envelopeRequired = new Set(envelope.required ?? []);
+// The envelope's own fields only: what `data` holds is listed under each event.
+const envelopeFields = Object.entries(envelope.properties).map(([name, schema]) => field(name, schema, envelopeRequired.has(name), MAX_DEPTH, []));
+// A short event, so the format section shows the envelope rather than a payload.
+const FORMAT_EXAMPLE = "preview.navigation_requested";
+const example = (message) =>
+  (message.examples ?? []).slice(0, 1).flatMap((e) => ["```json Example", JSON.stringify(e.payload, null, 2), "```", ""]);
+
+const protocol = [
+  ...frontmatter("Socket messages", "Every message on a socket session's connection, in both directions, and its payload."),
+  ...(notice ? [notice, ""] : []),
+  prose(doc.info.description), "",
+  prose(doc.servers.platform.description), "",
+  prose(doc.channels.platform.description), "",
+  "## Event format", "",
+  "Every event the server sends is an object with two fields:", "",
+  envelopeFields.join("\n\n"), "",
+  ...example(serverMessages.find((m) => m.name === FORMAT_EXAMPLE) ?? serverMessages[0]),
+  "## Events from the server", "",
+];
+for (const message of serverMessages) {
+  protocol.push(`### \`${message.name}\``, "", describe(message), "", "**`data` fields**", "", dataFields(message), "", ...example(message));
+}
+protocol.push("## Messages from the browser", "");
+for (const message of clientMessages) {
+  const [payload] = deref(message.payload);
+  protocol.push(`### \`${message.name}\``, "", describe(message), "");
+  protocol.push(`The payload is a \`${typeLabel(message.payload)}\`, not an object. ${constraints(payload).map(prose).join(" ")}`.trim(), "", ...example(message));
+}
+write("protocol/socket-messages.mdx", protocol);
+
+console.log(`Wrote ${serverMessages.length + clientMessages.length} messages to protocol/socket-messages.mdx`);

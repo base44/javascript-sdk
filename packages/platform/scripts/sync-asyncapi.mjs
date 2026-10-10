@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// Replaces asyncapi.json with the document a backend serves. Production publishes only beta and GA
-// messages, so while the events are alpha point this at a dev backend, e.g. a local apper:
+// Replaces asyncapi.json with the document a backend serves, production by default. Production
+// publishes only beta and GA messages; for alpha ones point this at a dev backend, e.g. a local apper:
 //   npm run sync:asyncapi -- http://localhost:8000/api/asyncapi.json
-// or set ASYNCAPI_URL. Then run `npm run gen:events`.
+// or set ASYNCAPI_URL. Then run `npm run gen:events`. The weekly sync-asyncapi workflow does both.
 import { writeFile } from "node:fs/promises";
 
 const url = process.argv[2] ?? process.env.ASYNCAPI_URL ?? "https://app.base44.com/api/asyncapi.json";
