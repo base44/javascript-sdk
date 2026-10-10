@@ -17,14 +17,9 @@ export interface PlatformClientOptions {
   /**
    * Returns a socket session token from your server.
    *
-   * Your server opens a session with its workspace API key through
-   * `POST /api/service/socket-sessions`, for the apps this page shows, and returns the
-   * `session_token`. The client calls this when a builder session first connects, and again only
-   * after Base44 rejects or expires the current token. Sessions last one hour. Open a new session
-   * on every call instead of returning a cached token.
-   *
-   * It must settle within 20 seconds and return a non-empty token, or the session reports
-   * `session_unavailable`. Never return a workspace API key or any other server credential.
+   * Your server opens a session with `POST /api/service/socket-sessions` and returns its
+   * `session_token`. The client calls this when it connects, and again when the token expires.
+   * Return a new token on every call.
    *
    * @returns The session token, or a promise resolving to it.
    */
