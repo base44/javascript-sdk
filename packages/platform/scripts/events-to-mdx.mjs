@@ -1,15 +1,19 @@
 #!/usr/bin/env node
-// Renders the events that reach onEvent as an MDX page beside the TypeDoc pages, from the committed
-// asyncapi.json, with the ResponseField / Expandable components the rest of the reference uses.
-// The event list is the SDK's own (eventNames), so the page and the types come from one copy.
+// Renders two MDX pages from the committed asyncapi.json, with the ResponseField / Expandable
+// components the rest of the reference uses:
+// - protocol/socket-messages: every message on the connection, both directions, as it travels.
+// - events/builder-events: how the client delivers them, from its own mapping (eventNames,
+//   roomNotices, sessionEndings), so the page and the code come from one copy.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { eventNames } from "../dist/modules/builder-protocol.js";
+import { eventNames, roomNotices, sessionEndings } from "../dist/modules/builder-protocol.js";
 
 const MAX_DEPTH = 8;
 const source = new URL("../asyncapi.json", import.meta.url);
-const target = new URL("../docs/content/events/builder-events.mdx", import.meta.url);
 const doc = JSON.parse(readFileSync(source, "utf8"));
-const PLATFORM_EVENT = "/developers/references/platform-sdk/docs/interfaces/builder#platformevent";
+const DOCS = "/developers/references/platform-sdk/docs";
+const PLATFORM_EVENT = `${DOCS}/interfaces/builder#platformevent`;
+const SOCKET_MESSAGES = `${DOCS}/protocol/socket-messages`;
+const SOCKET_ERROR = `${DOCS}/classes/PlatformSocketError`;
 
 function resolvePointer(ref) {
   if (!ref.startsWith("#/")) throw new Error(`Only local $refs are supported: ${ref}`);
@@ -198,28 +202,72 @@ function field(name, schema, required, depth, path) {
 }
 
 const messages = Object.fromEntries(Object.values(doc.components.messages).map((m) => [m.name, m]));
-const lines = [
-  "---",
-  'title: "Builder events"',
-  'description: "Every live event a builder subscription delivers to onEvent, and its payload."',
-  'sidebarTitle: "Builder events"',
-  "---",
-  "",
-  "{/* Generated from packages/platform/asyncapi.json by scripts/events-to-mdx.mjs in base44/javascript-sdk. */}",
-  "",
-  `Each event reaches your \`onEvent\` callback as a [\`PlatformEvent\`](${PLATFORM_EVENT}): \`{ type, appId, data }\`. ` +
-    "Check `type` to narrow `data` to that event's payload, listed below. A key missing from `data` means " +
-    "the value is unchanged, and an explicit `null` clears it.",
-  "",
-];
-for (const name of eventNames) {
-  const message = messages[name];
-  const [frame] = deref(message.payload);
-  const data = frame.properties.data;
-  lines.push(`## \`${name}\``, "", prose(message.description ?? message.summary), "");
-  const fields = deref(data)[0].properties ? fieldsOf(data, 0, deref(data)[1]) : [];
-  lines.push(fields.length ? fields.join("\n\n") : "`data` is empty.", "");
+const byDirection = (action) =>
+  Object.values(doc.operations).filter((op) => op.action === action).map((op) => deref(op.messages[0])[0]);
+
+function write(path, lines) {
+  const target = new URL(`../docs/content/${path}`, import.meta.url);
+  mkdirSync(new URL(".", target), { recursive: true });
+  writeFileSync(target, lines.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n");
 }
-mkdirSync(new URL(".", target), { recursive: true });
-writeFileSync(target, lines.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n");
-console.log(`Wrote ${eventNames.length} events to docs/content/events/builder-events.mdx`);
+
+function frontmatter(title, description) {
+  return [
+    "---", `title: "${title}"`, `description: "${description}"`, `sidebarTitle: "${title}"`, "---", "",
+    "{/* Generated from packages/platform/asyncapi.json by scripts/events-to-mdx.mjs in base44/javascript-sdk. */}", "",
+  ];
+}
+
+function dataFields(message) {
+  const data = deref(message.payload)[0].properties.data;
+  const fields = deref(data)[0].properties ? fieldsOf(data, 0, deref(data)[1]) : [];
+  return fields.length ? fields.join("\n\n") : "`data` is empty.";
+}
+
+const serverMessages = byDirection("send");
+const clientMessages = byDirection("receive");
+const room = deref(serverMessages[0].payload)[0].properties.room;
+const protocol = [
+  ...frontmatter("Socket messages", "Every message on a socket session's connection, in both directions, and its payload."),
+  prose(doc.info.description), "",
+  prose(doc.servers.platform.description), "",
+  prose(doc.channels.platform.description), "",
+  "## Sent by the server", "",
+  `Each message is \`{ room, data }\`. ${prose(deref(room)[0].description)}`.trim(), "",
+];
+for (const message of serverMessages) {
+  protocol.push(`### \`${message.name}\``, "", prose(message.description ?? message.summary), "", dataFields(message), "");
+}
+protocol.push("## Sent by the browser", "");
+for (const message of clientMessages) {
+  const [payload] = deref(message.payload);
+  protocol.push(`### \`${message.name}\``, "", prose(message.description ?? message.summary), "");
+  protocol.push(`The payload is a \`${typeLabel(message.payload)}\`, not an object. ${constraints(payload).map(prose).join(" ")}`.trim(), "");
+  if (payload.examples?.length) protocol.push("```json", JSON.stringify(payload.examples[0]), "```", "");
+}
+write("protocol/socket-messages.mdx", protocol);
+
+const reasons = Object.entries(sessionEndings).map(([reason, code]) =>
+  code === "session_expired"
+    ? `\`${reason}\` renews the session through \`getSessionToken\` and reconnects`
+    : `\`${reason}\` reports \`${code}\` to \`onError\` in \`builder.init\``);
+const events = [
+  ...frontmatter("Builder events", "How a builder subscription delivers the socket's events to your callbacks."),
+  `Each event reaches your \`onEvent\` callback as a [\`PlatformEvent\`](${PLATFORM_EVENT}): \`{ type, appId, data }\`. ` +
+    `\`data\` is the message's \`data\`, with the fields listed in [Socket messages](${SOCKET_MESSAGES}). ` +
+    "Check `type` to narrow `data` to that event's payload.",
+  "",
+  "## Delivered to `onEvent`", "",
+  ...eventNames.map((name) => `- \`${name}\`: ${prose(messages[name].summary)}`), "",
+  "## Handled by the client", "",
+  "The client sends and receives the other messages itself:", "",
+  "- `app.snapshot`: Delivered to the subscription's `onSnapshot`.",
+  `- \`session.ended\`: ${reasons.join(", ")}.`,
+  ...Object.entries(roomNotices).map(([name, code]) =>
+    `- \`${name}\`: Reported to the subscription's \`onError\` as a [\`PlatformSocketError\`](${SOCKET_ERROR}) with the code \`${code}\`.`),
+  "- `join` and `leave`: Sent by `subscribe` and `unsubscribe`. The client sends `join` again for each subscription when it reconnects, " +
+    "and after a `conversation.changed` on the main branch, to get a fresh snapshot.",
+];
+write("events/builder-events.mdx", events);
+const total = serverMessages.length + clientMessages.length;
+console.log(`Wrote ${total} messages to protocol/socket-messages.mdx and ${eventNames.length} events to events/builder-events.mdx`);

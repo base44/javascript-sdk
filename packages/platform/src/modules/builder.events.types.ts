@@ -15,8 +15,8 @@ export type PlatformEventMap = {
  * One live event for a subscribed app.
  *
  * Check `type` to narrow `data` to that event's payload. A key missing from `data` means the value
- * is unchanged, and an explicit `null` clears it. For every event and its payload, see the
- * [events reference](/developers/references/platform-sdk/docs/events/builder-events).
+ * is unchanged, and an explicit `null` clears it. For every event and its payload, see
+ * [Socket messages](/developers/references/platform-sdk/docs/protocol/socket-messages).
  *
  * @example
  * ```typescript
