@@ -11,11 +11,13 @@
       "@base44/platform/react": [
         "src/react/index.ts"
       ]
-    }
+    },
+    "jsx": "react-jsx"
   },
   "include": [
     "src/**/*.ts",
     "tests/types/**/*.ts",
-    "examples/**/*.ts"
+    "examples/**/*.ts",
+    "examples/**/*.tsx"
   ]
 }
