@@ -1,20 +1,20 @@
 import { io, type Socket } from "socket.io-client";
 import { PlatformSocketError } from "../errors.js";
-import { appFromRoom, appPattern, decode, decodeSnapshot, eventNames, object, roomFor, roomNotices, sessionEndings } from "./builder-protocol.js";
+import { appFromRoom, appPattern, decode, decodeSession, decodeSnapshot, eventNames, object, roomFor, roomNotices, sessionEndings } from "./builder-protocol.js";
 import { notify, Subscription } from "./builder-subscription.js";
-import type { PlatformClientOptions } from "../client.types.js";
-import type { BuilderInitOptions, BuilderSession, PlatformSubscription, SubscriptionOptions } from "./builder.types.js";
+import type { BuilderInitOptions, BuilderSession, PlatformSubscription, SocketSession, SubscriptionOptions } from "./builder.types.js";
 
 const MAX_DENIAL_RETRIES = 5;
 
 /** @internal */
 export class BuilderSocket implements BuilderSession {
-  private readonly socket: Socket;
+  private socket?: Socket;
+  private address?: string;
   private readonly subscriptions = new Map<string, Subscription>();
-  private readonly options: PlatformClientOptions & BuilderInitOptions;
+  private readonly options: BuilderInitOptions;
   private closed = false;
-  // The session token outlives reconnects; it is replaced only when the server rejects or expires it.
-  private token?: string;
+  // The session outlives reconnects; it is replaced only when the server rejects or expires its token.
+  private session?: SocketSession;
   private tokenFresh = false;
   private ending?: (typeof sessionEndings)[keyof typeof sessionEndings];
   private denialRetries = 0;
@@ -25,66 +25,26 @@ export class BuilderSocket implements BuilderSession {
   private resolveConnect?: () => void;
   private rejectConnect?: (error: PlatformSocketError) => void;
 
-  constructor(config: PlatformClientOptions, options: BuilderInitOptions) {
-    this.options = { ...config, onError: options.onError };
-    this.socket = io(config.socketUrl, {
-      path: "/ws/socket.io/", transports: ["websocket"], autoConnect: false,
-      forceNew: true, reconnectionAttempts: 5, reconnectionDelay: 1000, reconnectionDelayMax: 10000,
-      timeout: 20000,
-      auth: (callback) => { void this.authenticate(callback); },
-    });
-    this.socket.on("connect", () => {
-      this.tokenFresh = false;
-      this.denialRetries = 0;
-      for (const subscription of this.subscriptions.values()) this.join(subscription);
-      this.resolveConnect?.();
-      this.clearConnecting();
-    });
-    this.socket.on("disconnect", (reason) => {
-      ++this.authAttempt;
-      if (this.closed || reason !== "io server disconnect") return; // Transport loss reconnects by itself.
-      const ending = this.ending;
-      this.ending = undefined;
-      if (ending === "session_expired") this.socket.connect(); // Renew through getSessionToken.
-      else this.connectionError(new PlatformSocketError(ending ?? "connection_failed"));
-    });
-    this.socket.on("connect_error", (error) => this.refused(error as Error & { data?: { retryable?: boolean } }));
-    this.socket.io.on("reconnect_failed", () => this.connectionError(new PlatformSocketError("connection_failed")));
-    this.socket.on("app.snapshot", (raw: unknown) => {
-      try {
-        const snapshot = decodeSnapshot(raw);
-        this.subscriptions.get(appFromRoom(snapshot.room)!)?.snapshot(snapshot);
-      } catch { this.protocolError(raw); }
-    });
-    this.socket.on("session.ended", (raw: unknown) => this.sessionEnded(raw));
-    for (const [name, code] of Object.entries(roomNotices)) this.socket.on(name, (raw: unknown) => this.roomNotice(code, raw));
-    for (const type of eventNames) this.socket.on(type, (raw: unknown) => {
-      try {
-        const appId = appFromRoom(object(raw).room);
-        if (!appId) throw new Error("Invalid app");
-        const event = decode(type, appId, raw);
-        const subscription = this.subscriptions.get(appId);
-        subscription?.event(event);
-        // The server does not resend a snapshot after a rewrite of main: rejoining asks for one.
-        if (subscription && event.type === "conversation.changed" && event.data.branch_id == null) this.join(subscription);
-      } catch { this.protocolError(raw); }
-    });
+  constructor(options: BuilderInitOptions) {
+    this.options = { getSession: options.getSession, onError: options.onError };
   }
 
-  /** Connect with the session token. Resolves on CONNECT, before snapshots arrive.
+  /** Connect with the session's token. Resolves on CONNECT, before snapshots arrive.
+   * The first call fetches the session, whose address the socket opens on.
    * Transport loss retries up to five times and rejoins active subscriptions.
    * Call again after a failure or `session_replaced`; concurrent calls share one attempt.
    */
   connect(): Promise<void> {
     if (this.closed) return Promise.reject(new PlatformSocketError("client_closed"));
-    if (this.socket.connected) return Promise.resolve();
+    if (this.socket?.connected) return Promise.resolve();
     if (this.connecting) return this.connecting;
     const promise = new Promise<void>((resolve, reject) => {
       this.resolveConnect = resolve;
       this.rejectConnect = reject;
     });
     this.connecting = promise;
-    this.socket.connect();
+    if (this.socket) this.socket.connect();
+    else void this.authenticate();
     return promise;
   }
 
@@ -99,10 +59,10 @@ export class BuilderSocket implements BuilderSession {
     if (this.subscriptions.size >= 8) throw new PlatformSocketError("subscription_limit", appId);
     const subscription = new Subscription(appId, { ...options }, () => {
       this.subscriptions.delete(appId);
-      if (this.socket.connected) this.socket.emit("leave", roomFor(appId));
+      if (this.socket?.connected) this.socket.emit("leave", roomFor(appId));
     });
     this.subscriptions.set(appId, subscription);
-    if (this.socket.connected) this.join(subscription);
+    if (this.socket?.connected) this.join(subscription);
     return subscription;
   }
 
@@ -116,35 +76,90 @@ export class BuilderSocket implements BuilderSession {
     for (const subscription of this.subscriptions.values()) subscription.unsubscribe();
     this.rejectConnect?.(new PlatformSocketError("client_closed"));
     this.clearConnecting();
+    this.discard();
+  }
+
+  private open(url: string, path: string): void {
+    this.discard();
+    const socket = this.socket = io(url, {
+      path, transports: ["websocket"], autoConnect: false,
+      forceNew: true, reconnectionAttempts: 5, reconnectionDelay: 1000, reconnectionDelayMax: 10000,
+      timeout: 20000,
+      auth: (callback) => { void this.authenticate(callback); },
+    });
+    this.address = url + path;
+    socket.on("connect", () => {
+      this.tokenFresh = false;
+      this.denialRetries = 0;
+      for (const subscription of this.subscriptions.values()) this.join(subscription);
+      this.resolveConnect?.();
+      this.clearConnecting();
+    });
+    socket.on("disconnect", (reason) => {
+      ++this.authAttempt;
+      if (this.closed || reason !== "io server disconnect") return; // Transport loss reconnects by itself.
+      const ending = this.ending;
+      this.ending = undefined;
+      if (ending === "session_expired") socket.connect(); // Renew through getSession.
+      else this.connectionError(new PlatformSocketError(ending ?? "connection_failed"));
+    });
+    socket.on("connect_error", (error) => this.refused(error as Error & { data?: { retryable?: boolean } }));
+    socket.io.on("reconnect_failed", () => this.connectionError(new PlatformSocketError("connection_failed")));
+    socket.on("app.snapshot", (raw: unknown) => {
+      try {
+        const snapshot = decodeSnapshot(raw);
+        this.subscriptions.get(appFromRoom(snapshot.room)!)?.snapshot(snapshot);
+      } catch { this.protocolError(raw); }
+    });
+    socket.on("session.ended", (raw: unknown) => this.sessionEnded(raw));
+    for (const [name, code] of Object.entries(roomNotices)) socket.on(name, (raw: unknown) => this.roomNotice(code, raw));
+    for (const type of eventNames) socket.on(type, (raw: unknown) => {
+      try {
+        const appId = appFromRoom(object(raw).room);
+        if (!appId) throw new Error("Invalid app");
+        const event = decode(type, appId, raw);
+        const subscription = this.subscriptions.get(appId);
+        subscription?.event(event);
+        // The server does not resend a snapshot after a rewrite of main: rejoining asks for one.
+        if (subscription && event.type === "conversation.changed" && event.data.branch_id == null) this.join(subscription);
+      } catch { this.protocolError(raw); }
+    });
+    socket.connect();
+  }
+
+  private discard(): void {
+    if (!this.socket) return;
     this.socket.removeAllListeners();
     this.socket.io.removeAllListeners();
     this.socket.disconnect();
   }
 
   private join(subscription: Subscription): void {
-    this.socket.emit("join", roomFor(subscription.appId));
+    this.socket?.emit("join", roomFor(subscription.appId));
   }
 
-  private async authenticate(callback: (auth: { session_token: string }) => void): Promise<void> {
+  /** Without a callback, or when a new session moves the socket, opens a socket at the session's address. */
+  private async authenticate(callback?: (auth: { session_token: string }) => void): Promise<void> {
     const attempt = ++this.authAttempt;
     this.cancelAuth?.();
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error("Session token timeout")), 20000);
+      timer = setTimeout(() => reject(new Error("Session timeout")), 20000);
       this.cancelAuth = () => { clearTimeout(timer); reject(new Error("Cancelled")); };
     });
     try {
-      if (!this.token) {
-        const token = await Promise.race([Promise.resolve().then(() => this.options.getSessionToken()), timeout]);
+      if (!this.session) {
+        const session = await Promise.race([Promise.resolve().then(() => this.options.getSession()), timeout]);
         if (this.closed || attempt !== this.authAttempt) return;
-        if (typeof token !== "string" || !token.trim()) throw new Error("Missing session token");
-        this.token = token;
+        this.session = decodeSession(session);
         this.tokenFresh = true;
       }
-      callback({ session_token: this.token });
+      const { session_token, socket_url, socket_path } = this.session;
+      if (callback && this.address === socket_url + socket_path) callback({ session_token });
+      else this.open(socket_url, socket_path);
     } catch {
       if (this.closed || attempt !== this.authAttempt) return;
-      this.socket.disconnect();
+      this.socket?.disconnect();
       this.connectionError(new PlatformSocketError("session_unavailable"));
     } finally {
       clearTimeout(timer);
@@ -158,8 +173,8 @@ export class BuilderSocket implements BuilderSession {
     if (error.data?.retryable === true) { this.retryDenied(); return; }
     // A token this attempt did not just fetch may have expired: renew it once.
     const renew = !this.tokenFresh;
-    this.token = undefined;
-    if (renew) this.socket.connect();
+    this.session = undefined;
+    if (renew) this.socket?.connect();
     else this.connectionError(new PlatformSocketError("connection_denied"));
   }
 
@@ -170,7 +185,7 @@ export class BuilderSocket implements BuilderSession {
       return;
     }
     const delay = Math.min(1000 * 2 ** (this.denialRetries - 1), 10000) * (0.5 + Math.random() / 2);
-    this.retryTimer = setTimeout(() => { this.retryTimer = undefined; if (!this.closed) this.socket.connect(); }, delay);
+    this.retryTimer = setTimeout(() => { this.retryTimer = undefined; if (!this.closed) this.socket?.connect(); }, delay);
   }
 
   private clearConnecting(): void {
@@ -192,7 +207,7 @@ export class BuilderSocket implements BuilderSession {
         ? sessionEndings[reason as keyof typeof sessionEndings] : undefined;
       if (!ending) throw new Error("Unknown reason");
       // The server disconnects next; the disconnect handler renews or stops.
-      this.token = undefined;
+      this.session = undefined;
       this.ending = ending;
     } catch { this.protocolError(raw); }
   }

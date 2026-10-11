@@ -4,9 +4,11 @@
  */
 export type SessionErrorCode =
   /**
-   * `getSessionToken` threw, took longer than 20 seconds or returned no token.
+   * `getSession` threw, took longer than 20 seconds, or returned a session without a valid
+   * `session_token`, `socket_url` (an HTTP or HTTPS origin) or `socket_path` (an absolute path).
    *
-   * Check the endpoint that opens sessions, then call `connect()` again. Retryable.
+   * Check the endpoint that opens sessions, then call `connect()` again. Retryable, except that an
+   * invalid field needs a fix on your server first.
    */
   | "session_unavailable"
   /**
