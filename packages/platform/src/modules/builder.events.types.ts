@@ -44,13 +44,15 @@ export type PlatformEvent = {
  * An app's current state.
  *
  * Arrives after every join and rejoin, and after a rewrite of the main conversation. Replace
- * everything you hold for the app with it. It holds only the last 50 messages. For every field,
- * see [`app.snapshot`](/developers/references/platform-sdk/docs/protocol/socket-messages#app-snapshot).
+ * everything you hold for the app with it. It holds only the last 50 messages.
+ *
+ * Its fields are the `data` of [`app.snapshot`](/developers/references/platform-sdk/docs/protocol/socket-messages#app-snapshot),
+ * plus `room`.
  */
-export interface PlatformSnapshot extends Snapshot {
+export type PlatformSnapshot = Snapshot & {
   /** The app's room, `/apps/{app_id}`. */
   room: string;
-}
+};
 
 /** One tool call in a message's `tool_calls`. Check `name` to narrow it to that tool's call. */
 export type ToolCall = NonNullable<Message["tool_calls"]>[number];

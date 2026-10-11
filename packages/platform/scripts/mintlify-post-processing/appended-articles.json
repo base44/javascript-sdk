@@ -2,7 +2,7 @@
   "interfaces/builder": [
     "interfaces/BuilderSession",
     "type-aliases/PlatformEvent",
-    "interfaces/PlatformSnapshot"
+    "type-aliases/PlatformSnapshot"
   ],
   "classes/PlatformSocketError": [
     "type-aliases/SessionErrorCode",
