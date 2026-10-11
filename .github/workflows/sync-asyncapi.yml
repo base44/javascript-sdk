@@ -1,0 +1,92 @@
+name: Sync Platform SDK AsyncAPI
+
+# Refreshes packages/platform/asyncapi.json from production and regenerates the event
+# types from it. Changes go to one rolling PR; closing it without merging only skips
+# that week, since the next run proposes the same changes again.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays at 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-asyncapi
+  cancel-in-progress: false
+
+env:
+  BRANCH: bot/platform-asyncapi-sync
+  ASYNCAPI_URL: https://app.base44.com/api/asyncapi.json
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+
+      - name: Wix gateway proxy (mandatory)
+        uses: ./.github/actions/wix-gateway-proxy
+
+      - name: Use Node.js 20.x
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20.x"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Sync asyncapi.json and regenerate the event types
+        run: |
+          npm run sync:asyncapi -w @base44/platform -- "$ASYNCAPI_URL"
+          npm run gen:events -w @base44/platform
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet -- packages/platform/asyncapi.json packages/platform/src/modules/builder.events.generated.ts; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "✅ asyncapi.json and the event types are up to date"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Close a stale sync PR
+        if: steps.changes.outputs.changed == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pr=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')
+          if [ -n "$pr" ]; then gh pr close "$pr" --delete-branch --comment "main already matches production."; fi
+
+      - name: Build the docs and test the Platform SDK
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          npm run create-docs -w @base44/platform
+          npm test -w @base44/platform
+
+      - name: Update the sync PR
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH"
+          git add packages/platform/asyncapi.json packages/platform/src/modules/builder.events.generated.ts
+          git commit -m "chore(platform): sync asyncapi.json and the event types from production"
+          # Rebuilt from main every run, so the branch never drifts or conflicts.
+          git push --force origin "$BRANCH"
+
+          pr=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')
+          body="Refreshes \`packages/platform/asyncapi.json\` from $ASYNCAPI_URL and regenerates \`builder.events.generated.ts\`. The docs build and the Platform SDK tests passed on this change. Updated automatically every week."
+          if [ -z "$pr" ]; then
+            gh pr create --head "$BRANCH" --base main --title "Sync Platform SDK events from production" --body "$body"
+          fi
