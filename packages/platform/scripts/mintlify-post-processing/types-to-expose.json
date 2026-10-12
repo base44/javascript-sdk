@@ -5,5 +5,6 @@
   "PlatformEvent",
   "PlatformSnapshot",
   "PlatformSocketError",
-  "SessionErrorCode"
+  "SessionErrorCode",
+  "SocketSession"
 ]
