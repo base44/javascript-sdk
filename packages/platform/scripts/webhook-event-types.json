@@ -1,0 +1,8 @@
+[
+  "app.created.v1",
+  "app.published.v1",
+  "app.unpublished.v1",
+  "app.deleted.v1",
+  "app.restored.v1",
+  "webhook.test.v1"
+]

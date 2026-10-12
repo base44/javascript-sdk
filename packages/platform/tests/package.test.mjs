@@ -50,10 +50,28 @@ test("the server entrypoint resolves from the installed package", () => {
   `]);
 });
 
+test("the server entrypoint verifies a signed webhook and answers the activation challenge", () => {
+  run(process.execPath, ["--input-type=module", "--eval", `
+    import assert from "node:assert/strict";
+    import { createPlatformServer, WebhookVerificationError } from "@base44/platform/server";
+    const { publicKey, privateKey } = await crypto.subtle.generateKey("Ed25519", true, ["sign", "verify"]);
+    const wire = "whpk_" + Buffer.from(await crypto.subtle.exportKey("raw", publicKey)).toString("base64");
+    const body = JSON.stringify({ specversion: "1.0", id: "evt_1", type: "webhook.test.v1", data: { challenge: "abc" } });
+    const ts = String(Math.floor(Date.now() / 1000));
+    const sig = Buffer.from(await crypto.subtle.sign("Ed25519", privateKey, new TextEncoder().encode("evt_1." + ts + "." + body))).toString("base64");
+    const headers = new Headers({ "webhook-id": "evt_1", "webhook-timestamp": ts, "webhook-signature": "v1a," + sig });
+    const { webhooks } = createPlatformServer({ serverUrl: "https://example.test", apiKey: "key", webhooks: { publicKeys: wire } });
+    assert.deepEqual(webhooks.handleChallenge(await webhooks.verifyEvent(body, headers)), { challenge: "abc" });
+    await assert.rejects(webhooks.verifyEvent(body + " ", headers), WebhookVerificationError);
+  `]);
+});
+
 const consumer = `
-import { createPlatformServer, type PlatformServer } from "@base44/platform/server";
-const server: PlatformServer = createPlatformServer({ serverUrl: "https://example.test", apiKey: "key" });
-void server;
+import { createPlatformServer, WebhookVerificationError, type WebhookEvent } from "@base44/platform/server";
+const server = createPlatformServer({ serverUrl: "https://example.test", apiKey: "key", webhooks: { publicKeys: "whpk_x" } });
+server.webhooks.verifyEvent("{}", new Headers()).then((event: WebhookEvent) => {
+  if (event.type === "app.deleted.v1") { const id: string = event.data.app_id; void id; }
+}, (error: unknown) => error instanceof WebhookVerificationError && error.code);
 
 import { createPlatformClient, type PlatformEvent } from "@base44/platform";
 const platform = createPlatformClient();

@@ -33,6 +33,41 @@ subscription.unsubscribe();
 builder.close();
 ```
 
+## Receiving webhooks (server)
+
+`@base44/platform/server` verifies Base44 outbound webhooks and answers the endpoint
+activation challenge. It uses WebCrypto only (Node 20+, Deno, Bun, Workers, edge runtimes) and
+makes no network calls: pass your workspace's public keys (`whpk_…`) explicitly.
+
+```ts
+import { createPlatformServer, WebhookVerificationError } from "@base44/platform/server";
+
+const platform = createPlatformServer({
+  serverUrl: "https://base44.app",
+  apiKey: process.env.BASE44_API_KEY!,
+  webhooks: { publicKeys: process.env.BASE44_WEBHOOK_PUBLIC_KEYS },
+});
+
+export async function POST(request: Request) {
+  const rawBody = await request.text(); // exactly as received
+  let event;
+  try {
+    event = await platform.webhooks.verifyEvent(rawBody, request.headers);
+  } catch (error) {
+    if (error instanceof WebhookVerificationError) return new Response(null, { status: 400 });
+    throw error; // missing/malformed keys: a 500, so Base44 retries
+  }
+  const challenge = platform.webhooks.handleChallenge(event);
+  if (challenge) return Response.json(challenge); // activates the endpoint
+  if (event.type === "app.deleted.v1") await forget(event.data.app_id);
+  return new Response(null, { status: 204 });
+}
+```
+
+Delivery is at least once with no ordering guarantee: deduplicate on `event.id`, and answer
+2xx to event types you do not handle. Event types are generated from the schemas published at
+`https://base44.com/webhooks/schemas`; run `npm run generate:webhooks` to refresh them.
+
 ## Sessions
 
 `/api/builder-socket-session` is your backend's route, not an SDK endpoint. It opens a
