@@ -136,11 +136,11 @@ generated file differs from what `asyncapi.json` produces.
 ## Reference docs
 
 Every exported shape and field has JSDoc. `npm run docs` validates it into `docs`.
-`npm run create-docs` runs the app SDK's TypeDoc and Mintlify pipeline for this package, then renders
-the builder events page from `asyncapi.json` with `scripts/events-to-mdx.mjs`,
+`npm run create-docs` runs the app SDK's TypeDoc and Mintlify pipeline for this package,
 and `npm run copy-docs-local -- --target <mintlify-docs>` copies the result into
 `developers/references/platform-sdk/docs`. The pipeline's config for this package lives
-in `scripts/mintlify-post-processing/`.
+in `scripts/mintlify-post-processing/`. The Socket messages page is built in mintlify-docs from
+the service's AsyncAPI document, not here.
 
 `PlatformSocketError` extends `Error` with `code` and optional `appId`. Original
 exceptions, payloads and credentials are never attached.
