@@ -3,9 +3,9 @@ import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import nock from "nock";
 
-// What the bundler would have baked in for VITE_BASE44_BUILD_COMMIT. The real
-// source is swapped in by the package's `browser` field, which these tests
-// can't exercise, so it is replaced here and tested on its own below.
+// What the bundler would have baked in for VITE_BASE44_BUILD_COMMIT. The
+// reader is replaced here so each test picks its value; it is tested on its
+// own below.
 const source = vi.hoisted(() => ({ value: undefined as unknown }));
 vi.mock("../../src/utils/build-commit-source.ts", () => ({
   readBuildCommitSource: () => source.value,
@@ -189,53 +189,62 @@ describe("build commit source", () => {
     vi.unstubAllEnvs();
   });
 
-  test("the browser source reads VITE_BASE44_BUILD_COMMIT from import.meta.env", async () => {
+  test("the reader returns VITE_BASE44_BUILD_COMMIT from import.meta.env", async () => {
     const { readBuildCommitSource } = await vi.importActual<
-      typeof import("../../src/utils/build-commit-source.browser.ts")
-    >("../../src/utils/build-commit-source.browser.ts");
+      typeof import("../../src/utils/build-commit-source.ts")
+    >("../../src/utils/build-commit-source.ts");
 
     vi.stubEnv("VITE_BASE44_BUILD_COMMIT", COMMIT);
     expect(readBuildCommitSource()).toBe(COMMIT);
   });
 
-  test("the browser source keeps the exact expression Vite replaces", () => {
+  test("the reader keeps the exact expression Vite replaces", () => {
     // Vite substitutes the value by matching this expression statically; a
     // refactor that reaches it any other way silently stops the header.
     const file = fileURLToPath(
-      new URL("../../src/utils/build-commit-source.browser.ts", import.meta.url)
+      new URL("../../src/utils/build-commit-source.ts", import.meta.url)
     );
     expect(readFileSync(file, "utf8")).toContain(
       "import.meta.env.VITE_BASE44_BUILD_COMMIT"
     );
   });
 
-  test("the default source never touches import.meta", async () => {
-    const file = fileURLToPath(
-      new URL("../../src/utils/build-commit-source.ts", import.meta.url)
-    );
-    const code = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
-    expect(code).not.toContain("import.meta");
+  test("only the reader uses import.meta, and the fallback returns nothing", async () => {
+    // Anything else with `import.meta` would reach Metro, which can't take it.
+    const sources = import.meta.glob("../../src/**/*.ts", {
+      query: "?raw",
+      import: "default",
+      eager: true,
+    });
+    const usesImportMeta = Object.entries(sources)
+      .filter(([, code]) =>
+        (code as string).replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "").includes("import.meta")
+      )
+      .map(([file]) => file);
+    expect(usesImportMeta).toEqual(["../../src/utils/build-commit-source.ts"]);
 
     const { readBuildCommitSource } = await vi.importActual<
-      typeof import("../../src/utils/build-commit-source.ts")
-    >("../../src/utils/build-commit-source.ts");
+      typeof import("../../src/utils/build-commit-source.fallback.ts")
+    >("../../src/utils/build-commit-source.fallback.ts");
+    vi.stubEnv("VITE_BASE44_BUILD_COMMIT", COMMIT);
     expect(readBuildCommitSource()).toBeUndefined();
   });
 
-  test("package.json routes browsers to the reader and React Native back to the stub", () => {
+  test("package.json gives the reader only to the module condition", () => {
     const pkgPath = fileURLToPath(new URL("../../package.json", import.meta.url));
     const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
-    const stub = "./dist/utils/build-commit-source.js";
+    const map = pkg.imports["#build-commit-source"];
 
-    expect(pkg.browser).toEqual({
-      [stub]: "./dist/utils/build-commit-source.browser.js",
+    // Metro matches neither `module` nor `browser` here, so it takes the
+    // fallback on native and web alike. Order matters: the first match wins.
+    expect(map).toEqual({
+      module: "./dist/utils/build-commit-source.js",
+      default: "./dist/utils/build-commit-source.fallback.js",
     });
-    // Metro reads `react-native` before `browser`; without this it would pick
-    // the reader, and Hermes can't parse `import.meta`.
-    expect(pkg["react-native"]).toEqual({ [stub]: stub });
+    expect(Object.keys(map)).toEqual(["module", "default"]);
 
     // Each mapped dist file comes from a src file of the same name.
-    for (const target of [stub, pkg.browser[stub]]) {
+    for (const target of Object.values(map) as string[]) {
       const src = target.replace("./dist/", "../../src/").replace(/\.js$/, ".ts");
       expect(existsSync(fileURLToPath(new URL(src, import.meta.url)))).toBe(true);
     }

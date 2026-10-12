@@ -4,11 +4,11 @@
   "description": "JavaScript SDK for Base44 API",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "browser": {
-    "./dist/utils/build-commit-source.js": "./dist/utils/build-commit-source.browser.js"
-  },
-  "react-native": {
-    "./dist/utils/build-commit-source.js": "./dist/utils/build-commit-source.js"
+  "imports": {
+    "#build-commit-source": {
+      "module": "./dist/utils/build-commit-source.js",
+      "default": "./dist/utils/build-commit-source.fallback.js"
+    }
   },
   "type": "module",
   "files": [

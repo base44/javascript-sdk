@@ -1,5 +1,5 @@
 import { isNode, isReactNative } from "./common.js";
-import { readBuildCommitSource } from "./build-commit-source.js";
+import { readBuildCommitSource } from "#build-commit-source";
 
 /** Header the backend reads to tell which frontend build sent a request. */
 export const BUILD_COMMIT_HEADER = "X-Base44-Build";
