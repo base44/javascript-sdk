@@ -45,6 +45,9 @@ export type PlatformEvent = {
  *
  * Arrives after every join and rejoin, and after a rewrite of the main conversation. Replace
  * everything you hold for the app with it. It holds only the last 50 messages.
+ *
+ * Its fields are the `data` of [`app.snapshot`](/developers/references/apps-api/sections/socket-messages#app-snapshot),
+ * plus `room`.
  */
 export interface PlatformSnapshot extends Omit<Snapshot, "queue"> {
   /** The app's room, `/apps/{app_id}`. */
