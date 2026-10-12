@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Replaces asyncapi.json with the document a backend serves. Production publishes only beta and GA
-// messages, so while the events are alpha point this at a dev backend, e.g. a local apper:
+// Replaces asyncapi.json with the document a backend serves, production by default. Production
+// publishes only beta and GA messages; for alpha ones point this at a dev backend, e.g. a local apper:
 //   npm run sync:asyncapi -- http://localhost:8000/api/asyncapi.json
 // or set ASYNCAPI_URL. Then run `npm run gen:events`.
 import { writeFile } from "node:fs/promises";
