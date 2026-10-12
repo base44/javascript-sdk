@@ -1,6 +1,6 @@
-import { WebhookVerificationError } from "../errors.js";
+import { WebhookConfigurationError, WebhookVerificationError } from "../errors.js";
 import { anySignatureVerifies, importPublicKey, parsePublicKeys, parseSignatures, readHeader, signedPayload } from "./webhooks-signature.js";
-import type { WebhookEvent, WebhooksModule, WebhooksOptions } from "./webhooks.types.js";
+import type { DeliveredWebhookEvent, WebhookEvent, WebhooksModule, WebhooksOptions } from "./webhooks.types.js";
 
 const DEFAULT_TOLERANCE_SECONDS = 300;
 
@@ -15,41 +15,66 @@ export function createWebhooks(options: WebhooksOptions = {}): WebhooksModule {
       return imported.get(id)!;
     }));
 
+  const verifyEvent: WebhooksModule["verifyEvent"] = async (body, headers, verifyOptions = {}) => {
+    // Configuration problems surface first, whatever the request looks like: a missing key is ours to fix.
+    const keys = await keysFor(verifyOptions.publicKeys);
+
+    const id = readHeader(headers, "webhook-id");
+    const timestamp = readHeader(headers, "webhook-timestamp");
+    const signature = readHeader(headers, "webhook-signature", " ");
+    if (!id || !timestamp || !signature) throw new WebhookVerificationError("missing_headers");
+    // Negated so a non-numeric timestamp (NaN) is refused too.
+    if (!(Math.abs(Date.now() / 1000 - Number(timestamp)) <= (verifyOptions.toleranceSeconds ?? DEFAULT_TOLERANCE_SECONDS))) {
+      throw new WebhookVerificationError("timestamp_outside_tolerance");
+    }
+    const signatures = parseSignatures(signature);
+    if (signatures.length === 0) throw new WebhookVerificationError("no_signature_entries");
+    if (!(await anySignatureVerifies(keys, signatures, signedPayload(id, timestamp, body)))) {
+      throw new WebhookVerificationError("signature_mismatch");
+    }
+
+    // Only now is the body trusted enough to parse.
+    let event: unknown;
+    try {
+      event = JSON.parse(typeof body === "string" ? body : new TextDecoder().decode(body));
+    } catch {
+      throw new WebhookVerificationError("invalid_payload");
+    }
+    const { type, id: eventId, data } = (event ?? {}) as Record<string, unknown>;
+    if (typeof type !== "string" || typeof eventId !== "string" || typeof data !== "object" || data === null) {
+      throw new WebhookVerificationError("invalid_payload");
+    }
+    return event as WebhookEvent;
+  };
+
   return {
-    async verifyEvent(body, headers, verifyOptions = {}) {
-      // Configuration problems surface first, whatever the request looks like: a missing key is ours to fix.
-      const keys = await keysFor(verifyOptions.publicKeys);
+    verifyEvent,
 
-      const id = readHeader(headers, "webhook-id");
-      const timestamp = readHeader(headers, "webhook-timestamp");
-      const signature = readHeader(headers, "webhook-signature", " ");
-      if (!id || !timestamp || !signature) throw new WebhookVerificationError("missing_headers");
-      // Negated so a non-numeric timestamp (NaN) is refused too.
-      if (!(Math.abs(Date.now() / 1000 - Number(timestamp)) <= (verifyOptions.toleranceSeconds ?? DEFAULT_TOLERANCE_SECONDS))) {
-        throw new WebhookVerificationError("timestamp_outside_tolerance");
-      }
-      const signatures = parseSignatures(signature);
-      if (signatures.length === 0) throw new WebhookVerificationError("no_signature_entries");
-      if (!(await anySignatureVerifies(keys, signatures, signedPayload(id, timestamp, body)))) {
-        throw new WebhookVerificationError("signature_mismatch");
-      }
+    createHandler({ on = {}, onEvent, onSuccess, onError, ...verifyOptions } = {}) {
+      const fail = async (error: unknown, status: number, event?: DeliveredWebhookEvent) =>
+        (await onError?.(error, event)) ?? Response.json(
+          { error: error instanceof WebhookVerificationError ? error.code : error instanceof WebhookConfigurationError ? "receiver_misconfigured" : "handler_failed" },
+          { status },
+        );
 
-      // Only now is the body trusted enough to parse.
-      let event: unknown;
-      try {
-        event = JSON.parse(typeof body === "string" ? body : new TextDecoder().decode(body));
-      } catch {
-        throw new WebhookVerificationError("invalid_payload");
-      }
-      const { type, id: eventId, data } = (event ?? {}) as Record<string, unknown>;
-      if (typeof type !== "string" || typeof eventId !== "string" || typeof data !== "object" || data === null) {
-        throw new WebhookVerificationError("invalid_payload");
-      }
-      return event as WebhookEvent;
-    },
+      return async request => {
+        let event: WebhookEvent;
+        try {
+          event = await verifyEvent(new Uint8Array(await request.arrayBuffer()), request.headers, verifyOptions);
+        } catch (error) {
+          return fail(error, error instanceof WebhookVerificationError ? 400 : 500);
+        }
+        // Activation probe: echo the challenge, only after the signature verified. Never reaches your callbacks.
+        if (event.type === "webhook.test.v1") return Response.json({ challenge: event.data.challenge });
 
-    handleChallenge(event) {
-      return event.type === "webhook.test.v1" ? { challenge: event.data.challenge } : undefined;
+        try {
+          await onEvent?.(event);
+          await (on[event.type] as ((event: DeliveredWebhookEvent) => unknown) | undefined)?.(event);
+          return (await onSuccess?.(event)) ?? new Response(null, { status: 204 });
+        } catch (error) {
+          return fail(error, 500, event);
+        }
+      };
     },
   };
 }

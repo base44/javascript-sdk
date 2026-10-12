@@ -138,19 +138,79 @@ describe("webhooks.verifyEvent", () => {
   });
 });
 
-describe("webhooks.handleChallenge", () => {
-  const verified = async (type: string, data: unknown) => {
-    const body = JSON.stringify(envelope(type, data));
-    const { headers } = await delivery({ body });
-    return server(known.wire).webhooks.verifyEvent(body, headers);
+describe("webhooks.createHandler", () => {
+  const request = async (type = "app.created.v1", data?: unknown, overrides: { signers?: Signer[] } = {}) => {
+    const body = JSON.stringify(data === undefined ? envelope(type) : envelope(type, data));
+    const { headers } = await delivery({ body, ...overrides });
+    return new Request("https://receiver.example.test/webhooks", { method: "POST", body, headers });
   };
+  const probe = { endpoint_id: "e", workspace_id: "w", sent_at: "2026-09-01T10:15:30.123Z", challenge: "abc123" };
 
-  test("returns the challenge for the activation probe", async () => {
-    const event = await verified("webhook.test.v1", { endpoint_id: "e", workspace_id: "w", sent_at: "2026-09-01T10:15:30.123Z", challenge: "abc123" });
-    expect(server(known.wire).webhooks.handleChallenge(event)).toEqual({ challenge: "abc123" });
+  test("answers the activation probe without calling any callback", async () => {
+    const onEvent = vi.fn(), onSuccess = vi.fn();
+    const response = await server(known.wire).webhooks.createHandler({ onEvent, onSuccess })(await request("webhook.test.v1", probe));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ challenge: "abc123" });
+    expect(onEvent).not.toHaveBeenCalled();
+    expect(onSuccess).not.toHaveBeenCalled();
   });
 
-  test("returns undefined for every other event", async () => {
-    expect(server(known.wire).webhooks.handleChallenge(await verified("app.created.v1", {}))).toBeUndefined();
+  test("runs onEvent, then the type's handler, then onSuccess, and answers 204", async () => {
+    const calls: string[] = [];
+    const handler = server(known.wire).webhooks.createHandler({
+      on: { "app.created.v1": async event => { calls.push(`on:${event.data.app_type}`); }, "app.deleted.v1": () => { calls.push("wrong"); } },
+      onEvent: event => { calls.push(`event:${event.type}`); },
+      onSuccess: event => { calls.push(`success:${event.id}`); },
+    });
+    const response = await handler(await request());
+    expect(response.status).toBe(204);
+    expect(calls).toEqual(["event:app.created.v1", "on:user_app", "success:evt_1"]);
+  });
+
+  test("answers 2xx for event types without a handler", async () => {
+    expect((await server(known.wire).webhooks.createHandler()(await request("app.restored.v1", {}))).status).toBe(204);
+  });
+
+  test("onSuccess may replace the response", async () => {
+    const handler = server(known.wire).webhooks.createHandler({ onSuccess: () => Response.json({ ok: true }) });
+    const response = await handler(await request());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true });
+  });
+
+  test("refuses an unverified delivery with 400 and never calls handlers", async () => {
+    const onEvent = vi.fn(), onError = vi.fn();
+    const response = await server(known.wire).webhooks.createHandler({ onEvent, onError })(await request(undefined, undefined, { signers: [stranger] }));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "signature_mismatch" });
+    expect(onEvent).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledWith(expect.any(WebhookVerificationError), undefined);
+  });
+
+  test("answers 500 for a configuration problem, so Base44 retries", async () => {
+    const response = await server().webhooks.createHandler()(await request());
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: "receiver_misconfigured" });
+  });
+
+  test.each(["onEvent", "on", "onSuccess"] as const)("answers 500 and reports the event when %s throws", async name => {
+    const failure = new Error("boom");
+    const throws = () => { throw failure; };
+    const onError = vi.fn();
+    const options = name === "on" ? { on: { "app.created.v1": throws } } : { [name]: throws };
+    const response = await server(known.wire).webhooks.createHandler({ ...options, onError })(await request());
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: "handler_failed" });
+    expect(onError).toHaveBeenCalledWith(failure, expect.objectContaining({ id: "evt_1" }));
+  });
+
+  test("onError may replace the response", async () => {
+    const handler = server(known.wire).webhooks.createHandler({ onError: () => new Response("nope", { status: 401 }) });
+    expect((await handler(await request(undefined, undefined, { signers: [stranger] }))).status).toBe(401);
+  });
+
+  test("accepts per-handler verify options", async () => {
+    const handler = server(known.wire).webhooks.createHandler({ publicKeys: rotated.wire });
+    expect((await handler(await request(undefined, undefined, { signers: [rotated] }))).status).toBe(204);
   });
 });

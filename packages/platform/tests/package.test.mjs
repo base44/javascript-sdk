@@ -50,7 +50,7 @@ test("the server entrypoint resolves from the installed package", () => {
   `]);
 });
 
-test("the server entrypoint verifies a signed webhook and answers the activation challenge", () => {
+test("the server entrypoint verifies a signed webhook and its handler answers the activation challenge", () => {
   run(process.execPath, ["--input-type=module", "--eval", `
     import assert from "node:assert/strict";
     import { createPlatformServer, WebhookVerificationError } from "@base44/platform/server";
@@ -61,8 +61,10 @@ test("the server entrypoint verifies a signed webhook and answers the activation
     const sig = Buffer.from(await crypto.subtle.sign("Ed25519", privateKey, new TextEncoder().encode("evt_1." + ts + "." + body))).toString("base64");
     const headers = new Headers({ "webhook-id": "evt_1", "webhook-timestamp": ts, "webhook-signature": "v1a," + sig });
     const { webhooks } = createPlatformServer({ serverUrl: "https://example.test", apiKey: "key", webhooks: { publicKeys: wire } });
-    assert.deepEqual(webhooks.handleChallenge(await webhooks.verifyEvent(body, headers)), { challenge: "abc" });
+    assert.equal((await webhooks.verifyEvent(body, headers)).type, "webhook.test.v1");
     await assert.rejects(webhooks.verifyEvent(body + " ", headers), WebhookVerificationError);
+    const response = await webhooks.createHandler()(new Request("https://receiver.test", { method: "POST", body, headers }));
+    assert.deepEqual(await response.json(), { challenge: "abc" });
   `]);
 });
 
