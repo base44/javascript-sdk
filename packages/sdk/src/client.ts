@@ -24,6 +24,10 @@ import type {
 } from "./client.types.js";
 import { createAnalyticsModule } from "./modules/analytics.js";
 import {
+  createPaymentsModule,
+  createServiceRolePaymentsModule,
+} from "./modules/payments.js";
+import {
   createActorsModule,
   resolveActorsHost,
   type ActorConnectionCredentials,
@@ -263,6 +267,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     appLogs: createAppLogsModule(axiosClient, appId),
     app: createAppModule(axiosClient, appId),
     users: createUsersModule(axiosClient, appId),
+    payments: createPaymentsModule(axiosClient, appId),
     analytics: createAnalyticsModule({
       axiosClient,
       serverUrl,
@@ -314,6 +319,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
       headers: aiGatewayHeaders,
     }),
     appLogs: createAppLogsModule(serviceRoleAxiosClient, appId),
+    payments: createServiceRolePaymentsModule(serviceRoleAxiosClient, appId),
     cleanup: () => {
       if (socket) {
         socket.disconnect();

@@ -30,5 +30,10 @@
     "interfaces/ActorClient",
     "interfaces/ActorRegistry",
     "interfaces/ActorNameRegistry"
+  ],
+  "interfaces/PaymentsModule": [
+    "type-aliases/PaymentsErrorCode",
+    "type-aliases/PurchaseStatus",
+    "type-aliases/PaymentsRecurringFrequency"
   ]
 }
