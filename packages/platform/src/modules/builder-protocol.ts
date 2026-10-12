@@ -1,6 +1,7 @@
 import { serverEventNames, type ServerEventMap, type SessionEnded } from "./builder.events.generated.js";
 import type { PlatformSocketErrorCode } from "../errors.types.js";
 import type { PlatformEvent, PlatformEventMap, PlatformSnapshot } from "./builder.events.types.js";
+import type { SocketSession } from "./builder.types.js";
 
 const sessionEvents: readonly string[] = ["app.snapshot", "session.ended"];
 /** App events delivered to `onEvent`: every server event except the session events the socket handles. */
@@ -41,4 +42,15 @@ export function decodeSnapshot(raw: unknown): PlatformSnapshot {
   }
   const queue = data.queue !== null && typeof data.queue === "object" ? { queue: data.queue } : {};
   return { room: frame.room, status: data.status, messages: data.messages, ...queue } as PlatformSnapshot;
+}
+/** Keeps only the fields the socket needs; a URL with credentials, a path, query or fragment is refused. */
+export function decodeSession(raw: unknown): SocketSession {
+  const { session_token, socket_url, socket_path } = object(raw);
+  if (typeof session_token !== "string" || !session_token.trim()) throw new Error("Invalid session token");
+  if (typeof socket_url !== "string" || typeof socket_path !== "string" || !/^\/(?!\/)[^?#\s]*$/.test(socket_path)) throw new Error("Invalid socket address");
+  const url = new URL(socket_url);
+  if (!["https:", "http:"].includes(url.protocol) || url.username || url.password || url.search || url.hash || url.pathname !== "/") {
+    throw new Error("Invalid socket URL");
+  }
+  return { session_token, socket_url: url.origin, socket_path };
 }

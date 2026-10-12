@@ -1,6 +1,19 @@
-import { createPlatformClient, type PlatformEvent, type PlatformEventMap, type PlatformSnapshot, type ToolCall, type GuardApproval, type Message, type StatusObject } from "@base44/platform";
-const client = createPlatformClient({ socketUrl: "https://example.test", getSessionToken: async () => "session-token" });
-const builder = client.builder.init({ onError: error => { void error.code; } });
+import { createPlatformClient, type SocketSession, type PlatformEvent, type PlatformEventMap, type PlatformSnapshot, type ToolCall, type GuardApproval, type Message, type StatusObject } from "@base44/platform";
+const client = createPlatformClient();
+const builder = client.builder.init({
+  // The Create socket session body passes through, extra keys included.
+  getSession: async () => ({ session_id: "s1", session_token: "t", socket_url: "https://example.test", socket_path: "/ws/socket.io/", expires_in: 3600 }),
+  onError: error => { void error.code; },
+});
+client.builder.init({ getSession: async () => (await fetch("/session")).json(), onError() {} });
+const body: SocketSession = { session_token: "t", socket_url: "https://example.test", socket_path: "/ws/socket.io/" };
+void body;
+// @ts-expect-error The session needs its socket path.
+client.builder.init({ getSession: async () => ({ session_token: "t", socket_url: "https://example.test" }), onError() {} });
+// @ts-expect-error The session comes from init, not the client.
+createPlatformClient({ socketUrl: "https://example.test", getSessionToken: async () => "token" });
+// @ts-expect-error A session is required.
+client.builder.init({ onError() {} });
 const subscription = builder.subscribe("a".repeat(24), {
   onSnapshot(snapshot: PlatformSnapshot) {
     const state: "ready" | "processing" | "error" | null | undefined = snapshot.status?.state;
@@ -45,8 +58,6 @@ client.send("write_file", {});
 createPlatformClient({ apiKey: "private" });
 // @ts-expect-error Socket methods belong to the builder session.
 client.connect();
-// @ts-expect-error The retired token callback is not accepted.
-createPlatformClient({ socketUrl: "https://example.test", refreshToken: async () => "token" });
 
 const tool: ToolCall = {
   name: "ask_clarifying_questions",

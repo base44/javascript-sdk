@@ -35,16 +35,16 @@ test("the client resolves from the installed package without the runtime SDK", (
   run(process.execPath, ["--input-type=module", "--eval", `
     import assert from "node:assert/strict";
     import { createPlatformClient } from "@base44/platform";
-    const client = createPlatformClient({ socketUrl: "https://example.test", getSessionToken: () => "session-token" });
+    const client = createPlatformClient();
     assert.equal(typeof client.builder.init, "function");
-    client.builder.init({ onError() {} }).close();
+    client.builder.init({ getSession: async () => ({ session_token: "t", socket_url: "https://example.test", socket_path: "/ws/socket.io/" }), onError() {} }).close();
   `]);
 });
 
 const consumer = `
 import { createPlatformClient, type PlatformEvent } from "@base44/platform";
-const platform = createPlatformClient({ socketUrl: "https://example.test", getSessionToken: async () => "token" });
-platform.builder.init({ onError() {} }).subscribe("a".repeat(24), {
+const platform = createPlatformClient();
+platform.builder.init({ getSession: async () => (await fetch("/session")).json(), onError() {} }).subscribe("a".repeat(24), {
   onSnapshot(snapshot) { void snapshot.messages; },
   onEvent(event: PlatformEvent) {
     if (event.type === "message.updated") {
