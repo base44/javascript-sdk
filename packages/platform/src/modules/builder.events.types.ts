@@ -1,4 +1,4 @@
-import type { Message, ServerEventMap, Snapshot } from "./builder.events.generated.js";
+import type { Message, QueueState, ServerEventMap, Snapshot } from "./builder.events.generated.js";
 
 /**
  * Maps each live event name to the type of its `data` payload.
@@ -46,12 +46,17 @@ export type PlatformEvent = {
  * Arrives after every join and rejoin, and after a rewrite of the main conversation. Replace
  * everything you hold for the app with it. It holds only the last 50 messages.
  */
-export interface PlatformSnapshot extends Snapshot {
+export interface PlatformSnapshot extends Omit<Snapshot, "queue"> {
   /** The app's room, `/apps/{app_id}`. */
   room: string;
+  /** The main branch's prompt queue. Missing when the server sends none. */
+  queue?: QueueState;
 }
 
-/** One tool call in a message's `tool_calls`. Check `name` to narrow it to that tool's call. */
+/**
+ * One tool call in a message's `tool_calls`. Checking `name` narrows it to that tool's call and
+ * `OtherToolCall`, which covers tools the SDK doesn't know, so check a field with `in` before using it.
+ */
 export type ToolCall = NonNullable<Message["tool_calls"]>[number];
 
 /** Why a safety guard parked a tool call for approval. Check `guard` to narrow it. */

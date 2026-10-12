@@ -6,6 +6,8 @@ const subscription = builder.subscribe("a".repeat(24), {
     const state: "ready" | "processing" | "error" | null | undefined = snapshot.status?.state;
     const room: string = snapshot.room;
     void room;
+    void snapshot.queue?.items;
+    // @ts-expect-error A snapshot may arrive without a queue.
     void snapshot.queue.items;
     void state;
     void snapshot.messages[0]?.additional_message_params?.plan_mode;
