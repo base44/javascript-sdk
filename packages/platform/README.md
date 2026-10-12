@@ -169,3 +169,60 @@ exceptions, payloads and credentials are never attached.
 
 No SDK dependency, package version or lockfile changes are required. Socket.IO
 remains the existing SDK dependency. Chat commands and HTTP APIs are outside this entry point.
+
+## React
+
+`@base44/platform/react` adds one hook, `useBase44Chat`, that runs a builder chat for one
+app on top of this client: it opens the live session, turns messages into items made for
+rendering, and binds every question the builder asks to the actions that answer it. It
+renders nothing. React is an optional peer dependency, loaded only by this entry; the root
+entry stays framework-free.
+
+```tsx
+import { useBase44Chat } from "@base44/platform/react";
+
+const chat = useBase44Chat({ appId, server, onAppCreated });
+chat.items.map((item) => item.question?.kind === "approval" && <button onClick={item.question.approve}>Allow</button>);
+```
+
+`server` is four functions your backend provides, in any language behind them: `createApp`,
+`openLiveSession`, `sendMessage` and `submitToolCallInput`, each wrapping one Base44 REST
+call with your credentials, so the browser never holds a key. The hook returns `items`,
+a `phase` (`idle`, `creating`, `loading`, `waiting`, `building`), an `error`, `canSend`
+(false while a question is open, because Base44 drops a message sent into a stopped turn),
+and the actions `send`, `create` and `clearError`. A question is a union on `kind`
+(`choice`, `input`, `approval`, `unknown`) and carries only the actions its kind allows;
+declining is always one of them. Every shape has JSDoc in `src/react/chat.types.ts`, and
+[`examples/react-chat/`](examples/react-chat) shows Tiny Sunny's chat built on it, with its `server`.
+
+### Provider and parts
+
+`<Base44ChatProvider>` calls the hook once and shares the chat with the tree below it, so
+components anywhere under it read the chat without props, and `<Message>` draws an item with
+parts you replace:
+
+```tsx
+import { Base44ChatProvider, Message, useChatActions, useChatState } from "@base44/platform/react";
+
+<Base44ChatProvider appId={appId} server={server} onAppCreated={selectApp} components={{ question: { Approval: MyApproval } }}>
+  <Messages />
+  <Composer />
+</Base44ChatProvider>;
+
+function Messages() {
+  const { items } = useChatState();
+  return items.map((item) => <div key={item.id}><Message item={item} /></div>);
+}
+```
+
+- `useChatState()` returns `items`, `phase`, `error`, `canSend` and `messages`, and re-renders
+  on every live event. `useChatActions()` returns `send`, `create` and `clearError`, which keep
+  their identity, so a component that reads only actions never re-renders for a message.
+- `components` is `{ message: { Text, Step }, question: { Choice, Input, Approval, Unknown } }`.
+  A question part receives the question itself, with its bound actions. A part you leave out
+  is drawn as plain HTML with no classes and a `data-base44` attribute, so the package has no
+  look of its own and a question is never missing.
+- `<Message>` adds no element of its own; wrap it to lay messages out. `<Question>` draws a
+  question elsewhere, such as above the composer. Both also work over the bare hook.
+- Put the provider as high as the components that need the chat: a header that shows the
+  phase and a preview that waits for the build can read the same chat as the message list.
