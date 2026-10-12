@@ -3,11 +3,11 @@
 # it ships: packed and installed into node_modules, not linked.
 #
 #   scripts/verify-build-commit.sh          # Vite 6 and 7: build + dev server
-#   scripts/verify-build-commit.sh --expo   # also Expo 54 (Metro/Hermes)
+#   scripts/verify-build-commit.sh --expo   # also Expo 54: Android (Hermes) and web
 #
 # Checks that `vite build` bakes VITE_BASE44_BUILD_COMMIT into the bundle and
 # leaves no `import.meta` behind, that the dev server's prebundled SDK carries
-# it, and that a Metro/Hermes build still bundles the SDK without the reader.
+# it, and that Metro bundles the SDK without the reader on native and web.
 set -euo pipefail
 
 SDK_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -78,6 +78,7 @@ if [ "${1:-}" = "--expo" ]; then
   cd "$WORK"
   npx --yes create-expo-app@latest expo-app --template blank@sdk-54 --no-install >/dev/null 2>&1
   cd expo-app && npm install --silent >/dev/null 2>&1 && npm install --silent "$TARBALL" >/dev/null 2>&1
+  npx expo install react-dom react-native-web @expo/metro-runtime >/dev/null 2>&1
   printf '%s\n' "import { createClient } from '@base44/sdk';" \
     "export const base44 = createClient({ appId: 'x' });" | cat - App.js >App.tmp && mv App.tmp App.js
   npx expo export --platform android --output-dir out-hbc >/dev/null 2>&1 \
@@ -87,4 +88,17 @@ if [ "${1:-}" = "--expo" ]; then
   grep -q "X-Base44-Build" <<<"$bundle" || fail "expo 54: SDK not in bundle"
   ! grep -q "VITE_BASE44_BUILD_COMMIT" <<<"$bundle" || fail "expo 54: picked the browser reader"
   echo "ok  expo 54 Hermes build bundles the SDK without the import.meta reader"
+
+  # Metro's web build ships a classic <script>, where `import.meta` is a
+  # SyntaxError that blanks the page: parse the bundle the way a browser would.
+  npx expo export --platform web --output-dir out-web >/dev/null 2>&1 \
+    || fail "expo 54 web: build failed"
+  web=$(cat out-web/_expo/static/js/web/*.js)
+  grep -q "X-App-Id" <<<"$web" || fail "expo 54 web: SDK not in bundle"
+  ! grep -q "VITE_BASE44_BUILD_COMMIT" <<<"$web" || fail "expo 54 web: picked the import.meta reader"
+  for f in out-web/_expo/static/js/web/*.js; do
+    node -e 'new (require("vm").Script)(require("fs").readFileSync(process.argv[1], "utf8"))' "$f" \
+      || fail "expo 54 web: $f doesn't parse as a classic script"
+  done
+  echo "ok  expo 54 web bundle has no import.meta reader and parses as a classic script"
 fi
