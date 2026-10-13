@@ -659,7 +659,7 @@ describe("size", () => {
     expect(withOneMore.length).toBeGreaterThan(3072);
   });
 
-  test("the longest message, name and fn always fit", async () => {
+  test("the longest message, name and fn, without control characters, fit whole", async () => {
     const file = "a".repeat(196) + ".js";
     const lines = Array.from({ length: 30 }, (_, i) => `    at f (${file}:${i + 1}:1)`);
     const req = request();
@@ -673,6 +673,34 @@ describe("size", () => {
     expect(report.raw.fn).toBe("f".repeat(200));
     expect(report.raw.frames.length).toBeLessThan(30);
   });
+  test("a message that escapes past the budget is cut further, not dropped", async () => {
+    // 500 control characters are 500 bytes, but escape to 3000.
+    const req = request();
+    recordServerError(req, new TypeError("\u0001".repeat(500)), { fn: "sendInvoice" });
+    const report = readReport(await annotateServerResponse(req, new Response("ok")))!;
+    expect(report.raw).toMatchObject({ kind: "uncaught", name: "TypeError", fn: "sendInvoice" });
+    const kept = (report.raw.message as string).length;
+    expect(report.raw.message).toBe("\u0001".repeat(kept));
+    expect(kept).toBeGreaterThan(400);
+    expect(kept).toBeLessThan(500);
+    // As many as fit: one more would not.
+    const withOneMore = JSON.stringify({ ...report.raw, message: "\u0001".repeat(kept + 1) });
+    expect(withOneMore.replace(/[\u007f-\uffff]/g, "\\uffff").length).toBeGreaterThan(3072);
+  });
+
+  test("the worst case still writes a header, on a code point", async () => {
+    const req = request();
+    const error = errorWithStack("\u0001😀".repeat(100) + "\u0001".repeat(100), "");
+    error.name = "\u0001".repeat(64);
+    recordServerError(req, error, { fn: "f".repeat(200) });
+    const response = await annotateServerResponse(req, new Response("ok"));
+    const report = readReport(response)!;
+    expect(response.headers.get(REPORT)!.length).toBeLessThanOrEqual(3072);
+    expect(report.raw.name).toBe("\u0001".repeat(64));
+    expect(report.raw.message.length).toBeGreaterThan(0);
+    expect(report.raw.message.toWellFormed()).toBe(report.raw.message);
+  });
+
 });
 
 describe("fn", () => {

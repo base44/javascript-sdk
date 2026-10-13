@@ -3,3 +3,5 @@ dist/
 .tanstack/
 .wrangler/
 src/routeTree.gen.ts
+# The root .gitignore drops every lib/ folder; this one is the app's middleware.
+!src/lib/

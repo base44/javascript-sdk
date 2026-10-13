@@ -353,13 +353,27 @@ function buildReport(
     fn: fn && FN_RE.test(fn) ? fn : undefined,
     frames: frames.length ? frames : undefined,
   };
-  // Frames go from the end until it fits; the message always goes.
+  // Frames go from the end until it fits.
   let value = toAsciiJson(payload);
   while (value.length > HEADER_MAX_BYTES && frames.length) {
     frames.pop();
     if (!frames.length) payload.frames = undefined;
     value = toAsciiJson(payload);
   }
+  if (value.length <= HEADER_MAX_BYTES) return value;
+  // Still too long: escaping can grow a 500-byte message sixfold (`\u0001` per control character),
+  // so cut it further, to the most code points that fit.
+  const chars = Array.from(payload.message);
+  let fits = 0;
+  let tooMany = chars.length;
+  while (tooMany - fits > 1) {
+    const mid = (fits + tooMany) >> 1;
+    payload.message = chars.slice(0, mid).join("");
+    if (toAsciiJson(payload).length <= HEADER_MAX_BYTES) fits = mid;
+    else tooMany = mid;
+  }
+  payload.message = chars.slice(0, fits).join("");
+  value = toAsciiJson(payload);
   return value.length <= HEADER_MAX_BYTES ? value : undefined;
 }
 
