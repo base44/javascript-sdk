@@ -84,6 +84,32 @@ Every public method needs: description, `@param` tags, `@returns`, and at least 
 - **Never start a sentence with a lowercase inline-code term.** If the natural phrasing would open with one (e.g., "`week` is only supported on..."), restructure so a capitalized word leads instead (e.g., "Every date field supports `day`, `month` and `year`. The `created_date` and `updated_date` fields also support `week`.").
 - **Name the place and the AI correctly.** Write "app editor" (lowercase) for the place where you build, and "the AI" or "the AI chat" for the assistant doing the work ("The AI inserts this ID", "ask the AI chat to fix it"). Never use "builder" for either. It stays only for the Builder plan, the Base44 Builder GitHub App, people who build apps ("builders", "app builders"), and exact UI labels or code names.
 
+## Punctuation in prose
+
+JSDoc prose renders straight into the published reference, so it follows the same punctuation rules as the hand-written docs. Prefer periods and commas. A sentence that needs a colon, a semicolon, or a dash to hold it together is two sentences.
+
+- **No em dashes or dashes as sentence breaks.** Use commas or rewrite.
+- **No colons in prose.** A colon is allowed only on the line that introduces a bullet list, and in the `label: description` form of a definition bullet. A line that introduces a code block or an `@example` ends with a period.
+- **No semicolons.** No exceptions. Split the sentence or use a comma.
+- **Parentheses only when there's no better option.** Recast with commas or drop the aside. Call syntax such as `connection()` isn't a prose parenthesis, and a compact qualifier on a definition bullet's label is fine.
+
+| Instead of | Write |
+| ---------- | ----- |
+| Video generation is asynchronous: the request returns a job. | Video generation is asynchronous. The request returns a job. |
+| Pass `evaluationModel("jev")`; the gateway rejects other IDs. | Pass `evaluationModel("jev")`. The gateway rejects other IDs. |
+| Pass `automatic` (the default) to let Base44 choose. | Pass `automatic`, the default, to let Base44 choose. |
+
+## Sentence openings
+
+Never open a sentence with a lowercase backticked identifier. It reads as a typo, and it's especially common in JSDoc because the identifier being documented is top of mind. Lead with "The", "Use", "Set", "Pass", or "Returns", or recast so the identifier moves inside the sentence.
+
+| Instead of | Write |
+| ---------- | ----- |
+| `connection()` hands you a `baseURL` and `token`. | Call `connection()` to get a `baseURL` and `token`. |
+| `frame_images` pins the first frame to a still. | The `frame_images` field pins the first frame to a still. |
+
+This applies to prose only. A definition bullet, a `@param` description, or a table cell takes the identifier as its label, so `` - `seconds`: Length of the video. `` is correct.
+
 ## References
 
 - For the full JSDoc tag reference table, see [references/jsdoc-tags.md](references/jsdoc-tags.md)
@@ -96,4 +122,6 @@ Every public method needs: description, `@param` tags, `@returns`, and at least 
 2. **`@internal` on implementation:** Factory functions, config interfaces, and helpers are marked `@internal`.
 3. **Examples work:** Code examples are syntactically valid TypeScript and use the `base44.` call path.
 4. **Pipeline config:** New public types are in `types-to-expose.json`. Helper types that belong on another page are in `appended-articles.json`.
-5. **Generate and review:** Run `npm run create-docs -w @base44/sdk` and check the output renders correctly.
+5. **Punctuation:** No em dashes, no semicolons, no colons in prose, and no parentheses that commas could carry.
+6. **Sentence openings:** No sentence opens with a lowercase backticked identifier.
+7. **Generate and review:** Run `npm run create-docs -w @base44/sdk` and check the output renders correctly.
