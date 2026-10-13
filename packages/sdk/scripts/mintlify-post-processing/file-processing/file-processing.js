@@ -204,17 +204,23 @@ Access to additional integration packages.
     (match, linkText, linkPath, ext) => {
       modified = true;
 
+      // A member link keeps its anchor after the filename, as in
+      // `AppModule.mdx#getpublicsettings`. Split that off before renaming.
+      const hashAt = linkPath.indexOf("#");
+      const hash = hashAt === -1 ? "" : linkPath.slice(hashAt);
+      const pathOnly = hashAt === -1 ? linkPath : linkPath.slice(0, hashAt);
+
       // Check if the link points to a renamed module
-      const pathParts = linkPath.split("/");
+      const pathParts = pathOnly.split("/");
       const filename = pathParts[pathParts.length - 1];
 
       // If filename has extension, strip it for checking map
       const nameWithoutExt = filename.replace(/\.mdx?$/, "");
 
       const moduleRename = getModuleRename(nameWithoutExt);
-      if (moduleRename) {
-        pathParts[pathParts.length - 1] = moduleRename;
-        linkPath = pathParts.join("/");
+      if (moduleRename || (hash && nameWithoutExt !== filename)) {
+        pathParts[pathParts.length - 1] = moduleRename ?? nameWithoutExt;
+        linkPath = pathParts.join("/") + hash;
       }
 
       // Handle relative links that might be missing context (basic cleanup)
