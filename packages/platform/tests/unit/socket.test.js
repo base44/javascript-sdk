@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
 import { expect, test, vi } from "vitest";
-import { Base44PlatformClient } from "../../src/index.js";
+import { createPlatformClient } from "../../src/index.js";
 
 // Minimal Engine.IO/Socket.IO peer exercises the real client without a new server dependency.
 test("real Socket.IO handshake, join, snapshot, reconnect and session renewal", async () => {
@@ -30,8 +30,8 @@ test("real Socket.IO handshake, join, snapshot, reconnect and session renewal", 
     });
   });
   await new Promise(resolve => http.listen(0, "127.0.0.1", resolve));
-  const client = new Base44PlatformClient({
-    serverUrl: `http://127.0.0.1:${http.address().port}`,
+  const client = createPlatformClient({
+    socketUrl: `http://127.0.0.1:${http.address().port}`,
     getSessionToken: async () => `session-${++tokenCalls}`,
   });
   const builder = client.builder.init({ onError: error => errors.push(error) });

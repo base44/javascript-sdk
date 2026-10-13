@@ -1,0 +1,9 @@
+{
+  "typesWithOwnMethods": {
+    "BuilderSession": "Session methods"
+  },
+  "typeDefinitionGroups": [
+    ["PlatformEvent", "PlatformSnapshot"],
+    { "title": "Error codes", "types": ["SessionErrorCode", "AppErrorCode"] }
+  ]
+}
