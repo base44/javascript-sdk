@@ -51,21 +51,29 @@ export interface AppUserConnectorConnectionResponse {
 /**
  * How far a metered connector call progressed through the Base44 proxy.
  *
- * Only `not_sent` proves that the provider did not execute the request.
- * `timed_out` and `sent_unconfirmed` may have executed upstream, so do not
- * automatically retry non-idempotent requests based on those phases.
+ * Only `not_sent` proves that the provider didn't execute the request.
+ * `timed_out` and `sent_unconfirmed` don't prove that, so don't
+ * automatically retry a non-idempotent request based on those phases.
  */
 export type ConnectorApiResponsePhase =
+  /** The provider didn't execute the request. Only this phase proves that. */
   | "not_sent"
+  /** The provider returned a response. */
   | "responded"
+  /** The call timed out. This doesn't prove the provider didn't execute the request. */
   | "timed_out"
+  /** The request was sent, and completion wasn't confirmed. This doesn't prove the provider didn't execute the request. */
   | "sent_unconfirmed";
 
 /**
  * A request to forward to a metered connector's API through the Base44 proxy.
  */
 export interface ConnectorApiRequest {
-  /** HTTP method for the upstream request. Defaults to `'GET'`. */
+  /**
+   * HTTP method for the upstream request.
+   *
+   * Default: `'GET'`.
+   */
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD";
   /**
    * Which of the connector's API hosts to call, by the name it declares.
@@ -92,7 +100,7 @@ export interface ConnectorApiRequest {
  * The upstream API's response, as returned by the Base44 connector proxy.
  */
 export interface ConnectorApiResponse<T = unknown> {
-  /** `true` only when the upstream API returned a 2xx status. Proxy and upstream errors are `false`. */
+  /** Whether the upstream API returned a 2xx status. Proxy and upstream errors are `false`. */
   success: boolean;
   /** How far the call progressed. Only `not_sent` proves the provider did not execute it. */
   phase: ConnectorApiResponsePhase;
@@ -100,7 +108,7 @@ export interface ConnectorApiResponse<T = unknown> {
   status: number | null;
   /**
    * The parsed upstream response body, or proxy error details when no response
-   * was received. `null` when the response was binary — see {@link dataBase64}.
+   * was received. `null` when the response was binary. See {@link dataBase64}.
    */
   data: T | null;
   /**
@@ -163,15 +171,15 @@ export interface ConnectorProxyRawResponse {
  *
  * ## Metered connectors
  *
- * A few [platform connectors](#shared-connectors) are backed by paid third-party APIs that charge Base44 per call. For those, the OAuth token is **not** available to your code — {@linkcode getConnection | getConnection()} rejects with a `403`. Call them with {@linkcode callApi | callApi()} instead: Base44 attaches the credential server-side, forwards the request, and bills your workspace's integration credits for the call.
+ * A few [platform connectors](#shared-connectors) are backed by paid 3rd-party APIs that charge Base44 per call. For those, the OAuth token isn't available to your code. {@linkcode getConnection | getConnection()} rejects with a `403`. Call them with {@linkcode callApi | callApi()} instead. The proxy attaches the credential server-side, forwards the request, and bills your workspace's integration credits for the call.
  *
- * This applies to platform connectors only. A workspace-registered or app user connector runs on **your own** OAuth app, so the provider invoices you directly and there is nothing for Base44 to meter — those keep normal token access via {@linkcode getWorkspaceConnection | getWorkspaceConnection()} and {@linkcode getCurrentAppUserConnection | getCurrentAppUserConnection()}.
+ * This applies to platform connectors only. A workspace-registered or app user connector runs on your own OAuth app, so the provider invoices you directly and there's nothing for Base44 to meter. Those keep normal token access via {@linkcode getWorkspaceConnection | getWorkspaceConnection()} and {@linkcode getCurrentAppUserConnection | getCurrentAppUserConnection()}.
  *
- * Two things to keep in mind when writing against a metered connector:
+ * Keep the following in mind when writing against a metered connector:
  *
  * - **Cost varies by endpoint, sometimes sharply.** The same connector can charge two orders of magnitude more for one endpoint than another, so avoid putting an expensive call inside a loop and batch wherever the provider supports it. Each response reports what it actually cost as `creditsCharged`.
- * - **Provider and transport outcomes are returned, not thrown.** A provider `4xx`/`5xx` or a connection failure comes back as `success: false` with its `phase`; authorization, quota, and invalid proxy requests reject the promise.
- * - **Only `phase: 'not_sent'` proves the provider did not execute the request.** A timeout or in-flight failure may have executed upstream, so do not automatically retry a non-idempotent call unless the provider supports an idempotency key.
+ * - **Provider and transport outcomes are returned, not thrown.** A provider `4xx`/`5xx` or a connection failure comes back as `success: false` with its `phase`. Authorization, quota, and invalid proxy requests reject the promise.
+ * - **Only `phase: 'not_sent'` proves the provider didn't execute the request.** A timeout or an in-flight failure doesn't prove the provider didn't execute the request, so don't automatically retry a non-idempotent call unless the provider supports an idempotency key.
  *
  * Pass a {@link ConnectorApiRequest} to {@linkcode callApi | callApi()}. It returns a {@link ConnectorApiResponse}. {@link ConnectorApiResponsePhase} reports how far that call progressed through the proxy.
  *
@@ -446,11 +454,13 @@ export interface ConnectorsModule {
   /**
    * Calls a [metered connector's](#metered-connectors) API through the Base44 proxy.
    *
-   * Use this for a shared platform connector identified by an integration type. Base44 adds the OAuth credential to the outgoing request, forwards it, and bills the workspace for the call, so you never handle the token yourself.
+   * Use this for a shared platform connector identified by an integration type. The proxy adds the OAuth credential to the outgoing request, forwards it, and bills the workspace for the call, so you don't handle the token yourself.
+   *
+   * An upstream error is reported in `success` and `status`, not thrown. Only Base44-side failures reject the promise.
    *
    * @param integrationType - The type of integration, such as `'x'`. See [Available connectors](#available-connectors).
    * @param request - The upstream request to forward. See {@link ConnectorApiRequest}.
-   * @returns Promise resolving to a {@link ConnectorApiResponse}. Note that an upstream error is reported in `success` and `status`, not thrown — only Base44-side failures reject.
+   * @returns Promise resolving to a {@link ConnectorApiResponse}.
    *
    * @example
    * ```typescript
