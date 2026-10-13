@@ -1569,7 +1569,13 @@ function groupTypeDefinitions(content) {
   const typeGroups = [
     // Connectors module
     {
-      types: ["ConnectorIntegrationType", "ConnectorIntegrationTypeRegistry"],
+      types: [
+        "ConnectorIntegrationType",
+        "ConnectorIntegrationTypeRegistry",
+        "ConnectorApiRequest",
+        "ConnectorApiResponse",
+        "ConnectorApiResponsePhase",
+      ],
       indicator: "ConnectorIntegrationType"
     },
     // Entities module
