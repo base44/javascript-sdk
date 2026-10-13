@@ -173,6 +173,8 @@ export interface ConnectorProxyRawResponse {
  * - **Provider and transport outcomes are returned, not thrown.** A provider `4xx`/`5xx` or a connection failure comes back as `success: false` with its `phase`; authorization, quota, and invalid proxy requests reject the promise.
  * - **Only `phase: 'not_sent'` proves the provider did not execute the request.** A timeout or in-flight failure may have executed upstream, so do not automatically retry a non-idempotent call unless the provider supports an idempotency key.
  *
+ * Pass a {@link ConnectorApiRequest} to {@linkcode callApi | callApi()}. It returns a {@link ConnectorApiResponse}. {@link ConnectorApiResponsePhase} reports how far that call progressed through the proxy.
+ *
  * ## Available connectors
  *
  * The connectors below can be used as shared connectors or as app user connectors. For a shared platform connector, pass the integration type string to {@linkcode getConnection | getConnection()}. For a connector you register in Workspace Settings with your own OAuth app, use the connector ID with {@linkcode getWorkspaceConnection | getWorkspaceConnection()} for a shared token, or with {@linkcode getCurrentAppUserConnection | getCurrentAppUserConnection()} for a per-user token.
