@@ -168,19 +168,42 @@ describe("X-Base44-Build header", () => {
     expect(await entityCallBuildHeader(client)).toBeUndefined();
   });
 
-  test("a caller-supplied header still wins", async () => {
+  // Every call path must report the same build, or one client's requests get
+  // attributed to two different bundles.
+  test.each([
+    ["exact casing, over a baked-in commit", "X-Base44-Build", COMMIT],
+    ["lowercase, over a baked-in commit", "x-base44-build", COMMIT],
+    ["uppercase, over a baked-in commit", "X-BASE44-BUILD", COMMIT],
+    ["exact casing, with no baked-in commit", "X-Base44-Build", undefined],
+  ])("a caller-supplied header wins on every call path (%s)", async (_label, name, baked) => {
     stubBrowserGlobals();
-    source.value = COMMIT;
-    const other = "f".repeat(40);
+    source.value = baked;
+    const override = "f".repeat(40);
     const { createClient } = await loadSdk();
     const client = createClient({
       serverUrl,
       appId,
       analytics: { enabled: false },
-      headers: { "X-Base44-Build": other },
+      headers: { [name]: override },
     });
 
-    expect(await entityCallBuildHeader(client)).toBe(other);
+    expect(await entityCallBuildHeader(client)).toBe(override);
+
+    let invoked: string | string[] | undefined;
+    nock(serverUrl)
+      .post(`/api/apps/${appId}/functions/hello`)
+      .reply(function () {
+        invoked = this.req.headers["x-base44-build"];
+        return [200, {}];
+      });
+    await client.functions.invoke("hello", {});
+    expect(invoked).toBe(override);
+
+    const fetchMock = vi.fn(async () => new Response("ok"));
+    vi.stubGlobal("fetch", fetchMock);
+    await client.functions.fetch("/hello");
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(new Headers(init.headers).get("X-Base44-Build")).toBe(override);
   });
 });
 

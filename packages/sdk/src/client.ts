@@ -9,7 +9,10 @@ import {
 } from "./modules/connectors.js";
 import { getAccessToken } from "./utils/auth-utils.js";
 import { createFetchWithAuth } from "./utils/fetch-with-auth.js";
-import { getBuildCommitHeaders } from "./utils/build-commit.js";
+import {
+  BUILD_COMMIT_HEADER,
+  getBuildCommitHeaders,
+} from "./utils/build-commit.js";
 import { createFunctionsModule } from "./modules/functions.js";
 import { createAgentsModule } from "./modules/agents.js";
 import { createAiGatewayModule } from "./modules/ai-gateway.js";
@@ -119,11 +122,20 @@ function buildClient(
   };
 
   // The build commit goes on every API call, so the backend can tell which
-  // frontend bundle a request came from. Platform headers win over it.
-  const buildCommitHeaders = sendBuildCommit ? getBuildCommitHeaders() : {};
+  // frontend bundle a request came from. One set by the caller, in any
+  // casing, replaces it; resolving that once here keeps every call path,
+  // functions.fetch() included, reporting the same build.
+  const callerBuildCommit = Object.entries(optionalHeaders ?? {}).find(
+    ([name]) => name.toLowerCase() === BUILD_COMMIT_HEADER.toLowerCase()
+  );
+  const buildCommitHeaders: Record<string, string> = callerBuildCommit
+    ? { [BUILD_COMMIT_HEADER]: callerBuildCommit[1] }
+    : sendBuildCommit
+      ? getBuildCommitHeaders()
+      : {};
 
   const headers = {
-    ...buildCommitHeaders,
+    ...(callerBuildCommit ? {} : buildCommitHeaders),
     ...optionalHeaders,
     "X-App-Id": String(appId),
   };
