@@ -285,7 +285,7 @@ export interface SubscriptionResult {
   /** ID of the subscription. */
   subscription_id: string;
   /** Current status of the subscription. */
-  status: "active" | "paused" | "canceled";
+  status: "active" | "past_due" | "paused" | "canceled";
   /** Whether the subscription is set to cancel at the end of the current billing period. */
   cancel_at_period_end: boolean;
 }
