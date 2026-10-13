@@ -3,7 +3,6 @@ import { createPlatformServer } from "@base44/platform/server";
 const platform = createPlatformServer({
   serverUrl: "https://base44.app",
   apiKey: process.env.BASE44_API_KEY!,
-  webhooks: { publicKeys: process.env.BASE44_WEBHOOK_PUBLIC_KEYS },
 });
 
 /**
@@ -11,6 +10,8 @@ const platform = createPlatformServer({
  * Works as-is as a Next.js route handler, a Hono/Workers/Deno/Bun fetch handler.
  */
 export const POST = platform.webhooks.createHandler({
+  // Your workspace's public keys. Pass both during a key rotation; missing or malformed keys answer 500.
+  publicKeys: process.env.BASE44_WEBHOOK_PUBLIC_KEYS!,
   on: {
     "app.deleted.v1": async event => {
       console.log("trashed (restorable for 30 days):", event.data.app_id);

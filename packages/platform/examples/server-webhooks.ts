@@ -3,9 +3,10 @@ import { createPlatformServer, WebhookConfigurationError, WebhookVerificationErr
 const platform = createPlatformServer({
   serverUrl: "https://base44.app",
   apiKey: process.env.BASE44_API_KEY!,
-  // Public keys of your workspace. Pass both during a key rotation.
-  webhooks: { publicKeys: process.env.BASE44_WEBHOOK_PUBLIC_KEYS },
 });
+
+// Your workspace's public keys. Pass both during a key rotation.
+const publicKeys = process.env.BASE44_WEBHOOK_PUBLIC_KEYS!;
 
 /** verifyEvent + switch: full control over the response. See server-webhooks-handler.ts for the managed variant. */
 export async function POST(request: Request): Promise<Response> {
@@ -13,7 +14,7 @@ export async function POST(request: Request): Promise<Response> {
 
   let event;
   try {
-    event = await platform.webhooks.verifyEvent(rawBody, request.headers);
+    event = await platform.webhooks.verifyEvent(rawBody, request.headers, { publicKeys });
   } catch (error) {
     if (error instanceof WebhookVerificationError) return Response.json({ error: error.code }, { status: 400 });
     if (error instanceof WebhookConfigurationError) console.error(error.message); // 500: Base44 retries

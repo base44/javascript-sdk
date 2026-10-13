@@ -37,7 +37,7 @@ builder.close();
 
 `@base44/platform/server` verifies Base44 outbound webhooks and answers the endpoint
 activation challenge. It uses WebCrypto only (Node 20+, Deno, Bun, Workers, edge runtimes) and
-makes no network calls: pass your workspace's public keys (`whpk_…`) explicitly.
+makes no network calls: pass your workspace's public keys (`whpk_…`) to each call that verifies.
 
 The simplest route is `createHandler`. It reads the raw body, verifies it, answers the
 activation challenge and picks the status code: 400 for a delivery that fails verification,
@@ -50,10 +50,11 @@ import { createPlatformServer } from "@base44/platform/server";
 const platform = createPlatformServer({
   serverUrl: "https://base44.app",
   apiKey: process.env.BASE44_API_KEY!,
-  webhooks: { publicKeys: process.env.BASE44_WEBHOOK_PUBLIC_KEYS },
 });
+const publicKeys = process.env.BASE44_WEBHOOK_PUBLIC_KEYS!; // two keys during a rotation
 
 export const POST = platform.webhooks.createHandler({
+  publicKeys,
   on: {
     "app.deleted.v1": async event => forget(event.data.app_id), // event is narrowed per type
   },
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
   const rawBody = await request.text(); // exactly as received
   let event;
   try {
-    event = await platform.webhooks.verifyEvent(rawBody, request.headers);
+    event = await platform.webhooks.verifyEvent(rawBody, request.headers, { publicKeys });
   } catch (error) {
     if (error instanceof WebhookVerificationError) return new Response(null, { status: 400 });
     throw error; // missing/malformed keys: a 500, so Base44 retries

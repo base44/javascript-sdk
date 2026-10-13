@@ -7,6 +7,6 @@ export function createPlatformServer(options: PlatformServerOptions): PlatformSe
   if (!options.apiKey) throw new TypeError("apiKey is required");
   normalizeServerUrl(options.serverUrl);
   return Object.freeze({
-    webhooks: Object.freeze(createWebhooks(options.webhooks)),
+    webhooks: Object.freeze(createWebhooks()),
   });
 }

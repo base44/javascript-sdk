@@ -60,18 +60,18 @@ test("the server entrypoint verifies a signed webhook and its handler answers th
     const ts = String(Math.floor(Date.now() / 1000));
     const sig = Buffer.from(await crypto.subtle.sign("Ed25519", privateKey, new TextEncoder().encode("evt_1." + ts + "." + body))).toString("base64");
     const headers = new Headers({ "webhook-id": "evt_1", "webhook-timestamp": ts, "webhook-signature": "v1a," + sig });
-    const { webhooks } = createPlatformServer({ serverUrl: "https://example.test", apiKey: "key", webhooks: { publicKeys: wire } });
-    assert.equal((await webhooks.verifyEvent(body, headers)).type, "webhook.test.v1");
-    await assert.rejects(webhooks.verifyEvent(body + " ", headers), WebhookVerificationError);
-    const response = await webhooks.createHandler()(new Request("https://receiver.test", { method: "POST", body, headers }));
+    const { webhooks } = createPlatformServer({ serverUrl: "https://example.test", apiKey: "key" });
+    assert.equal((await webhooks.verifyEvent(body, headers, { publicKeys: wire })).type, "webhook.test.v1");
+    await assert.rejects(webhooks.verifyEvent(body + " ", headers, { publicKeys: wire }), WebhookVerificationError);
+    const response = await webhooks.createHandler({ publicKeys: wire })(new Request("https://receiver.test", { method: "POST", body, headers }));
     assert.deepEqual(await response.json(), { challenge: "abc" });
   `]);
 });
 
 const consumer = `
 import { createPlatformServer, WebhookVerificationError, type WebhookEvent } from "@base44/platform/server";
-const server = createPlatformServer({ serverUrl: "https://example.test", apiKey: "key", webhooks: { publicKeys: "whpk_x" } });
-server.webhooks.verifyEvent("{}", new Headers()).then((event: WebhookEvent) => {
+const server = createPlatformServer({ serverUrl: "https://example.test", apiKey: "key" });
+server.webhooks.verifyEvent("{}", new Headers(), { publicKeys: "whpk_x" }).then((event: WebhookEvent) => {
   if (event.type === "app.deleted.v1") { const id: string = event.data.app_id; void id; }
 }, (error: unknown) => error instanceof WebhookVerificationError && error.code);
 

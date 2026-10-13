@@ -1,4 +1,4 @@
-import type { WebhooksModule, WebhooksOptions } from "./modules/webhooks.types.js";
+import type { WebhooksModule } from "./modules/webhooks.types.js";
 
 /** Shared configuration for server platform modules. */
 export interface PlatformServerOptions {
@@ -6,8 +6,6 @@ export interface PlatformServerOptions {
   serverUrl: string;
   /** Workspace API key. Keep it on your server; never ship it to a browser. */
   apiKey: string;
-  /** Webhook receiving settings. */
-  webhooks?: WebhooksOptions;
 }
 
 /** Server platform client, returned by `createPlatformServer`. */

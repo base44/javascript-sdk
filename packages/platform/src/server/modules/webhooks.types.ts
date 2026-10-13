@@ -47,16 +47,13 @@ export type WebhookHeaders = Headers | Record<string, string | string[] | undefi
 /** One Ed25519 public key (`whpk_…`), or several separated by commas or whitespace. */
 export type WebhookPublicKeys = string | string[];
 
-/** Webhook settings for `createPlatformServer`. */
-export interface WebhooksOptions {
-  /** Public keys of your workspace. Pass more than one while a key rotation is in progress. */
-  publicKeys?: WebhookPublicKeys;
-}
-
-/** Per-call overrides for `verifyEvent`. */
+/** Options for `verifyEvent`. */
 export interface VerifyEventOptions {
-  /** Public keys to verify against, instead of the ones the client was created with. */
-  publicKeys?: WebhookPublicKeys;
+  /**
+   * Your workspace's public keys. Pass more than one while a key rotation is in progress.
+   * Missing or malformed keys reject with `WebhookConfigurationError`.
+   */
+  publicKeys: WebhookPublicKeys;
   /** Maximum age or clock skew of a delivery, in seconds. Defaults to 300. */
   toleranceSeconds?: number;
 }
@@ -99,7 +96,7 @@ export interface WebhooksModule {
    * or malformed (let it surface as a 500 so Base44 retries). To activate an endpoint, answer
    * the `webhook.test.v1` event with `{ "challenge": event.data.challenge }`.
    */
-  verifyEvent(body: string | Uint8Array, headers: WebhookHeaders, options?: VerifyEventOptions): Promise<WebhookEvent>;
+  verifyEvent(body: string | Uint8Array, headers: WebhookHeaders, options: VerifyEventOptions): Promise<WebhookEvent>;
 
   /**
    * Build a fetch-style route handler (`(request: Request) => Promise<Response>`) for Next.js, Hono,
@@ -107,5 +104,5 @@ export interface WebhooksModule {
    * challenge, then runs your callbacks. Delivery is at least once, so handlers must tolerate
    * the same event (same `event.id`) arriving twice.
    */
-  createHandler(options?: CreateHandlerOptions): (request: Request) => Promise<Response>;
+  createHandler(options: CreateHandlerOptions): (request: Request) => Promise<Response>;
 }

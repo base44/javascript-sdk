@@ -2,10 +2,11 @@ import {
   createPlatformServer, type AppCreatedV1Data, type WebhookEvent, type WebhookEventMap, type WebhookTestV1Data,
 } from "@base44/platform/server";
 
-const platform = createPlatformServer({ serverUrl: "https://example.test", apiKey: "key", webhooks: { publicKeys: ["whpk_x"] } });
+const platform = createPlatformServer({ serverUrl: "https://example.test", apiKey: "key" });
+const publicKeys = ["whpk_x"];
 
 async function handle(body: string, headers: Headers) {
-  const event = await platform.webhooks.verifyEvent(body, headers, { toleranceSeconds: 60 });
+  const event = await platform.webhooks.verifyEvent(body, headers, { publicKeys, toleranceSeconds: 60 });
   switch (event.type) {
     case "app.created.v1": {
       const appType: "imported_app" | "user_agent" | "user_app" | "user_game" = event.data.app_type;
@@ -32,6 +33,7 @@ const map: Pick<WebhookEventMap, "app.created.v1" | "webhook.test.v1"> = { "app.
 void map;
 
 const route: (request: Request) => Promise<Response> = platform.webhooks.createHandler({
+  publicKeys,
   toleranceSeconds: 60,
   on: {
     "app.deleted.v1": event => { const at: string = event.data.deleted_at; void at; },
@@ -44,13 +46,20 @@ const route: (request: Request) => Promise<Response> = platform.webhooks.createH
 });
 void route;
 platform.webhooks.createHandler({
+  publicKeys,
   // @ts-expect-error The activation probe is answered by the handler and cannot be handled.
   on: { "webhook.test.v1": () => {} },
 });
 // @ts-expect-error The probe never reaches onEvent.
-platform.webhooks.createHandler({ onEvent: event => event.type === "webhook.test.v1" });
+platform.webhooks.createHandler({ publicKeys, onEvent: event => event.type === "webhook.test.v1" });
 // @ts-expect-error Unknown option.
-platform.webhooks.verifyEvent("", new Headers(), { secret: "x" });
+platform.webhooks.verifyEvent("", new Headers(), { publicKeys, secret: "x" });
+// @ts-expect-error Public keys are required.
+platform.webhooks.verifyEvent("", new Headers());
+// @ts-expect-error Public keys are required.
+platform.webhooks.createHandler({ on: {} });
+// @ts-expect-error Keys are passed to the webhook functions, not the factory.
+createPlatformServer({ serverUrl: "https://example.test", apiKey: "key", webhooks: { publicKeys } });
 const event = null as unknown as WebhookEvent;
 // @ts-expect-error Unknown event type.
 if (event.type === "app.exploded.v1") void event;

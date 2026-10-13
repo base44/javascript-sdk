@@ -6,5 +6,5 @@ export type { PlatformServer, PlatformServerOptions } from "./server.types.js";
 export type {
   AppCreatedV1Data, AppDeletedV1Data, AppPublishedV1Data, AppRestoredV1Data, AppUnpublishedV1Data, CloudEvent, CreateHandlerOptions,
   DeliveredWebhookEvent, VerifyEventOptions, WebhookEventHandlers, WebhookEvent, WebhookEventMap, WebhookEventType, WebhookHeaders,
-  WebhookPublicKeys, WebhooksModule, WebhooksOptions, WebhookTestV1Data,
+  WebhookPublicKeys, WebhooksModule, WebhookTestV1Data,
 } from "./modules/webhooks.types.js";

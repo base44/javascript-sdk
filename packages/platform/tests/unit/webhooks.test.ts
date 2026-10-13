@@ -27,8 +27,7 @@ async function delivery({ body = BODY, id = "evt_1", ts = String(Math.floor(Date
   const signatures = await Promise.all(signers.map(async s => `${scheme},${await sign(s, id, ts, body)}`));
   return { body, headers: new Headers({ "webhook-id": id, "webhook-timestamp": ts, "webhook-signature": signatures.join(" ") }) };
 }
-const server = (publicKeys?: string | string[]) =>
-  createPlatformServer({ serverUrl: "https://api.example.test", apiKey: "key", webhooks: { publicKeys } });
+const { webhooks } = createPlatformServer({ serverUrl: "https://api.example.test", apiKey: "key" });
 const failure = async (promise: Promise<unknown>) => promise.then(() => null, (error: WebhookVerificationError | WebhookConfigurationError) => error);
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
@@ -36,7 +35,7 @@ afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 describe("webhooks.verifyEvent", () => {
   test("returns the parsed event for a genuine delivery", async () => {
     const { body, headers } = await delivery();
-    const event = await server(known.wire).webhooks.verifyEvent(body, headers);
+    const event = await webhooks.verifyEvent(body, headers, { publicKeys: known.wire });
     expect(event.type).toBe("app.created.v1");
     expect(event.id).toBe("evt_1");
   });
@@ -44,27 +43,22 @@ describe("webhooks.verifyEvent", () => {
   test("accepts a byte body and a Node-style header object", async () => {
     const { body, headers } = await delivery();
     const plain = Object.fromEntries([...headers].map(([k, v]) => [k.toUpperCase(), [v]]));
-    const event = await server(known.wire).webhooks.verifyEvent(new TextEncoder().encode(body), plain);
+    const event = await webhooks.verifyEvent(new TextEncoder().encode(body), plain, { publicKeys: known.wire });
     expect(event.id).toBe("evt_1");
   });
 
   test("accepts keys with or without the whpk_ prefix, as a list or a delimited string", async () => {
     const { body, headers } = await delivery();
     for (const keys of [known.wire.slice(5), [known.wire], `${stranger.wire}, ${known.wire}`, `${stranger.wire}\n${known.wire}`]) {
-      expect((await server(keys).webhooks.verifyEvent(body, headers)).id).toBe("evt_1");
+      expect((await webhooks.verifyEvent(body, headers, { publicKeys: keys })).id).toBe("evt_1");
     }
   });
 
   test("verifies during a key rotation, whichever key the receiver has pinned", async () => {
     const { body, headers } = await delivery({ signers: [known, rotated] });
     for (const keys of [known.wire, rotated.wire, [known.wire, rotated.wire]]) {
-      expect((await server(keys).webhooks.verifyEvent(body, headers)).id).toBe("evt_1");
+      expect((await webhooks.verifyEvent(body, headers, { publicKeys: keys })).id).toBe("evt_1");
     }
-  });
-
-  test("per-call keys override the configured ones", async () => {
-    const { body, headers } = await delivery({ signers: [rotated] });
-    expect((await server(known.wire).webhooks.verifyEvent(body, headers, { publicKeys: rotated.wire })).id).toBe("evt_1");
   });
 
   test.each([
@@ -87,7 +81,7 @@ describe("webhooks.verifyEvent", () => {
     }, "no_signature_entries"],
   ])("refuses %s", async (_name, build, code) => {
     const { body, headers } = await build();
-    const error = await failure(server(known.wire).webhooks.verifyEvent(body, headers));
+    const error = await failure(webhooks.verifyEvent(body, headers, { publicKeys: known.wire }));
     expect(error).toBeInstanceOf(WebhookVerificationError);
     expect(error).toMatchObject({ code });
   });
@@ -95,25 +89,25 @@ describe("webhooks.verifyEvent", () => {
   test.each(["webhook-id", "webhook-timestamp", "webhook-signature"])("refuses a delivery missing %s", async name => {
     const { body, headers } = await delivery();
     headers.delete(name);
-    expect(await failure(server(known.wire).webhooks.verifyEvent(body, headers))).toMatchObject({ code: "missing_headers" });
+    expect(await failure(webhooks.verifyEvent(body, headers, { publicKeys: known.wire }))).toMatchObject({ code: "missing_headers" });
   });
 
   test("honors toleranceSeconds", async () => {
     const { body, headers } = await delivery({ ts: String(Math.floor(Date.now() / 1000) - 400) });
-    expect((await server(known.wire).webhooks.verifyEvent(body, headers, { toleranceSeconds: 600 })).id).toBe("evt_1");
+    expect((await webhooks.verifyEvent(body, headers, { publicKeys: known.wire, toleranceSeconds: 600 })).id).toBe("evt_1");
   });
 
   test("refuses a signed body that is not an event, after verifying it", async () => {
     for (const body of ["not json", "null", JSON.stringify({ type: "app.created.v1" })]) {
       const { headers } = await delivery({ body });
-      expect(await failure(server(known.wire).webhooks.verifyEvent(body, headers))).toMatchObject({ code: "invalid_payload" });
+      expect(await failure(webhooks.verifyEvent(body, headers, { publicKeys: known.wire }))).toMatchObject({ code: "invalid_payload" });
     }
   });
 
   test("never parses an unverified body", async () => {
     const parse = vi.spyOn(JSON, "parse");
     const { headers } = await delivery({ signers: [stranger] });
-    await failure(server(known.wire).webhooks.verifyEvent(BODY, headers));
+    await failure(webhooks.verifyEvent(BODY, headers, { publicKeys: known.wire }));
     expect(parse).not.toHaveBeenCalled();
     parse.mockRestore();
   });
@@ -122,7 +116,7 @@ describe("webhooks.verifyEvent", () => {
     const fetch = vi.fn(() => { throw new Error("verification made a network call"); });
     vi.stubGlobal("fetch", fetch);
     const { body, headers } = await delivery();
-    await server(known.wire).webhooks.verifyEvent(body, headers);
+    await webhooks.verifyEvent(body, headers, { publicKeys: known.wire });
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -130,11 +124,11 @@ describe("webhooks.verifyEvent", () => {
     const { body, headers } = await delivery();
     const truncated = `whpk_${Buffer.alloc(31, 1).toString("base64")}`;
     for (const [keys, code] of [[undefined, "missing_public_keys"], [" , ", "missing_public_keys"], [[], "missing_public_keys"], [truncated, "invalid_public_key"], ["whpk_%%%", "invalid_public_key"]] as const) {
-      const error = await failure(server(keys as string | string[] | undefined).webhooks.verifyEvent(body, headers));
+      const error = await failure(webhooks.verifyEvent(body, headers, { publicKeys: keys as string | string[] }));
       expect(error).toBeInstanceOf(WebhookConfigurationError);
       expect(error).toMatchObject({ code });
     }
-    expect(await failure(server().webhooks.verifyEvent(body, new Headers()))).toBeInstanceOf(WebhookConfigurationError);
+    expect(await failure(webhooks.verifyEvent(body, new Headers(), { publicKeys: "" }))).toBeInstanceOf(WebhookConfigurationError);
   });
 });
 
@@ -148,7 +142,7 @@ describe("webhooks.createHandler", () => {
 
   test("answers the activation probe without calling any callback", async () => {
     const onEvent = vi.fn(), onSuccess = vi.fn();
-    const response = await server(known.wire).webhooks.createHandler({ onEvent, onSuccess })(await request("webhook.test.v1", probe));
+    const response = await webhooks.createHandler({ publicKeys: known.wire, onEvent, onSuccess })(await request("webhook.test.v1", probe));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ challenge: "abc123" });
     expect(onEvent).not.toHaveBeenCalled();
@@ -157,7 +151,8 @@ describe("webhooks.createHandler", () => {
 
   test("runs onEvent, then the type's handler, then onSuccess, and answers 204", async () => {
     const calls: string[] = [];
-    const handler = server(known.wire).webhooks.createHandler({
+    const handler = webhooks.createHandler({
+      publicKeys: known.wire,
       on: { "app.created.v1": async event => { calls.push(`on:${event.data.app_type}`); }, "app.deleted.v1": () => { calls.push("wrong"); } },
       onEvent: event => { calls.push(`event:${event.type}`); },
       onSuccess: event => { calls.push(`success:${event.id}`); },
@@ -168,11 +163,11 @@ describe("webhooks.createHandler", () => {
   });
 
   test("answers 2xx for event types without a handler", async () => {
-    expect((await server(known.wire).webhooks.createHandler()(await request("app.restored.v1", {}))).status).toBe(204);
+    expect((await webhooks.createHandler({ publicKeys: known.wire })(await request("app.restored.v1", {}))).status).toBe(204);
   });
 
   test("onSuccess may replace the response", async () => {
-    const handler = server(known.wire).webhooks.createHandler({ onSuccess: () => Response.json({ ok: true }) });
+    const handler = webhooks.createHandler({ publicKeys: known.wire, onSuccess: () => Response.json({ ok: true }) });
     const response = await handler(await request());
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
@@ -180,7 +175,7 @@ describe("webhooks.createHandler", () => {
 
   test("refuses an unverified delivery with 400 and never calls handlers", async () => {
     const onEvent = vi.fn(), onError = vi.fn();
-    const response = await server(known.wire).webhooks.createHandler({ onEvent, onError })(await request(undefined, undefined, { signers: [stranger] }));
+    const response = await webhooks.createHandler({ publicKeys: known.wire, onEvent, onError })(await request(undefined, undefined, { signers: [stranger] }));
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: "signature_mismatch" });
     expect(onEvent).not.toHaveBeenCalled();
@@ -188,7 +183,7 @@ describe("webhooks.createHandler", () => {
   });
 
   test("answers 500 for a configuration problem, so Base44 retries", async () => {
-    const response = await server().webhooks.createHandler()(await request());
+    const response = await webhooks.createHandler({ publicKeys: "" })(await request());
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ error: "receiver_misconfigured" });
   });
@@ -198,19 +193,19 @@ describe("webhooks.createHandler", () => {
     const throws = () => { throw failure; };
     const onError = vi.fn();
     const options = name === "on" ? { on: { "app.created.v1": throws } } : { [name]: throws };
-    const response = await server(known.wire).webhooks.createHandler({ ...options, onError })(await request());
+    const response = await webhooks.createHandler({ publicKeys: known.wire, ...options, onError })(await request());
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ error: "handler_failed" });
     expect(onError).toHaveBeenCalledWith(failure, expect.objectContaining({ id: "evt_1" }));
   });
 
   test("onError may replace the response", async () => {
-    const handler = server(known.wire).webhooks.createHandler({ onError: () => new Response("nope", { status: 401 }) });
+    const handler = webhooks.createHandler({ publicKeys: known.wire, onError: () => new Response("nope", { status: 401 }) });
     expect((await handler(await request(undefined, undefined, { signers: [stranger] }))).status).toBe(401);
   });
 
-  test("accepts per-handler verify options", async () => {
-    const handler = server(known.wire).webhooks.createHandler({ publicKeys: rotated.wire });
+  test("verifies with the keys passed to the handler", async () => {
+    const handler = webhooks.createHandler({ publicKeys: rotated.wire });
     expect((await handler(await request(undefined, undefined, { signers: [rotated] }))).status).toBe(204);
   });
 });
