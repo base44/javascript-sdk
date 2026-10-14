@@ -114,7 +114,10 @@ export class BuilderSocket implements BuilderSession {
     socket.on("session.ended", (raw: unknown) => this.sessionEnded(raw));
     for (const [name, code] of Object.entries(roomNotices)) socket.on(name, (raw: unknown) => this.roomNotice(code, raw));
     for (const name of eventNames) socket.on(name, (raw: unknown) => this.appEvent(name, raw));
-    socket.onAny((name: string, raw: unknown) => { if (isUnknownEvent(name)) this.appEvent(name, raw); });
+    // An unknown event with no app room (a future session-wide event) has nowhere to go: ignore it.
+    socket.onAny((name: string, raw: unknown) => {
+      if (isUnknownEvent(name) && appFromRoom((raw as { room?: unknown } | null)?.room)) this.appEvent(name, raw);
+    });
     socket.connect();
   }
 

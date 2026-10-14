@@ -367,6 +367,19 @@ describe("platform client", () => {
     expect(otherEvent).not.toHaveBeenCalled();
   });
 
+  test("an unknown event with no app room is ignored", async () => {
+    const { client, onError } = setup(); const appError = vi.fn(), onEvent = vi.fn();
+    const sub = client.subscribe(app, { onSnapshot: vi.fn(), onEvent, onError: appError });
+    await connected(client);
+    for (const at of [null, undefined, "/apps/not-an-app", "/session"]) fake.handlers["*"]("session.expiring", { room: at, data: {} });
+    fake.handlers["*"]("session.expiring", null);
+    await settle();
+    expect(sub.active).toBe(true);
+    expect(onEvent).not.toHaveBeenCalled();
+    expect(appError).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+  });
+
   test("a malformed unknown event fails only its app", async () => {
     const { client } = setup(); const onError = vi.fn();
     const sub = client.subscribe(app, { onSnapshot: vi.fn(), onEvent: vi.fn(), onError });
