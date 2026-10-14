@@ -1,15 +1,32 @@
 import type { WebhooksModule } from "./modules/webhooks.types.js";
 
-/** Shared configuration for server platform modules. */
+/**
+ * Options for {@linkcode createPlatformServer | createPlatformServer()}.
+ *
+ * The server client runs on your backend and holds your workspace API key. Never pass these options
+ * to code that runs in the browser.
+ */
 export interface PlatformServerOptions {
-  /** Origin of the platform service, e.g. https://base44.app. No path/query/credentials. */
+  /**
+   * Origin of the Base44 API, such as `https://base44.app`.
+   *
+   * It must be an origin with no path, query, fragment, or credentials.
+   */
   serverUrl: string;
-  /** Workspace API key. Keep it on your server; never ship it to a browser. */
+  /**
+   * Your workspace API key.
+   *
+   * Keep it on your server. The browser client never needs it.
+   */
   apiKey: string;
 }
 
-/** Server platform client, returned by `createPlatformServer`. */
+/**
+ * The platform server client.
+ *
+ * Provides access to the platform's server modules.
+ */
 export interface PlatformServer {
-  /** Verify Base44 outbound webhooks and answer the activation challenge. */
+  /** [Webhooks module](/developers/references/platform-sdk/docs/interfaces/webhooks) for receiving the events Base44 sends to your server. */
   readonly webhooks: WebhooksModule;
 }

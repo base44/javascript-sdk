@@ -1,7 +1,8 @@
 {
   "$schema": "https://typedoc.org/schema.json",
   "extends": ["./typedoc.json"],
-  "entryPoints": ["./src/client/index.ts"],
+  "entryPoints": ["./scripts/mintlify-post-processing/reference.ts"],
+  "tsconfig": "./tsconfig.docs.json",
   "out": "docs/content",
   "plugin": [
     "typedoc-plugin-markdown",

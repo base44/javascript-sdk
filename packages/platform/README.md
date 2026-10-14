@@ -202,7 +202,8 @@ Every exported shape and field has JSDoc. `npm run docs` validates it into `docs
 `npm run create-docs` runs the app SDK's TypeDoc and Mintlify pipeline for this package,
 and `npm run copy-docs-local -- --target <mintlify-docs>` copies the result into
 `developers/references/platform-sdk/docs`. The pipeline's config for this package lives
-in `scripts/mintlify-post-processing/`. The Socket messages page is built in mintlify-docs from
+in `scripts/mintlify-post-processing/`, including `reference.ts`, the docs-only entry that combines
+the client and server entrypoints into one reference. The Socket messages page is built in mintlify-docs from
 the service's AsyncAPI document, not here.
 
 `PlatformSocketError` extends `Error` with `code` and optional `appId`. Original

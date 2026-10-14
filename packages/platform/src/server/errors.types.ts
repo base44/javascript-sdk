@@ -1,6 +1,55 @@
-/** Why a delivery was refused. Respond 400: the request is not a genuine, current Base44 event. */
+/**
+ * Codes of errors for a delivery that can't be trusted. Answer these with a 400. Base44 treats the
+ * request as failed and retries it, and a genuine delivery verifies on the retry.
+ */
 export type WebhookVerificationErrorCode =
-  | "missing_headers" | "timestamp_outside_tolerance" | "no_signature_entries" | "signature_mismatch" | "invalid_payload";
+  /**
+   * The request is missing one of the `webhook-id`, `webhook-timestamp` or `webhook-signature` headers.
+   *
+   * Check that a proxy in front of your endpoint forwards all request headers.
+   */
+  | "missing_headers"
+  /**
+   * The `webhook-timestamp` header is more than `toleranceSeconds` (300 by default) away from your server's clock, or isn't a number.
+   *
+   * Check your server's clock. A replayed old delivery fails this way too.
+   */
+  | "timestamp_outside_tolerance"
+  /**
+   * The `webhook-signature` header has no signature in the `v1a` scheme Base44 uses.
+   *
+   * The request didn't come from Base44, or a proxy rewrote the header.
+   */
+  | "no_signature_entries"
+  /**
+   * No signature matches any of your public keys.
+   *
+   * Check that you pass the request body exactly as received. Parsing the JSON and serializing it again
+   * changes the bytes. Also check that your public keys belong to the workspace that sends the webhook.
+   */
+  | "signature_mismatch"
+  /**
+   * The signature is valid, but the body isn't a JSON event.
+   *
+   * This shouldn't happen with deliveries from Base44.
+   */
+  | "invalid_payload";
 
-/** Why verification could not run at all. This is your deployment, not the request: let it surface as a 500 so Base44 retries. */
-export type WebhookConfigurationErrorCode = "missing_public_keys" | "invalid_public_key";
+/**
+ * Codes of errors that stop verification before it starts, because the public keys you passed can't
+ * be used. They're about your deployment, not the request, so let them surface as a 500. Base44 then
+ * retries the delivery, and it succeeds once you fix the keys.
+ */
+export type WebhookConfigurationErrorCode =
+  /**
+   * No public keys were passed, for example because an environment variable is unset.
+   *
+   * Pass your workspace's public keys to `verifyEvent()` or `createHandler()`.
+   */
+  | "missing_public_keys"
+  /**
+   * A public key isn't a base64-encoded 32-byte Ed25519 key, with or without the `whpk_` prefix.
+   *
+   * Copy the key again. A truncated key fails this way.
+   */
+  | "invalid_public_key";
