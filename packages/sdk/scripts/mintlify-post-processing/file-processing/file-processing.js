@@ -1599,8 +1599,8 @@ function groupTypeDefinitions(content) {
     },
     // App module
     {
-      types: ["AppPublicSettingsResponse", "AppPublicSettings"],
-      indicator: "AppPublicSettingsResponse"
+      types: ["AppPublicSettings"],
+      indicator: "AppPublicSettings"
     }
   ];
   
@@ -2195,7 +2195,7 @@ function cleanupSortFieldSignature(dir) {
 }
 
 /**
- * Fix truncated intersection types in ParamField type attributes.
+ * Fix truncated or collapsed types in ParamField and ResponseField type attributes.
  * TypeDoc renders (Partial<T> & { id: string })[] as "Partial<...> & object[]".
  */
 function cleanupTruncatedParamTypes(dir) {
@@ -2216,6 +2216,16 @@ function cleanupTruncatedParamTypes(dir) {
         content = content.replace(
           /type="Partial<\.\.\.> & object\[\]"/g,
           'type="(Partial<T> & { id: string })[]"'
+        );
+        modified = true;
+      }
+
+      // AppPublicSettings ends in `| string`, so TypeScript reduces it to plain
+      // `string` and TypeDoc renders the public_settings field as "string".
+      if (content.includes('<ResponseField name="public_settings" type="string"')) {
+        content = content.replace(
+          /(<ResponseField name="public_settings" type=)"string"/g,
+          '$1"AppPublicSettings"'
         );
         modified = true;
       }

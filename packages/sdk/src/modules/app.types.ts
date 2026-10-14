@@ -1,11 +1,7 @@
 /**
- * The app's visibility.
+ * The app's [visibility](/Setting-up-your-app/Managing-access#setting-your-app-visibility).
  *
- * You can set and manage the app's visibility in the app's dashboard or with the Base44 CLI [`visibility`](/developers/references/cli/commands/visibility) command. Learn more about [app visibility](/Setting-up-your-app/Managing-access#setting-your-app-visibility).
- *
- * <Note>
- * The CLI doesn't support `public_with_login`. To use it, change the app's visibility in the dashboard.
- * </Note>
+ * You can set and manage the app's visibility in the app's dashboard or with the Base44 CLI [`visibility`](/developers/references/cli/commands/visibility) command. 
  *
  * The following table shows the supported values and the visibility each one represents:
  *
@@ -15,6 +11,10 @@
  * | `workspace_with_login` | **Workspace**: Users in your Base44 [workspace](/documentation/account-and-billing/about-workspaces) |
  * | `public_with_login` | **Public (login required)**: Visitors with a Base44 account |
  * | `public_without_login` | **Public (no login)**: Anyone |
+ *
+ * <Note>
+ * If your workspace [enforces SSO for apps](/Enterprise/Enterprise-SSO-and-app-visibility), apps set to `public_without_login` also require sign-in. 
+ * </Note>
  */
 export type AppPublicSettings =
   | "private_with_login"
@@ -30,19 +30,14 @@ export interface AppPublicSettingsResponse {
   /** The app's ID. */
   id: string;
   /**
-   * The app's visibility.
-   *
-   * Returns the value saved in the app's settings.
-   *
-   * <Note>
-   * If your workspace [enforces SSO for apps](/Enterprise/Enterprise-SSO-and-app-visibility), apps set to `public_without_login` also require sign-in. Visitors who aren't signed in get the `auth_required` error.
-   * </Note>
+   * The app's visibility. 
+   * For supported values, see [`AppPublicSettings`](#apppublicsettings).
    */
   public_settings: AppPublicSettings;
 }
 
 /**
- * App module for reading an app's public settings, including its visibility.
+ * App module for reading an app's public settings. 
  *
  * Use it to read the app's visibility and determine whether the current visitor can access the app.
  * If the app requires login, use `redirectToLogin()` from the {@link AuthModule | auth module} to send the visitor to the login page.
