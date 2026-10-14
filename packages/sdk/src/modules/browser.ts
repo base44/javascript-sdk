@@ -17,10 +17,18 @@ interface BrowserSessionResponse {
  * Creates the Browser module for the Base44 SDK.
  *
  * @param axios - Axios instance (should be service role client)
- * @returns Browser module with methods to create remote browser sessions
+ * @returns Browser module with methods to create and end remote browser sessions
  * @internal
  */
 export function createBrowserModule(axios: AxiosInstance): BrowserModule {
+  const endSession = async (sessionId: string): Promise<void> => {
+    if (!sessionId || typeof sessionId !== "string") {
+      throw new Error("Session ID is required and must be a string");
+    }
+
+    await axios.delete(`/v1/browser-sessions/${encodeURIComponent(sessionId)}`);
+  };
+
   return {
     async getSession(
       options: BrowserSessionOptions = {}
@@ -42,7 +50,10 @@ export function createBrowserModule(axios: AxiosInstance): BrowserModule {
         ...(data.session_expires_at && {
           sessionExpiresAt: data.session_expires_at,
         }),
+        end: () => endSession(data.session_id),
       };
     },
+
+    endSession,
   };
 }

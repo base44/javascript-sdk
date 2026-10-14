@@ -14,7 +14,11 @@ export interface BrowserSessionOptions {
  * A remote browser session returned by {@linkcode BrowserModule.getSession | getSession()}.
  */
 export interface BrowserSession {
-  /** Opaque session identifier issued by the remote browser provider. */
+  /**
+   * Opaque session identifier issued to your app.
+   *
+   * Pass it unchanged to {@linkcode BrowserModule.endSession | endSession()} to end the session from a different request.
+   */
   sessionId: string;
   /**
    * Signed WebSocket URL for connecting to the browser over the Chrome DevTools Protocol (CDP).
@@ -33,12 +37,16 @@ export interface BrowserSession {
   connectionExpiresAt?: string;
   /** ISO 8601 timestamp when the browser session expires. Omitted when the provider doesn't expose it. */
   sessionExpiresAt?: string;
+  /**
+   * Ends the session. Equivalent to calling {@linkcode BrowserModule.endSession | endSession()} with this session's ID.
+   */
+  end: () => Promise<void>;
 }
 
 /**
  * Browser module for running browser automation from your backend.
  *
- * This module creates remote browser sessions that you can control with a CDP client library such as Playwright or Puppeteer. Base44 doesn't store browser state, so each session is independent.
+ * This module creates remote browser sessions that you can control with a CDP client library such as Playwright or Puppeteer. Base44 doesn't store browser state, so each session is independent. End each session when you're done with it. Otherwise it keeps running until the remote browser provider times it out.
  *
  * This module is only available to use with a client in service role authentication mode, which means it can only be used in backend environments.
  */
@@ -59,15 +67,19 @@ export interface BrowserModule {
    *
    * Deno.serve(async (req) => {
    *   const base44 = createClientFromRequest(req);
-   *   const { connectionUrl } = await base44.asServiceRole.browser.getSession();
+   *   const session = await base44.asServiceRole.browser.getSession();
    *
-   *   const browser = await chromium.connectOverCDP(connectionUrl);
-   *   const page = browser.contexts()[0].pages()[0] ?? (await browser.newPage());
-   *   await page.goto('https://example.com');
-   *   const title = await page.title();
-   *   await browser.close();
+   *   try {
+   *     const browser = await chromium.connectOverCDP(session.connectionUrl);
+   *     const page = browser.contexts()[0].pages()[0] ?? (await browser.newPage());
+   *     await page.goto('https://example.com');
+   *     const title = await page.title();
+   *     await browser.close();
    *
-   *   return Response.json({ title });
+   *     return Response.json({ title });
+   *   } finally {
+   *     await session.end();
+   *   }
    * });
    * ```
    *
@@ -80,4 +92,28 @@ export interface BrowserModule {
    * ```
    */
   getSession(options?: BrowserSessionOptions): Promise<BrowserSession>;
+
+  /**
+   * Ends a browser session created by your app.
+   *
+   * Use this when the session was created in a different request. Otherwise call `end()` on the session returned by {@linkcode getSession | getSession()}. Ending a session that has already ended succeeds, so it's safe to call more than once. The call fails with the `browser_session_not_found` error code if the ID wasn't issued to your app.
+   *
+   * @param sessionId - The `sessionId` returned by {@linkcode getSession | getSession()}, unchanged.
+   * @returns Promise that resolves when the session has ended.
+   *
+   * @example
+   * ```typescript
+   * // End a session whose ID was saved by an earlier request
+   * import { createClientFromRequest } from 'npm:@base44/sdk';
+   *
+   * Deno.serve(async (req) => {
+   *   const base44 = createClientFromRequest(req);
+   *   const { sessionId } = await req.json();
+   *   await base44.asServiceRole.browser.endSession(sessionId);
+   *
+   *   return new Response(null, { status: 204 });
+   * });
+   * ```
+   */
+  endSession(sessionId: string): Promise<void>;
 }
