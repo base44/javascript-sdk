@@ -1,0 +1,11 @@
+{
+  "interfaces/builder": [
+    "interfaces/BuilderSession",
+    "type-aliases/PlatformEvent",
+    "interfaces/PlatformSnapshot"
+  ],
+  "classes/PlatformSocketError": [
+    "type-aliases/SessionErrorCode",
+    "type-aliases/AppErrorCode"
+  ]
+}

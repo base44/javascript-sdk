@@ -1,0 +1,5879 @@
+{
+  "asyncapi": "3.0.0",
+  "info": {
+    "title": "Base44 Live Builder Updates",
+    "version": "1.0.0",
+    "description": "Live updates of the builder chat for the apps a white-label session may watch. The connection is Socket.IO, not a raw WebSocket: connect with `io(socket_url, { path: socket_path, transports: [\"websocket\"], auth: { session_token } })`, using the values your server received from `POST /api/service/socket-sessions`. Then send `join` for each app, and receive its snapshot followed by live events."
+  },
+  "servers": {
+    "platform": {
+      "host": "ws.base44.com",
+      "protocol": "wss",
+      "pathname": "/ws/socket.io/",
+      "description": "Send the session token in the Socket.IO CONNECT `auth` as `session_token`. A refused connect is a `connect_error` with `message: \"connection_denied\"` and `data: { retryable }`: retry with backoff when `retryable`, otherwise ask your server for a new session."
+    }
+  },
+  "channels": {
+    "platform": {
+      "title": "Platform socket",
+      "description": "One connection per session. Every event carries the `room` it belongs to, `/apps/{app_id}`; `room` is null for `session.ended`. Omitted keys in `data` are unchanged; explicit null clears.",
+      "messages": {
+        "MessageUpdatedEvent": {
+          "$ref": "#/components/messages/MessageUpdatedEvent"
+        },
+        "MessageRemovedEvent": {
+          "$ref": "#/components/messages/MessageRemovedEvent"
+        },
+        "AppStatusChangedEvent": {
+          "$ref": "#/components/messages/AppStatusChangedEvent"
+        },
+        "PreviewReloadRequestedEvent": {
+          "$ref": "#/components/messages/PreviewReloadRequestedEvent"
+        },
+        "PreviewNavigationRequestedEvent": {
+          "$ref": "#/components/messages/PreviewNavigationRequestedEvent"
+        },
+        "QueueUpdatedEvent": {
+          "$ref": "#/components/messages/QueueUpdatedEvent"
+        },
+        "TaskProgressedEvent": {
+          "$ref": "#/components/messages/TaskProgressedEvent"
+        },
+        "ImageResolvedEvent": {
+          "$ref": "#/components/messages/ImageResolvedEvent"
+        },
+        "ConversationChangedEvent": {
+          "$ref": "#/components/messages/ConversationChangedEvent"
+        },
+        "FilesChangedEvent": {
+          "$ref": "#/components/messages/FilesChangedEvent"
+        },
+        "BranchDeletedEvent": {
+          "$ref": "#/components/messages/BranchDeletedEvent"
+        },
+        "RepositoryChangedEvent": {
+          "$ref": "#/components/messages/RepositoryChangedEvent"
+        },
+        "PullRequestChangedEvent": {
+          "$ref": "#/components/messages/PullRequestChangedEvent"
+        },
+        "SessionEndedEvent": {
+          "$ref": "#/components/messages/SessionEndedEvent"
+        },
+        "RoomAccessDeniedEvent": {
+          "$ref": "#/components/messages/RoomAccessDeniedEvent"
+        },
+        "RoomAccessRevokedEvent": {
+          "$ref": "#/components/messages/RoomAccessRevokedEvent"
+        },
+        "RoomSnapshotUnavailableEvent": {
+          "$ref": "#/components/messages/RoomSnapshotUnavailableEvent"
+        },
+        "AppSnapshotEvent": {
+          "$ref": "#/components/messages/AppSnapshotEvent"
+        },
+        "JoinMessage": {
+          "$ref": "#/components/messages/JoinMessage"
+        },
+        "LeaveMessage": {
+          "$ref": "#/components/messages/LeaveMessage"
+        }
+      }
+    }
+  },
+  "operations": {
+    "sendMessageUpdatedEvent": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/platform"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/platform/messages/MessageUpdatedEvent"
+        }
+      ],
+      "summary": "A chat message was added or replaced. Replace the message with the same `id`."
+    },
+    "sendMessageRemovedEvent": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/platform"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/platform/messages/MessageRemovedEvent"
+        }
+      ],
+      "summary": "A chat message was removed or hidden. An `id` the viewer never saw is a no-op."
+    },
+    "sendAppStatusChangedEvent": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/platform"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/platform/messages/AppStatusChangedEvent"
+        }
+      ],
+      "summary": "The builder started, finished or failed a turn. Null status clears it."
+    },
+    "sendPreviewReloadRequestedEvent": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/platform"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/platform/messages/PreviewReloadRequestedEvent"
+        }
+      ],
+      "summary": "Reload the app preview."
+    },
+    "sendPreviewNavigationRequestedEvent": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/platform"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/platform/messages/PreviewNavigationRequestedEvent"
+        }
+      ],
+      "summary": "Show this page of the app in the preview."
+    },
+    "sendQueueUpdatedEvent": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/platform"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/platform/messages/QueueUpdatedEvent"
+        }
+      ],
+      "summary": "The whole prompt queue, after any change."
+    },
+    "sendTaskProgressedEvent": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/platform"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/platform/messages/TaskProgressedEvent"
+        }
+      ],
+      "summary": "Progress of a long-running tool, by `tool_call_id`."
+    },
+    "sendImageResolvedEvent": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/platform"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/platform/messages/ImageResolvedEvent"
+        }
+      ],
+      "summary": "A generated image finished or failed. Replace its `placeholder_url` wherever it appears."
+    },
+    "sendConversationChangedEvent": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/platform"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/platform/messages/ConversationChangedEvent"
+        }
+      ],
+      "summary": "The conversation was rewritten (undo, restore, sync). Rejoin the room for a fresh snapshot."
+    },
+    "sendFilesChangedEvent": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/platform"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/platform/messages/FilesChangedEvent"
+        }
+      ],
+      "summary": "The app's files changed outside a chat turn."
+    },
+    "sendBranchDeletedEvent": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/platform"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/platform/messages/BranchDeletedEvent"
+        }
+      ],
+      "summary": "A branch was deleted."
+    },
+    "sendRepositoryChangedEvent": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/platform"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/platform/messages/RepositoryChangedEvent"
+        }
+      ],
+      "summary": "The imported app's repository changed."
+    },
+    "sendPullRequestChangedEvent": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/platform"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/platform/messages/PullRequestChangedEvent"
+        }
+      ],
+      "summary": "The imported app's pull request changed."
+    },
+    "sendSessionEndedEvent": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/platform"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/platform/messages/SessionEndedEvent"
+        }
+      ],
+      "summary": "The session ended (expired, revoked, or taken by a newer socket). The socket disconnects next."
+    },
+    "sendRoomAccessDeniedEvent": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/platform"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/platform/messages/RoomAccessDeniedEvent"
+        }
+      ],
+      "summary": "A join was refused: the app is not on the session's allowlist, or the socket joins too often."
+    },
+    "sendRoomAccessRevokedEvent": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/platform"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/platform/messages/RoomAccessRevokedEvent"
+        }
+      ],
+      "summary": "The app left the session's allowlist, or its workspace. Events for it stop; do not rejoin."
+    },
+    "sendRoomSnapshotUnavailableEvent": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/platform"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/platform/messages/RoomSnapshotUnavailableEvent"
+        }
+      ],
+      "summary": "The join held but its snapshot failed. Live events still arrive; rejoin later for a snapshot."
+    },
+    "sendAppSnapshotEvent": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/platform"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/platform/messages/AppSnapshotEvent"
+        }
+      ],
+      "summary": "The app's current status and its last 50 public messages, after every join. Replace the app's state with it."
+    },
+    "receiveJoinMessage": {
+      "action": "receive",
+      "channel": {
+        "$ref": "#/channels/platform"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/platform/messages/JoinMessage"
+        }
+      ],
+      "summary": "Join an app's room, once per app after every connect. An `app.snapshot` follows, then its live events. Refused with `room.access_denied` when the app is not on the session's allowlist, or past 30 joins a minute."
+    },
+    "receiveLeaveMessage": {
+      "action": "receive",
+      "channel": {
+        "$ref": "#/channels/platform"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/platform/messages/LeaveMessage"
+        }
+      ],
+      "summary": "Leave an app's room. Its events stop."
+    }
+  },
+  "components": {
+    "messages": {
+      "MessageUpdatedEvent": {
+        "name": "message.updated",
+        "title": "message.updated",
+        "summary": "A chat message was added or replaced. Replace the message with the same `id`.",
+        "description": "A chat message was added or replaced. Replace the message with the same `id`.",
+        "payload": {
+          "$ref": "#/components/schemas/MessageUpdatedEvent"
+        }
+      },
+      "MessageRemovedEvent": {
+        "name": "message.removed",
+        "title": "message.removed",
+        "summary": "A chat message was removed or hidden. An `id` the viewer never saw is a no-op.",
+        "description": "A chat message was removed or hidden. An `id` the viewer never saw is a no-op.",
+        "payload": {
+          "$ref": "#/components/schemas/MessageRemovedEvent"
+        }
+      },
+      "AppStatusChangedEvent": {
+        "name": "app.status_changed",
+        "title": "app.status_changed",
+        "summary": "The builder started, finished or failed a turn. Null status clears it.",
+        "description": "The builder started, finished or failed a turn. Null status clears it.",
+        "payload": {
+          "$ref": "#/components/schemas/AppStatusChangedEvent"
+        }
+      },
+      "PreviewReloadRequestedEvent": {
+        "name": "preview.reload_requested",
+        "title": "preview.reload_requested",
+        "summary": "Reload the app preview.",
+        "description": "Reload the app preview.",
+        "payload": {
+          "$ref": "#/components/schemas/PreviewReloadRequestedEvent"
+        }
+      },
+      "PreviewNavigationRequestedEvent": {
+        "name": "preview.navigation_requested",
+        "title": "preview.navigation_requested",
+        "summary": "Show this page of the app in the preview.",
+        "description": "Show this page of the app in the preview.",
+        "payload": {
+          "$ref": "#/components/schemas/PreviewNavigationRequestedEvent"
+        }
+      },
+      "QueueUpdatedEvent": {
+        "name": "queue.updated",
+        "title": "queue.updated",
+        "summary": "The whole prompt queue, after any change.",
+        "description": "The whole prompt queue, after any change.",
+        "payload": {
+          "$ref": "#/components/schemas/QueueUpdatedEvent"
+        }
+      },
+      "TaskProgressedEvent": {
+        "name": "task.progressed",
+        "title": "task.progressed",
+        "summary": "Progress of a long-running tool, by `tool_call_id`.",
+        "description": "Progress of a long-running tool, by `tool_call_id`.",
+        "payload": {
+          "$ref": "#/components/schemas/TaskProgressedEvent"
+        }
+      },
+      "ImageResolvedEvent": {
+        "name": "image.resolved",
+        "title": "image.resolved",
+        "summary": "A generated image finished or failed. Replace its `placeholder_url` wherever it appears.",
+        "description": "A generated image finished or failed. Replace its `placeholder_url` wherever it appears.",
+        "payload": {
+          "$ref": "#/components/schemas/ImageResolvedEvent"
+        }
+      },
+      "ConversationChangedEvent": {
+        "name": "conversation.changed",
+        "title": "conversation.changed",
+        "summary": "The conversation was rewritten (undo, restore, sync). Rejoin the room for a fresh snapshot.",
+        "description": "The conversation was rewritten (undo, restore, sync). Rejoin the room for a fresh snapshot.",
+        "payload": {
+          "$ref": "#/components/schemas/ConversationChangedEvent"
+        }
+      },
+      "FilesChangedEvent": {
+        "name": "files.changed",
+        "title": "files.changed",
+        "summary": "The app's files changed outside a chat turn.",
+        "description": "The app's files changed outside a chat turn.",
+        "payload": {
+          "$ref": "#/components/schemas/FilesChangedEvent"
+        }
+      },
+      "BranchDeletedEvent": {
+        "name": "branch.deleted",
+        "title": "branch.deleted",
+        "summary": "A branch was deleted.",
+        "description": "A branch was deleted.",
+        "payload": {
+          "$ref": "#/components/schemas/BranchDeletedEvent"
+        }
+      },
+      "RepositoryChangedEvent": {
+        "name": "repository.changed",
+        "title": "repository.changed",
+        "summary": "The imported app's repository changed.",
+        "description": "The imported app's repository changed.",
+        "payload": {
+          "$ref": "#/components/schemas/RepositoryChangedEvent"
+        }
+      },
+      "PullRequestChangedEvent": {
+        "name": "pull_request.changed",
+        "title": "pull_request.changed",
+        "summary": "The imported app's pull request changed.",
+        "description": "The imported app's pull request changed.",
+        "payload": {
+          "$ref": "#/components/schemas/PullRequestChangedEvent"
+        }
+      },
+      "SessionEndedEvent": {
+        "name": "session.ended",
+        "title": "session.ended",
+        "summary": "The session ended (expired, revoked, or taken by a newer socket). The socket disconnects next.",
+        "description": "The session ended (expired, revoked, or taken by a newer socket). The socket disconnects next.",
+        "payload": {
+          "$ref": "#/components/schemas/SessionEndedEvent"
+        }
+      },
+      "RoomAccessDeniedEvent": {
+        "name": "room.access_denied",
+        "title": "room.access_denied",
+        "summary": "A join was refused: the app is not on the session's allowlist, or the socket joins too often.",
+        "description": "A join was refused: the app is not on the session's allowlist, or the socket joins too often.",
+        "payload": {
+          "$ref": "#/components/schemas/RoomAccessDeniedEvent"
+        }
+      },
+      "RoomAccessRevokedEvent": {
+        "name": "room.access_revoked",
+        "title": "room.access_revoked",
+        "summary": "The app left the session's allowlist, or its workspace. Events for it stop; do not rejoin.",
+        "description": "The app left the session's allowlist, or its workspace. Events for it stop; do not rejoin.",
+        "payload": {
+          "$ref": "#/components/schemas/RoomAccessRevokedEvent"
+        }
+      },
+      "RoomSnapshotUnavailableEvent": {
+        "name": "room.snapshot_unavailable",
+        "title": "room.snapshot_unavailable",
+        "summary": "The join held but its snapshot failed. Live events still arrive; rejoin later for a snapshot.",
+        "description": "The join held but its snapshot failed. Live events still arrive; rejoin later for a snapshot.",
+        "payload": {
+          "$ref": "#/components/schemas/RoomSnapshotUnavailableEvent"
+        }
+      },
+      "AppSnapshotEvent": {
+        "name": "app.snapshot",
+        "title": "app.snapshot",
+        "summary": "The app's current status and its last 50 public messages, after every join. Replace the app's state with it.",
+        "description": "The app's current status and its last 50 public messages, after every join. Replace the app's state with it.",
+        "payload": {
+          "$ref": "#/components/schemas/AppSnapshotEvent"
+        }
+      },
+      "JoinMessage": {
+        "name": "join",
+        "title": "join",
+        "summary": "Join an app's room, once per app after every connect. An `app.snapshot` follows, then its live events. Refused with `room.access_denied` when the app is not on the session's allowlist, or past 30 joins a minute.",
+        "description": "Join an app's room, once per app after every connect. An `app.snapshot` follows, then its live events. Refused with `room.access_denied` when the app is not on the session's allowlist, or past 30 joins a minute.",
+        "payload": {
+          "$ref": "#/components/schemas/JoinMessage"
+        }
+      },
+      "LeaveMessage": {
+        "name": "leave",
+        "title": "leave",
+        "summary": "Leave an app's room. Its events stop.",
+        "description": "Leave an app's room. Its events stop.",
+        "payload": {
+          "$ref": "#/components/schemas/LeaveMessage"
+        }
+      }
+    },
+    "schemas": {
+      "AccessRuleChangeDetails": {
+        "description": "An entity access-rule change waiting for approval.",
+        "properties": {
+          "entity_name": {
+            "description": "Entity whose access rules change.",
+            "title": "Entity Name",
+            "type": "string"
+          },
+          "change_type": {
+            "description": "How the access rules change.",
+            "title": "Change Type",
+            "type": "string"
+          },
+          "changed_ops": {
+            "description": "Access operations whose rules change.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Changed Ops",
+            "type": "array"
+          }
+        },
+        "title": "AccessRuleChangeDetails",
+        "type": "object"
+      },
+      "AppSnapshotEvent": {
+        "description": "The app's current status and its last 50 public messages, after every join. Replace the app's state with it.",
+        "properties": {
+          "room": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "title": "Room"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Snapshot"
+          }
+        },
+        "required": [
+          "room",
+          "data"
+        ],
+        "title": "AppSnapshotEvent",
+        "type": "object"
+      },
+      "AppStatusChanged": {
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StatusObject"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "branch_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Branch Id"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "AppStatusChanged",
+        "type": "object"
+      },
+      "AppStatusChangedEvent": {
+        "description": "The builder started, finished or failed a turn. Null status clears it.",
+        "properties": {
+          "room": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "title": "Room"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AppStatusChanged"
+          }
+        },
+        "required": [
+          "room",
+          "data"
+        ],
+        "title": "AppStatusChangedEvent",
+        "type": "object"
+      },
+      "AskClarifyingQuestionsCall": {
+        "description": "A `ask_clarifying_questions` call.",
+        "properties": {
+          "name": {
+            "const": "ask_clarifying_questions",
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "requires_user_input": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Requires User Input"
+          },
+          "auto_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Auto Approved"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "running",
+                  "success",
+                  "error",
+                  "stopped",
+                  "waiting_for_user_input"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "mutation_applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Mutation Applied"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of answer a parked call waits for.",
+            "title": "Waiting On"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BackendFunctionEntityDeleteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BashApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EntityRlsGuardApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolEntityMutationApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolGithubRepoWriteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolInviteUserApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendEmailApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendSmsApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OtherApproval"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "title": "Approval"
+          },
+          "arguments": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuestionArguments"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "user_input": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuestionInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "AskClarifyingQuestionsCall",
+        "type": "object"
+      },
+      "AskPlanQuestionsCall": {
+        "description": "A `ask_plan_questions` call.",
+        "properties": {
+          "name": {
+            "const": "ask_plan_questions",
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "requires_user_input": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Requires User Input"
+          },
+          "auto_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Auto Approved"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "running",
+                  "success",
+                  "error",
+                  "stopped",
+                  "waiting_for_user_input"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "mutation_applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Mutation Applied"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of answer a parked call waits for.",
+            "title": "Waiting On"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BackendFunctionEntityDeleteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BashApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EntityRlsGuardApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolEntityMutationApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolGithubRepoWriteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolInviteUserApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendEmailApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendSmsApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OtherApproval"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "title": "Approval"
+          },
+          "arguments": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuestionArguments"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "user_input": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuestionInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "AskPlanQuestionsCall",
+        "type": "object"
+      },
+      "BackendFunctionEntityDeleteApproval": {
+        "description": "Parked by the `backend_function_entity_delete` guard.",
+        "properties": {
+          "guard": {
+            "const": "backend_function_entity_delete",
+            "title": "Guard",
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "description": "Why the guard parked the call.",
+            "title": "Reason"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FunctionEntityDeleteDetails"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "guard"
+        ],
+        "title": "BackendFunctionEntityDeleteApproval",
+        "type": "object"
+      },
+      "BashApproval": {
+        "description": "Parked by the `bash_approval` guard.",
+        "properties": {
+          "guard": {
+            "const": "bash_approval",
+            "title": "Guard",
+            "type": "string"
+          }
+        },
+        "required": [
+          "guard"
+        ],
+        "title": "BashApproval",
+        "type": "object"
+      },
+      "BashCall": {
+        "description": "A `bash` call.",
+        "properties": {
+          "name": {
+            "const": "bash",
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "requires_user_input": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Requires User Input"
+          },
+          "auto_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Auto Approved"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "running",
+                  "success",
+                  "error",
+                  "stopped",
+                  "waiting_for_user_input"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "mutation_applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Mutation Applied"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of answer a parked call waits for.",
+            "title": "Waiting On"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BackendFunctionEntityDeleteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BashApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EntityRlsGuardApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolEntityMutationApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolGithubRepoWriteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolInviteUserApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendEmailApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendSmsApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OtherApproval"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "title": "Approval"
+          },
+          "display": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SummaryDisplay"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "BashCall",
+        "type": "object"
+      },
+      "BranchChange": {
+        "description": "Re-read what changed; the event carries no content.",
+        "properties": {
+          "branch_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Branch Id"
+          }
+        },
+        "title": "BranchChange",
+        "type": "object"
+      },
+      "BranchDeletedEvent": {
+        "description": "A branch was deleted.",
+        "properties": {
+          "room": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "title": "Room"
+          },
+          "data": {
+            "$ref": "#/components/schemas/BranchChange"
+          }
+        },
+        "required": [
+          "room",
+          "data"
+        ],
+        "title": "BranchDeletedEvent",
+        "type": "object"
+      },
+      "ConversationChangedEvent": {
+        "description": "The conversation was rewritten (undo, restore, sync). Rejoin the room for a fresh snapshot.",
+        "properties": {
+          "room": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "title": "Room"
+          },
+          "data": {
+            "$ref": "#/components/schemas/BranchChange"
+          }
+        },
+        "required": [
+          "room",
+          "data"
+        ],
+        "title": "ConversationChangedEvent",
+        "type": "object"
+      },
+      "CreateEntityRecordsCall": {
+        "description": "A `create_entity_records` call.",
+        "properties": {
+          "name": {
+            "const": "create_entity_records",
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "requires_user_input": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Requires User Input"
+          },
+          "auto_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Auto Approved"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "running",
+                  "success",
+                  "error",
+                  "stopped",
+                  "waiting_for_user_input"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "mutation_applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Mutation Applied"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of answer a parked call waits for.",
+            "title": "Waiting On"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BackendFunctionEntityDeleteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BashApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EntityRlsGuardApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolEntityMutationApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolGithubRepoWriteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolInviteUserApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendEmailApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendSmsApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OtherApproval"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "title": "Approval"
+          },
+          "display": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityRecordsDisplay"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CreateEntityRecordsCall",
+        "type": "object"
+      },
+      "DeleteEntitiesCall": {
+        "description": "A `delete_entities` call.",
+        "properties": {
+          "name": {
+            "const": "delete_entities",
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "requires_user_input": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Requires User Input"
+          },
+          "auto_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Auto Approved"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "running",
+                  "success",
+                  "error",
+                  "stopped",
+                  "waiting_for_user_input"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "mutation_applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Mutation Applied"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of answer a parked call waits for.",
+            "title": "Waiting On"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BackendFunctionEntityDeleteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BashApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EntityRlsGuardApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolEntityMutationApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolGithubRepoWriteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolInviteUserApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendEmailApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendSmsApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OtherApproval"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "title": "Approval"
+          },
+          "arguments": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityChangeArguments"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "display": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityDisplay"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "DeleteEntitiesCall",
+        "type": "object"
+      },
+      "DeleteFileCall": {
+        "description": "A `delete_file` call.",
+        "properties": {
+          "name": {
+            "const": "delete_file",
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "requires_user_input": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Requires User Input"
+          },
+          "auto_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Auto Approved"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "running",
+                  "success",
+                  "error",
+                  "stopped",
+                  "waiting_for_user_input"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "mutation_applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Mutation Applied"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of answer a parked call waits for.",
+            "title": "Waiting On"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BackendFunctionEntityDeleteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BashApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EntityRlsGuardApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolEntityMutationApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolGithubRepoWriteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolInviteUserApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendEmailApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendSmsApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OtherApproval"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "title": "Approval"
+          },
+          "display": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FileDisplay"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "DeleteFileCall",
+        "type": "object"
+      },
+      "EditRepoFileCall": {
+        "description": "A `edit_repo_file` call.",
+        "properties": {
+          "name": {
+            "const": "edit_repo_file",
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "requires_user_input": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Requires User Input"
+          },
+          "auto_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Auto Approved"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "running",
+                  "success",
+                  "error",
+                  "stopped",
+                  "waiting_for_user_input"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "mutation_applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Mutation Applied"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of answer a parked call waits for.",
+            "title": "Waiting On"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BackendFunctionEntityDeleteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BashApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EntityRlsGuardApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolEntityMutationApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolGithubRepoWriteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolInviteUserApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendEmailApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendSmsApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OtherApproval"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "title": "Approval"
+          },
+          "display": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FileDisplay"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "EditRepoFileCall",
+        "type": "object"
+      },
+      "EntityChangeArguments": {
+        "description": "An entity update or delete; the entity is in `display.entity_name`.",
+        "properties": {
+          "summary": {
+            "description": "The agent's summary of the change. Queries and record values are never included.",
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "title": "EntityChangeArguments",
+        "type": "object"
+      },
+      "EntityDisplay": {
+        "description": "The entity an entity operation touched.",
+        "properties": {
+          "entity_name": {
+            "description": "Entity type. Records and query values are never included.",
+            "title": "Entity Name",
+            "type": "string"
+          }
+        },
+        "title": "EntityDisplay",
+        "type": "object"
+      },
+      "EntityMutationDetails": {
+        "description": "What a parked entity mutation would do. Record data is never included.",
+        "properties": {
+          "method": {
+            "description": "Entity method the code calls, such as `delete`.",
+            "title": "Method",
+            "type": "string"
+          },
+          "summary": {
+            "description": "The agent's summary of what the code does.",
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "title": "EntityMutationDetails",
+        "type": "object"
+      },
+      "EntityRecordsDisplay": {
+        "properties": {
+          "entity_name": {
+            "description": "Entity type. Records and query values are never included.",
+            "title": "Entity Name",
+            "type": "string"
+          },
+          "record_count": {
+            "description": "Number of records created.",
+            "title": "Record Count",
+            "type": "integer"
+          }
+        },
+        "title": "EntityRecordsDisplay",
+        "type": "object"
+      },
+      "EntityRlsGuardApproval": {
+        "description": "Parked by the `entity_rls_guard` guard.",
+        "properties": {
+          "guard": {
+            "const": "entity_rls_guard",
+            "title": "Guard",
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "description": "Why the guard parked the call.",
+            "title": "Reason"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccessRuleChangeDetails"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "guard"
+        ],
+        "title": "EntityRlsGuardApproval",
+        "type": "object"
+      },
+      "ExecDisplay": {
+        "description": "What a code execution did.",
+        "properties": {
+          "summary": {
+            "description": "Reviewed activity summary. Code and output are never included.",
+            "title": "Summary",
+            "type": "string"
+          },
+          "writes_entities": {
+            "description": "The code changed entity data: refresh the preview.",
+            "title": "Writes Entities",
+            "type": "boolean"
+          }
+        },
+        "title": "ExecDisplay",
+        "type": "object"
+      },
+      "ExecToolCall": {
+        "description": "A `exec_tool` call.",
+        "properties": {
+          "name": {
+            "const": "exec_tool",
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "requires_user_input": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Requires User Input"
+          },
+          "auto_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Auto Approved"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "running",
+                  "success",
+                  "error",
+                  "stopped",
+                  "waiting_for_user_input"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "mutation_applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Mutation Applied"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of answer a parked call waits for.",
+            "title": "Waiting On"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BackendFunctionEntityDeleteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BashApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EntityRlsGuardApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolEntityMutationApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolGithubRepoWriteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolInviteUserApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendEmailApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendSmsApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OtherApproval"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "title": "Approval"
+          },
+          "display": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExecDisplay"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "ExecToolCall",
+        "type": "object"
+      },
+      "ExecToolEntityMutationApproval": {
+        "description": "Parked by the `exec_tool_entity_mutation` guard.",
+        "properties": {
+          "guard": {
+            "const": "exec_tool_entity_mutation",
+            "title": "Guard",
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "description": "Why the guard parked the call.",
+            "title": "Reason"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityMutationDetails"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "guard"
+        ],
+        "title": "ExecToolEntityMutationApproval",
+        "type": "object"
+      },
+      "ExecToolGithubRepoWriteApproval": {
+        "description": "Parked by the `exec_tool_github_repo_write` guard.",
+        "properties": {
+          "guard": {
+            "const": "exec_tool_github_repo_write",
+            "title": "Guard",
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "description": "Why the guard parked the call.",
+            "title": "Reason"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SummaryDetails"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "guard"
+        ],
+        "title": "ExecToolGithubRepoWriteApproval",
+        "type": "object"
+      },
+      "ExecToolInviteUserApproval": {
+        "description": "Parked by the `exec_tool_invite_user` guard.",
+        "properties": {
+          "guard": {
+            "const": "exec_tool_invite_user",
+            "title": "Guard",
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "description": "Why the guard parked the call.",
+            "title": "Reason"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SummaryDetails"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "guard"
+        ],
+        "title": "ExecToolInviteUserApproval",
+        "type": "object"
+      },
+      "ExecToolSendEmailApproval": {
+        "description": "Parked by the `exec_tool_send_email` guard.",
+        "properties": {
+          "guard": {
+            "const": "exec_tool_send_email",
+            "title": "Guard",
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "description": "Why the guard parked the call.",
+            "title": "Reason"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SummaryDetails"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "guard"
+        ],
+        "title": "ExecToolSendEmailApproval",
+        "type": "object"
+      },
+      "ExecToolSendSmsApproval": {
+        "description": "Parked by the `exec_tool_send_sms` guard.",
+        "properties": {
+          "guard": {
+            "const": "exec_tool_send_sms",
+            "title": "Guard",
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "description": "Why the guard parked the call.",
+            "title": "Reason"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SummaryDetails"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "guard"
+        ],
+        "title": "ExecToolSendSmsApproval",
+        "type": "object"
+      },
+      "FileDisplay": {
+        "description": "The files a file operation touched.",
+        "properties": {
+          "file_paths": {
+            "description": "Changed file paths. Source bodies and diffs are never included.",
+            "items": {
+              "type": "string"
+            },
+            "title": "File Paths",
+            "type": "array"
+          },
+          "content_empty": {
+            "description": "A write intentionally used empty content.",
+            "title": "Content Empty",
+            "type": "boolean"
+          }
+        },
+        "title": "FileDisplay",
+        "type": "object"
+      },
+      "FilesChangedEvent": {
+        "description": "The app's files changed outside a chat turn.",
+        "properties": {
+          "room": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "title": "Room"
+          },
+          "data": {
+            "$ref": "#/components/schemas/BranchChange"
+          }
+        },
+        "required": [
+          "room",
+          "data"
+        ],
+        "title": "FilesChangedEvent",
+        "type": "object"
+      },
+      "FindReplaceCall": {
+        "description": "A `find_replace` call.",
+        "properties": {
+          "name": {
+            "const": "find_replace",
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "requires_user_input": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Requires User Input"
+          },
+          "auto_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Auto Approved"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "running",
+                  "success",
+                  "error",
+                  "stopped",
+                  "waiting_for_user_input"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "mutation_applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Mutation Applied"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of answer a parked call waits for.",
+            "title": "Waiting On"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BackendFunctionEntityDeleteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BashApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EntityRlsGuardApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolEntityMutationApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolGithubRepoWriteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolInviteUserApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendEmailApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendSmsApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OtherApproval"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "title": "Approval"
+          },
+          "display": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FileDisplay"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "FindReplaceCall",
+        "type": "object"
+      },
+      "FunctionEntityDeleteDetails": {
+        "description": "A backend function test that would delete entity records.",
+        "properties": {
+          "function_name": {
+            "description": "Backend function under test.",
+            "title": "Function Name",
+            "type": "string"
+          },
+          "method": {
+            "description": "Entity method the function calls.",
+            "title": "Method",
+            "type": "string"
+          },
+          "inspection_failed": {
+            "description": "The guard could not verify the function's source.",
+            "title": "Inspection Failed",
+            "type": "boolean"
+          }
+        },
+        "title": "FunctionEntityDeleteDetails",
+        "type": "object"
+      },
+      "GameImageArguments": {
+        "description": "What to generate.",
+        "properties": {
+          "aspect_ratio": {
+            "description": "Requested aspect ratio, such as `1:1`.",
+            "title": "Aspect Ratio",
+            "type": "string"
+          }
+        },
+        "title": "GameImageArguments",
+        "type": "object"
+      },
+      "GenerateGameBackgroundCall": {
+        "description": "A `generate_game_background` call.",
+        "properties": {
+          "name": {
+            "const": "generate_game_background",
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "requires_user_input": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Requires User Input"
+          },
+          "auto_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Auto Approved"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "running",
+                  "success",
+                  "error",
+                  "stopped",
+                  "waiting_for_user_input"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "mutation_applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Mutation Applied"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of answer a parked call waits for.",
+            "title": "Waiting On"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BackendFunctionEntityDeleteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BashApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EntityRlsGuardApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolEntityMutationApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolGithubRepoWriteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolInviteUserApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendEmailApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendSmsApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OtherApproval"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "title": "Approval"
+          },
+          "results": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Results"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "GenerateGameBackgroundCall",
+        "type": "object"
+      },
+      "GenerateGameImageCall": {
+        "description": "A `generate_game_image` call.",
+        "properties": {
+          "name": {
+            "const": "generate_game_image",
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "requires_user_input": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Requires User Input"
+          },
+          "auto_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Auto Approved"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "running",
+                  "success",
+                  "error",
+                  "stopped",
+                  "waiting_for_user_input"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "mutation_applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Mutation Applied"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of answer a parked call waits for.",
+            "title": "Waiting On"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BackendFunctionEntityDeleteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BashApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EntityRlsGuardApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolEntityMutationApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolGithubRepoWriteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolInviteUserApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendEmailApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendSmsApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OtherApproval"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "title": "Approval"
+          },
+          "arguments": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GameImageArguments"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "results": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Results"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "GenerateGameImageCall",
+        "type": "object"
+      },
+      "GenerateImageCall": {
+        "description": "A `generate_image` call.",
+        "properties": {
+          "name": {
+            "const": "generate_image",
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "requires_user_input": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Requires User Input"
+          },
+          "auto_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Auto Approved"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "running",
+                  "success",
+                  "error",
+                  "stopped",
+                  "waiting_for_user_input"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "mutation_applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Mutation Applied"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of answer a parked call waits for.",
+            "title": "Waiting On"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BackendFunctionEntityDeleteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BashApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EntityRlsGuardApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolEntityMutationApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolGithubRepoWriteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolInviteUserApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendEmailApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendSmsApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OtherApproval"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "title": "Approval"
+          },
+          "arguments": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MediaArguments"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "results": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageResult"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "GenerateImageCall",
+        "type": "object"
+      },
+      "GeneratePrdCall": {
+        "description": "A `generate_prd` call.",
+        "properties": {
+          "name": {
+            "const": "generate_prd",
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "requires_user_input": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Requires User Input"
+          },
+          "auto_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Auto Approved"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "running",
+                  "success",
+                  "error",
+                  "stopped",
+                  "waiting_for_user_input"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "mutation_applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Mutation Applied"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of answer a parked call waits for.",
+            "title": "Waiting On"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BackendFunctionEntityDeleteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BashApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EntityRlsGuardApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolEntityMutationApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolGithubRepoWriteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolInviteUserApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendEmailApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendSmsApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OtherApproval"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "title": "Approval"
+          },
+          "arguments": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PrdArguments"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "GeneratePrdCall",
+        "type": "object"
+      },
+      "GenerateVideoCall": {
+        "description": "A `generate_video` call.",
+        "properties": {
+          "name": {
+            "const": "generate_video",
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "requires_user_input": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Requires User Input"
+          },
+          "auto_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Auto Approved"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "running",
+                  "success",
+                  "error",
+                  "stopped",
+                  "waiting_for_user_input"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "mutation_applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Mutation Applied"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of answer a parked call waits for.",
+            "title": "Waiting On"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BackendFunctionEntityDeleteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BashApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EntityRlsGuardApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolEntityMutationApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolGithubRepoWriteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolInviteUserApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendEmailApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendSmsApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OtherApproval"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "title": "Approval"
+          },
+          "arguments": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MediaArguments"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "results": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Results"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "GenerateVideoCall",
+        "type": "object"
+      },
+      "ImageResolved": {
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "pending",
+                  "completed",
+                  "failed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "placeholder_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Placeholder Url"
+          },
+          "image_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Image Url"
+          }
+        },
+        "title": "ImageResolved",
+        "type": "object"
+      },
+      "ImageResolvedEvent": {
+        "description": "A generated image finished or failed. Replace its `placeholder_url` wherever it appears.",
+        "properties": {
+          "room": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "title": "Room"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ImageResolved"
+          }
+        },
+        "required": [
+          "room",
+          "data"
+        ],
+        "title": "ImageResolvedEvent",
+        "type": "object"
+      },
+      "ImageResult": {
+        "description": "The generated image's state.",
+        "properties": {
+          "placeholder_url": {
+            "description": "Placeholder URL, used to associate an `image.resolved` event with this tool.",
+            "title": "Placeholder Url",
+            "type": "string"
+          },
+          "status": {
+            "description": "Current generation status.",
+            "enum": [
+              "pending",
+              "completed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "image_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Generated image URL, once available.",
+            "title": "Image Url"
+          }
+        },
+        "title": "ImageResult",
+        "type": "object"
+      },
+      "InstallNpmPackageCall": {
+        "description": "A `install_npm_package` call.",
+        "properties": {
+          "name": {
+            "const": "install_npm_package",
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "requires_user_input": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Requires User Input"
+          },
+          "auto_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Auto Approved"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "running",
+                  "success",
+                  "error",
+                  "stopped",
+                  "waiting_for_user_input"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "mutation_applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Mutation Applied"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of answer a parked call waits for.",
+            "title": "Waiting On"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BackendFunctionEntityDeleteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BashApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EntityRlsGuardApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolEntityMutationApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolGithubRepoWriteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolInviteUserApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendEmailApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendSmsApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OtherApproval"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "title": "Approval"
+          },
+          "arguments": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InstallPackageArguments"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "InstallNpmPackageCall",
+        "type": "object"
+      },
+      "InstallPackageArguments": {
+        "description": "The package operations the builder runs.",
+        "properties": {
+          "packages": {
+            "description": "Requested package operations.",
+            "items": {
+              "$ref": "#/components/schemas/PackageOperation"
+            },
+            "title": "Packages",
+            "type": "array"
+          }
+        },
+        "title": "InstallPackageArguments",
+        "type": "object"
+      },
+      "JoinMessage": {
+        "description": "Join an app's room, once per app after every connect. An `app.snapshot` follows, then its live events. Refused with `room.access_denied` when the app is not on the session's allowlist, or past 30 joins a minute.",
+        "pattern": "^/apps/[0-9a-f]{24}$",
+        "title": "JoinMessage",
+        "type": "string"
+      },
+      "LeaveMessage": {
+        "description": "Leave an app's room. Its events stop.",
+        "pattern": "^/apps/[0-9a-f]{24}$",
+        "title": "LeaveMessage",
+        "type": "string"
+      },
+      "MediaArguments": {
+        "description": "What to generate.",
+        "properties": {
+          "label": {
+            "description": "Visible media label.",
+            "title": "Label",
+            "type": "string"
+          },
+          "aspect_ratio": {
+            "description": "Requested aspect ratio, such as `16:9`.",
+            "title": "Aspect Ratio",
+            "type": "string"
+          }
+        },
+        "title": "MediaArguments",
+        "type": "object"
+      },
+      "Message": {
+        "description": "A public chat message. Replace the message with the same `id` as a whole.",
+        "properties": {
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "enum": [
+                  "user",
+                  "assistant",
+                  "system"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Role"
+          },
+          "content": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Content"
+          },
+          "tool_calls": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/AskClarifyingQuestionsCall"
+                },
+                {
+                  "$ref": "#/components/schemas/AskPlanQuestionsCall"
+                },
+                {
+                  "$ref": "#/components/schemas/BashCall"
+                },
+                {
+                  "$ref": "#/components/schemas/CreateEntityRecordsCall"
+                },
+                {
+                  "$ref": "#/components/schemas/DeleteEntitiesCall"
+                },
+                {
+                  "$ref": "#/components/schemas/DeleteFileCall"
+                },
+                {
+                  "$ref": "#/components/schemas/EditRepoFileCall"
+                },
+                {
+                  "$ref": "#/components/schemas/ExecToolCall"
+                },
+                {
+                  "$ref": "#/components/schemas/FindReplaceCall"
+                },
+                {
+                  "$ref": "#/components/schemas/GenerateGameBackgroundCall"
+                },
+                {
+                  "$ref": "#/components/schemas/GenerateGameImageCall"
+                },
+                {
+                  "$ref": "#/components/schemas/GenerateImageCall"
+                },
+                {
+                  "$ref": "#/components/schemas/GeneratePrdCall"
+                },
+                {
+                  "$ref": "#/components/schemas/GenerateVideoCall"
+                },
+                {
+                  "$ref": "#/components/schemas/InstallNpmPackageCall"
+                },
+                {
+                  "$ref": "#/components/schemas/PreviewExecuteCodeCall"
+                },
+                {
+                  "$ref": "#/components/schemas/PreviewScreenshotCall"
+                },
+                {
+                  "$ref": "#/components/schemas/ReadOnlyExecToolCall"
+                },
+                {
+                  "$ref": "#/components/schemas/ReadRepoFileCall"
+                },
+                {
+                  "$ref": "#/components/schemas/RunShellCommandCall"
+                },
+                {
+                  "$ref": "#/components/schemas/SetSecretsCall"
+                },
+                {
+                  "$ref": "#/components/schemas/UpdateEntitiesCall"
+                },
+                {
+                  "$ref": "#/components/schemas/UpdatePlanCall"
+                },
+                {
+                  "$ref": "#/components/schemas/WriteFileCall"
+                },
+                {
+                  "$ref": "#/components/schemas/WriteRepoFileCall"
+                },
+                {
+                  "$ref": "#/components/schemas/OtherToolCall"
+                }
+              ]
+            },
+            "type": [
+              "array",
+              "null"
+            ],
+            "default": null,
+            "title": "Tool Calls"
+          },
+          "checkpoint_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Checkpoint Id"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MessageMetadata"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "additional_message_params": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MessageParams"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Additional Message Params"
+          }
+        },
+        "title": "Message",
+        "type": "object"
+      },
+      "MessageMetadata": {
+        "description": "Message timestamp, without author identity.",
+        "properties": {
+          "created_date": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Created Date"
+          }
+        },
+        "title": "MessageMetadata",
+        "type": "object"
+      },
+      "MessageParams": {
+        "description": "Scalar parameters a chat UI needs while a turn runs.",
+        "properties": {
+          "client_creation_id": {
+            "description": "Identifier the sending client attached, to match its optimistic message.",
+            "title": "Client Creation Id",
+            "type": "string"
+          },
+          "plan_mode": {
+            "description": "The message was sent in plan mode.",
+            "title": "Plan Mode",
+            "type": "boolean"
+          },
+          "plan_approved": {
+            "description": "The message approves a plan.",
+            "title": "Plan Approved",
+            "type": "boolean"
+          },
+          "skip_ai_response": {
+            "description": "The message expects no AI reply.",
+            "title": "Skip Ai Response",
+            "type": "boolean"
+          },
+          "system_message_type": {
+            "description": "System message category.",
+            "title": "System Message Type",
+            "type": "string"
+          }
+        },
+        "title": "MessageParams",
+        "type": "object"
+      },
+      "MessageRemoved": {
+        "properties": {
+          "message_id": {
+            "title": "Message Id",
+            "type": "string"
+          },
+          "conversation_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Conversation Id"
+          },
+          "branch_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Branch Id"
+          }
+        },
+        "required": [
+          "message_id"
+        ],
+        "title": "MessageRemoved",
+        "type": "object"
+      },
+      "MessageRemovedEvent": {
+        "description": "A chat message was removed or hidden. An `id` the viewer never saw is a no-op.",
+        "properties": {
+          "room": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "title": "Room"
+          },
+          "data": {
+            "$ref": "#/components/schemas/MessageRemoved"
+          }
+        },
+        "required": [
+          "room",
+          "data"
+        ],
+        "title": "MessageRemovedEvent",
+        "type": "object"
+      },
+      "MessageUpdated": {
+        "properties": {
+          "message": {
+            "$ref": "#/components/schemas/Message"
+          },
+          "conversation_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Conversation Id"
+          },
+          "branch_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Branch Id"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "MessageUpdated",
+        "type": "object"
+      },
+      "MessageUpdatedEvent": {
+        "description": "A chat message was added or replaced. Replace the message with the same `id`.",
+        "properties": {
+          "room": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "title": "Room"
+          },
+          "data": {
+            "$ref": "#/components/schemas/MessageUpdated"
+          }
+        },
+        "required": [
+          "room",
+          "data"
+        ],
+        "title": "MessageUpdatedEvent",
+        "type": "object"
+      },
+      "OtherApproval": {
+        "description": "Parked by a guard that publishes only its name.",
+        "properties": {
+          "guard": {
+            "not": {
+              "enum": [
+                "backend_function_entity_delete",
+                "bash_approval",
+                "entity_rls_guard",
+                "exec_tool_entity_mutation",
+                "exec_tool_github_repo_write",
+                "exec_tool_invite_user",
+                "exec_tool_send_email",
+                "exec_tool_send_sms"
+              ]
+            },
+            "title": "Guard",
+            "type": "string"
+          }
+        },
+        "required": [
+          "guard"
+        ],
+        "title": "OtherApproval",
+        "type": "object"
+      },
+      "OtherToolCall": {
+        "description": "A call to a tool that publishes only its name and progress.",
+        "properties": {
+          "name": {
+            "not": {
+              "enum": [
+                "ask_clarifying_questions",
+                "ask_plan_questions",
+                "bash",
+                "create_entity_records",
+                "delete_entities",
+                "delete_file",
+                "edit_repo_file",
+                "exec_tool",
+                "find_replace",
+                "generate_game_background",
+                "generate_game_image",
+                "generate_image",
+                "generate_prd",
+                "generate_video",
+                "install_npm_package",
+                "preview_execute_code",
+                "preview_screenshot",
+                "read_only_exec_tool",
+                "read_repo_file",
+                "run_shell_command",
+                "set_secrets",
+                "update_entities",
+                "update_plan",
+                "write_file",
+                "write_repo_file"
+              ]
+            },
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "requires_user_input": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Requires User Input"
+          },
+          "auto_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Auto Approved"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "running",
+                  "success",
+                  "error",
+                  "stopped",
+                  "waiting_for_user_input"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "mutation_applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Mutation Applied"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of answer a parked call waits for.",
+            "title": "Waiting On"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BackendFunctionEntityDeleteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BashApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EntityRlsGuardApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolEntityMutationApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolGithubRepoWriteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolInviteUserApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendEmailApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendSmsApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OtherApproval"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "title": "Approval"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "OtherToolCall",
+        "type": "object"
+      },
+      "PackageOperation": {
+        "description": "A package operation. Versions and package-manager output are never included.",
+        "properties": {
+          "name": {
+            "description": "Package name.",
+            "title": "Name",
+            "type": "string"
+          },
+          "action": {
+            "description": "Requested operation, such as `install`.",
+            "title": "Action",
+            "type": "string"
+          }
+        },
+        "title": "PackageOperation",
+        "type": "object"
+      },
+      "PlanUpdate": {
+        "description": "An add-only plan update.",
+        "properties": {
+          "action": {
+            "description": "Update action.",
+            "title": "Action",
+            "type": "string"
+          },
+          "section": {
+            "description": "Plan section key.",
+            "title": "Section",
+            "type": "string"
+          },
+          "section_label": {
+            "description": "User-facing section label.",
+            "title": "Section Label",
+            "type": "string"
+          },
+          "text": {
+            "description": "Plan point.",
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "title": "PlanUpdate",
+        "type": "object"
+      },
+      "PrdArguments": {
+        "description": "The user's own plan. In plan mode the message `content` beside it can be empty.",
+        "properties": {
+          "app_name": {
+            "description": "App or feature name.",
+            "title": "App Name",
+            "type": "string"
+          },
+          "intent_and_goal": {
+            "description": "What is being built and why.",
+            "title": "Intent And Goal",
+            "type": "string"
+          },
+          "audience_and_roles": {
+            "description": "Who uses it and their roles.",
+            "title": "Audience And Roles",
+            "type": "string"
+          },
+          "core_flows": {
+            "description": "End-to-end user flows.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Core Flows",
+            "type": "array"
+          },
+          "technical_requirements": {
+            "description": "Specific technical requirements.",
+            "title": "Technical Requirements",
+            "type": "string"
+          },
+          "design_preferences": {
+            "description": "Design preferences.",
+            "title": "Design Preferences",
+            "type": "string"
+          },
+          "prd_type": {
+            "description": "Build or plan declaration, when the builder asks for one.",
+            "title": "Prd Type",
+            "type": "string"
+          },
+          "store_platform": {
+            "description": "Store platform settled in planning, for e-commerce plans.",
+            "title": "Store Platform",
+            "type": "string"
+          },
+          "game_engine": {
+            "description": "Engine settled in planning, for game plans.",
+            "title": "Game Engine",
+            "type": "string"
+          }
+        },
+        "title": "PrdArguments",
+        "type": "object"
+      },
+      "PreviewExecuteCodeCall": {
+        "description": "A `preview_execute_code` call.",
+        "properties": {
+          "name": {
+            "const": "preview_execute_code",
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "requires_user_input": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Requires User Input"
+          },
+          "auto_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Auto Approved"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "running",
+                  "success",
+                  "error",
+                  "stopped",
+                  "waiting_for_user_input"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "mutation_applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Mutation Applied"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of answer a parked call waits for.",
+            "title": "Waiting On"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BackendFunctionEntityDeleteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BashApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EntityRlsGuardApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolEntityMutationApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolGithubRepoWriteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolInviteUserApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendEmailApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendSmsApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OtherApproval"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "title": "Approval"
+          },
+          "display": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExecDisplay"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "PreviewExecuteCodeCall",
+        "type": "object"
+      },
+      "PreviewNavigationRequested": {
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "force": {
+            "description": "Navigate even when the user has moved away from the page.",
+            "title": "Force",
+            "type": "boolean"
+          },
+          "branch_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Branch Id"
+          }
+        },
+        "required": [
+          "path",
+          "force"
+        ],
+        "title": "PreviewNavigationRequested",
+        "type": "object"
+      },
+      "PreviewNavigationRequestedEvent": {
+        "description": "Show this page of the app in the preview.",
+        "properties": {
+          "room": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "title": "Room"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PreviewNavigationRequested"
+          }
+        },
+        "required": [
+          "room",
+          "data"
+        ],
+        "title": "PreviewNavigationRequestedEvent",
+        "type": "object"
+      },
+      "PreviewReloadRequested": {
+        "properties": {
+          "branch_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Branch Id"
+          }
+        },
+        "title": "PreviewReloadRequested",
+        "type": "object"
+      },
+      "PreviewReloadRequestedEvent": {
+        "description": "Reload the app preview.",
+        "properties": {
+          "room": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "title": "Room"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PreviewReloadRequested"
+          }
+        },
+        "required": [
+          "room",
+          "data"
+        ],
+        "title": "PreviewReloadRequestedEvent",
+        "type": "object"
+      },
+      "PreviewScreenshotCall": {
+        "description": "A `preview_screenshot` call.",
+        "properties": {
+          "name": {
+            "const": "preview_screenshot",
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "requires_user_input": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Requires User Input"
+          },
+          "auto_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Auto Approved"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "running",
+                  "success",
+                  "error",
+                  "stopped",
+                  "waiting_for_user_input"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "mutation_applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Mutation Applied"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of answer a parked call waits for.",
+            "title": "Waiting On"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BackendFunctionEntityDeleteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BashApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EntityRlsGuardApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolEntityMutationApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolGithubRepoWriteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolInviteUserApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendEmailApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendSmsApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OtherApproval"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "title": "Approval"
+          },
+          "display": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SummaryDisplay"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "PreviewScreenshotCall",
+        "type": "object"
+      },
+      "PullRequestChangedEvent": {
+        "description": "The imported app's pull request changed.",
+        "properties": {
+          "room": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "title": "Room"
+          },
+          "data": {
+            "$ref": "#/components/schemas/BranchChange"
+          }
+        },
+        "required": [
+          "room",
+          "data"
+        ],
+        "title": "PullRequestChangedEvent",
+        "type": "object"
+      },
+      "Question": {
+        "description": "A question for the user. Image and HTML sources and private design context are never included.",
+        "properties": {
+          "question": {
+            "description": "Visible question text.",
+            "title": "Question",
+            "type": "string"
+          },
+          "type": {
+            "description": "Question category, such as `text`.",
+            "title": "Type",
+            "type": "string"
+          },
+          "description": {
+            "description": "Supporting text.",
+            "title": "Description",
+            "type": "string"
+          },
+          "multi_select": {
+            "description": "More than one answer may be selected.",
+            "title": "Multi Select",
+            "type": "boolean"
+          },
+          "covers": {
+            "description": "Plan section the question covers.",
+            "title": "Covers",
+            "type": "string"
+          },
+          "options": {
+            "description": "Selectable options; a bare string is its label.",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/components/schemas/QuestionOption"
+                }
+              ]
+            },
+            "title": "Options",
+            "type": "array"
+          }
+        },
+        "title": "Question",
+        "type": "object"
+      },
+      "QuestionAnswer": {
+        "description": "An answer to a question. Secret-form input is never included.",
+        "properties": {
+          "question_index": {
+            "description": "Zero-based question index.",
+            "title": "Question Index",
+            "type": "integer"
+          },
+          "selected_label": {
+            "description": "Label selected for a single-select question.",
+            "title": "Selected Label",
+            "type": "string"
+          },
+          "selected_labels": {
+            "description": "Labels selected for a multi-select question.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Selected Labels",
+            "type": "array"
+          },
+          "custom_text": {
+            "description": "Free-text answer. Structural filtering does not redact prose.",
+            "title": "Custom Text",
+            "type": "string"
+          }
+        },
+        "title": "QuestionAnswer",
+        "type": "object"
+      },
+      "QuestionArguments": {
+        "description": "The questions the builder asks.",
+        "properties": {
+          "questions": {
+            "description": "Questions presented to the user.",
+            "items": {
+              "$ref": "#/components/schemas/Question"
+            },
+            "title": "Questions",
+            "type": "array"
+          }
+        },
+        "title": "QuestionArguments",
+        "type": "object"
+      },
+      "QuestionInput": {
+        "description": "The user's answers.",
+        "properties": {
+          "answers": {
+            "description": "Answers supplied to the question card.",
+            "items": {
+              "$ref": "#/components/schemas/QuestionAnswer"
+            },
+            "title": "Answers",
+            "type": "array"
+          }
+        },
+        "title": "QuestionInput",
+        "type": "object"
+      },
+      "QuestionOption": {
+        "description": "A selectable answer.",
+        "properties": {
+          "label": {
+            "description": "Visible option label.",
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "title": "QuestionOption",
+        "type": "object"
+      },
+      "QueueItem": {
+        "description": "A prompt waiting in the queue.",
+        "properties": {
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "content": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Content"
+          },
+          "branch_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Branch Id"
+          },
+          "created_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Created At"
+          }
+        },
+        "title": "QueueItem",
+        "type": "object"
+      },
+      "QueueState": {
+        "description": "The prompt queue: the prompts the builder runs next, in order.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/QueueItem"
+            },
+            "type": [
+              "array",
+              "null"
+            ],
+            "default": null,
+            "title": "Items"
+          },
+          "is_paused": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Is Paused"
+          }
+        },
+        "title": "QueueState",
+        "type": "object"
+      },
+      "QueueUpdated": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/QueueItem"
+            },
+            "type": [
+              "array",
+              "null"
+            ],
+            "default": null,
+            "title": "Items"
+          },
+          "is_paused": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Is Paused"
+          },
+          "processed_item_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Processed Item Id"
+          },
+          "branch_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Branch Id"
+          }
+        },
+        "title": "QueueUpdated",
+        "type": "object"
+      },
+      "QueueUpdatedEvent": {
+        "description": "The whole prompt queue, after any change.",
+        "properties": {
+          "room": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "title": "Room"
+          },
+          "data": {
+            "$ref": "#/components/schemas/QueueUpdated"
+          }
+        },
+        "required": [
+          "room",
+          "data"
+        ],
+        "title": "QueueUpdatedEvent",
+        "type": "object"
+      },
+      "ReadOnlyExecToolCall": {
+        "description": "A `read_only_exec_tool` call.",
+        "properties": {
+          "name": {
+            "const": "read_only_exec_tool",
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "requires_user_input": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Requires User Input"
+          },
+          "auto_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Auto Approved"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "running",
+                  "success",
+                  "error",
+                  "stopped",
+                  "waiting_for_user_input"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "mutation_applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Mutation Applied"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of answer a parked call waits for.",
+            "title": "Waiting On"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BackendFunctionEntityDeleteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BashApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EntityRlsGuardApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolEntityMutationApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolGithubRepoWriteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolInviteUserApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendEmailApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendSmsApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OtherApproval"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "title": "Approval"
+          },
+          "display": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExecDisplay"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "ReadOnlyExecToolCall",
+        "type": "object"
+      },
+      "ReadRepoFileCall": {
+        "description": "A `read_repo_file` call.",
+        "properties": {
+          "name": {
+            "const": "read_repo_file",
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "requires_user_input": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Requires User Input"
+          },
+          "auto_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Auto Approved"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "running",
+                  "success",
+                  "error",
+                  "stopped",
+                  "waiting_for_user_input"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "mutation_applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Mutation Applied"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of answer a parked call waits for.",
+            "title": "Waiting On"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BackendFunctionEntityDeleteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BashApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EntityRlsGuardApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolEntityMutationApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolGithubRepoWriteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolInviteUserApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendEmailApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendSmsApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OtherApproval"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "title": "Approval"
+          },
+          "display": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FileDisplay"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "ReadRepoFileCall",
+        "type": "object"
+      },
+      "RepositoryChangedEvent": {
+        "description": "The imported app's repository changed.",
+        "properties": {
+          "room": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "title": "Room"
+          },
+          "data": {
+            "$ref": "#/components/schemas/BranchChange"
+          }
+        },
+        "required": [
+          "room",
+          "data"
+        ],
+        "title": "RepositoryChangedEvent",
+        "type": "object"
+      },
+      "RoomAccessDeniedEvent": {
+        "description": "A join was refused: the app is not on the session's allowlist, or the socket joins too often.",
+        "properties": {
+          "room": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "title": "Room"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RoomNotice"
+          }
+        },
+        "required": [
+          "room",
+          "data"
+        ],
+        "title": "RoomAccessDeniedEvent",
+        "type": "object"
+      },
+      "RoomAccessRevokedEvent": {
+        "description": "The app left the session's allowlist, or its workspace. Events for it stop; do not rejoin.",
+        "properties": {
+          "room": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "title": "Room"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RoomNotice"
+          }
+        },
+        "required": [
+          "room",
+          "data"
+        ],
+        "title": "RoomAccessRevokedEvent",
+        "type": "object"
+      },
+      "RoomNotice": {
+        "description": "The app is named by the event's room.",
+        "properties": {},
+        "title": "RoomNotice",
+        "type": "object"
+      },
+      "RoomSnapshotUnavailableEvent": {
+        "description": "The join held but its snapshot failed. Live events still arrive; rejoin later for a snapshot.",
+        "properties": {
+          "room": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "title": "Room"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RoomNotice"
+          }
+        },
+        "required": [
+          "room",
+          "data"
+        ],
+        "title": "RoomSnapshotUnavailableEvent",
+        "type": "object"
+      },
+      "RunShellCommandCall": {
+        "description": "A `run_shell_command` call.",
+        "properties": {
+          "name": {
+            "const": "run_shell_command",
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "requires_user_input": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Requires User Input"
+          },
+          "auto_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Auto Approved"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "running",
+                  "success",
+                  "error",
+                  "stopped",
+                  "waiting_for_user_input"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "mutation_applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Mutation Applied"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of answer a parked call waits for.",
+            "title": "Waiting On"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BackendFunctionEntityDeleteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BashApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EntityRlsGuardApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolEntityMutationApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolGithubRepoWriteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolInviteUserApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendEmailApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendSmsApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OtherApproval"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "title": "Approval"
+          },
+          "display": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SummaryDisplay"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "RunShellCommandCall",
+        "type": "object"
+      },
+      "SecretField": {
+        "description": "A requested secret. Its value is never sent over the socket.",
+        "properties": {
+          "secretName": {
+            "description": "Requested secret name.",
+            "title": "Secretname",
+            "type": "string"
+          },
+          "description": {
+            "description": "Where to obtain it.",
+            "title": "Description",
+            "type": "string"
+          }
+        },
+        "title": "SecretField",
+        "type": "object"
+      },
+      "SessionEnded": {
+        "properties": {
+          "reason": {
+            "description": "`expired`: ask the partner backend for a new session. `revoked`: the partner or an admin ended it; don't reconnect. `replaced`: another tab took it; stop.",
+            "enum": [
+              "expired",
+              "revoked",
+              "replaced"
+            ],
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "SessionEnded",
+        "type": "object"
+      },
+      "SessionEndedEvent": {
+        "description": "The session ended (expired, revoked, or taken by a newer socket). The socket disconnects next.",
+        "properties": {
+          "room": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "title": "Room"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SessionEnded"
+          }
+        },
+        "required": [
+          "room",
+          "data"
+        ],
+        "title": "SessionEndedEvent",
+        "type": "object"
+      },
+      "SetSecretsArguments": {
+        "description": "The secrets the builder asks for.",
+        "properties": {
+          "secrets_schema": {
+            "description": "Requested secrets.",
+            "items": {
+              "$ref": "#/components/schemas/SecretField"
+            },
+            "title": "Secrets Schema",
+            "type": "array"
+          }
+        },
+        "title": "SetSecretsArguments",
+        "type": "object"
+      },
+      "SetSecretsCall": {
+        "description": "A `set_secrets` call.",
+        "properties": {
+          "name": {
+            "const": "set_secrets",
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "requires_user_input": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Requires User Input"
+          },
+          "auto_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Auto Approved"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "running",
+                  "success",
+                  "error",
+                  "stopped",
+                  "waiting_for_user_input"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "mutation_applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Mutation Applied"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of answer a parked call waits for.",
+            "title": "Waiting On"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BackendFunctionEntityDeleteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BashApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EntityRlsGuardApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolEntityMutationApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolGithubRepoWriteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolInviteUserApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendEmailApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendSmsApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OtherApproval"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "title": "Approval"
+          },
+          "arguments": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SetSecretsArguments"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "SetSecretsCall",
+        "type": "object"
+      },
+      "Snapshot": {
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StatusObject"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            },
+            "title": "Messages",
+            "type": "array"
+          },
+          "queue": {
+            "$ref": "#/components/schemas/QueueState",
+            "description": "The main branch's prompt queue."
+          }
+        },
+        "required": [
+          "status",
+          "messages",
+          "queue"
+        ],
+        "title": "Snapshot",
+        "type": "object"
+      },
+      "StatusObject": {
+        "description": "Public builder state, without error diagnostics or billing context.",
+        "properties": {
+          "state": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ready",
+                  "processing",
+                  "error"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "State"
+          },
+          "turn_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Turn Id"
+          },
+          "last_updated_date": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Last Updated Date"
+          }
+        },
+        "title": "StatusObject",
+        "type": "object"
+      },
+      "SummaryDetails": {
+        "description": "What a parked code execution would do.",
+        "properties": {
+          "summary": {
+            "description": "The agent's summary of what the code does.",
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "title": "SummaryDetails",
+        "type": "object"
+      },
+      "SummaryDisplay": {
+        "description": "What a command or screenshot did.",
+        "properties": {
+          "summary": {
+            "description": "Reviewed activity summary. Commands and output are never included.",
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "title": "SummaryDisplay",
+        "type": "object"
+      },
+      "TaskProgress": {
+        "properties": {
+          "current": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "default": null,
+            "title": "Current"
+          },
+          "total": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "default": null,
+            "title": "Total"
+          },
+          "percentage": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "default": null,
+            "title": "Percentage"
+          }
+        },
+        "title": "TaskProgress",
+        "type": "object"
+      },
+      "TaskProgressed": {
+        "properties": {
+          "tool_call_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Tool Call Id"
+          },
+          "message_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Message Id"
+          },
+          "event_type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Event Type"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskProgress"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "branch_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Branch Id"
+          }
+        },
+        "title": "TaskProgressed",
+        "type": "object"
+      },
+      "TaskProgressedEvent": {
+        "description": "Progress of a long-running tool, by `tool_call_id`.",
+        "properties": {
+          "room": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "title": "Room"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TaskProgressed"
+          }
+        },
+        "required": [
+          "room",
+          "data"
+        ],
+        "title": "TaskProgressedEvent",
+        "type": "object"
+      },
+      "UpdateEntitiesCall": {
+        "description": "A `update_entities` call.",
+        "properties": {
+          "name": {
+            "const": "update_entities",
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "requires_user_input": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Requires User Input"
+          },
+          "auto_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Auto Approved"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "running",
+                  "success",
+                  "error",
+                  "stopped",
+                  "waiting_for_user_input"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "mutation_applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Mutation Applied"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of answer a parked call waits for.",
+            "title": "Waiting On"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BackendFunctionEntityDeleteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BashApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EntityRlsGuardApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolEntityMutationApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolGithubRepoWriteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolInviteUserApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendEmailApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendSmsApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OtherApproval"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "title": "Approval"
+          },
+          "arguments": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityChangeArguments"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "display": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityDisplay"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "UpdateEntitiesCall",
+        "type": "object"
+      },
+      "UpdatePlanArguments": {
+        "description": "Settled plan points.",
+        "properties": {
+          "updates": {
+            "description": "Plan updates in their emitted order.",
+            "items": {
+              "$ref": "#/components/schemas/PlanUpdate"
+            },
+            "title": "Updates",
+            "type": "array"
+          },
+          "sections_with_enough": {
+            "description": "Base plan sections the builder considers sufficiently specified.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Sections With Enough",
+            "type": "array"
+          }
+        },
+        "title": "UpdatePlanArguments",
+        "type": "object"
+      },
+      "UpdatePlanCall": {
+        "description": "A `update_plan` call.",
+        "properties": {
+          "name": {
+            "const": "update_plan",
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "requires_user_input": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Requires User Input"
+          },
+          "auto_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Auto Approved"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "running",
+                  "success",
+                  "error",
+                  "stopped",
+                  "waiting_for_user_input"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "mutation_applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Mutation Applied"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of answer a parked call waits for.",
+            "title": "Waiting On"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BackendFunctionEntityDeleteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BashApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EntityRlsGuardApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolEntityMutationApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolGithubRepoWriteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolInviteUserApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendEmailApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendSmsApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OtherApproval"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "title": "Approval"
+          },
+          "arguments": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdatePlanArguments"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "UpdatePlanCall",
+        "type": "object"
+      },
+      "WaitingOn": {
+        "description": "What a parked call waits for. Render the widget by kind, not by tool name.",
+        "properties": {
+          "kind": {
+            "description": "`choice`: pick among options. `input`: supply values. `approval`: approve or reject.",
+            "enum": [
+              "choice",
+              "input",
+              "approval"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "title": "WaitingOn",
+        "type": "object"
+      },
+      "WriteFileCall": {
+        "description": "A `write_file` call.",
+        "properties": {
+          "name": {
+            "const": "write_file",
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "requires_user_input": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Requires User Input"
+          },
+          "auto_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Auto Approved"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "running",
+                  "success",
+                  "error",
+                  "stopped",
+                  "waiting_for_user_input"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "mutation_applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Mutation Applied"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of answer a parked call waits for.",
+            "title": "Waiting On"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BackendFunctionEntityDeleteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BashApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EntityRlsGuardApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolEntityMutationApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolGithubRepoWriteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolInviteUserApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendEmailApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendSmsApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OtherApproval"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "title": "Approval"
+          },
+          "display": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FileDisplay"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "WriteFileCall",
+        "type": "object"
+      },
+      "WriteRepoFileCall": {
+        "description": "A `write_repo_file` call.",
+        "properties": {
+          "name": {
+            "const": "write_repo_file",
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "requires_user_input": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Requires User Input"
+          },
+          "auto_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Auto Approved"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "running",
+                  "success",
+                  "error",
+                  "stopped",
+                  "waiting_for_user_input"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "mutation_applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": null,
+            "title": "Mutation Applied"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of answer a parked call waits for.",
+            "title": "Waiting On"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BackendFunctionEntityDeleteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BashApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EntityRlsGuardApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolEntityMutationApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolGithubRepoWriteApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolInviteUserApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendEmailApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecToolSendSmsApproval"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OtherApproval"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why a safety guard parked the call: the guard, and its declared reason and details.",
+            "title": "Approval"
+          },
+          "display": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FileDisplay"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "WriteRepoFileCall",
+        "type": "object"
+      }
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "typesWithOwnMethods": {
+    "EntityHandler": "Entity Handler Methods",
+    "ActorRef": "Actor methods",
+    "Connection": "Connection methods",
+    "ActorSubscription": "Subscription methods"
+  },
+  "typeDefinitionGroups": [
+    [
+      "ConnectorIntegrationType",
+      "ConnectorIntegrationTypeRegistry"
+    ],
+    [
+      "EntityRecord",
+      "EntityTypeRegistry",
+      "SortField",
+      "EntityFilterQuery"
+    ],
+    [
+      "FunctionName",
+      "FunctionNameRegistry"
+    ],
+    [
+      "AgentName",
+      "AgentNameRegistry"
+    ],
+    [
+      "ActorClient",
+      "ActorRegistry",
+      "ActorNameRegistry"
+    ],
+    [
+      "AppPublicSettings"
+    ]
+  ]
+}
