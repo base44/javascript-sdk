@@ -93,10 +93,16 @@ jobs:
           git checkout -B "$BRANCH"
           git add packages/platform/asyncapi.json packages/platform/src/modules/builder.events.generated.ts
           git commit -m "chore(platform): sync asyncapi.json and the event types from production"
+
+          pr=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')
+          # An open sync PR whose branch already has this exact tree needs no new commit or force-push.
+          if [ -n "$pr" ] && git fetch --depth=1 origin "$BRANCH" && [ "$(git rev-parse 'HEAD^{tree}')" = "$(git rev-parse 'FETCH_HEAD^{tree}')" ]; then
+            echo "✅ #$pr already has these changes"
+            exit 0
+          fi
           # Rebuilt from main every run, so the branch never drifts or conflicts.
           git push --force origin "$BRANCH"
 
-          pr=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')
           body="Refreshes \`packages/platform/asyncapi.json\` from $ASYNCAPI_URL and regenerates \`builder.events.generated.ts\`. The docs build and the Platform SDK tests passed on this change. Checked against production every hour."
           if [ -z "$pr" ]; then
             gh pr create --head "$BRANCH" --base main --title "Sync Platform SDK events from production" --body "$body"
