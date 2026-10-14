@@ -3,6 +3,10 @@ import type { IntegrationsModule } from "./modules/integrations.types.js";
 import type { AuthModule } from "./modules/auth.types.js";
 import type { SsoModule } from "./modules/sso.types.js";
 import type {
+  PaymentsModule,
+  ServiceRolePaymentsModule,
+} from "./modules/payments.types.js";
+import type {
   ConnectorsModule,
   UserConnectorsModule,
 } from "./modules/connectors.types.js";
@@ -145,6 +149,8 @@ export interface Base44Client {
   functions: FunctionsModule;
   /** {@link IntegrationsModule | Integrations module} for calling pre-built integration endpoints. */
   integrations: IntegrationsModule;
+  /** {@link PaymentsModule | Payments module} for checkouts and purchases. */
+  payments: PaymentsModule;
   /** Cleanup function to disconnect WebSocket connections. Call when you're done with the client. */
   cleanup: () => void;
 
@@ -241,6 +247,8 @@ export interface Base44Client {
     functions: FunctionsModule;
     /** {@link IntegrationsModule | Integrations module} with elevated permissions. */
     integrations: IntegrationsModule;
+    /** {@link ServiceRolePaymentsModule | Payments module} for creating checkouts, refunds, and subscription changes. */
+    payments: ServiceRolePaymentsModule;
     /** {@link SsoModule | SSO module} for generating SSO tokens. */
     sso: SsoModule;
     /** Cleanup function to disconnect WebSocket connections. */

@@ -29,6 +29,7 @@ The SDK provides access to Base44's functionality through the following modules:
 - **[`entities`](https://docs.base44.com/developers/references/sdk/docs/interfaces/entities)**: Work with your app's data entities using CRUD operations.
 - **[`functions`](https://docs.base44.com/developers/references/sdk/docs/interfaces/functions)**: Execute backend functions.
 - **[`integrations`](https://docs.base44.com/developers/references/sdk/docs/type-aliases/integrations)**: Access pre-built and third-party integrations.
+- **[`payments`](https://docs.base44.com/developers/references/sdk/docs/interfaces/payments)**: Embed checkouts, look up purchases, and handle refunds and subscriptions with the service role.
 
 ## Quickstarts
 

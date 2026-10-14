@@ -47,6 +47,11 @@
   "FunctionsModule",
   "ImportResult",
   "IntegrationsModule",
+  "PaymentsErrorCode",
+  "PaymentsModule",
+  "PaymentsRecurringFrequency",
+  "PurchaseStatus",
+  "ServiceRolePaymentsModule",
   "SortField",
   "SsoModule",
   "UpdateManyResult"
