@@ -1,5 +1,9 @@
 import { AxiosInstance } from "axios";
-import { loadScript, mountCheckout } from "./payments-checkout.js";
+import {
+  loadScript,
+  mountCheckout,
+  PaymentsCheckoutConfig,
+} from "./payments-checkout.js";
 import {
   CancelSubscriptionOptions,
   CompleteCheckoutResult,
@@ -76,12 +80,24 @@ export function createPaymentsModule(
   appId: string
 ): PaymentsModule {
   const requests = createPaymentsRequests(axios, appId);
+  // One fetch per client, retried on the next mount if it fails.
+  let config: Promise<PaymentsCheckoutConfig> | undefined;
+  const getConfig = () => {
+    config ??= (
+      axios.get(`/apps/${appId}/payments/config`) as Promise<PaymentsCheckoutConfig>
+    ).catch((error) => {
+      config = undefined;
+      throw error;
+    });
+    return config;
+  };
   return {
     completeCheckout: requests.completeCheckout,
     listPurchases: requests.listPurchases,
     mountCheckout(element, checkout, options = {}) {
       return mountCheckout(element, checkout, options, {
         completeCheckout: requests.completeCheckout,
+        getConfig,
         loadScript,
       });
     },

@@ -8,15 +8,11 @@ import type {
   StripeEmbeddedCheckout,
 } from "./payments.types.js";
 
-// PayPal JS SDK v6: https://developer.paypal.com/sdk/js/reference
-const PAYPAL_SCRIPT_URLS = {
-  live: "https://www.paypal.com/web-sdk/v6/core",
-  sandbox: "https://www.sandbox.paypal.com/web-sdk/v6/core",
-} as const;
-
-// Use v3 rather than a dated release, because Base44 creates sessions with ui_mode "embedded",
-// which dahlia and later reject.
-const STRIPE_SCRIPT_URL = "https://js.stripe.com/v3/";
+// The backend picks each script URL, but the script runs on the buyer's page, so only these hosts may load.
+const ALLOWED_SCRIPT_HOSTS: Record<"paypal" | "stripe", readonly string[]> = {
+  paypal: ["www.paypal.com", "www.sandbox.paypal.com"],
+  stripe: ["js.stripe.com"],
+};
 
 interface PayPalSession {
   start(
@@ -79,10 +75,45 @@ type StripeConstructor = (publishableKey: string) => StripeInstance;
 /** @internal */
 export type LoadScript = (src: string) => Promise<void>;
 
+/**
+ * The response of `GET /payments/config`.
+ * @internal
+ */
+export interface PaymentsCheckoutConfig {
+  paypal?: { script_url?: string };
+  stripe?: { script_url?: string };
+}
+
 /** @internal */
 export interface MountCheckoutDeps {
   completeCheckout: (checkoutId: string) => Promise<CompleteCheckoutResult>;
+  getConfig: () => Promise<PaymentsCheckoutConfig>;
   loadScript: LoadScript;
+}
+
+async function scriptUrlFor(
+  provider: "paypal" | "stripe",
+  deps: MountCheckoutDeps
+): Promise<string> {
+  const value = (await deps.getConfig())?.[provider]?.script_url;
+  let url: URL | undefined;
+  try {
+    url = value ? new URL(value) : undefined;
+  } catch {
+    url = undefined;
+  }
+  if (
+    !url ||
+    url.protocol !== "https:" ||
+    url.port !== "" ||
+    url.username !== "" ||
+    url.password !== "" ||
+    !ALLOWED_SCRIPT_HOSTS[provider].includes(url.hostname)
+  ) {
+    const name = provider === "paypal" ? "PayPal" : "Stripe";
+    throw new Error(`The payments config has no valid ${name} script URL`);
+  }
+  return url.href;
 }
 
 function browserGlobals(): { paypal?: PayPalNamespace; Stripe?: StripeConstructor } {
@@ -139,12 +170,13 @@ let activeStripeCheckout: CheckoutMount | null = null;
 
 function mountStripe(
   element: CheckoutElement,
+  scriptUrl: string,
   embedded: StripeEmbeddedCheckout,
   deps: MountCheckoutDeps
 ): Promise<CheckoutMount> {
   const mount = stripeQueue.then(async () => {
     const Stripe = await loadGlobal<StripeConstructor>(
-      STRIPE_SCRIPT_URL,
+      scriptUrl,
       () => browserGlobals().Stripe,
       deps.loadScript
     );
@@ -187,44 +219,20 @@ function mountStripe(
   return mount;
 }
 
-// The v6 script for one environment defines the same global as the other's.
-let loadedPayPalEnvironment: PayPalEmbeddedCheckout["environment"] | undefined;
-
 async function mountPayPal(
   element: CheckoutElement,
+  scriptUrl: string,
   checkoutId: string,
   currency: string,
   embedded: PayPalEmbeddedCheckout,
   options: MountCheckoutOptions,
   deps: MountCheckoutDeps
 ): Promise<CheckoutMount> {
-  const environment = embedded.environment;
-  const scriptUrl = PAYPAL_SCRIPT_URLS[environment];
-  if (!scriptUrl) {
-    throw new Error(
-      "This checkout is missing embedded.environment. Pass the full result of createCheckout() to mountCheckout()."
-    );
-  }
-  if (loadedPayPalEnvironment && loadedPayPalEnvironment !== environment) {
-    throw new Error(
-      `PayPal's ${loadedPayPalEnvironment} script is already loaded on this page, so a ${environment} checkout can't mount. Reload the page first.`
-    );
-  }
-  // The environment of a PayPal script the app loaded itself can't be detected, so it's trusted.
-  if (!browserGlobals().paypal && !loadedPayPalEnvironment) {
-    loadedPayPalEnvironment = environment;
-  }
-  let paypal: PayPalNamespace;
-  try {
-    paypal = await loadGlobal<PayPalNamespace>(
-      scriptUrl,
-      () => browserGlobals().paypal,
-      deps.loadScript
-    );
-  } catch (error) {
-    if (!browserGlobals().paypal) loadedPayPalEnvironment = undefined;
-    throw error;
-  }
+  const paypal = await loadGlobal<PayPalNamespace>(
+    scriptUrl,
+    () => browserGlobals().paypal,
+    deps.loadScript
+  );
   if (typeof paypal.createInstance !== "function") {
     throw new Error(
       "Another PayPal JS SDK version is already loaded on this page. Remove it to use mountCheckout()."
@@ -353,10 +361,11 @@ export async function mountCheckout(
   }
   switch (embedded.provider) {
     case "stripe":
-      return mountStripe(element, embedded, deps);
+      return mountStripe(element, await scriptUrlFor("stripe", deps), embedded, deps);
     case "paypal":
       return mountPayPal(
         element,
+        await scriptUrlFor("paypal", deps),
         checkout.checkout_id,
         checkout.currency,
         embedded,

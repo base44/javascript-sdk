@@ -228,6 +228,7 @@ describe("mountCheckout", () => {
     });
     vi.stubGlobal("window", {});
     loadScript = vi.fn().mockResolvedValue(undefined);
+    getConfig = vi.fn().mockResolvedValue(config);
     completeCheckout = vi.fn();
   });
 
@@ -243,7 +244,6 @@ describe("mountCheckout", () => {
     merchant_id: "MERCHANT1",
     partner_attribution_id: null,
     intent: "capture",
-    environment: "sandbox",
     ...overrides,
   });
 
@@ -265,7 +265,12 @@ describe("mountCheckout", () => {
     return { paypal, sdk, session, callbacks: () => callbacks };
   }
 
-  const deps = () => ({ completeCheckout, loadScript });
+  const config = {
+    paypal: { script_url: "https://www.sandbox.paypal.com/web-sdk/v6/core" },
+    stripe: { script_url: "https://js.stripe.com/v3/" },
+  };
+  let getConfig: ReturnType<typeof vi.fn>;
+  const deps = () => ({ completeCheckout, getConfig, loadScript });
 
   const stripeCheckout = (): MountableCheckout => ({
     checkout_id: "cs_1",
@@ -317,14 +322,13 @@ describe("mountCheckout", () => {
       currency: "usd",
       embedded: paypalEmbedded({
         intent: "subscription",
-        environment: "live",
         partner_attribution_id: "BN-CODE",
       }),
     };
 
     await mountCheckout(container as any, checkout, {}, deps());
 
-    expect(loadScript).toHaveBeenCalledWith("https://www.paypal.com/web-sdk/v6/core");
+    expect(loadScript).toHaveBeenCalledWith("https://www.sandbox.paypal.com/web-sdk/v6/core");
     expect(paypal.createInstance).toHaveBeenCalledWith(
       expect.objectContaining({
         partnerAttributionId: "BN-CODE",
@@ -372,16 +376,6 @@ describe("mountCheckout", () => {
       "PayPal isn't available"
     );
     expect(container.children).toHaveLength(0);
-  });
-
-  test("rejects a PayPal checkout without an environment", async () => {
-    const embedded = { ...paypalEmbedded(), environment: undefined } as any;
-    const checkout = { checkout_id: "ORDER1", currency: "usd", embedded };
-
-    await expect(mountCheckout(container as any, checkout, {}, deps())).rejects.toThrow(
-      "missing embedded.environment"
-    );
-    expect(loadScript).not.toHaveBeenCalled();
   });
 
   test("rejects when another PayPal SDK version is on the page", async () => {
@@ -463,25 +457,6 @@ describe("mountCheckout", () => {
 
     expect(completeCheckout).toHaveBeenCalledWith("ORDER1");
     expect(onComplete).not.toHaveBeenCalled();
-  });
-
-  test("rejects a PayPal checkout from the other environment than the loaded script", async () => {
-    installPayPal();
-    await mountCheckout(
-      container as any,
-      { checkout_id: "ORDER1", currency: "usd", embedded: paypalEmbedded() },
-      {},
-      deps()
-    );
-
-    await expect(
-      mountCheckout(
-        container as any,
-        { checkout_id: "ORDER2", currency: "usd", embedded: paypalEmbedded({ environment: "live" }) },
-        {},
-        deps()
-      )
-    ).rejects.toThrow("sandbox script is already loaded");
   });
 
   test("falls back to createPayPalSubscriptionSession", async () => {
@@ -602,12 +577,104 @@ describe("mountCheckout", () => {
     expect(embeddedCheckout.destroy).toHaveBeenCalledTimes(1);
   });
 
+  test("loads the live PayPal script when the config names it", async () => {
+    installPayPal();
+    getConfig.mockResolvedValue({
+      ...config,
+      paypal: { script_url: "https://www.paypal.com/web-sdk/v6/core" },
+    });
+    const checkout = { checkout_id: "ORDER1", currency: "usd", embedded: paypalEmbedded() };
+
+    await mountCheckout(container as any, checkout, {}, deps());
+
+    expect(loadScript).toHaveBeenCalledWith("https://www.paypal.com/web-sdk/v6/core");
+  });
+
+  test.each([
+    ["another host", "https://evil.example.com/web-sdk/v6/core"],
+    ["a lookalike host", "https://www.paypal.com.evil.example.com/sdk"],
+    ["plain http", "http://www.paypal.com/web-sdk/v6/core"],
+    ["a port", "https://www.paypal.com:8443/web-sdk/v6/core"],
+    ["credentials", "https://user@www.paypal.com/web-sdk/v6/core"],
+    ["a relative path", "/web-sdk/v6/core"],
+    ["javascript:", "javascript:alert(1)//www.paypal.com"],
+    ["data:", "data:text/javascript,1"],
+    ["a trailing dot", "https://www.paypal.com./web-sdk/v6/core"],
+    ["a number", 123],
+    ["an object", {}],
+  ])("rejects a PayPal script URL with %s and adds no script", async (_, url) => {
+    installPayPal();
+    getConfig.mockResolvedValue({ ...config, paypal: { script_url: url } });
+    const checkout = { checkout_id: "ORDER1", currency: "usd", embedded: paypalEmbedded() };
+
+    await expect(mountCheckout(container as any, checkout, {}, deps())).rejects.toThrow(
+      "no valid PayPal script URL"
+    );
+    expect(loadScript).not.toHaveBeenCalled();
+  });
+
+  test("rejects a missing config without loading a script", async () => {
+    installPayPal();
+    getConfig.mockResolvedValue(null);
+    const checkout = { checkout_id: "ORDER1", currency: "usd", embedded: paypalEmbedded() };
+
+    await expect(mountCheckout(container as any, checkout, {}, deps())).rejects.toThrow(
+      "no valid PayPal script URL"
+    );
+    expect(loadScript).not.toHaveBeenCalled();
+  });
+
+  test("loads the normalized URL it checked", async () => {
+    installPayPal();
+    getConfig.mockResolvedValue({
+      ...config,
+      paypal: { script_url: " HTTPS://WWW.PAYPAL.COM/web-sdk/v6/core " },
+    });
+    const checkout = { checkout_id: "ORDER1", currency: "usd", embedded: paypalEmbedded() };
+
+    await mountCheckout(container as any, checkout, {}, deps());
+
+    expect(loadScript).toHaveBeenCalledWith("https://www.paypal.com/web-sdk/v6/core");
+  });
+
+  test("keeps the mounted Stripe checkout when the next one has a bad config", async () => {
+    const embeddedCheckout = { mount: vi.fn(), destroy: vi.fn() };
+    (window as any).Stripe = vi.fn(() => ({
+      initEmbeddedCheckout: vi.fn().mockResolvedValue(embeddedCheckout),
+    }));
+    await mountCheckout(container as any, stripeCheckout(), {}, deps());
+
+    getConfig.mockResolvedValueOnce({ ...config, stripe: { script_url: "https://evil.example.com/v3/" } });
+    await expect(mountCheckout(container as any, stripeCheckout(), {}, deps())).rejects.toThrow(
+      "no valid Stripe script URL"
+    );
+
+    expect(embeddedCheckout.destroy).not.toHaveBeenCalled();
+  });
+
+  test("rejects a Stripe script URL from PayPal's host, and a missing one", async () => {
+    getConfig.mockResolvedValueOnce({
+      ...config,
+      stripe: { script_url: "https://www.paypal.com/web-sdk/v6/core" },
+    });
+    await expect(mountCheckout(container as any, stripeCheckout(), {}, deps())).rejects.toThrow(
+      "no valid Stripe script URL"
+    );
+
+    getConfig.mockResolvedValueOnce({ paypal: config.paypal });
+    await expect(mountCheckout(container as any, stripeCheckout(), {}, deps())).rejects.toThrow(
+      "no valid Stripe script URL"
+    );
+    expect(loadScript).not.toHaveBeenCalled();
+  });
+
   test("rejects a redirect checkout", async () => {
     const checkout = { checkout_id: "cs_1", currency: "usd", embedded: null };
 
     await expect(mountCheckout(container as any, checkout, {}, deps())).rejects.toThrow(
       "isn't embedded"
     );
+    expect(getConfig).not.toHaveBeenCalled();
   });
 
   test("rejects outside a browser", async () => {
@@ -647,5 +714,62 @@ describe("loadScript", () => {
     expect(scripts).toHaveLength(2);
     scripts[1].onload();
     await expect(retry).resolves.toBeUndefined();
+  });
+});
+
+describe("payments config", () => {
+  const appId = "test-app-id";
+  const serverUrl = "https://base44.app";
+  const configPath = `/api/apps/${appId}/payments/config`;
+  const config = {
+    paypal: { script_url: "https://www.sandbox.paypal.com/web-sdk/v6/core" },
+    stripe: { script_url: "https://js.stripe.com/v3/" },
+  };
+  const checkout: MountableCheckout = {
+    checkout_id: "cs_1",
+    currency: "usd",
+    embedded: { provider: "stripe", publishable_key: "pk_test_1", client_secret: "s" },
+  };
+
+  afterEach(() => {
+    nock.cleanAll();
+    vi.unstubAllGlobals();
+  });
+
+  async function setup() {
+    vi.resetModules();
+    const { createClient: create } = await import("../../src/index.ts");
+    const base44 = create({ serverUrl, appId, token: "user-token", analytics: { enabled: false } });
+    // Stripe is already on the page, so no script tag is needed.
+    const stripe = {
+      initEmbeddedCheckout: vi.fn(async () => ({ mount: vi.fn(), destroy: vi.fn() })),
+    };
+    vi.stubGlobal("window", { Stripe: vi.fn(() => stripe) });
+    vi.stubGlobal("document", {});
+    return base44;
+  }
+
+  test("is fetched once and reused for later mounts", async () => {
+    const base44 = await setup();
+    const scope = nock(serverUrl).get(configPath).once().reply(200, config);
+
+    await base44.payments.mountCheckout({} as any, checkout);
+    await base44.payments.mountCheckout({} as any, checkout);
+
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test("is fetched again after a failed fetch", async () => {
+    const base44 = await setup();
+    const scope = nock(serverUrl)
+      .get(configPath)
+      .reply(503, { error: { code: "provider_unavailable", message: "Down", details: {} } })
+      .get(configPath)
+      .reply(200, config);
+
+    await expect(base44.payments.mountCheckout({} as any, checkout)).rejects.toThrow("Down");
+    await base44.payments.mountCheckout({} as any, checkout);
+
+    expect(scope.isDone()).toBe(true);
   });
 });

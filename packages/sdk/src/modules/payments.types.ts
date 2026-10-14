@@ -119,8 +119,6 @@ export interface PayPalEmbeddedCheckout {
   partner_attribution_id?: string | null;
   /** Whether the checkout is a one-time payment or a subscription. */
   intent: "capture" | "subscription";
-  /** PayPal environment the checkout was created in. */
-  environment: "sandbox" | "live";
 }
 
 /**
@@ -346,7 +344,9 @@ export interface MountCheckoutOptions {
   /**
    * Called after the buyer approves a PayPal payment and the SDK completes the checkout.
    *
-   * Stripe doesn't call this. After a Stripe payment, the buyer returns to the checkout's `success_path` with a `session_id` query parameter. That parameter is the `checkout_id`. Check the purchase there with [`listPurchases()`](/developers/references/sdk/docs/interfaces/payments#listpurchases).
+   * Use it to update the page, not to grant access. Browser callbacks can be faked, so unlock paid content only after your backend confirms the purchase, for example with [`listPurchases()`](/developers/references/sdk/docs/interfaces/service-role-payments#listpurchases) in a backend function.
+   *
+   * Stripe doesn't call this. After a Stripe payment, the buyer returns to the checkout's `success_path` with a `session_id` query parameter. That parameter is the `checkout_id`. Show the result there with [`listPurchases()`](/developers/references/sdk/docs/interfaces/payments#listpurchases), and grant access only after your backend confirms it.
    */
   onComplete?: (result: CompleteCheckoutResult) => void;
   /** Called when the buyer closes the PayPal window without paying. The button stays mounted so the buyer can try again. */
@@ -475,7 +475,9 @@ export interface PaymentsModule {
    * - PayPal: Renders a PayPal button. When the buyer approves the payment, the SDK calls {@linkcode completeCheckout | completeCheckout()} and then `onComplete`.
    * - Stripe: Mounts Stripe Embedded Checkout. After paying, the buyer returns to the checkout's `success_path`. Stripe allows one embedded checkout per page, so mounting another Stripe checkout destroys the previous one.
    *
-   * Requires a browser environment and can't be used in the backend. Rejects when the checkout isn't embedded, when the provider's script fails to load, or when PayPal isn't available for the checkout's currency.
+   * Requires a browser environment and can't be used in the backend. Rejects when the checkout isn't embedded, when the payments config can't be fetched or has no valid script URL for the provider, when the provider's script fails to load, or when PayPal isn't available for the checkout's currency.
+   *
+   * The checkout's callbacks run in the buyer's browser, where they can be faked. Grant access to what the buyer paid for only after your backend confirms the purchase, for example with [`listPurchases()`](/developers/references/sdk/docs/interfaces/service-role-payments#listpurchases) in a backend function.
    *
    * @param element - Element to render the checkout in. It should be empty.
    * @param checkout - The result of [`createCheckout()`](/developers/references/sdk/docs/interfaces/service-role-payments#createcheckout).
