@@ -23,6 +23,9 @@
     "interfaces/CoreIntegrations",
     "interfaces/CustomIntegrationsModule"
   ],
+  "interfaces/AppModule": [
+    "type-aliases/AppPublicSettings"
+  ],
   "type-aliases/ActorsModule": [
     "interfaces/ActorRef",
     "interfaces/Connection",

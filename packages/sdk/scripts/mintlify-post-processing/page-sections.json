@@ -28,6 +28,9 @@
       "ActorClient",
       "ActorRegistry",
       "ActorNameRegistry"
+    ],
+    [
+      "AppPublicSettings"
     ]
   ]
 }
