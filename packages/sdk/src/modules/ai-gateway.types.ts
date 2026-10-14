@@ -5,8 +5,9 @@ export interface AiGatewayConnection {
   /** Base URL of the selected gateway provider. */
   baseURL: string;
   /**
-   * Bearer token that authenticates the request. Empty string when the caller is
-   * unauthenticated.
+   * Bearer token that authenticates the request: the service-role token from
+   * `base44.asServiceRole.aiGateway`, or the signed-in user's token from
+   * `base44.aiGateway`. The gateway expects the service-role token.
    */
   token: string;
   /**
@@ -94,8 +95,8 @@ export interface AiGatewayModuleConfig {
  *
  * The mode determines which token `connection()` returns:
  *
- * - **User authentication** (`base44.aiGateway`): Returns the signed-in app user's token.
- * - **Service role authentication** (`base44.asServiceRole.aiGateway`): Returns the service-role token instead. Use it from backend functions: apps that restrict Core integrations, the default for new apps, reject user-token gateway calls on public apps. It also works when there's no signed-in user, such as from a scheduled automation.
+ * - **Service role authentication** (`base44.asServiceRole.aiGateway`): Returns the app's service-role token. Use it server-side; the gateway rejects other calls with a `403` and the error code `ai_gateway_requires_service_role`. It also works with no signed-in user, such as from a scheduled automation.
+ * - **User authentication** (`base44.aiGateway`): Returns the signed-in app user's token. The gateway accepts it only on apps shared privately or with your workspace.
  *
  * ## Billing and limits
  *
