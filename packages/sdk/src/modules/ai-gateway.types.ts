@@ -5,8 +5,10 @@ export interface AiGatewayConnection {
   /** Base URL of the selected gateway provider. */
   baseURL: string;
   /**
-   * Bearer token that authenticates the request. Empty string when the caller is
-   * unauthenticated.
+   * Bearer token that authenticates the request: the service-role token from
+   * `base44.asServiceRole.aiGateway`, or the signed-in user's token from
+   * `base44.aiGateway`. The user token is an empty string when no one is signed
+   * in, and the gateway rejects that call.
    */
   token: string;
   /**
@@ -95,7 +97,20 @@ export interface AiGatewayModuleConfig {
  * The mode determines which token `connection()` returns:
  *
  * - **User authentication** (`base44.aiGateway`): Returns the signed-in app user's token.
- * - **Service role authentication** (`base44.asServiceRole.aiGateway`): Returns the service-role token instead. Use it from backend functions: apps that restrict Core integrations, the default for new apps, reject user-token gateway calls on public apps. It also works when there's no signed-in user, such as from a scheduled automation.
+ * - **Service role authentication** (`base44.asServiceRole.aiGateway`): Returns the service-role token instead.
+ *
+ * Use service role from a backend function, as every example here does. The
+ * gateway accepts a user token only on apps shared privately or with your
+ * workspace. It rejects anonymous calls, and user-token calls on public apps,
+ * with a `403` and the error code `ai_gateway_requires_service_role`, so a
+ * visitor can't spend your app's credits by calling the gateway from the
+ * browser. A user-token call therefore works while you're building and starts
+ * failing the moment you share the app publicly. Service role also works when
+ * there's no signed-in user at all, such as from a scheduled automation.
+ *
+ * To control who triggers a billed request, check the caller with
+ * `base44.auth.me()` in your backend function before calling the gateway, and
+ * call that function from your page with `base44.functions.invoke()`.
  *
  * ## Billing and limits
  *
