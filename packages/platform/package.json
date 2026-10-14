@@ -1,7 +1,7 @@
 {
   "name": "@base44/platform",
   "version": "0.2.0",
-  "description": "Browser client for building on the Base44 platform",
+  "description": "Client and server SDK for building on the Base44 platform",
   "main": "dist/client/index.js",
   "types": "dist/client/index.d.ts",
   "type": "module",
@@ -10,7 +10,18 @@
       "types": "./dist/client/index.d.ts",
       "default": "./dist/client/index.js"
     },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "default": "./dist/server/index.js"
+    },
     "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "server": [
+        "dist/server/index.d.ts"
+      ]
+    }
   },
   "files": [
     "dist"
