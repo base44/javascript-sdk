@@ -9,7 +9,7 @@
  * | --- | --- |
  * | `private_with_login` | **Private**: Only [invited users](/Setting-up-your-app/Managing-access#inviting-users-to-your-app) |
  * | `workspace_with_login` | **Workspace**: Users in your Base44 [workspace](/documentation/account-and-billing/about-workspaces) |
- * | `public_with_login` | **Public (login required)**: Visitors with a Base44 account |
+ * | `public_with_login` | **Public (login required)**: Visitors must log in |
  * | `public_without_login` | **Public (no login)**: Anyone |
  *
  * <Note>
