@@ -1,6 +1,20 @@
 /**
- * The app's access policy: whether the app is reachable without an account, and
- * who may sign in.
+ * The app's visibility.
+ *
+ * You can set and manage the app's visibility in the app's dashboard or with the Base44 CLI [`visibility`](/developers/references/cli/commands/visibility) command. Learn more about [app visibility](/Setting-up-your-app/Managing-access#setting-your-app-visibility).
+ *
+ * <Note>
+ * The CLI doesn't support `public_with_login`. To use it, change the app's visibility in the dashboard.
+ * </Note>
+ *
+ * The following table shows the supported values and the visibility each one represents:
+ *
+ * | Value | Visibility |
+ * | --- | --- |
+ * | `private_with_login` | **Private**: Only [invited users](/Setting-up-your-app/Managing-access#inviting-users-to-your-app) |
+ * | `workspace_with_login` | **Workspace**: Users in your Base44 [workspace](/documentation/account-and-billing/about-workspaces) |
+ * | `public_with_login` | **Public (login required)**: Visitors with a Base44 account |
+ * | `public_without_login` | **Public (no login)**: Anyone |
  */
 export type AppPublicSettings =
   | "private_with_login"
@@ -10,47 +24,55 @@ export type AppPublicSettings =
   | string;
 
 /**
- * The app's public configuration, as returned by {@linkcode AppModule.getPublicSettings | getPublicSettings()}.
+ * The app's public settings.
  */
 export interface AppPublicSettingsResponse {
   /** The app's ID. */
   id: string;
-  /** The app's access policy. */
+  /**
+   * The app's visibility.
+   *
+   * Returns the value saved in the app's settings.
+   *
+   * <Note>
+   * If your workspace [enforces SSO for apps](/Enterprise/Enterprise-SSO-and-app-visibility), apps set to `public_without_login` also require sign-in. Visitors who aren't signed in get the `auth_required` error.
+   * </Note>
+   */
   public_settings: AppPublicSettings;
 }
 
 /**
- * App module for reading the app's own public configuration.
+ * App module for reading an app's public settings, including its visibility.
  *
- * Use it to discover how the app is gated before rendering it, so a private app
- * can send the visitor to login instead of rendering an empty shell.
+ * Use it to read the app's visibility and determine whether the current visitor can access the app.
+ * If the app requires login, use `redirectToLogin()` from the {@link AuthModule | auth module} to send the visitor to the login page.
  *
- * ## Authentication Modes
+ * Learn more about [app visibility](/Setting-up-your-app/Managing-access#setting-your-app-visibility).
  *
- * This module is available to use with a client in all authentication modes. The
- * client's token, when it has one, is sent with the request — a signed-in visitor
- * who has no access to the app is reported differently from an anonymous one.
+ * ## Authentication modes
+ *
+ * You can use this module with a client in any authentication mode. The client sends its token, if it has one, with the request.
  */
 export interface AppModule {
   /**
-   * Get the app's public configuration.
+   * Retrieves the app's public settings.
    *
-   * Rejects with a {@linkcode Base44Error} when the visitor may not open the app:
-   * `status` is `403` and `data.extra_data.reason` says why — `"auth_required"`
-   * when the visitor must sign in, `"user_not_registered"` when the signed-in
-   * visitor has no access to this app.
+   * Rejects with a {@linkcode Base44Error} that has a `status` of `403` when the visitor can't access the app.
+   * Check `data.extra_data.reason` to find the cause:
+   * - `auth_required`: The visitor must sign in.
+   * - `user_not_registered`: The visitor is signed in but doesn't have access.
    *
-   * @returns Promise resolving to the app's ID and access policy.
+   * @returns Promise resolving to the app's ID and visibility.
    *
    * @example
    * ```typescript
-   * // Decide what to render before the app boots
+   * // Redirect a visitor who isn't signed in
    * try {
    *   const { public_settings } = await base44.app.getPublicSettings();
-   *   console.log('App access policy:', public_settings);
+   *   console.log('App visibility:', public_settings);
    * } catch (error) {
-   *   if (error.status === 403) {
-   *     console.log('Blocked because:', error.data?.extra_data?.reason);
+   *   if (error.status === 403 && error.data?.extra_data?.reason === 'auth_required') {
+   *     base44.auth.redirectToLogin('<URL to return to after login>');
    *   }
    * }
    * ```

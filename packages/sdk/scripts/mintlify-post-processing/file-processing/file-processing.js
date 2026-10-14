@@ -1596,6 +1596,11 @@ function groupTypeDefinitions(content) {
     {
       types: ["ActorClient", "ActorRegistry", "ActorNameRegistry"],
       indicator: "ActorClient"
+    },
+    // App module
+    {
+      types: ["AppPublicSettingsResponse", "AppPublicSettings"],
+      indicator: "AppPublicSettingsResponse"
     }
   ];
   

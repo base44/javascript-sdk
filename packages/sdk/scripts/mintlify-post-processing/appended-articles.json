@@ -23,6 +23,10 @@
     "interfaces/CoreIntegrations",
     "interfaces/CustomIntegrationsModule"
   ],
+  "interfaces/AppModule": [
+    "interfaces/AppPublicSettingsResponse",
+    "type-aliases/AppPublicSettings"
+  ],
   "type-aliases/ActorsModule": [
     "interfaces/ActorRef",
     "interfaces/Connection",
