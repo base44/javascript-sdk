@@ -95,20 +95,8 @@ export interface AiGatewayModuleConfig {
  *
  * The mode determines which token `connection()` returns:
  *
- * - **Service role authentication** (`base44.asServiceRole.aiGateway`): Returns the app's service-role token.
+ * - **Service role authentication** (`base44.asServiceRole.aiGateway`): Returns the app's service-role token. Use it server-side; the gateway rejects other calls with a `403` and the error code `ai_gateway_requires_service_role`. It also works with no signed-in user, such as from a scheduled automation.
  * - **User authentication** (`base44.aiGateway`): Returns the signed-in app user's token. The gateway accepts it only on apps shared privately or with your workspace.
- *
- * Call the gateway server-side with the app's service role, as every example
- * here does. Calls from the browser or with a user's token are rejected with a
- * `403`, the error code `ai_gateway_requires_service_role`, and the message
- * "AI gateway requests must be made server-side using the app's service role.
- * Calls from the browser or with a user's token are not allowed." Service role
- * also works when there's no signed-in user at all, such as from a scheduled
- * automation.
- *
- * In a backend function, for example, you can check the caller with
- * `base44.auth.me()` before calling the gateway, and call the function from
- * your page with `base44.functions.invoke()`.
  *
  * ## Billing and limits
  *
