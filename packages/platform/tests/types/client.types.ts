@@ -40,6 +40,13 @@ const subscription = builder.subscribe("a".repeat(24), {
       const status: "pending" | "completed" | "failed" | null | undefined = event.data.status;
       void status;
     }
+    if (event.type === "unknown") {
+      const name: string = event.name;
+      // @ts-expect-error An unknown event's payload is unchecked.
+      const title: string = event.data.title;
+      if (typeof event.data.title === "string") void event.data.title.length;
+      void name; void title;
+    }
     // @ts-expect-error Payload must be narrowed by event.type.
     void event.data.items;
     // @ts-expect-error There is no replay cursor.

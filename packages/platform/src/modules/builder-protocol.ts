@@ -8,6 +8,9 @@ const sessionEvents: readonly string[] = ["app.snapshot", "session.ended"];
 export const eventNames = serverEventNames.filter(
   (name): name is keyof PlatformEventMap & typeof name => !sessionEvents.includes(name) && !name.startsWith("room."),
 );
+const knownNames: readonly string[] = serverEventNames;
+/** A name newer than this SDK's protocol, delivered to `onEvent` as `unknown`. New `room.*` notices have no error code, so they are dropped. */
+export const isUnknownEvent = (name: string) => !knownNames.includes(name) && !name.startsWith("room.");
 /** Notices that name an app room, by the error code each one reports. A new notice fails to compile until it has one. */
 export const roomNotices = {
   "room.access_denied": "access_denied",
@@ -31,8 +34,9 @@ export function appFromRoom(value: unknown): string | undefined {
   return typeof value === "string" && /^\/apps\/[a-f0-9]{24}$/.test(value) ? value.slice(6) : undefined;
 }
 /** Every event is `{room, data}`; payload schemas are the service's, so only the envelope is validated. */
-export function decode(type: keyof PlatformEventMap, appId: string, raw: unknown): PlatformEvent {
-  return { type, appId, data: object(object(raw).data) } as PlatformEvent;
+export function decode(name: string, appId: string, raw: unknown): PlatformEvent {
+  const data = object(object(raw).data);
+  return (knownNames.includes(name) ? { type: name, appId, data } : { type: "unknown", name, appId, data }) as PlatformEvent;
 }
 export function decodeSnapshot(raw: unknown): PlatformSnapshot {
   const frame = object(raw);

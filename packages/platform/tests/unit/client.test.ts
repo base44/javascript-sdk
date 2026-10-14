@@ -7,7 +7,8 @@ const fake = vi.hoisted(() => {
   const socket = {
     connected: false,
     on: vi.fn((name, handler) => { handlers[name] = handler; }),
-    emit: vi.fn(), connect: vi.fn(), disconnect: vi.fn(), removeAllListeners: vi.fn(),
+    onAny: vi.fn(handler => { handlers["*"] = handler; }),
+    emit: vi.fn(), connect: vi.fn(), disconnect: vi.fn(), removeAllListeners: vi.fn(), offAny: vi.fn(),
     io: { on: vi.fn((name, handler) => { managerHandlers[name] = handler; }), removeAllListeners: vi.fn() },
   };
   return { handlers, managerHandlers, socket, io: vi.fn(() => socket) };
@@ -353,6 +354,28 @@ describe("platform client", () => {
     expect(onError.mock.calls[0][0].code).toBe("protocol_error");
   });
 
+  test("forwards an event the SDK doesn't know to its app only", async () => {
+    const { client } = setup(); const onEvent = vi.fn(), otherEvent = vi.fn();
+    client.subscribe(app, { onSnapshot: vi.fn(), onEvent, onError: vi.fn() });
+    client.subscribe(other, { onSnapshot: vi.fn(), onEvent: otherEvent, onError: vi.fn() });
+    await connected(client);
+    for (const name of ["app.renamed", "message.updated", "app.snapshot", "session.ended", "room.access_denied", "room.new_notice"]) {
+      fake.handlers["*"](name, { room, data: { name: "Shop" } });
+    }
+    await settle();
+    expect(onEvent.mock.calls).toEqual([[{ type: "unknown", name: "app.renamed", appId: app, data: { name: "Shop" } }]]);
+    expect(otherEvent).not.toHaveBeenCalled();
+  });
+
+  test("a malformed unknown event fails only its app", async () => {
+    const { client } = setup(); const onError = vi.fn();
+    const sub = client.subscribe(app, { onSnapshot: vi.fn(), onEvent: vi.fn(), onError });
+    const second = client.subscribe(other, { onSnapshot: vi.fn(), onEvent: vi.fn(), onError: vi.fn() }); await connected(client);
+    fake.handlers["*"]("app.renamed", { room, data: [] });
+    expect(sub.active).toBe(false); expect(second.active).toBe(true);
+    expect(onError.mock.calls[0][0].code).toBe("protocol_error");
+  });
+
   test("bounded pending delivery overflows explicitly", async () => {
     const { client } = setup(); const onError = vi.fn();
     const sub = client.subscribe(app, { onSnapshot: vi.fn(), onEvent: () => new Promise(() => {}), onError });
@@ -368,7 +391,7 @@ describe("platform client", () => {
     expect(joins()).toEqual([["join", room], ["join", room]]);
     client.close(); client.close(); expect(fake.socket.disconnect).toHaveBeenCalledOnce();
     await expect(client.connect()).rejects.toMatchObject({ code: "client_closed" });
-    expect(fake.socket.removeAllListeners).toHaveBeenCalledOnce();
+    expect(fake.socket.removeAllListeners).toHaveBeenCalledOnce(); expect(fake.socket.offAny).toHaveBeenCalledOnce();
   });
 
   test("validates app IDs, duplicate subscriptions and limits", () => {

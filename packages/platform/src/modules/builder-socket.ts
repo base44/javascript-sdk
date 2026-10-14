@@ -1,6 +1,6 @@
 import { io, type Socket } from "socket.io-client";
 import { PlatformSocketError } from "../errors.js";
-import { appFromRoom, appPattern, decode, decodeSession, decodeSnapshot, eventNames, object, roomFor, roomNotices, sessionEndings } from "./builder-protocol.js";
+import { appFromRoom, appPattern, decode, decodeSession, decodeSnapshot, eventNames, isUnknownEvent, object, roomFor, roomNotices, sessionEndings } from "./builder-protocol.js";
 import { notify, Subscription } from "./builder-subscription.js";
 import type { BuilderInitOptions, BuilderSession, PlatformSubscription, SocketSession, SubscriptionOptions } from "./builder.types.js";
 
@@ -113,23 +113,27 @@ export class BuilderSocket implements BuilderSession {
     });
     socket.on("session.ended", (raw: unknown) => this.sessionEnded(raw));
     for (const [name, code] of Object.entries(roomNotices)) socket.on(name, (raw: unknown) => this.roomNotice(code, raw));
-    for (const type of eventNames) socket.on(type, (raw: unknown) => {
-      try {
-        const appId = appFromRoom(object(raw).room);
-        if (!appId) throw new Error("Invalid app");
-        const event = decode(type, appId, raw);
-        const subscription = this.subscriptions.get(appId);
-        subscription?.event(event);
-        // The server does not resend a snapshot after a rewrite of main: rejoining asks for one.
-        if (subscription && event.type === "conversation.changed" && event.data.branch_id == null) this.join(subscription);
-      } catch { this.protocolError(raw); }
-    });
+    for (const name of eventNames) socket.on(name, (raw: unknown) => this.appEvent(name, raw));
+    socket.onAny((name: string, raw: unknown) => { if (isUnknownEvent(name)) this.appEvent(name, raw); });
     socket.connect();
+  }
+
+  private appEvent(name: string, raw: unknown): void {
+    try {
+      const appId = appFromRoom(object(raw).room);
+      if (!appId) throw new Error("Invalid app");
+      const event = decode(name, appId, raw);
+      const subscription = this.subscriptions.get(appId);
+      subscription?.event(event);
+      // The server does not resend a snapshot after a rewrite of main: rejoining asks for one.
+      if (subscription && event.type === "conversation.changed" && event.data.branch_id == null) this.join(subscription);
+    } catch { this.protocolError(raw); }
   }
 
   private discard(): void {
     if (!this.socket) return;
     this.socket.removeAllListeners();
+    this.socket.offAny();
     this.socket.io.removeAllListeners();
     this.socket.disconnect();
   }

@@ -115,7 +115,9 @@ their exceptions are isolated so they cannot interrupt another app's delivery.
 event is `{room, data}`; the SDK routes by `room` and validates the envelope, while
 payload schemas and private-field filtering are the server's. Omitted keys mean
 unchanged and explicit null clears. Events carrying `branch_id` belong to that branch;
-null or absent is main. Unknown event names are not forwarded. `PlatformSnapshot` is
+null or absent is main. An event name the SDK doesn't know is forwarded as
+`{type: "unknown", name, appId, data}` with only the envelope validated, so a new event reaches
+partners when the service deploys it; new `room.*` notices are dropped. `PlatformSnapshot` is
 the service's `Snapshot` plus the app's `room`. Structural filtering does not promise
 redaction of generated prose or user content.
 

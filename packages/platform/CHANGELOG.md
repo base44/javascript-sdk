@@ -2,8 +2,8 @@
 
 ## 0.2.0
 
-**Breaking.** The client, its options and the event type names change. Runtime delivery of events
-is unchanged.
+**Breaking.** The client, its options and the event type names change, and events the SDK doesn't
+know now reach `onEvent`.
 
 ### Client and session
 
@@ -61,6 +61,9 @@ names.
   `WriteFileCall`. Check `name` to narrow it to that tool's `arguments` and `display`.
   `ToolArguments` and `ToolDisplay` are removed.
 - `BranchScoped` is removed. Each payload that belongs to a branch has its own `branch_id`.
+- `PlatformEvent` gains a member for events newer than the SDK: `{ type: "unknown", name, appId,
+  data }`, where `data` is `Record<string, unknown>`. Before, the SDK dropped them. A `switch` on
+  `event.type` that must cover every case needs a `case "unknown"`.
 - New: `SessionErrorCode` and `AppErrorCode` split `PlatformSocketErrorCode`, and every schema in
   the protocol is exported, with `ServerEventMap` and `ClientMessageMap`.
 
