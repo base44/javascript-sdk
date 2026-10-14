@@ -7,8 +7,7 @@ export interface AiGatewayConnection {
   /**
    * Bearer token that authenticates the request: the service-role token from
    * `base44.asServiceRole.aiGateway`, or the signed-in user's token from
-   * `base44.aiGateway`. The user token is an empty string when no one is signed
-   * in, and the gateway rejects that call.
+   * `base44.aiGateway`. The gateway expects the service-role token.
    */
   token: string;
   /**
@@ -96,21 +95,20 @@ export interface AiGatewayModuleConfig {
  *
  * The mode determines which token `connection()` returns:
  *
- * - **User authentication** (`base44.aiGateway`): Returns the signed-in app user's token.
- * - **Service role authentication** (`base44.asServiceRole.aiGateway`): Returns the service-role token instead.
+ * - **Service role authentication** (`base44.asServiceRole.aiGateway`): Returns the app's service-role token.
+ * - **User authentication** (`base44.aiGateway`): Returns the signed-in app user's token. The gateway accepts it only on apps shared privately or with your workspace.
  *
- * Use service role from a backend function, as every example here does. The
- * gateway accepts a user token only on apps shared privately or with your
- * workspace. It rejects anonymous calls, and user-token calls on public apps,
- * with a `403` and the error code `ai_gateway_requires_service_role`, so a
- * visitor can't spend your app's credits by calling the gateway from the
- * browser. A user-token call therefore works while you're building and starts
- * failing the moment you share the app publicly. Service role also works when
- * there's no signed-in user at all, such as from a scheduled automation.
+ * Call the gateway server-side with the app's service role, as every example
+ * here does. Calls from the browser or with a user's token are rejected with a
+ * `403`, the error code `ai_gateway_requires_service_role`, and the message
+ * "AI gateway requests must be made server-side using the app's service role.
+ * Calls from the browser or with a user's token are not allowed." Service role
+ * also works when there's no signed-in user at all, such as from a scheduled
+ * automation.
  *
- * To control who triggers a billed request, check the caller with
- * `base44.auth.me()` in your backend function before calling the gateway, and
- * call that function from your page with `base44.functions.invoke()`.
+ * In a backend function, for example, you can check the caller with
+ * `base44.auth.me()` before calling the gateway, and call the function from
+ * your page with `base44.functions.invoke()`.
  *
  * ## Billing and limits
  *
