@@ -12,15 +12,14 @@ The workspace must have white-label sockets enabled; this SDK does not open sess
 ```ts
 import { createPlatformClient } from "@base44/platform";
 
-const client = createPlatformClient({
-  socketUrl, // the session's socket_url, from POST /api/service/socket-sessions
-  async getSessionToken() {
+const client = createPlatformClient();
+const builder = client.builder.init({
+  // Returns the body of POST /api/service/socket-sessions, unchanged.
+  async getSession() {
     const response = await fetch("/api/builder-socket-session", { method: "POST" });
     if (!response.ok) throw new Error("Session request failed");
-    return (await response.json()).session_token;
+    return response.json();
   },
-});
-const builder = client.builder.init({
   onError(error) { showConnectionError(error.code); },
 });
 const subscription = builder.subscribe(appId, {
@@ -38,34 +37,40 @@ builder.close();
 
 `/api/builder-socket-session` is your backend's route, not an SDK endpoint. It opens a
 socket session with its workspace key (`apps:watch` scope) through
-`POST /api/service/socket-sessions` with `{ app_ids }`, and returns only the
-`session_token` and `socket_url` to the browser. Pass `socket_url` as `socketUrl`. Never pass the workspace key or any other server
-credential to this client. Subscribe only to apps on the session's allowlist; your
+`POST /api/service/socket-sessions` with `{ app_ids }`, and returns the response body
+to the browser. `getSession` returns that body unchanged: the SDK reads `session_token`,
+`socket_url` and `socket_path` and ignores other keys such as `session_id` and
+`expires_in`. Never pass the workspace key or any other server credential to this client. Subscribe only to apps on the session's allowlist; your
 backend adds or removes apps with `PUT`/`DELETE /api/service/socket-sessions/{session_id}/rooms/{app_id}`.
 
 A session lasts one hour and is never extended. The token goes exclusively in
 CONNECT `auth.session_token`, never a URL, and the SDK keeps it in memory only. It
-is reused across automatic reconnects. `getSessionToken` is called when a builder
+is reused across automatic reconnects. `getSession` is called when a builder
 session first connects, and again only when the server rejects the cached token or
-expires the session; the SDK then reconnects once with the new token. Retrieval has
-a twenty-second timeout and reports `session_unavailable` on failure.
+expires the session; the SDK then reconnects once with the new session. If the new
+session has a different `socket_url` or `socket_path`, the SDK closes the old socket,
+opens one at the new address and rejoins every active subscription. Retrieval has a
+twenty-second timeout. A failure, a timeout, or a session without a token, an
+HTTP(S) origin as `socket_url` (no credentials, path, query or fragment) or an
+absolute `socket_path` reports `session_unavailable`.
 
 One live socket per session: a newer connection with the same token replaces the
 older one, which stops with `session_replaced`. Open one session per page.
 
 ## Lifecycle
 
-`createPlatformClient({ socketUrl, getSessionToken })` creates a lightweight module
-container: no Socket.IO instance, timers, token request or network activity. Its
+`createPlatformClient()` creates a lightweight module container: no Socket.IO
+instance, timers, session request or network activity. It takes no options. Its
 `builder` module follows the server SDK's module-factory pattern.
 
-`client.builder.init({ onError })` synchronously creates an independent `BuilderSession`
-without connecting. Repeated calls create separate sessions, each owning its own
+`client.builder.init({ getSession, onError })` synchronously creates an independent
+`BuilderSession` without connecting or creating a socket. Repeated calls create separate sessions, each owning its own
 socket, listeners, subscriptions and cleanup. Close the returned session when its
 view is disposed; the root client and other sessions remain usable.
 
-`builder.connect()` resolves on CONNECT, before any snapshot. The socket uses the
-default namespace on `/ws/socket.io/`, WebSocket only, with a dedicated manager.
+`builder.connect()` fetches the first session, creates the socket at its address and
+resolves on CONNECT, before any snapshot. The socket uses the default namespace on the
+session's `socket_path`, WebSocket only, with a dedicated manager.
 Transport reconnection uses five attempts, starting at one second and capped at ten
 seconds with jitter; each attempt has a twenty-second timeout. A temporary server
 refusal is retried the same way. After exhaustion, a refusal or `session_replaced`,
@@ -94,9 +99,10 @@ their exceptions are isolated so they cannot interrupt another app's delivery.
 
 ## Public shapes
 
-- `PlatformClientOptions` (`client.types.ts`): `socketUrl`, `getSessionToken`.
+- `PlatformClient` (`client.types.ts`): the `builder` module.
 - `BuilderModule` (`modules/builder.types.ts`): lazy `init(options)` factory.
-- `BuilderInitOptions`: connection-level `onError` observer.
+- `BuilderInitOptions`: `getSession` and the connection-level `onError` observer.
+- `SocketSession`: the `session_token`, `socket_url` and `socket_path` that `getSession` returns.
 - `BuilderSession`: `connect()`, `subscribe(appId, options)`, `close()`.
 - `SubscriptionOptions`: required `onSnapshot`, `onEvent` and `onError`.
 - `PlatformSubscription`: read-only `appId`, `active`, and `unsubscribe()`.
@@ -109,7 +115,9 @@ their exceptions are isolated so they cannot interrupt another app's delivery.
 event is `{room, data}`; the SDK routes by `room` and validates the envelope, while
 payload schemas and private-field filtering are the server's. Omitted keys mean
 unchanged and explicit null clears. Events carrying `branch_id` belong to that branch;
-null or absent is main. Unknown event names are not forwarded. `PlatformSnapshot` is
+null or absent is main. An event name the SDK doesn't know is forwarded as
+`{type: "unknown", name, appId, data}` with only the envelope validated, so a new event reaches
+partners when the service deploys it; new `room.*` notices are dropped. `PlatformSnapshot` is
 the service's `Snapshot` plus the app's `room`. Structural filtering does not promise
 redaction of generated prose or user content.
 
@@ -148,7 +156,7 @@ exceptions, payloads and credentials are never attached.
 | Error code | Action |
 | --- | --- |
 | `connection_denied` | The session was rejected even with a fresh token: the workspace, key or session is not usable. |
-| `session_unavailable` | `getSessionToken` failed or timed out; no provider details are forwarded. |
+| `session_unavailable` | `getSession` failed, timed out or returned an invalid session; no provider details are forwarded. |
 | `session_replaced` | Another connection with the same session took over. Stop, or open a new session. |
 | `connection_failed` | Transport failure or exhausted retries; call `connect()` after fixing connectivity. |
 | `access_denied` | The join was refused: the app is not on the session's allowlist, or joins were rate limited. |

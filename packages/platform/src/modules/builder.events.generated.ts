@@ -31,24 +31,24 @@ export interface AccessRuleChangeDetails {
  */
 export interface AppSnapshotEvent {
   /**
-   * Room.
+   * The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.
    */
   room: string | null;
   /**
-   * The `data` field.
+   * The event's payload. Its fields depend on the event.
    */
   data: Snapshot;
 }
 /**
- * The `Snapshot` schema.
+ * The app's current state, sent after every join. Replace what the viewer holds for the app with it.
  */
 export interface Snapshot {
   /**
-   * The `status` field.
+   * The app's build status, or `null` when none is recorded.
    */
   status: StatusObject | null;
   /**
-   * Messages.
+   * The last 50 messages visible to partners, oldest first.
    */
   messages: Message[];
   /**
@@ -57,19 +57,19 @@ export interface Snapshot {
   queue: QueueState;
 }
 /**
- * Public builder state, without error diagnostics or billing context.
+ * The app's current build status.
  */
 export interface StatusObject {
   /**
-   * State.
+   * Where the app is in its build lifecycle. Ready means idle with no build in progress, processing means the app is being generated or modified, and error means the last build failed. This tracks building, not publishing.
    */
   state?: ("ready" | "processing" | "error") | null;
   /**
-   * Turn ID.
+   * ID of the user message whose turn the status belongs to.
    */
   turn_id?: string | null;
   /**
-   * Last updated date.
+   * Time the status was last updated, as a UTC timestamp in ISO 8601 format.
    */
   last_updated_date?: string | null;
 }
@@ -78,19 +78,19 @@ export interface StatusObject {
  */
 export interface Message {
   /**
-   * Id.
+   * ID of the message. An update carries the whole message again under the same ID.
    */
   id?: string | null;
   /**
-   * Role.
+   * `user` for a message a person sent, `assistant` for the AI's reply. `system` messages are never sent.
    */
   role?: ("user" | "assistant" | "system") | null;
   /**
-   * Content.
+   * Text of the message. Attachments and structured content are left out.
    */
   content?: string | null;
   /**
-   * Tool calls.
+   * The tool calls the AI made in this message, in order. Each is updated in place as it progresses.
    */
   tool_calls?:
     | (
@@ -123,52 +123,52 @@ export interface Message {
       )[]
     | null;
   /**
-   * Checkpoint ID.
+   * ID of the checkpoint tied to the message. On a message a person sent it holds the app before the turn, on the AI's final reply the app after it. Absent when the turn made no checkpoint.
    */
   checkpoint_id?: string | null;
   /**
-   * The `metadata` field.
+   * When the message was created.
    */
   metadata?: MessageMetadata | null;
   /**
-   * Additional message params.
+   * Flags on the message, such as plan mode. Only the flags listed here are published.
    */
   additional_message_params?: MessageParams | null;
 }
 /**
- * A `ask_clarifying_questions` call.
+ * The AI asks the user questions before it goes on. The call waits until the user answers.
  */
 export interface AskClarifyingQuestionsCall {
   /**
-   * Name.
+   * The tool that was called.
    */
   name: "ask_clarifying_questions";
   /**
-   * Id.
+   * ID of the call. Every update to the call carries the same ID.
    */
   id?: string | null;
   /**
-   * Requires user input.
+   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * Auto approved.
+   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * Status.
+   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
-   * Mutation applied.
+   * Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.
    */
   mutation_applied?: boolean | null;
   /**
-   * What kind of answer a parked call waits for.
+   * What kind of answer the call waits for, while `status` is `waiting_for_user_input`.
    */
   waiting_on?: WaitingOn | null;
   /**
-   * Why a safety guard parked the call: the guard, and its declared reason and details.
+   * Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.
    */
   approval?:
     | (
@@ -184,16 +184,16 @@ export interface AskClarifyingQuestionsCall {
       )
     | null;
   /**
-   * The `arguments` field.
+   * What the AI asked the tool to do, narrowed to what this tool publishes.
    */
   arguments?: QuestionArguments | null;
   /**
-   * The `user_input` field.
+   * The user's answer to the call, once given, for tools that take one.
    */
   user_input?: QuestionInput | null;
 }
 /**
- * What a parked call waits for. Render the widget by kind, not by tool name.
+ * What the call waits for. Render the widget by kind, not by tool name.
  */
 export interface WaitingOn {
   /**
@@ -202,19 +202,19 @@ export interface WaitingOn {
   kind?: "choice" | "input" | "approval";
 }
 /**
- * Parked by the `backend_function_entity_delete` guard.
+ * Waiting for approval: testing a backend function would delete records from an entity.
  */
 export interface BackendFunctionEntityDeleteApproval {
   /**
-   * Guard.
+   * The check that paused the call.
    */
   guard: "backend_function_entity_delete";
   /**
-   * Why the guard parked the call.
+   * Why the call needs approval, as the check explained it.
    */
   reason?: string | null;
   /**
-   * The `details` field.
+   * What the check found.
    */
   details?: FunctionEntityDeleteDetails | null;
 }
@@ -231,55 +231,55 @@ export interface FunctionEntityDeleteDetails {
    */
   method?: string;
   /**
-   * The guard could not verify the function's source.
+   * The check could not verify the function's source.
    */
   inspection_failed?: boolean;
 }
 /**
- * Parked by the `bash_approval` guard.
+ * Waiting for approval: the AI wants to run a shell command that needs a review first. The command itself is not published.
  */
 export interface BashApproval {
   /**
-   * Guard.
+   * The check that paused the call.
    */
   guard: "bash_approval";
 }
 /**
- * Parked by the `entity_rls_guard` guard.
+ * Waiting for approval: the AI wants to change who can read or write an entity's records.
  */
 export interface EntityRlsGuardApproval {
   /**
-   * Guard.
+   * The check that paused the call.
    */
   guard: "entity_rls_guard";
   /**
-   * Why the guard parked the call.
+   * Why the call needs approval, as the check explained it.
    */
   reason?: string | null;
   /**
-   * The `details` field.
+   * What the check found.
    */
   details?: AccessRuleChangeDetails | null;
 }
 /**
- * Parked by the `exec_tool_entity_mutation` guard.
+ * Waiting for approval: the AI's code would update or delete records in an entity.
  */
 export interface ExecToolEntityMutationApproval {
   /**
-   * Guard.
+   * The check that paused the call.
    */
   guard: "exec_tool_entity_mutation";
   /**
-   * Why the guard parked the call.
+   * Why the call needs approval, as the check explained it.
    */
   reason?: string | null;
   /**
-   * The `details` field.
+   * What the check found.
    */
   details?: EntityMutationDetails | null;
 }
 /**
- * What a parked entity mutation would do. Record data is never included.
+ * What the entity change waiting for approval would do. Record data is never included.
  */
 export interface EntityMutationDetails {
   /**
@@ -292,24 +292,24 @@ export interface EntityMutationDetails {
   summary?: string;
 }
 /**
- * Parked by the `exec_tool_github_repo_write` guard.
+ * Waiting for approval: the AI's code would write to a GitHub repository.
  */
 export interface ExecToolGithubRepoWriteApproval {
   /**
-   * Guard.
+   * The check that paused the call.
    */
   guard: "exec_tool_github_repo_write";
   /**
-   * Why the guard parked the call.
+   * Why the call needs approval, as the check explained it.
    */
   reason?: string | null;
   /**
-   * The `details` field.
+   * What the check found.
    */
   details?: SummaryDetails | null;
 }
 /**
- * What a parked code execution would do.
+ * What the code waiting for approval would do.
  */
 export interface SummaryDetails {
   /**
@@ -318,62 +318,62 @@ export interface SummaryDetails {
   summary?: string;
 }
 /**
- * Parked by the `exec_tool_invite_user` guard.
+ * Waiting for approval: the AI's code would invite someone to the app by email.
  */
 export interface ExecToolInviteUserApproval {
   /**
-   * Guard.
+   * The check that paused the call.
    */
   guard: "exec_tool_invite_user";
   /**
-   * Why the guard parked the call.
+   * Why the call needs approval, as the check explained it.
    */
   reason?: string | null;
   /**
-   * The `details` field.
+   * What the check found.
    */
   details?: SummaryDetails | null;
 }
 /**
- * Parked by the `exec_tool_send_email` guard.
+ * Waiting for approval: the AI's code would send an email.
  */
 export interface ExecToolSendEmailApproval {
   /**
-   * Guard.
+   * The check that paused the call.
    */
   guard: "exec_tool_send_email";
   /**
-   * Why the guard parked the call.
+   * Why the call needs approval, as the check explained it.
    */
   reason?: string | null;
   /**
-   * The `details` field.
+   * What the check found.
    */
   details?: SummaryDetails | null;
 }
 /**
- * Parked by the `exec_tool_send_sms` guard.
+ * Waiting for approval: the AI's code would send a text message.
  */
 export interface ExecToolSendSmsApproval {
   /**
-   * Guard.
+   * The check that paused the call.
    */
   guard: "exec_tool_send_sms";
   /**
-   * Why the guard parked the call.
+   * Why the call needs approval, as the check explained it.
    */
   reason?: string | null;
   /**
-   * The `details` field.
+   * What the check found.
    */
   details?: SummaryDetails | null;
 }
 /**
- * Parked by a guard that publishes only its name.
+ * Waiting for approval from a check that publishes only its name.
  */
 export interface OtherApproval {
   /**
-   * Guard.
+   * The check that paused the call.
    */
   guard: string;
 }
@@ -411,7 +411,7 @@ export interface Question {
    */
   covers?: string;
   /**
-   * Selectable options; a bare string is its label.
+   * Selectable options. A bare string is its label.
    */
   options?: (string | QuestionOption)[];
 }
@@ -455,39 +455,39 @@ export interface QuestionAnswer {
   custom_text?: string;
 }
 /**
- * A `ask_plan_questions` call.
+ * The AI asks the user questions that shape the plan, in plan mode. The call waits until the user answers.
  */
 export interface AskPlanQuestionsCall {
   /**
-   * Name.
+   * The tool that was called.
    */
   name: "ask_plan_questions";
   /**
-   * Id.
+   * ID of the call. Every update to the call carries the same ID.
    */
   id?: string | null;
   /**
-   * Requires user input.
+   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * Auto approved.
+   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * Status.
+   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
-   * Mutation applied.
+   * Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.
    */
   mutation_applied?: boolean | null;
   /**
-   * What kind of answer a parked call waits for.
+   * What kind of answer the call waits for, while `status` is `waiting_for_user_input`.
    */
   waiting_on?: WaitingOn | null;
   /**
-   * Why a safety guard parked the call: the guard, and its declared reason and details.
+   * Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.
    */
   approval?:
     | (
@@ -503,48 +503,48 @@ export interface AskPlanQuestionsCall {
       )
     | null;
   /**
-   * The `arguments` field.
+   * What the AI asked the tool to do, narrowed to what this tool publishes.
    */
   arguments?: QuestionArguments | null;
   /**
-   * The `user_input` field.
+   * The user's answer to the call, once given, for tools that take one.
    */
   user_input?: QuestionInput | null;
 }
 /**
- * A `bash` call.
+ * The AI runs a shell command in the app's sandbox.
  */
 export interface BashCall {
   /**
-   * Name.
+   * The tool that was called.
    */
   name: "bash";
   /**
-   * Id.
+   * ID of the call. Every update to the call carries the same ID.
    */
   id?: string | null;
   /**
-   * Requires user input.
+   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * Auto approved.
+   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * Status.
+   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
-   * Mutation applied.
+   * Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.
    */
   mutation_applied?: boolean | null;
   /**
-   * What kind of answer a parked call waits for.
+   * What kind of answer the call waits for, while `status` is `waiting_for_user_input`.
    */
   waiting_on?: WaitingOn | null;
   /**
-   * Why a safety guard parked the call: the guard, and its declared reason and details.
+   * Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.
    */
   approval?:
     | (
@@ -560,7 +560,7 @@ export interface BashCall {
       )
     | null;
   /**
-   * The `display` field.
+   * What the tool touched, for showing its progress. Never file contents or commands.
    */
   display?: SummaryDisplay | null;
 }
@@ -574,39 +574,39 @@ export interface SummaryDisplay {
   summary?: string;
 }
 /**
- * A `create_entity_records` call.
+ * The AI adds records to one of the app's entities.
  */
 export interface CreateEntityRecordsCall {
   /**
-   * Name.
+   * The tool that was called.
    */
   name: "create_entity_records";
   /**
-   * Id.
+   * ID of the call. Every update to the call carries the same ID.
    */
   id?: string | null;
   /**
-   * Requires user input.
+   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * Auto approved.
+   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * Status.
+   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
-   * Mutation applied.
+   * Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.
    */
   mutation_applied?: boolean | null;
   /**
-   * What kind of answer a parked call waits for.
+   * What kind of answer the call waits for, while `status` is `waiting_for_user_input`.
    */
   waiting_on?: WaitingOn | null;
   /**
-   * Why a safety guard parked the call: the guard, and its declared reason and details.
+   * Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.
    */
   approval?:
     | (
@@ -622,12 +622,12 @@ export interface CreateEntityRecordsCall {
       )
     | null;
   /**
-   * The `display` field.
+   * What the tool touched, for showing its progress. Never file contents or commands.
    */
   display?: EntityRecordsDisplay | null;
 }
 /**
- * The `EntityRecordsDisplay` schema.
+ * The entity an operation added records to.
  */
 export interface EntityRecordsDisplay {
   /**
@@ -640,39 +640,39 @@ export interface EntityRecordsDisplay {
   record_count?: number;
 }
 /**
- * A `delete_entities` call.
+ * The AI deletes records from one of the app's entities.
  */
 export interface DeleteEntitiesCall {
   /**
-   * Name.
+   * The tool that was called.
    */
   name: "delete_entities";
   /**
-   * Id.
+   * ID of the call. Every update to the call carries the same ID.
    */
   id?: string | null;
   /**
-   * Requires user input.
+   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * Auto approved.
+   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * Status.
+   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
-   * Mutation applied.
+   * Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.
    */
   mutation_applied?: boolean | null;
   /**
-   * What kind of answer a parked call waits for.
+   * What kind of answer the call waits for, while `status` is `waiting_for_user_input`.
    */
   waiting_on?: WaitingOn | null;
   /**
-   * Why a safety guard parked the call: the guard, and its declared reason and details.
+   * Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.
    */
   approval?:
     | (
@@ -688,16 +688,16 @@ export interface DeleteEntitiesCall {
       )
     | null;
   /**
-   * The `arguments` field.
+   * What the AI asked the tool to do, narrowed to what this tool publishes.
    */
   arguments?: EntityChangeArguments | null;
   /**
-   * The `display` field.
+   * What the tool touched, for showing its progress. Never file contents or commands.
    */
   display?: EntityDisplay | null;
 }
 /**
- * An entity update or delete; the entity is in `display.entity_name`.
+ * An entity update or delete. The entity is in `display.entity_name`.
  */
 export interface EntityChangeArguments {
   /**
@@ -715,39 +715,39 @@ export interface EntityDisplay {
   entity_name?: string;
 }
 /**
- * A `delete_file` call.
+ * The AI deletes a file from the app.
  */
 export interface DeleteFileCall {
   /**
-   * Name.
+   * The tool that was called.
    */
   name: "delete_file";
   /**
-   * Id.
+   * ID of the call. Every update to the call carries the same ID.
    */
   id?: string | null;
   /**
-   * Requires user input.
+   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * Auto approved.
+   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * Status.
+   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
-   * Mutation applied.
+   * Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.
    */
   mutation_applied?: boolean | null;
   /**
-   * What kind of answer a parked call waits for.
+   * What kind of answer the call waits for, while `status` is `waiting_for_user_input`.
    */
   waiting_on?: WaitingOn | null;
   /**
-   * Why a safety guard parked the call: the guard, and its declared reason and details.
+   * Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.
    */
   approval?:
     | (
@@ -763,7 +763,7 @@ export interface DeleteFileCall {
       )
     | null;
   /**
-   * The `display` field.
+   * What the tool touched, for showing its progress. Never file contents or commands.
    */
   display?: FileDisplay | null;
 }
@@ -781,39 +781,39 @@ export interface FileDisplay {
   content_empty?: boolean;
 }
 /**
- * A `edit_repo_file` call.
+ * The AI edits a file in the imported repository.
  */
 export interface EditRepoFileCall {
   /**
-   * Name.
+   * The tool that was called.
    */
   name: "edit_repo_file";
   /**
-   * Id.
+   * ID of the call. Every update to the call carries the same ID.
    */
   id?: string | null;
   /**
-   * Requires user input.
+   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * Auto approved.
+   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * Status.
+   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
-   * Mutation applied.
+   * Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.
    */
   mutation_applied?: boolean | null;
   /**
-   * What kind of answer a parked call waits for.
+   * What kind of answer the call waits for, while `status` is `waiting_for_user_input`.
    */
   waiting_on?: WaitingOn | null;
   /**
-   * Why a safety guard parked the call: the guard, and its declared reason and details.
+   * Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.
    */
   approval?:
     | (
@@ -829,44 +829,44 @@ export interface EditRepoFileCall {
       )
     | null;
   /**
-   * The `display` field.
+   * What the tool touched, for showing its progress. Never file contents or commands.
    */
   display?: FileDisplay | null;
 }
 /**
- * A `exec_tool` call.
+ * The AI runs code against the app's data and integrations.
  */
 export interface ExecToolCall {
   /**
-   * Name.
+   * The tool that was called.
    */
   name: "exec_tool";
   /**
-   * Id.
+   * ID of the call. Every update to the call carries the same ID.
    */
   id?: string | null;
   /**
-   * Requires user input.
+   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * Auto approved.
+   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * Status.
+   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
-   * Mutation applied.
+   * Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.
    */
   mutation_applied?: boolean | null;
   /**
-   * What kind of answer a parked call waits for.
+   * What kind of answer the call waits for, while `status` is `waiting_for_user_input`.
    */
   waiting_on?: WaitingOn | null;
   /**
-   * Why a safety guard parked the call: the guard, and its declared reason and details.
+   * Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.
    */
   approval?:
     | (
@@ -882,7 +882,7 @@ export interface ExecToolCall {
       )
     | null;
   /**
-   * The `display` field.
+   * What the tool touched, for showing its progress. Never file contents or commands.
    */
   display?: ExecDisplay | null;
 }
@@ -895,44 +895,44 @@ export interface ExecDisplay {
    */
   summary?: string;
   /**
-   * The code changed entity data: refresh the preview.
+   * The code changed entity data, so refresh the preview.
    */
   writes_entities?: boolean;
 }
 /**
- * A `find_replace` call.
+ * The AI edits files by replacing text in them.
  */
 export interface FindReplaceCall {
   /**
-   * Name.
+   * The tool that was called.
    */
   name: "find_replace";
   /**
-   * Id.
+   * ID of the call. Every update to the call carries the same ID.
    */
   id?: string | null;
   /**
-   * Requires user input.
+   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * Auto approved.
+   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * Status.
+   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
-   * Mutation applied.
+   * Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.
    */
   mutation_applied?: boolean | null;
   /**
-   * What kind of answer a parked call waits for.
+   * What kind of answer the call waits for, while `status` is `waiting_for_user_input`.
    */
   waiting_on?: WaitingOn | null;
   /**
-   * Why a safety guard parked the call: the guard, and its declared reason and details.
+   * Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.
    */
   approval?:
     | (
@@ -948,44 +948,44 @@ export interface FindReplaceCall {
       )
     | null;
   /**
-   * The `display` field.
+   * What the tool touched, for showing its progress. Never file contents or commands.
    */
   display?: FileDisplay | null;
 }
 /**
- * A `generate_game_background` call.
+ * The AI generates a background image for a game. An `image.resolved` event follows when it is ready.
  */
 export interface GenerateGameBackgroundCall {
   /**
-   * Name.
+   * The tool that was called.
    */
   name: "generate_game_background";
   /**
-   * Id.
+   * ID of the call. Every update to the call carries the same ID.
    */
   id?: string | null;
   /**
-   * Requires user input.
+   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * Auto approved.
+   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * Status.
+   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
-   * Mutation applied.
+   * Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.
    */
   mutation_applied?: boolean | null;
   /**
-   * What kind of answer a parked call waits for.
+   * What kind of answer the call waits for, while `status` is `waiting_for_user_input`.
    */
   waiting_on?: WaitingOn | null;
   /**
-   * Why a safety guard parked the call: the guard, and its declared reason and details.
+   * Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.
    */
   approval?:
     | (
@@ -1001,44 +1001,44 @@ export interface GenerateGameBackgroundCall {
       )
     | null;
   /**
-   * Results.
+   * The tool's result, narrowed to what this tool publishes. Absent while the call waits for approval.
    */
   results?: string | null;
 }
 /**
- * A `generate_game_image` call.
+ * The AI generates an image asset for a game. An `image.resolved` event follows when it is ready.
  */
 export interface GenerateGameImageCall {
   /**
-   * Name.
+   * The tool that was called.
    */
   name: "generate_game_image";
   /**
-   * Id.
+   * ID of the call. Every update to the call carries the same ID.
    */
   id?: string | null;
   /**
-   * Requires user input.
+   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * Auto approved.
+   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * Status.
+   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
-   * Mutation applied.
+   * Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.
    */
   mutation_applied?: boolean | null;
   /**
-   * What kind of answer a parked call waits for.
+   * What kind of answer the call waits for, while `status` is `waiting_for_user_input`.
    */
   waiting_on?: WaitingOn | null;
   /**
-   * Why a safety guard parked the call: the guard, and its declared reason and details.
+   * Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.
    */
   approval?:
     | (
@@ -1054,11 +1054,11 @@ export interface GenerateGameImageCall {
       )
     | null;
   /**
-   * The `arguments` field.
+   * What the AI asked the tool to do, narrowed to what this tool publishes.
    */
   arguments?: GameImageArguments | null;
   /**
-   * Results.
+   * The tool's result, narrowed to what this tool publishes. Absent while the call waits for approval.
    */
   results?: string | null;
 }
@@ -1072,39 +1072,39 @@ export interface GameImageArguments {
   aspect_ratio?: string;
 }
 /**
- * A `generate_image` call.
+ * The AI generates an image for the app. An `image.resolved` event follows when it is ready.
  */
 export interface GenerateImageCall {
   /**
-   * Name.
+   * The tool that was called.
    */
   name: "generate_image";
   /**
-   * Id.
+   * ID of the call. Every update to the call carries the same ID.
    */
   id?: string | null;
   /**
-   * Requires user input.
+   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * Auto approved.
+   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * Status.
+   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
-   * Mutation applied.
+   * Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.
    */
   mutation_applied?: boolean | null;
   /**
-   * What kind of answer a parked call waits for.
+   * What kind of answer the call waits for, while `status` is `waiting_for_user_input`.
    */
   waiting_on?: WaitingOn | null;
   /**
-   * Why a safety guard parked the call: the guard, and its declared reason and details.
+   * Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.
    */
   approval?:
     | (
@@ -1120,11 +1120,11 @@ export interface GenerateImageCall {
       )
     | null;
   /**
-   * The `arguments` field.
+   * What the AI asked the tool to do, narrowed to what this tool publishes.
    */
   arguments?: MediaArguments | null;
   /**
-   * The `results` field.
+   * The tool's result, narrowed to what this tool publishes. Absent while the call waits for approval.
    */
   results?: ImageResult | null;
 }
@@ -1159,39 +1159,39 @@ export interface ImageResult {
   image_url?: string | null;
 }
 /**
- * A `generate_prd` call.
+ * The AI writes down the plan it settled with the user. In plan mode this call carries the plan itself.
  */
 export interface GeneratePrdCall {
   /**
-   * Name.
+   * The tool that was called.
    */
   name: "generate_prd";
   /**
-   * Id.
+   * ID of the call. Every update to the call carries the same ID.
    */
   id?: string | null;
   /**
-   * Requires user input.
+   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * Auto approved.
+   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * Status.
+   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
-   * Mutation applied.
+   * Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.
    */
   mutation_applied?: boolean | null;
   /**
-   * What kind of answer a parked call waits for.
+   * What kind of answer the call waits for, while `status` is `waiting_for_user_input`.
    */
   waiting_on?: WaitingOn | null;
   /**
-   * Why a safety guard parked the call: the guard, and its declared reason and details.
+   * Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.
    */
   approval?:
     | (
@@ -1207,7 +1207,7 @@ export interface GeneratePrdCall {
       )
     | null;
   /**
-   * The `arguments` field.
+   * What the AI asked the tool to do, narrowed to what this tool publishes.
    */
   arguments?: PrdArguments | null;
 }
@@ -1253,39 +1253,39 @@ export interface PrdArguments {
   game_engine?: string;
 }
 /**
- * A `generate_video` call.
+ * The AI generates a video for the app.
  */
 export interface GenerateVideoCall {
   /**
-   * Name.
+   * The tool that was called.
    */
   name: "generate_video";
   /**
-   * Id.
+   * ID of the call. Every update to the call carries the same ID.
    */
   id?: string | null;
   /**
-   * Requires user input.
+   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * Auto approved.
+   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * Status.
+   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
-   * Mutation applied.
+   * Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.
    */
   mutation_applied?: boolean | null;
   /**
-   * What kind of answer a parked call waits for.
+   * What kind of answer the call waits for, while `status` is `waiting_for_user_input`.
    */
   waiting_on?: WaitingOn | null;
   /**
-   * Why a safety guard parked the call: the guard, and its declared reason and details.
+   * Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.
    */
   approval?:
     | (
@@ -1301,48 +1301,48 @@ export interface GenerateVideoCall {
       )
     | null;
   /**
-   * The `arguments` field.
+   * What the AI asked the tool to do, narrowed to what this tool publishes.
    */
   arguments?: MediaArguments | null;
   /**
-   * Results.
+   * The tool's result, narrowed to what this tool publishes. Absent while the call waits for approval.
    */
   results?: string | null;
 }
 /**
- * A `install_npm_package` call.
+ * The AI installs or removes npm packages in the app.
  */
 export interface InstallNpmPackageCall {
   /**
-   * Name.
+   * The tool that was called.
    */
   name: "install_npm_package";
   /**
-   * Id.
+   * ID of the call. Every update to the call carries the same ID.
    */
   id?: string | null;
   /**
-   * Requires user input.
+   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * Auto approved.
+   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * Status.
+   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
-   * Mutation applied.
+   * Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.
    */
   mutation_applied?: boolean | null;
   /**
-   * What kind of answer a parked call waits for.
+   * What kind of answer the call waits for, while `status` is `waiting_for_user_input`.
    */
   waiting_on?: WaitingOn | null;
   /**
-   * Why a safety guard parked the call: the guard, and its declared reason and details.
+   * Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.
    */
   approval?:
     | (
@@ -1358,7 +1358,7 @@ export interface InstallNpmPackageCall {
       )
     | null;
   /**
-   * The `arguments` field.
+   * What the AI asked the tool to do, narrowed to what this tool publishes.
    */
   arguments?: InstallPackageArguments | null;
 }
@@ -1385,39 +1385,39 @@ export interface PackageOperation {
   action?: string;
 }
 /**
- * A `preview_execute_code` call.
+ * The AI runs code inside the app preview to inspect it.
  */
 export interface PreviewExecuteCodeCall {
   /**
-   * Name.
+   * The tool that was called.
    */
   name: "preview_execute_code";
   /**
-   * Id.
+   * ID of the call. Every update to the call carries the same ID.
    */
   id?: string | null;
   /**
-   * Requires user input.
+   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * Auto approved.
+   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * Status.
+   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
-   * Mutation applied.
+   * Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.
    */
   mutation_applied?: boolean | null;
   /**
-   * What kind of answer a parked call waits for.
+   * What kind of answer the call waits for, while `status` is `waiting_for_user_input`.
    */
   waiting_on?: WaitingOn | null;
   /**
-   * Why a safety guard parked the call: the guard, and its declared reason and details.
+   * Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.
    */
   approval?:
     | (
@@ -1433,44 +1433,44 @@ export interface PreviewExecuteCodeCall {
       )
     | null;
   /**
-   * The `display` field.
+   * What the tool touched, for showing its progress. Never file contents or commands.
    */
   display?: ExecDisplay | null;
 }
 /**
- * A `preview_screenshot` call.
+ * The AI takes a screenshot of the app preview to check its work.
  */
 export interface PreviewScreenshotCall {
   /**
-   * Name.
+   * The tool that was called.
    */
   name: "preview_screenshot";
   /**
-   * Id.
+   * ID of the call. Every update to the call carries the same ID.
    */
   id?: string | null;
   /**
-   * Requires user input.
+   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * Auto approved.
+   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * Status.
+   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
-   * Mutation applied.
+   * Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.
    */
   mutation_applied?: boolean | null;
   /**
-   * What kind of answer a parked call waits for.
+   * What kind of answer the call waits for, while `status` is `waiting_for_user_input`.
    */
   waiting_on?: WaitingOn | null;
   /**
-   * Why a safety guard parked the call: the guard, and its declared reason and details.
+   * Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.
    */
   approval?:
     | (
@@ -1486,44 +1486,44 @@ export interface PreviewScreenshotCall {
       )
     | null;
   /**
-   * The `display` field.
+   * What the tool touched, for showing its progress. Never file contents or commands.
    */
   display?: SummaryDisplay | null;
 }
 /**
- * A `read_only_exec_tool` call.
+ * The AI runs code that only reads the app's data.
  */
 export interface ReadOnlyExecToolCall {
   /**
-   * Name.
+   * The tool that was called.
    */
   name: "read_only_exec_tool";
   /**
-   * Id.
+   * ID of the call. Every update to the call carries the same ID.
    */
   id?: string | null;
   /**
-   * Requires user input.
+   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * Auto approved.
+   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * Status.
+   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
-   * Mutation applied.
+   * Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.
    */
   mutation_applied?: boolean | null;
   /**
-   * What kind of answer a parked call waits for.
+   * What kind of answer the call waits for, while `status` is `waiting_for_user_input`.
    */
   waiting_on?: WaitingOn | null;
   /**
-   * Why a safety guard parked the call: the guard, and its declared reason and details.
+   * Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.
    */
   approval?:
     | (
@@ -1539,44 +1539,44 @@ export interface ReadOnlyExecToolCall {
       )
     | null;
   /**
-   * The `display` field.
+   * What the tool touched, for showing its progress. Never file contents or commands.
    */
   display?: ExecDisplay | null;
 }
 /**
- * A `read_repo_file` call.
+ * The AI reads a file in the imported repository.
  */
 export interface ReadRepoFileCall {
   /**
-   * Name.
+   * The tool that was called.
    */
   name: "read_repo_file";
   /**
-   * Id.
+   * ID of the call. Every update to the call carries the same ID.
    */
   id?: string | null;
   /**
-   * Requires user input.
+   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * Auto approved.
+   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * Status.
+   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
-   * Mutation applied.
+   * Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.
    */
   mutation_applied?: boolean | null;
   /**
-   * What kind of answer a parked call waits for.
+   * What kind of answer the call waits for, while `status` is `waiting_for_user_input`.
    */
   waiting_on?: WaitingOn | null;
   /**
-   * Why a safety guard parked the call: the guard, and its declared reason and details.
+   * Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.
    */
   approval?:
     | (
@@ -1592,44 +1592,44 @@ export interface ReadRepoFileCall {
       )
     | null;
   /**
-   * The `display` field.
+   * What the tool touched, for showing its progress. Never file contents or commands.
    */
   display?: FileDisplay | null;
 }
 /**
- * A `run_shell_command` call.
+ * The AI runs a shell command in the imported repository's sandbox.
  */
 export interface RunShellCommandCall {
   /**
-   * Name.
+   * The tool that was called.
    */
   name: "run_shell_command";
   /**
-   * Id.
+   * ID of the call. Every update to the call carries the same ID.
    */
   id?: string | null;
   /**
-   * Requires user input.
+   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * Auto approved.
+   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * Status.
+   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
-   * Mutation applied.
+   * Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.
    */
   mutation_applied?: boolean | null;
   /**
-   * What kind of answer a parked call waits for.
+   * What kind of answer the call waits for, while `status` is `waiting_for_user_input`.
    */
   waiting_on?: WaitingOn | null;
   /**
-   * Why a safety guard parked the call: the guard, and its declared reason and details.
+   * Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.
    */
   approval?:
     | (
@@ -1645,44 +1645,44 @@ export interface RunShellCommandCall {
       )
     | null;
   /**
-   * The `display` field.
+   * What the tool touched, for showing its progress. Never file contents or commands.
    */
   display?: SummaryDisplay | null;
 }
 /**
- * A `set_secrets` call.
+ * The AI asks the user for secret values, such as API keys. The call waits until the user supplies them.
  */
 export interface SetSecretsCall {
   /**
-   * Name.
+   * The tool that was called.
    */
   name: "set_secrets";
   /**
-   * Id.
+   * ID of the call. Every update to the call carries the same ID.
    */
   id?: string | null;
   /**
-   * Requires user input.
+   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * Auto approved.
+   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * Status.
+   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
-   * Mutation applied.
+   * Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.
    */
   mutation_applied?: boolean | null;
   /**
-   * What kind of answer a parked call waits for.
+   * What kind of answer the call waits for, while `status` is `waiting_for_user_input`.
    */
   waiting_on?: WaitingOn | null;
   /**
-   * Why a safety guard parked the call: the guard, and its declared reason and details.
+   * Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.
    */
   approval?:
     | (
@@ -1698,7 +1698,7 @@ export interface SetSecretsCall {
       )
     | null;
   /**
-   * The `arguments` field.
+   * What the AI asked the tool to do, narrowed to what this tool publishes.
    */
   arguments?: SetSecretsArguments | null;
 }
@@ -1725,39 +1725,39 @@ export interface SecretField {
   description?: string;
 }
 /**
- * A `update_entities` call.
+ * The AI updates records in one of the app's entities.
  */
 export interface UpdateEntitiesCall {
   /**
-   * Name.
+   * The tool that was called.
    */
   name: "update_entities";
   /**
-   * Id.
+   * ID of the call. Every update to the call carries the same ID.
    */
   id?: string | null;
   /**
-   * Requires user input.
+   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * Auto approved.
+   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * Status.
+   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
-   * Mutation applied.
+   * Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.
    */
   mutation_applied?: boolean | null;
   /**
-   * What kind of answer a parked call waits for.
+   * What kind of answer the call waits for, while `status` is `waiting_for_user_input`.
    */
   waiting_on?: WaitingOn | null;
   /**
-   * Why a safety guard parked the call: the guard, and its declared reason and details.
+   * Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.
    */
   approval?:
     | (
@@ -1773,48 +1773,48 @@ export interface UpdateEntitiesCall {
       )
     | null;
   /**
-   * The `arguments` field.
+   * What the AI asked the tool to do, narrowed to what this tool publishes.
    */
   arguments?: EntityChangeArguments | null;
   /**
-   * The `display` field.
+   * What the tool touched, for showing its progress. Never file contents or commands.
    */
   display?: EntityDisplay | null;
 }
 /**
- * A `update_plan` call.
+ * The AI adds settled points to the plan.
  */
 export interface UpdatePlanCall {
   /**
-   * Name.
+   * The tool that was called.
    */
   name: "update_plan";
   /**
-   * Id.
+   * ID of the call. Every update to the call carries the same ID.
    */
   id?: string | null;
   /**
-   * Requires user input.
+   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * Auto approved.
+   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * Status.
+   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
-   * Mutation applied.
+   * Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.
    */
   mutation_applied?: boolean | null;
   /**
-   * What kind of answer a parked call waits for.
+   * What kind of answer the call waits for, while `status` is `waiting_for_user_input`.
    */
   waiting_on?: WaitingOn | null;
   /**
-   * Why a safety guard parked the call: the guard, and its declared reason and details.
+   * Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.
    */
   approval?:
     | (
@@ -1830,7 +1830,7 @@ export interface UpdatePlanCall {
       )
     | null;
   /**
-   * The `arguments` field.
+   * What the AI asked the tool to do, narrowed to what this tool publishes.
    */
   arguments?: UpdatePlanArguments | null;
 }
@@ -1869,39 +1869,39 @@ export interface PlanUpdate {
   text?: string;
 }
 /**
- * A `write_file` call.
+ * The AI writes a file in the app.
  */
 export interface WriteFileCall {
   /**
-   * Name.
+   * The tool that was called.
    */
   name: "write_file";
   /**
-   * Id.
+   * ID of the call. Every update to the call carries the same ID.
    */
   id?: string | null;
   /**
-   * Requires user input.
+   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * Auto approved.
+   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * Status.
+   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
-   * Mutation applied.
+   * Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.
    */
   mutation_applied?: boolean | null;
   /**
-   * What kind of answer a parked call waits for.
+   * What kind of answer the call waits for, while `status` is `waiting_for_user_input`.
    */
   waiting_on?: WaitingOn | null;
   /**
-   * Why a safety guard parked the call: the guard, and its declared reason and details.
+   * Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.
    */
   approval?:
     | (
@@ -1917,44 +1917,44 @@ export interface WriteFileCall {
       )
     | null;
   /**
-   * The `display` field.
+   * What the tool touched, for showing its progress. Never file contents or commands.
    */
   display?: FileDisplay | null;
 }
 /**
- * A `write_repo_file` call.
+ * The AI writes a file in the imported repository.
  */
 export interface WriteRepoFileCall {
   /**
-   * Name.
+   * The tool that was called.
    */
   name: "write_repo_file";
   /**
-   * Id.
+   * ID of the call. Every update to the call carries the same ID.
    */
   id?: string | null;
   /**
-   * Requires user input.
+   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * Auto approved.
+   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * Status.
+   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
-   * Mutation applied.
+   * Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.
    */
   mutation_applied?: boolean | null;
   /**
-   * What kind of answer a parked call waits for.
+   * What kind of answer the call waits for, while `status` is `waiting_for_user_input`.
    */
   waiting_on?: WaitingOn | null;
   /**
-   * Why a safety guard parked the call: the guard, and its declared reason and details.
+   * Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.
    */
   approval?:
     | (
@@ -1970,44 +1970,44 @@ export interface WriteRepoFileCall {
       )
     | null;
   /**
-   * The `display` field.
+   * What the tool touched, for showing its progress. Never file contents or commands.
    */
   display?: FileDisplay | null;
 }
 /**
- * A call to a tool that publishes only its name and progress.
+ * A call to any other tool. Only its name and progress are published.
  */
 export interface OtherToolCall {
   /**
-   * Name.
+   * The tool that was called.
    */
   name: string;
   /**
-   * Id.
+   * ID of the call. Every update to the call carries the same ID.
    */
   id?: string | null;
   /**
-   * Requires user input.
+   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * Auto approved.
+   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * Status.
+   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
-   * Mutation applied.
+   * Whether the call changed the app or its data. `false` means it finished without changing anything. `null` means the tool did not report it, so whether it changed anything is unknown.
    */
   mutation_applied?: boolean | null;
   /**
-   * What kind of answer a parked call waits for.
+   * What kind of answer the call waits for, while `status` is `waiting_for_user_input`.
    */
   waiting_on?: WaitingOn | null;
   /**
-   * Why a safety guard parked the call: the guard, and its declared reason and details.
+   * Why the call waits for approval, from the check that paused it. Present only while `status` is `waiting_for_user_input`.
    */
   approval?:
     | (
@@ -2028,7 +2028,7 @@ export interface OtherToolCall {
  */
 export interface MessageMetadata {
   /**
-   * Created date.
+   * Time the message was created, as a UTC timestamp in ISO 8601 format.
    */
   created_date?: string | null;
 }
@@ -2058,15 +2058,15 @@ export interface MessageParams {
   system_message_type?: string;
 }
 /**
- * The prompt queue: the prompts the builder runs next, in order.
+ * The prompts the builder runs next, in order.
  */
 export interface QueueState {
   /**
-   * Items.
+   * Queued prompts, in the order they will run.
    */
   items?: QueueItem[] | null;
   /**
-   * Is paused.
+   * Whether the queue is paused, so queued prompts wait. A person can pause it, and the builder pauses it while the AI waits for an answer.
    */
   is_paused?: boolean | null;
 }
@@ -2075,32 +2075,32 @@ export interface QueueState {
  */
 export interface QueueItem {
   /**
-   * Id.
+   * ID of the queued prompt.
    */
   id?: string | null;
   /**
-   * Content.
+   * Text of the prompt.
    */
   content?: string | null;
   /**
-   * Branch ID.
+   * ID of the branch the prompt runs on, or `null` for the main branch.
    */
   branch_id?: string | null;
   /**
-   * Created at.
+   * Time the prompt was queued, as a UTC timestamp in ISO 8601 format.
    */
   created_at?: string | null;
 }
 /**
- * The `AppStatusChanged` schema.
+ * The app's build status changed, because a turn started, finished or failed.
  */
 export interface AppStatusChanged {
   /**
-   * The `status` field.
+   * The new status, or `null` when the status was cleared.
    */
   status: StatusObject | null;
   /**
-   * Branch ID.
+   * ID of the branch the change belongs to. Omitted or `null` means the main branch.
    */
   branch_id?: string | null;
 }
@@ -2109,20 +2109,20 @@ export interface AppStatusChanged {
  */
 export interface AppStatusChangedEvent {
   /**
-   * Room.
+   * The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.
    */
   room: string | null;
   /**
-   * The `data` field.
+   * The event's payload. Its fields depend on the event.
    */
   data: AppStatusChanged;
 }
 /**
- * Re-read what changed; the event carries no content.
+ * Something changed outside the chat. Re-read it, because the event carries no content.
  */
 export interface BranchChange {
   /**
-   * Branch ID.
+   * ID of the branch the change belongs to. Omitted or `null` means the main branch.
    */
   branch_id?: string | null;
 }
@@ -2131,11 +2131,11 @@ export interface BranchChange {
  */
 export interface BranchDeletedEvent {
   /**
-   * Room.
+   * The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.
    */
   room: string | null;
   /**
-   * The `data` field.
+   * The event's payload. Its fields depend on the event.
    */
   data: BranchChange;
 }
@@ -2144,11 +2144,11 @@ export interface BranchDeletedEvent {
  */
 export interface ConversationChangedEvent {
   /**
-   * Room.
+   * The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.
    */
   room: string | null;
   /**
-   * The `data` field.
+   * The event's payload. Its fields depend on the event.
    */
   data: BranchChange;
 }
@@ -2157,28 +2157,28 @@ export interface ConversationChangedEvent {
  */
 export interface FilesChangedEvent {
   /**
-   * Room.
+   * The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.
    */
   room: string | null;
   /**
-   * The `data` field.
+   * The event's payload. Its fields depend on the event.
    */
   data: BranchChange;
 }
 /**
- * The `ImageResolved` schema.
+ * A generated image finished or failed. Replace `placeholder_url` with `image_url` wherever the app shows it.
  */
 export interface ImageResolved {
   /**
-   * Status.
+   * `pending` while the image generates, `completed` once `image_url` is ready, `failed` when generation failed.
    */
   status?: ("pending" | "completed" | "failed") | null;
   /**
-   * Placeholder URL.
+   * Placeholder URL the app shows while the image generates. Match it to find where the image appears.
    */
   placeholder_url?: string | null;
   /**
-   * Image URL.
+   * URL of the finished image, or `null` while it is pending or after it failed.
    */
   image_url?: string | null;
 }
@@ -2187,28 +2187,28 @@ export interface ImageResolved {
  */
 export interface ImageResolvedEvent {
   /**
-   * Room.
+   * The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.
    */
   room: string | null;
   /**
-   * The `data` field.
+   * The event's payload. Its fields depend on the event.
    */
   data: ImageResolved;
 }
 /**
- * The `MessageRemoved` schema.
+ * A chat message was removed or hidden. Drop the message with `message_id`.
  */
 export interface MessageRemoved {
   /**
-   * Message ID.
+   * ID of the removed message.
    */
   message_id: string;
   /**
-   * Conversation ID.
+   * ID of the conversation the message belongs to. Each branch has its own conversation, so a viewer showing one branch can drop another branch's messages.
    */
   conversation_id?: string | null;
   /**
-   * Branch ID.
+   * ID of the branch the change belongs to. Omitted or `null` means the main branch.
    */
   branch_id?: string | null;
 }
@@ -2217,28 +2217,28 @@ export interface MessageRemoved {
  */
 export interface MessageRemovedEvent {
   /**
-   * Room.
+   * The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.
    */
   room: string | null;
   /**
-   * The `data` field.
+   * The event's payload. Its fields depend on the event.
    */
   data: MessageRemoved;
 }
 /**
- * The `MessageUpdated` schema.
+ * A chat message was added or changed. Replace the message with the same `id`.
  */
 export interface MessageUpdated {
   /**
-   * The `message` field.
+   * The message in full, as it now reads.
    */
   message: Message;
   /**
-   * Conversation ID.
+   * ID of the conversation the message belongs to. Each branch has its own conversation, so a viewer showing one branch can drop another branch's messages.
    */
   conversation_id?: string | null;
   /**
-   * Branch ID.
+   * ID of the branch the change belongs to. Omitted or `null` means the main branch.
    */
   branch_id?: string | null;
 }
@@ -2247,20 +2247,20 @@ export interface MessageUpdated {
  */
 export interface MessageUpdatedEvent {
   /**
-   * Room.
+   * The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.
    */
   room: string | null;
   /**
-   * The `data` field.
+   * The event's payload. Its fields depend on the event.
    */
   data: MessageUpdated;
 }
 /**
- * The `PreviewNavigationRequested` schema.
+ * The app preview should show a page of the app, usually one the AI just built.
  */
 export interface PreviewNavigationRequested {
   /**
-   * Path.
+   * Path of the page to show, relative to the app's root, such as `/settings`.
    */
   path: string;
   /**
@@ -2268,7 +2268,7 @@ export interface PreviewNavigationRequested {
    */
   force: boolean;
   /**
-   * Branch ID.
+   * ID of the branch the change belongs to. Omitted or `null` means the main branch.
    */
   branch_id?: string | null;
 }
@@ -2277,20 +2277,20 @@ export interface PreviewNavigationRequested {
  */
 export interface PreviewNavigationRequestedEvent {
   /**
-   * Room.
+   * The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.
    */
   room: string | null;
   /**
-   * The `data` field.
+   * The event's payload. Its fields depend on the event.
    */
   data: PreviewNavigationRequested;
 }
 /**
- * The `PreviewReloadRequested` schema.
+ * The app preview should reload, because its files changed under it.
  */
 export interface PreviewReloadRequested {
   /**
-   * Branch ID.
+   * ID of the branch the change belongs to. Omitted or `null` means the main branch.
    */
   branch_id?: string | null;
 }
@@ -2299,11 +2299,11 @@ export interface PreviewReloadRequested {
  */
 export interface PreviewReloadRequestedEvent {
   /**
-   * Room.
+   * The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.
    */
   room: string | null;
   /**
-   * The `data` field.
+   * The event's payload. Its fields depend on the event.
    */
   data: PreviewReloadRequested;
 }
@@ -2312,32 +2312,32 @@ export interface PreviewReloadRequestedEvent {
  */
 export interface PullRequestChangedEvent {
   /**
-   * Room.
+   * The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.
    */
   room: string | null;
   /**
-   * The `data` field.
+   * The event's payload. Its fields depend on the event.
    */
   data: BranchChange;
 }
 /**
- * The `QueueUpdated` schema.
+ * The whole prompt queue after a change. Replace the queue with it.
  */
 export interface QueueUpdated {
   /**
-   * Items.
+   * Queued prompts, in the order they will run.
    */
   items?: QueueItem[] | null;
   /**
-   * Is paused.
+   * Whether the queue is paused, so queued prompts wait. A person can pause it, and the builder pauses it while the AI waits for an answer.
    */
   is_paused?: boolean | null;
   /**
-   * Processed item ID.
+   * ID of the queued prompt the builder just picked up to run. Absent when a prompt was added, removed or cleared.
    */
   processed_item_id?: string | null;
   /**
-   * Branch ID.
+   * ID of the branch the change belongs to. Omitted or `null` means the main branch.
    */
   branch_id?: string | null;
 }
@@ -2346,11 +2346,11 @@ export interface QueueUpdated {
  */
 export interface QueueUpdatedEvent {
   /**
-   * Room.
+   * The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.
    */
   room: string | null;
   /**
-   * The `data` field.
+   * The event's payload. Its fields depend on the event.
    */
   data: QueueUpdated;
 }
@@ -2359,63 +2359,63 @@ export interface QueueUpdatedEvent {
  */
 export interface RepositoryChangedEvent {
   /**
-   * Room.
+   * The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.
    */
   room: string | null;
   /**
-   * The `data` field.
+   * The event's payload. Its fields depend on the event.
    */
   data: BranchChange;
 }
 /**
- * A join was refused: the app is not on the session's allowlist, or the socket joins too often.
+ * A join was refused because the app is not on the session's allowlist, or the socket joins too often.
  */
 export interface RoomAccessDeniedEvent {
   /**
-   * Room.
+   * The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.
    */
   room: string | null;
   /**
-   * The `data` field.
+   * The event's payload. Its fields depend on the event.
    */
   data: RoomNotice;
 }
 /**
- * The app is named by the event's room.
+ * An empty payload. The app concerned is the event's `room`.
  */
 export interface RoomNotice {}
 /**
- * The app left the session's allowlist, or its workspace. Events for it stop; do not rejoin.
+ * The app left the session's allowlist, or its workspace. Events for it stop. Do not rejoin.
  */
 export interface RoomAccessRevokedEvent {
   /**
-   * Room.
+   * The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.
    */
   room: string | null;
   /**
-   * The `data` field.
+   * The event's payload. Its fields depend on the event.
    */
   data: RoomNotice;
 }
 /**
- * The join held but its snapshot failed. Live events still arrive; rejoin later for a snapshot.
+ * The join held but its snapshot failed. Live events still arrive. Rejoin later for a snapshot.
  */
 export interface RoomSnapshotUnavailableEvent {
   /**
-   * Room.
+   * The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.
    */
   room: string | null;
   /**
-   * The `data` field.
+   * The event's payload. Its fields depend on the event.
    */
   data: RoomNotice;
 }
 /**
- * The `SessionEnded` schema.
+ * The session is over. The socket disconnects right after this event.
  */
 export interface SessionEnded {
   /**
-   * `expired`: ask the partner backend for a new session. `revoked`: the partner or an admin ended it; don't reconnect. `replaced`: another tab took it; stop.
+   * `expired`: ask the partner backend for a new session. `revoked`: the partner or an admin ended it, so do not reconnect. `replaced`: a newer socket took the session, so stop.
    */
   reason: "expired" | "revoked" | "replaced";
 }
@@ -2424,53 +2424,53 @@ export interface SessionEnded {
  */
 export interface SessionEndedEvent {
   /**
-   * Room.
+   * The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.
    */
   room: string | null;
   /**
-   * The `data` field.
+   * The event's payload. Its fields depend on the event.
    */
   data: SessionEnded;
 }
 /**
- * The `TaskProgress` schema.
+ * How far a long-running task has got.
  */
 export interface TaskProgress {
   /**
-   * Current.
+   * Items processed so far.
    */
   current?: number | null;
   /**
-   * Total.
+   * Items to process in all.
    */
   total?: number | null;
   /**
-   * Percentage.
+   * Share of the work done, from 0 to 100.
    */
   percentage?: number | null;
 }
 /**
- * The `TaskProgressed` schema.
+ * A long-running task, such as a data import, started, made progress, finished, failed or was cancelled.
  */
 export interface TaskProgressed {
   /**
-   * Tool call ID.
+   * ID of the tool call that started the task.
    */
   tool_call_id?: string | null;
   /**
-   * Message ID.
+   * ID of the message that holds that tool call.
    */
   message_id?: string | null;
   /**
-   * Event type.
+   * `task_started`, `task_progress`, `task_completed`, `task_failed` or `task_cancelled`.
    */
-  event_type?: string | null;
+  event_type?: ("task_started" | "task_progress" | "task_completed" | "task_failed" | "task_cancelled") | null;
   /**
-   * The `progress` field.
+   * Progress so far.
    */
   progress?: TaskProgress | null;
   /**
-   * Branch ID.
+   * ID of the branch the change belongs to. Omitted or `null` means the main branch.
    */
   branch_id?: string | null;
 }
@@ -2479,11 +2479,11 @@ export interface TaskProgressed {
  */
 export interface TaskProgressedEvent {
   /**
-   * Room.
+   * The app the event belongs to, as `/apps/{app_id}`. It is `null` for `session.ended`, which concerns the whole session.
    */
   room: string | null;
   /**
-   * The `data` field.
+   * The event's payload. Its fields depend on the event.
    */
   data: TaskProgressed;
 }
@@ -2518,11 +2518,11 @@ export interface ServerEventMap {
   "pull_request.changed": BranchChange;
   /** The session ended (expired, revoked, or taken by a newer socket). The socket disconnects next. */
   "session.ended": SessionEnded;
-  /** A join was refused: the app is not on the session's allowlist, or the socket joins too often. */
+  /** A join was refused because the app is not on the session's allowlist, or the socket joins too often. */
   "room.access_denied": RoomNotice;
-  /** The app left the session's allowlist, or its workspace. Events for it stop; do not rejoin. */
+  /** The app left the session's allowlist, or its workspace. Events for it stop. Do not rejoin. */
   "room.access_revoked": RoomNotice;
-  /** The join held but its snapshot failed. Live events still arrive; rejoin later for a snapshot. */
+  /** The join held but its snapshot failed. Live events still arrive. Rejoin later for a snapshot. */
   "room.snapshot_unavailable": RoomNotice;
   /** The app's current status and its last 50 public messages, after every join. Replace the app's state with it. */
   "app.snapshot": Snapshot;

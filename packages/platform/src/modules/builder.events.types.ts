@@ -18,6 +18,10 @@ export type PlatformEventMap = {
  * is unchanged, and an explicit `null` clears it. For every event and its payload, see
  * [Socket messages](/developers/references/apps-api/sections/socket-messages).
  *
+ * An event added to the service after this version of the SDK arrives with `type: "unknown"`, its
+ * name in `name` and an unchecked `data`, so check a field before using it. After you upgrade, it
+ * arrives under its own `type`.
+ *
  * @example
  * ```typescript
  * // Narrow an event by type
@@ -25,6 +29,9 @@ export type PlatformEventMap = {
  *   if (event.type === "message.updated") {
  *     const { message } = event.data;
  *     console.log(`Message ${message.id} changed`);
+ *   }
+ *   if (event.type === "unknown" && event.name === "app.renamed" && typeof event.data.name === "string") {
+ *     console.log(`App renamed to ${event.data.name}`);
  *   }
  * }
  * ```
@@ -38,13 +45,25 @@ export type PlatformEvent = {
     /** Event payload. */
     data: PlatformEventMap[K];
   };
-}[keyof PlatformEventMap];
+}[keyof PlatformEventMap] | {
+  /** An event this version of the SDK doesn't know. */
+  type: "unknown";
+  /** The event's name on the socket. */
+  name: string;
+  /** ID of the app the event belongs to. */
+  appId: string;
+  /** Event payload, not checked by the SDK. */
+  data: Record<string, unknown>;
+};
 
 /**
  * An app's current state.
  *
  * Arrives after every join and rejoin, and after a rewrite of the main conversation. Replace
  * everything you hold for the app with it. It holds only the last 50 messages.
+ *
+ * Its fields are the `data` of [`app.snapshot`](/developers/references/apps-api/sections/socket-messages#app-snapshot),
+ * plus `room`.
  */
 export interface PlatformSnapshot extends Omit<Snapshot, "queue"> {
   /** The app's room, `/apps/{app_id}`. */

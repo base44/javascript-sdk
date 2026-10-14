@@ -1,8 +1,35 @@
 import type { PlatformEvent, PlatformSnapshot } from "./builder.events.types.js";
 import type { PlatformSocketError } from "../errors.js";
 
+/**
+ * The socket session your server opened, as [Create socket session](/api-reference/create-socket-session) returned it.
+ *
+ * Pass the response body through unchanged. The client reads these three fields and ignores the
+ * rest, such as `session_id` and `expires_in`.
+ */
+export interface SocketSession {
+  /** Token that authenticates the socket. The client keeps it in memory and sends it only when the socket connects. */
+  session_token: string;
+  /** Origin of the platform socket, with no path, query, fragment or credentials. */
+  socket_url: string;
+  /** Absolute path the socket connects on, such as `/ws/socket.io/`. */
+  socket_path: string;
+}
+
 /** Options for {@linkcode BuilderModule.init | init()}. */
 export interface BuilderInitOptions {
+  /**
+   * Returns a new socket session from your server.
+   *
+   * Your server opens the session with its workspace API key through
+   * [Create socket session](/api-reference/create-socket-session) and returns the response body, a [`SocketSession`](#socketsession).
+   * The client calls this on the first `connect()`, and again only when the session expires or
+   * Base44 rejects its token. Return a new session on every call. If a new session has a different
+   * `socket_url` or `socket_path`, the client moves to it and rejoins every active subscription.
+   *
+   * @returns The session, as your server received it.
+   */
+  getSession: () => Promise<SocketSession>;
   /**
    * Called on errors that affect the whole session, such as a failed connection or an ended session.
    * Errors for one app go to that subscription's `onError` instead. See the
@@ -27,7 +54,7 @@ export interface BuilderModule {
    * Creates a builder session without connecting it.
    *
    * Call {@linkcode BuilderSession.connect | connect()} on the returned session to open the socket.
-   * Each session is independent, with its own socket, token and subscriptions.
+   * Each session is independent, with its own socket, socket session and subscriptions.
    *
    * @param options - Session options.
    * @returns The new session.
@@ -36,6 +63,10 @@ export interface BuilderModule {
    * ```typescript
    * // Create and connect a session
    * const builder = client.builder.init({
+   *   async getSession() {
+   *     const response = await fetch('/api/builder-socket-session', { method: 'POST' });
+   *     return response.json();
+   *   },
    *   onError(error) {
    *     console.error('Builder session error', error.code);
    *   },
@@ -56,8 +87,8 @@ export interface BuilderSession {
    *
    * Resolves once the socket connects, before any snapshot arrives. If the connection drops, the
    * session retries five times and rejoins every active subscription, each with a fresh snapshot.
-   * An expired or rejected token is replaced once through `getSessionToken`. Concurrent calls share
-   * one attempt. Call it again after a failure or a `session_replaced` error.
+   * The first call fetches a session through `getSession`, and an expired or rejected token is
+   * replaced once the same way. Concurrent calls share one attempt. Call it again after a failure or a `session_replaced` error.
    *
    * @returns Promise that resolves when the socket connects.
    * @throws {PlatformSocketError} With `connection_denied`, `connection_failed` or `session_unavailable`
@@ -137,7 +168,8 @@ export interface SubscriptionOptions {
   /**
    * Called with each live event, a [`PlatformEvent`](#platformevent). Events for an app arrive one at a time, in order. If the callback
    * throws or rejects, the subscription ends with `handler_failed`. New event types can be added at
-   * any time, so ignore types you don't handle. For every event and its payload,
+   * any time, so ignore types you don't handle. An event newer than this SDK arrives with
+   * `type: "unknown"` and its name in `name`. For every event and its payload,
    * see [Socket messages](/developers/references/apps-api/sections/socket-messages).
    */
   onEvent: (event: PlatformEvent) => void | Promise<void>;

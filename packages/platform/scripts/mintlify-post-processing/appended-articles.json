@@ -1,6 +1,7 @@
 {
   "interfaces/builder": [
     "interfaces/BuilderSession",
+    "interfaces/SocketSession",
     "type-aliases/PlatformEvent",
     "interfaces/PlatformSnapshot"
   ],
