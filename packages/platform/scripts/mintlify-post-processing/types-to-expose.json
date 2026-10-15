@@ -6,5 +6,12 @@
   "PlatformSnapshot",
   "PlatformSocketError",
   "SessionErrorCode",
-  "SocketSession"
+  "SocketSession",
+  "UnknownWebhookEvent",
+  "WebhookConfigurationError",
+  "WebhookConfigurationErrorCode",
+  "WebhookEvent",
+  "WebhookVerificationError",
+  "WebhookVerificationErrorCode",
+  "WebhooksModule"
 ]

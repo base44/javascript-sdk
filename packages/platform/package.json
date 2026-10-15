@@ -1,7 +1,7 @@
 {
   "name": "@base44/platform",
   "version": "0.2.0",
-  "description": "Client and server SDK for building on the Base44 platform",
+  "description": "Base44 Platform SDK for white-label platforms: a browser client for watching the builder and a server entrypoint for webhooks",
   "main": "dist/client/index.js",
   "types": "dist/client/index.d.ts",
   "type": "module",
@@ -44,7 +44,8 @@
     "create-docs-local": "npm run create-docs && npm run copy-docs-local",
     "copy-docs-local": "node ../sdk/scripts/mintlify-post-processing/copy-to-local-docs.js --package-dir .",
     "create-docs:generate": "node -e \"fs.rmSync('docs',{recursive:true,force:true})\" && typedoc --options typedoc.mintlify.json",
-    "create-docs:process": "node ../sdk/scripts/mintlify-post-processing/file-processing/file-processing.js --package-dir ."
+    "create-docs:process": "node ../sdk/scripts/mintlify-post-processing/file-processing/file-processing.js --package-dir .",
+    "generate:webhooks": "node scripts/generate-webhook-types.mjs"
   },
   "dependencies": {
     "socket.io-client": "^4.8.3"
@@ -52,7 +53,8 @@
   "keywords": [
     "base44",
     "platform",
-    "white-label"
+    "white-label",
+    "webhooks"
   ],
   "author": "Base44",
   "license": "MIT",
@@ -67,5 +69,8 @@
   "homepage": "https://github.com/base44/javascript-sdk/tree/main/packages/platform#readme",
   "devDependencies": {
     "json-schema-to-typescript": "16.0.0"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

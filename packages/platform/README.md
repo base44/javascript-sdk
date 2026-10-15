@@ -4,10 +4,15 @@
 npm install @base44/platform
 ```
 
-This package implements the read-only white-label builder socket contract: a
-partner's browser watches the builder chat of up to eight apps over the platform's
-shared socket. It is independent of the app SDK (`@base44/sdk`).
-The workspace must have white-label sockets enabled; this SDK does not open sessions.
+The Platform SDK for white-label platforms built on Base44. It is independent of the app SDK
+(`@base44/sdk`) and has two entrypoints:
+
+- `@base44/platform`, for the browser: implements the read-only white-label builder socket
+  contract. A partner's browser watches the builder chat of up to eight apps over the platform's
+  shared socket. The workspace must have white-label sockets enabled; this SDK does not open sessions.
+- `@base44/platform/server`, for your backend: verify the webhooks Base44 sends when apps are
+  created, published, unpublished, trashed or restored. See
+  [Receiving webhooks](#receiving-webhooks-server).
 
 ```ts
 import { createPlatformClient } from "@base44/platform";
@@ -32,6 +37,63 @@ await builder.connect();
 subscription.unsubscribe();
 builder.close();
 ```
+
+## Receiving webhooks (server)
+
+`@base44/platform/server` verifies Base44 outbound webhooks and answers the endpoint
+activation challenge. It uses WebCrypto only (Node 20+, Deno, Bun, Workers, edge runtimes) and
+makes no network calls: pass your workspace's public keys (`whpk_…`) to each call that verifies.
+
+The simplest route is `createHandler`. It reads the raw body, verifies it, answers the
+activation challenge and picks the status code: 400 for a delivery that fails verification,
+500 when your keys are misconfigured, the body can't be read or a callback throws, and 204
+otherwise, including for event types you have no handler for. Base44 retries any answer that
+isn't 2xx; the status only shows in its delivery log which side failed.
+
+```ts
+import { createPlatformServer } from "@base44/platform/server";
+
+const platform = createPlatformServer();
+const publicKeys = process.env.BASE44_WEBHOOK_PUBLIC_KEYS!; // two keys during a rotation
+
+export const POST = platform.webhooks.createHandler({
+  publicKeys,
+  on: {
+    "app.deleted.v1": async event => forget(event.data.app_id), // event is narrowed per type
+  },
+  onEvent: event => log(event.type),      // every event, before its handler
+  onSuccess: event => {},                 // return a Response to replace the 204
+  onError: (error, event) => report(error), // return a Response to replace the 400/500
+});
+```
+
+For full control, verify and dispatch yourself:
+
+```ts
+export async function POST(request: Request) {
+  const rawBody = await request.text(); // exactly as received
+  let event;
+  try {
+    event = await platform.webhooks.verifyEvent(rawBody, request.headers, { publicKeys });
+  } catch (error) {
+    if (error instanceof WebhookVerificationError) return new Response(null, { status: 400 });
+    throw error; // missing/malformed keys: a 500. Base44 retries any non-2xx answer
+  }
+  switch (event.type) {
+    case "webhook.test.v1": return Response.json({ challenge: event.data.challenge }); // activates the endpoint
+    case "app.deleted.v1": await forget(event.data.app_id); break;
+  }
+  return new Response(null, { status: 204 });
+}
+```
+
+An event type added to Base44 after your SDK version arrives as `{ type: "unknown", name, data }`,
+with its real type in `name` and an unchecked `data`, the same shape the client uses. After you
+upgrade, it arrives under its own `type`.
+
+Delivery is at least once with no ordering guarantee: deduplicate on `event.id`, and answer
+2xx to event types you do not handle. Event types are generated from the schemas published at
+`https://base44.com/webhooks/schemas`; run `npm run generate:webhooks` to refresh them.
 
 ## Sessions
 
@@ -147,7 +209,8 @@ Every exported shape and field has JSDoc. `npm run docs` validates it into `docs
 `npm run create-docs` runs the app SDK's TypeDoc and Mintlify pipeline for this package,
 and `npm run copy-docs-local -- --target <mintlify-docs>` copies the result into
 `developers/references/platform-sdk/docs`. The pipeline's config for this package lives
-in `scripts/mintlify-post-processing/`. The Socket messages page is built in mintlify-docs from
+in `scripts/mintlify-post-processing/`, including `reference.ts`, the docs-only entry that combines
+the client and server entrypoints into one reference. The Socket messages page is built in mintlify-docs from
 the service's AsyncAPI document, not here.
 
 `PlatformSocketError` extends `Error` with `code` and optional `appId`. Original
