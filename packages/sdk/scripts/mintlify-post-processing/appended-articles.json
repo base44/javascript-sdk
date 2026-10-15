@@ -23,6 +23,9 @@
     "interfaces/CoreIntegrations",
     "interfaces/CustomIntegrationsModule"
   ],
+  "interfaces/AppModule": [
+    "type-aliases/AppPublicSettings"
+  ],
   "type-aliases/ActorsModule": [
     "interfaces/ActorRef",
     "interfaces/Connection",
@@ -30,5 +33,10 @@
     "interfaces/ActorClient",
     "interfaces/ActorRegistry",
     "interfaces/ActorNameRegistry"
+  ],
+  "interfaces/PaymentsModule": [
+    "type-aliases/PaymentsErrorCode",
+    "type-aliases/PurchaseStatus",
+    "type-aliases/PaymentsRecurringFrequency"
   ]
 }

@@ -5,8 +5,7 @@ export interface AiGatewayConnection {
   /** Base URL of the selected gateway provider. */
   baseURL: string;
   /**
-   * Bearer token that authenticates the request. Empty string when the caller is
-   * unauthenticated.
+   * Bearer token that authenticates the request. The mode you call `connection()` from determines whose token it is.
    */
   token: string;
   /**
@@ -94,8 +93,14 @@ export interface AiGatewayModuleConfig {
  *
  * The mode determines which token `connection()` returns:
  *
- * - **User authentication** (`base44.aiGateway`): Returns the signed-in app user's token.
- * - **Service role authentication** (`base44.asServiceRole.aiGateway`): Returns the service-role token instead. Use it from backend functions: apps that restrict Core integrations, the default for new apps, reject user-token gateway calls on public apps. It also works when there's no signed-in user, such as from a scheduled automation.
+ * - **Service role authentication** (`base44.asServiceRole.aiGateway`): Returns the app's service-role token. Use it server-side. Calls from the browser or with a user's token get a `403` and the error code `ai_gateway_requires_service_role`. It also works when no user is signed in, such as from a scheduled automation.
+ * - **User authentication** (`base44.aiGateway`): Returns the signed-in app user's token. The gateway accepts it only on apps shared privately or with your workspace.
+ *
+ * The mode decides which token you get and whether the gateway accepts the call.
+ * It grants the model no extra reach, because the gateway runs a model and never
+ * touches your data. Access to your app's data comes from the `base44.entities`
+ * calls you write around the gateway call, so pick the mode for those on their
+ * own merits rather than matching this one.
  *
  * ## Billing and limits
  *

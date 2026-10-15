@@ -136,6 +136,38 @@ export type {
 
 export type { SsoModule, SsoAccessTokenResponse } from "./modules/sso.types.js";
 
+export type {
+  PaymentsModule,
+  ServiceRolePaymentsModule,
+  PaymentsErrorCode,
+  PaymentsRecurringFrequency,
+  CheckoutBuyer,
+  CheckoutFreeTrial,
+  CheckoutItem,
+  CheckoutItemRecurring,
+  CheckoutPresentation,
+  CheckoutElement,
+  CheckoutMount,
+  MountableCheckout,
+  CreateCheckoutParams,
+  CreateCheckoutResult,
+  CompleteCheckoutResult,
+  EmbeddedCheckout,
+  PayPalEmbeddedCheckout,
+  StripeEmbeddedCheckout,
+  MountCheckoutOptions,
+  ListPurchasesParams,
+  ServiceRoleListPurchasesParams,
+  ListPurchasesResult,
+  Purchase,
+  PurchaseItem,
+  PurchaseStatus,
+  RefundParams,
+  RefundResult,
+  CancelSubscriptionOptions,
+  SubscriptionResult,
+} from "./modules/payments.types.js";
+
 export { Actor, type Conn } from "./actor.js";
 
 export type {

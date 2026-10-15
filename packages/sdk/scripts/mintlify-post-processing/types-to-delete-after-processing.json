@@ -1,6 +1,7 @@
 [
   "AiGatewayConnection",
   "ActorConnectOptions",
+  "AppPublicSettingsResponse",
   "DeleteManyResult",
   "DeleteResult",
   "EntityAggregateResult",

@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
 import { expect, test, vi } from "vitest";
-import { Base44PlatformClient } from "../../src/index.js";
+import { createPlatformClient } from "../../src/index.js";
 
 // Minimal Engine.IO/Socket.IO peer exercises the real client without a new server dependency.
 test("real Socket.IO handshake, join, snapshot, reconnect and session renewal", async () => {
@@ -30,11 +30,13 @@ test("real Socket.IO handshake, join, snapshot, reconnect and session renewal", 
     });
   });
   await new Promise(resolve => http.listen(0, "127.0.0.1", resolve));
-  const client = new Base44PlatformClient({
-    serverUrl: `http://127.0.0.1:${http.address().port}`,
-    getSessionToken: async () => `session-${++tokenCalls}`,
+  const builder = createPlatformClient().builder.init({
+    getSession: async () => ({
+      session_id: `id-${tokenCalls}`, session_token: `session-${++tokenCalls}`, expires_in: 3600,
+      socket_url: `http://127.0.0.1:${http.address().port}`, socket_path: "/live/socket.io/",
+    }),
+    onError: error => errors.push(error),
   });
-  const builder = client.builder.init({ onError: error => errors.push(error) });
   try {
     builder.subscribe(appId, { onSnapshot: s => { snapshots.push(s.messages[0].id); }, onEvent: vi.fn(), onError: error => errors.push(error) });
     await builder.connect();
@@ -48,7 +50,7 @@ test("real Socket.IO handshake, join, snapshot, reconnect and session renewal", 
     expect(joins).toEqual([[room], [room], [room]]);
     expect(handshakes.map(item => item.token)).toEqual(["session-1", "session-1", "session-2"]);
     for (const { url } of handshakes) {
-      expect(url.pathname).toBe("/ws/socket.io/");
+      expect(url.pathname).toBe("/live/socket.io/");
       expect(url.searchParams.get("transport")).toBe("websocket");
       expect([...url.searchParams.keys()].some(key => /token/i.test(key))).toBe(false);
     }
