@@ -5,7 +5,7 @@
     "rootDir": ".",
     "baseUrl": ".",
     "paths": {
-      "@base44/platform": ["src/index.ts"]
+      "@base44/platform": ["src/client/index.ts"]
     }
   },
   "include": ["src/**/*.ts", "tests/types/**/*.ts", "examples/**/*.ts"]

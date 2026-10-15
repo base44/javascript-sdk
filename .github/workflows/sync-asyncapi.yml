@@ -62,7 +62,7 @@ jobs:
       - name: Check for changes
         id: changes
         run: |
-          if git diff --quiet -- packages/platform/asyncapi.json packages/platform/src/modules/builder.events.generated.ts; then
+          if git diff --quiet -- packages/platform/asyncapi.json packages/platform/src/client/modules/builder.events.generated.ts; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "✅ asyncapi.json and the event types are up to date"
           else
@@ -91,7 +91,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -B "$BRANCH"
-          git add packages/platform/asyncapi.json packages/platform/src/modules/builder.events.generated.ts
+          git add packages/platform/asyncapi.json packages/platform/src/client/modules/builder.events.generated.ts
           git commit -m "chore(platform): sync asyncapi.json and the event types from production"
 
           pr=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')

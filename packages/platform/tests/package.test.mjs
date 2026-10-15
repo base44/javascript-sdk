@@ -26,7 +26,7 @@ for (const name of Object.keys(manifest.dependencies)) {
 
 test("the tarball contains the compiled entry point and no source or test trees", () => {
   const files = new Set(packed.files.map(file => file.path));
-  for (const file of ["dist/index.js", "dist/index.d.ts", "README.md"]) assert.ok(files.has(file), file);
+  for (const file of ["dist/client/index.js", "dist/client/index.d.ts", "README.md"]) assert.ok(files.has(file), file);
   assert.equal([...files].some(file => /^(src|tests|examples)\//.test(file)), false);
 });
 

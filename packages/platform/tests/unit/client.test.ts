@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { createPlatformClient, PlatformSocketError, type BuilderSession } from "../../src/index.js";
+import { createPlatformClient, PlatformSocketError, type BuilderSession } from "../../src/client/index.js";
 
 const fake = vi.hoisted(() => {
   const handlers: Record<string, (...args: any[]) => void> = {};

@@ -124,7 +124,7 @@ redaction of generated prose or user content.
 ## Event types
 
 The socket protocol is defined by the service's AsyncAPI document, committed as
-`asyncapi.json`. `src/modules/builder.events.generated.ts` is generated from it with
+`asyncapi.json`. `src/client/modules/builder.events.generated.ts` is generated from it with
 `json-schema-to-typescript`: one type per schema, named after the backend model
 (`Message`, `StatusObject`, `QueueState`, one `*Call` per tool, one `*Approval` per
 guard), plus `ServerEventMap` and `ClientMessageMap`. Never edit it by hand.
