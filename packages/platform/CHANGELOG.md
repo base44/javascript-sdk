@@ -3,7 +3,7 @@
 ## 0.2.0
 
 **Breaking.** The client, its options and the event type names change, and events the SDK doesn't
-know now reach `onEvent`.
+know now reach `onEvent`. A server entrypoint, `@base44/platform/server`, is new.
 
 ### Client and session
 
@@ -34,6 +34,14 @@ After:
 const client = createPlatformClient();
 const builder = client.builder.init({ getSession: fetchSession, onError });
 ```
+
+### Server entrypoint
+
+- New: `@base44/platform/server` exports `createPlatformServer({ serverUrl, apiKey })` for your
+  server, authenticated with a workspace API key. It has no modules yet. Keep the key on your
+  server; the browser client never takes it.
+- The browser client moves to `dist/client/`. Import paths don't change: `@base44/platform` is
+  still the client.
 
 ### Event types
 
