@@ -1,7 +1,7 @@
 {
   "name": "@base44/platform",
   "version": "0.2.0",
-  "description": "Client and server SDK for building on the Base44 platform",
+  "description": "Base44 Platform SDK for white-label platforms: a browser client for live AI chat updates and a server entrypoint for webhooks",
   "main": "dist/client/index.js",
   "types": "dist/client/index.d.ts",
   "type": "module",
@@ -53,7 +53,8 @@
   "keywords": [
     "base44",
     "platform",
-    "white-label"
+    "white-label",
+    "webhooks"
   ],
   "author": "Base44",
   "license": "MIT",
