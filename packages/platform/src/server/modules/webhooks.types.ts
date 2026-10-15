@@ -36,12 +36,42 @@ export interface CloudEvent<TType extends string, TData> {
 }
 
 /**
+ * A webhook event whose type this version of the SDK doesn't know, such as one Base44 added later.
+ *
+ * The envelope is the same as for every event, but `type` is `"unknown"`, the event's real type is
+ * in `name`, and `data` isn't checked, so check a field before using it.
+ */
+export interface UnknownWebhookEvent extends Omit<CloudEvent<string, Record<string, unknown>>, "type"> {
+  /** Always `"unknown"`. Narrows the event to this shape. */
+  type: "unknown";
+  /** The event's type as Base44 sent it, such as `app.renamed.v1`. */
+  name: string;
+}
+
+/**
  * A verified webhook event.
  *
- * Check `type` to narrow `data` to that event's payload. Base44 can add event types later, so give a
- * `switch` a default branch that still answers 2xx. A non-2xx answer makes Base44 retry the delivery.
+ * Check `type` to narrow `data` to that event's payload. An event added to Base44 after this version
+ * of the SDK arrives with `type: "unknown"`, its type in `name` and an unchecked `data`, so check a
+ * field before using it. After you upgrade, it arrives under its own `type`. Answer it with a 2xx
+ * too: Base44 retries any answer that isn't 2xx.
+ *
+ * @example
+ * ```typescript
+ * // Narrow an event by type
+ * switch (event.type) {
+ *   case 'app.deleted.v1':
+ *     await removeApp(event.data.app_id);
+ *     break;
+ *   case 'unknown':
+ *     console.log(`Skipping ${event.name}, which this SDK version doesn't know`);
+ *     break;
+ * }
+ * ```
  */
-export type WebhookEvent = { [K in WebhookEventType]: CloudEvent<K, WebhookEventMap[K]> }[WebhookEventType];
+export type WebhookEvent =
+  | { [K in WebhookEventType]: CloudEvent<K, WebhookEventMap[K]> }[WebhookEventType]
+  | UnknownWebhookEvent;
 
 /** Request headers, as a fetch `Headers` object or a Node.js-style object. Header names are case-insensitive. */
 export type WebhookHeaders = Headers | Record<string, string | string[] | undefined>;
@@ -65,14 +95,17 @@ export interface VerifyEventOptions {
 /** An event your callbacks receive. Every event except the `webhook.test.v1` activation probe, which the handler answers itself. */
 export type DeliveredWebhookEvent = Exclude<WebhookEvent, CloudEvent<"webhook.test.v1", WebhookTestV1Data>>;
 
-/** Handlers keyed by event type. Each handler receives the event narrowed to its type. */
+/**
+ * Handlers keyed by event type. Each handler receives the event narrowed to its type. The `unknown`
+ * key handles every event type this version of the SDK doesn't know.
+ */
 export type WebhookEventHandlers = {
   [K in DeliveredWebhookEvent["type"]]?: (event: Extract<DeliveredWebhookEvent, { type: K }>) => unknown;
 };
 
 /** Options for {@linkcode WebhooksModule.createHandler | createHandler()}. Every callback can be async. */
 export interface CreateHandlerOptions extends VerifyEventOptions {
-  /** Handlers keyed by event type. Events without a handler are still answered 2xx, so Base44 doesn't retry them. */
+  /** Handlers keyed by event type. Events without a handler, including unknown ones, are still answered 2xx, so Base44 doesn't retry them. */
   on?: WebhookEventHandlers;
   /** Called for every verified event, before its handler in `on`. */
   onEvent?: (event: DeliveredWebhookEvent) => unknown;
@@ -85,9 +118,11 @@ export interface CreateHandlerOptions extends VerifyEventOptions {
   /**
    * Called when a delivery fails.
    *
-   * The handler answers a `WebhookVerificationError` with a 400. It answers a `WebhookConfigurationError`,
-   * or anything a callback throws, with a 500 so Base44 retries. The `event` argument is set when the
-   * delivery verified and a callback failed. Return a `Response` to replace the default answer.
+   * The handler answers a `WebhookVerificationError` with a 400, and a `WebhookConfigurationError`, a
+   * failed body read or anything a callback throws with a 500. Base44 retries either way, because it
+   * retries any answer that isn't 2xx. The status only shows in its delivery log whether the delivery
+   * or your side failed. The `event` argument is set when the delivery verified and a callback failed.
+   * Return a `Response` to replace the default answer.
    */
   onError?: (error: unknown, event?: DeliveredWebhookEvent) => Response | void | Promise<Response | void>;
 }
@@ -122,7 +157,7 @@ export interface WebhooksModule {
    * @param options - Verification options, including your public keys.
    * @returns Promise resolving to the verified event.
    * @throws {WebhookVerificationError} When the delivery can't be trusted. Answer with a 400.
-   * @throws {WebhookConfigurationError} When the public keys are missing or malformed. Let it surface as a 500.
+   * @throws {WebhookConfigurationError} When the public keys are missing or malformed, or the runtime can't use them. Answer with a 500.
    *
    * @example
    * ```typescript
@@ -161,9 +196,13 @@ export interface WebhooksModule {
    * `on`, and `onSuccess`, in that order.
    *
    * It answers with:
-   * - 204 when the event was handled, including events with no handler.
-   * - 400 when the delivery doesn't verify.
-   * - 500 when the public keys are misconfigured or a callback throws. Base44 then retries.
+   * - 204 when the event was handled, including events with no handler and unknown events.
+   * - 400 when the delivery doesn't verify, with the error code in the body.
+   * - 500 when the public keys are misconfigured (`receiver_misconfigured`), the body can't be read
+   *   (`request_failed`) or a callback throws (`handler_failed`).
+   *
+   * Base44 retries any answer that isn't 2xx, 400 and 500 alike. The status only shows in its delivery
+   * log whether the delivery or your side failed.
    *
    * Base44 can deliver the same event more than once, so make your handlers safe to run twice for the
    * same `event.id`.

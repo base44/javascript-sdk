@@ -1,9 +1,6 @@
 import { createPlatformServer, WebhookConfigurationError, WebhookVerificationError } from "@base44/platform/server";
 
-const platform = createPlatformServer({
-  serverUrl: "https://base44.app",
-  apiKey: process.env.BASE44_API_KEY!,
-});
+const platform = createPlatformServer();
 
 // Your workspace's public keys. Pass both during a key rotation.
 const publicKeys = process.env.BASE44_WEBHOOK_PUBLIC_KEYS!;
@@ -17,7 +14,7 @@ export async function POST(request: Request): Promise<Response> {
     event = await platform.webhooks.verifyEvent(rawBody, request.headers, { publicKeys });
   } catch (error) {
     if (error instanceof WebhookVerificationError) return Response.json({ error: error.code }, { status: 400 });
-    if (error instanceof WebhookConfigurationError) console.error(error.message); // 500: Base44 retries
+    if (error instanceof WebhookConfigurationError) console.error(error.message); // answered 500; Base44 retries any non-2xx
     throw error;
   }
 
@@ -28,8 +25,12 @@ export async function POST(request: Request): Promise<Response> {
     case "app.deleted.v1":
       console.log("trashed (restorable for 30 days):", event.data.app_id);
       break;
+    case "unknown":
+      // An event added to Base44 after this SDK version: its type is in `name`, `data` is unchecked.
+      console.log("skipping", event.name);
+      break;
     default:
-      break; // Unhandled types still get a 2xx, or Base44 retries and eventually pauses the endpoint.
+      break; // Unhandled and unknown types still get a 2xx, or Base44 retries and eventually pauses the endpoint.
   }
   return new Response(null, { status: 204 });
 }

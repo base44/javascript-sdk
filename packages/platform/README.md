@@ -46,16 +46,14 @@ makes no network calls: pass your workspace's public keys (`whpk_…`) to each c
 
 The simplest route is `createHandler`. It reads the raw body, verifies it, answers the
 activation challenge and picks the status code: 400 for a delivery that fails verification,
-500 when your keys are misconfigured or a callback throws (Base44 retries), 204 otherwise,
-including for event types you have no handler for.
+500 when your keys are misconfigured, the body can't be read or a callback throws, and 204
+otherwise, including for event types you have no handler for. Base44 retries any answer that
+isn't 2xx; the status only shows in its delivery log which side failed.
 
 ```ts
 import { createPlatformServer } from "@base44/platform/server";
 
-const platform = createPlatformServer({
-  serverUrl: "https://base44.app",
-  apiKey: process.env.BASE44_API_KEY!,
-});
+const platform = createPlatformServer();
 const publicKeys = process.env.BASE44_WEBHOOK_PUBLIC_KEYS!; // two keys during a rotation
 
 export const POST = platform.webhooks.createHandler({
@@ -79,7 +77,7 @@ export async function POST(request: Request) {
     event = await platform.webhooks.verifyEvent(rawBody, request.headers, { publicKeys });
   } catch (error) {
     if (error instanceof WebhookVerificationError) return new Response(null, { status: 400 });
-    throw error; // missing/malformed keys: a 500, so Base44 retries
+    throw error; // missing/malformed keys: a 500. Base44 retries any non-2xx answer
   }
   switch (event.type) {
     case "webhook.test.v1": return Response.json({ challenge: event.data.challenge }); // activates the endpoint
@@ -88,6 +86,10 @@ export async function POST(request: Request) {
   return new Response(null, { status: 204 });
 }
 ```
+
+An event type added to Base44 after your SDK version arrives as `{ type: "unknown", name, data }`,
+with its real type in `name` and an unchecked `data`, the same shape the client uses. After you
+upgrade, it arrives under its own `type`.
 
 Delivery is at least once with no ordering guarantee: deduplicate on `event.id`, and answer
 2xx to event types you do not handle. Event types are generated from the schemas published at

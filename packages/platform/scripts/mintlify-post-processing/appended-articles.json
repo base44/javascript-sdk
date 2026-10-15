@@ -10,7 +10,8 @@
     "type-aliases/AppErrorCode"
   ],
   "interfaces/webhooks": [
-    "type-aliases/WebhookEvent"
+    "type-aliases/WebhookEvent",
+    "interfaces/UnknownWebhookEvent"
   ],
   "classes/WebhookVerificationError": [
     "type-aliases/WebhookVerificationErrorCode"

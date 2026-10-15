@@ -47,6 +47,7 @@ for (const type of types) {
 body += `/** Every event type Base44 sends, mapped to the shape of its \`data\` object. */\nexport interface WebhookEventMap {\n`;
 for (const type of types) body += `  /** ${docs[type].split("\n")[0]} */\n  "${type}": ${dataName(type)};\n`;
 body += "}\n";
+body += `\n/** Every event type in {@link WebhookEventMap}, so events from a newer Base44 can be told apart at runtime. @internal */\nexport const WEBHOOK_EVENT_TYPES = ${JSON.stringify(types)} as const;\n`;
 
 await writeFile(out, body);
 console.log(`Wrote ${types.length} event types to ${path.relative(process.cwd(), out)}`);

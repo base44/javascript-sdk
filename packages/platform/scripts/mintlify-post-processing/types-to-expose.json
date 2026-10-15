@@ -7,6 +7,7 @@
   "PlatformSocketError",
   "SessionErrorCode",
   "SocketSession",
+  "UnknownWebhookEvent",
   "WebhookConfigurationError",
   "WebhookConfigurationErrorCode",
   "WebhookEvent",

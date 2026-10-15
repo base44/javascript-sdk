@@ -175,3 +175,6 @@ export interface WebhookEventMap {
   /** Carries no domain data — its only job is to be verifiable and echoed. */
   "webhook.test.v1": WebhookTestV1Data;
 }
+
+/** Every event type in {@link WebhookEventMap}, so events from a newer Base44 can be told apart at runtime. @internal */
+export const WEBHOOK_EVENT_TYPES = ["app.created.v1","app.published.v1","app.unpublished.v1","app.deleted.v1","app.restored.v1","webhook.test.v1"] as const;

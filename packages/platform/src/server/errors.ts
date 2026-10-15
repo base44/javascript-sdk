@@ -39,7 +39,7 @@ export class WebhookVerificationError extends Error {
  *
  * You don't create it. The [`verifyEvent()`](/developers/references/platform-sdk/docs/interfaces/webhooks#verifyevent) method rejects with
  * it, and [`createHandler()`](/developers/references/platform-sdk/docs/interfaces/webhooks#createhandler) answers it with a 500 and passes it
- * to your `onError`. Fix the keys, and Base44's retries then succeed.
+ * to your `onError`. Base44 retries the delivery, and the retries succeed once you fix the problem.
  *
  * @example
  * ```typescript

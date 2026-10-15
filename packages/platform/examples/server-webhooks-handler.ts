@@ -1,9 +1,6 @@
 import { createPlatformServer } from "@base44/platform/server";
 
-const platform = createPlatformServer({
-  serverUrl: "https://base44.app",
-  apiKey: process.env.BASE44_API_KEY!,
-});
+const platform = createPlatformServer();
 
 /**
  * createHandler: verification, the activation challenge and status codes are handled for you.
@@ -23,6 +20,6 @@ export const POST = platform.webhooks.createHandler({
   // Runs for every event (except the activation probe), before its handler in `on`.
   onEvent: event => console.log("received", event.type, event.id),
   onSuccess: event => console.log("handled", event.id), // return a Response to replace the default 204
-  // Verification failure -> 400, bad config -> 500, handler threw -> 500 (Base44 retries).
+  // Verification failure -> 400, bad config or body read -> 500, handler threw -> 500. Base44 retries any non-2xx.
   onError: (error, event) => console.error("webhook failed", event?.id, error),
 });

@@ -1,6 +1,9 @@
 import { WebhookConfigurationError, WebhookVerificationError } from "../errors.js";
 import { anySignatureVerifies, importPublicKey, parsePublicKeys, parseSignatures, readHeader, signedPayload } from "./webhooks-signature.js";
+import { WEBHOOK_EVENT_TYPES } from "./webhooks.events.generated.js";
 import type { DeliveredWebhookEvent, WebhookEvent, WebhookPublicKeys, WebhooksModule } from "./webhooks.types.js";
+
+const knownTypes: ReadonlySet<string> = new Set(WEBHOOK_EVENT_TYPES);
 
 const DEFAULT_TOLERANCE_SECONDS = 300;
 
@@ -11,7 +14,13 @@ export function createWebhooks(): WebhooksModule {
   const keysFor = (publicKeys: WebhookPublicKeys | undefined) =>
     Promise.all(parsePublicKeys(publicKeys).map(raw => {
       const id = raw.join(",");
-      if (!imported.has(id)) imported.set(id, importPublicKey(raw));
+      if (!imported.has(id)) {
+        imported.set(id, importPublicKey(raw).catch(() => {
+          // Evicted so a later call retries the import instead of replaying this failure.
+          imported.delete(id);
+          throw new WebhookConfigurationError("unsupported_runtime", "this runtime can't import Ed25519 keys with WebCrypto");
+        }));
+      }
       return imported.get(id)!;
     }));
 
@@ -44,25 +53,30 @@ export function createWebhooks(): WebhooksModule {
     if (typeof type !== "string" || typeof eventId !== "string" || typeof data !== "object" || data === null) {
       throw new WebhookVerificationError("invalid_payload");
     }
-    return event as WebhookEvent;
+    // A type from a newer Base44 gets the client's unknown-event shape, so known types keep narrowing.
+    return (knownTypes.has(type) ? event : { ...(event as object), type: "unknown", name: type }) as WebhookEvent;
   };
 
   return {
     verifyEvent,
 
     createHandler({ on = {}, onEvent, onSuccess, onError, ...verifyOptions }) {
-      const fail = async (error: unknown, status: number, event?: DeliveredWebhookEvent) =>
-        (await onError?.(error, event)) ?? Response.json(
-          { error: error instanceof WebhookVerificationError ? error.code : error instanceof WebhookConfigurationError ? "receiver_misconfigured" : "handler_failed" },
-          { status },
-        );
+      const fail = async (error: unknown, status: number, label: string, event?: DeliveredWebhookEvent) =>
+        (await onError?.(error, event)) ?? Response.json({ error: label }, { status });
 
       return async request => {
+        let body: Uint8Array;
+        try {
+          body = new Uint8Array(await request.arrayBuffer());
+        } catch (error) {
+          return fail(error, 500, "request_failed");
+        }
         let event: WebhookEvent;
         try {
-          event = await verifyEvent(new Uint8Array(await request.arrayBuffer()), request.headers, verifyOptions);
+          event = await verifyEvent(body, request.headers, verifyOptions);
         } catch (error) {
-          return fail(error, error instanceof WebhookVerificationError ? 400 : 500);
+          if (error instanceof WebhookVerificationError) return fail(error, 400, error.code);
+          return fail(error, 500, error instanceof WebhookConfigurationError ? "receiver_misconfigured" : "request_failed");
         }
         // Activation probe: echo the challenge, only after the signature verified. Never reaches your callbacks.
         if (event.type === "webhook.test.v1") return Response.json({ challenge: event.data.challenge });
@@ -72,7 +86,7 @@ export function createWebhooks(): WebhooksModule {
           await (on[event.type] as ((event: DeliveredWebhookEvent) => unknown) | undefined)?.(event);
           return (await onSuccess?.(event)) ?? new Response(null, { status: 204 });
         } catch (error) {
-          return fail(error, 500, event);
+          return fail(error, 500, "handler_failed", event);
         }
       };
     },

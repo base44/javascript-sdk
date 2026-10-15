@@ -27,7 +27,7 @@ async function delivery({ body = BODY, id = "evt_1", ts = String(Math.floor(Date
   const signatures = await Promise.all(signers.map(async s => `${scheme},${await sign(s, id, ts, body)}`));
   return { body, headers: new Headers({ "webhook-id": id, "webhook-timestamp": ts, "webhook-signature": signatures.join(" ") }) };
 }
-const { webhooks } = createPlatformServer({ serverUrl: "https://api.example.test", apiKey: "key" });
+const { webhooks } = createPlatformServer();
 const failure = async (promise: Promise<unknown>) => promise.then(() => null, (error: WebhookVerificationError | WebhookConfigurationError) => error);
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
@@ -130,6 +130,24 @@ describe("webhooks.verifyEvent", () => {
     }
     expect(await failure(webhooks.verifyEvent(body, new Headers(), { publicKeys: "" }))).toBeInstanceOf(WebhookConfigurationError);
   });
+  test("returns an event type this SDK doesn't know as type \"unknown\", with its type in name", async () => {
+    const body = JSON.stringify(envelope("app.renamed.v1", { app_id: "a", name: "New name" }));
+    const { headers } = await delivery({ body });
+    const event = await webhooks.verifyEvent(body, headers, { publicKeys: known.wire });
+    expect(event).toMatchObject({ type: "unknown", name: "app.renamed.v1", id: "evt_1", data: { name: "New name" } });
+  });
+
+  test("reports a runtime that can't import Ed25519 keys as a configuration error, and retries the import next time", async () => {
+    const fresh = createPlatformServer().webhooks;
+    const { body, headers } = await delivery();
+    const importKey = vi.spyOn(crypto.subtle, "importKey").mockRejectedValueOnce(new DOMException("Unsupported", "NotSupportedError"));
+    const error = await failure(fresh.verifyEvent(body, headers, { publicKeys: known.wire }));
+    expect(error).toBeInstanceOf(WebhookConfigurationError);
+    expect(error).toMatchObject({ code: "unsupported_runtime" });
+    expect((await fresh.verifyEvent(body, headers, { publicKeys: known.wire })).id).toBe("evt_1");
+    expect(importKey).toHaveBeenCalledTimes(2);
+    importKey.mockRestore();
+  });
 });
 
 describe("webhooks.createHandler", () => {
@@ -207,5 +225,25 @@ describe("webhooks.createHandler", () => {
   test("verifies with the keys passed to the handler", async () => {
     const handler = webhooks.createHandler({ publicKeys: rotated.wire });
     expect((await handler(await request(undefined, undefined, { signers: [rotated] }))).status).toBe(204);
+  });
+
+  test("passes unknown event types to onEvent and on.unknown, and answers 204", async () => {
+    const onEvent = vi.fn(), onUnknown = vi.fn();
+    const response = await webhooks.createHandler({ publicKeys: known.wire, onEvent, on: { unknown: onUnknown } })(await request("app.renamed.v1", { app_id: "a" }));
+    expect(response.status).toBe(204);
+    const unknown = expect.objectContaining({ type: "unknown", name: "app.renamed.v1" });
+    expect(onEvent).toHaveBeenCalledWith(unknown);
+    expect(onUnknown).toHaveBeenCalledWith(unknown);
+  });
+
+  test("answers 500 request_failed when the body can't be read, without calling handlers", async () => {
+    const onEvent = vi.fn(), onError = vi.fn();
+    const failure = new Error("aborted");
+    const broken = { headers: new Headers(), arrayBuffer: () => Promise.reject(failure) } as unknown as Request;
+    const response = await webhooks.createHandler({ publicKeys: known.wire, onEvent, onError })(broken);
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: "request_failed" });
+    expect(onEvent).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledWith(failure, undefined);
   });
 });

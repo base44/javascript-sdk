@@ -1,28 +1,22 @@
-import { normalizeServerUrl } from "./server-url.js";
 import { createWebhooks } from "./modules/webhooks.js";
-import type { PlatformServer, PlatformServerOptions } from "./server.types.js";
+import type { PlatformServer } from "./server.types.js";
 
 /**
  * Creates a platform server client.
  *
  * This is the entry point of the Platform SDK on your backend. Import it from
  * `@base44/platform/server`. The client gives your server access to the platform's server modules,
- * such as [`webhooks`](/developers/references/platform-sdk/docs/interfaces/webhooks). Creating it
- * makes no network requests.
+ * such as [`webhooks`](/developers/references/platform-sdk/docs/interfaces/webhooks). It takes no
+ * options and makes no network requests. Each module takes what it needs when you call it.
  *
- * @param options - Configuration object for the client.
- * @returns A configured server client with access to the platform's server modules.
- * @throws {TypeError} When `serverUrl` isn't an HTTP or HTTPS origin, or `apiKey` is empty.
+ * @returns A server client with access to the platform's server modules.
  *
  * @example
  * ```typescript
  * // Create a server client on your backend
  * import { createPlatformServer } from '@base44/platform/server';
  *
- * const platform = createPlatformServer({
- *   serverUrl: 'https://base44.app',
- *   apiKey: process.env.BASE44_API_KEY,
- * });
+ * const platform = createPlatformServer();
  *
  * // Use the client to receive webhooks
  * export const POST = platform.webhooks.createHandler({
@@ -33,9 +27,7 @@ import type { PlatformServer, PlatformServerOptions } from "./server.types.js";
  * });
  * ```
  */
-export function createPlatformServer(options: PlatformServerOptions): PlatformServer {
-  if (!options.apiKey) throw new TypeError("apiKey is required");
-  normalizeServerUrl(options.serverUrl);
+export function createPlatformServer(): PlatformServer {
   return Object.freeze({
     webhooks: Object.freeze(createWebhooks()),
   });

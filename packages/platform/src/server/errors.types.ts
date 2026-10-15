@@ -1,6 +1,6 @@
 /**
- * Codes of errors for a delivery that can't be trusted. Answer these with a 400. Base44 treats the
- * request as failed and retries it, and a genuine delivery verifies on the retry.
+ * Codes of errors for a delivery that can't be trusted. Answer these with a 400. Base44 retries any
+ * answer that isn't 2xx, so a genuine delivery that failed because of a passing problem verifies on the retry.
  */
 export type WebhookVerificationErrorCode =
   /**
@@ -37,8 +37,8 @@ export type WebhookVerificationErrorCode =
 
 /**
  * Codes of errors that stop verification before it starts, because the public keys you passed can't
- * be used. They're about your deployment, not the request, so let them surface as a 500. Base44 then
- * retries the delivery, and it succeeds once you fix the keys.
+ * be used. They're about your deployment, not the request, so answer them with a 500. Base44 retries
+ * the delivery, as it does for any answer that isn't 2xx, and it succeeds once you fix the problem.
  */
 export type WebhookConfigurationErrorCode =
   /**
@@ -52,4 +52,10 @@ export type WebhookConfigurationErrorCode =
    *
    * Copy the key again. A truncated key fails this way.
    */
-  | "invalid_public_key";
+  | "invalid_public_key"
+  /**
+   * The runtime can't import Ed25519 keys with WebCrypto.
+   *
+   * Run your server on Node.js 20 or later, or on an edge runtime that supports Ed25519 in WebCrypto.
+   */
+  | "unsupported_runtime";
