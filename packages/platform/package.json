@@ -1,6 +1,6 @@
 {
   "name": "@base44/platform",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Client and server SDK for building on the Base44 platform",
   "main": "dist/client/index.js",
   "types": "dist/client/index.d.ts",
