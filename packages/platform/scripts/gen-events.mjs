@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Generates src/modules/builder.events.generated.ts from asyncapi.json. `--check` fails on drift instead.
+// Generates src/client/modules/builder.events.generated.ts from asyncapi.json. `--check` fails on drift instead.
 import { readFile, writeFile } from "node:fs/promises";
 import { compile } from "json-schema-to-typescript";
 
 const source = new URL("../asyncapi.json", import.meta.url);
-const target = new URL("../src/modules/builder.events.generated.ts", import.meta.url);
+const target = new URL("../src/client/modules/builder.events.generated.ts", import.meta.url);
 const doc = JSON.parse(await readFile(source, "utf8"));
 const schemas = doc.components.schemas;
 const refName = (ref) => ref.split("/").pop();

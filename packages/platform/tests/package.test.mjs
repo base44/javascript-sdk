@@ -26,7 +26,7 @@ for (const name of Object.keys(manifest.dependencies)) {
 
 test("the tarball contains the compiled entry point and no source or test trees", () => {
   const files = new Set(packed.files.map(file => file.path));
-  for (const file of ["dist/index.js", "dist/index.d.ts", "README.md"]) assert.ok(files.has(file), file);
+  for (const file of ["dist/client/index.js", "dist/client/index.d.ts", "dist/server/index.js", "dist/server/index.d.ts", "README.md"]) assert.ok(files.has(file), file);
   assert.equal([...files].some(file => /^(src|tests|examples)\//.test(file)), false);
 });
 
@@ -41,7 +41,20 @@ test("the client resolves from the installed package without the runtime SDK", (
   `]);
 });
 
+test("the server entrypoint resolves from the installed package", () => {
+  run(process.execPath, ["--input-type=module", "--eval", `
+    import assert from "node:assert/strict";
+    import { createPlatformServer } from "@base44/platform/server";
+    assert.ok(Object.isFrozen(createPlatformServer({ serverUrl: "https://example.test", apiKey: "key" })));
+    assert.throws(() => createPlatformServer({ serverUrl: "https://example.test/path", apiKey: "key" }), TypeError);
+  `]);
+});
+
 const consumer = `
+import { createPlatformServer, type PlatformServer } from "@base44/platform/server";
+const server: PlatformServer = createPlatformServer({ serverUrl: "https://example.test", apiKey: "key" });
+void server;
+
 import { createPlatformClient, type PlatformEvent } from "@base44/platform";
 const platform = createPlatformClient();
 platform.builder.init({ getSession: async () => (await fetch("/session")).json(), onError() {} }).subscribe("a".repeat(24), {

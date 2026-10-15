@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
 import { expect, test, vi } from "vitest";
-import { createPlatformClient } from "../../src/index.js";
+import { createPlatformClient } from "../../src/client/index.js";
 
 // Minimal Engine.IO/Socket.IO peer exercises the real client without a new server dependency.
 test("real Socket.IO handshake, join, snapshot, reconnect and session renewal", async () => {
