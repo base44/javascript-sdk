@@ -2,6 +2,7 @@ import type { EntitiesModule } from "./modules/entities.types.js";
 import type { IntegrationsModule } from "./modules/integrations.types.js";
 import type { AuthModule } from "./modules/auth.types.js";
 import type { SsoModule } from "./modules/sso.types.js";
+import type { BrowserModule } from "./modules/browser.types.js";
 import type {
   PaymentsModule,
   ServiceRolePaymentsModule,
@@ -239,6 +240,8 @@ export interface Base44Client {
     aiGateway: AiGatewayModule;
     /** {@link AppLogsModule | App logs module} with elevated permissions. */
     appLogs: AppLogsModule;
+    /** {@link BrowserModule | Browser module} for remote browser sessions. */
+    browser: BrowserModule;
     /** {@link ConnectorsModule | Connectors module} for OAuth token retrieval. */
     connectors: ConnectorsModule;
     /** {@link EntitiesModule | Entities module} with elevated permissions. */

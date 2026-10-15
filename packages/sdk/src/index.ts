@@ -168,6 +168,12 @@ export type {
   SubscriptionResult,
 } from "./modules/payments.types.js";
 
+export type {
+  BrowserModule,
+  BrowserSession,
+  BrowserSessionOptions,
+} from "./modules/browser.types.js";
+
 export { Actor, type Conn } from "./actor.js";
 
 export type {
