@@ -7,9 +7,9 @@ npm install @base44/platform
 The Platform SDK for white-label platforms built on Base44. It is independent of the app SDK
 (`@base44/sdk`) and has two entrypoints:
 
-- `@base44/platform`, for the browser: follow the AI chat of up to eight apps live over the
-  platform's shared socket. It implements the read-only white-label socket contract. The
-  workspace must have white-label sockets enabled; this SDK does not open sessions.
+- `@base44/platform`, for the browser: implements the read-only white-label builder socket
+  contract. A partner's browser watches the builder chat of up to eight apps over the platform's
+  shared socket. The workspace must have white-label sockets enabled; this SDK does not open sessions.
 - `@base44/platform/server`, for your backend: verify the webhooks Base44 sends when apps are
   created, published, unpublished, trashed or restored. See
   [Receiving webhooks](#receiving-webhooks-server).
