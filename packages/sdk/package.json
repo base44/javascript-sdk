@@ -4,6 +4,12 @@
   "description": "JavaScript SDK for Base44 API",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "imports": {
+    "#build-commit-source": {
+      "module": "./dist/utils/build-commit-source.js",
+      "default": "./dist/utils/build-commit-source.fallback.js"
+    }
+  },
   "type": "module",
   "files": [
     "dist"
@@ -16,6 +22,7 @@
     "test:e2e": "vitest run tests/e2e",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:build-commit": "scripts/verify-build-commit.sh",
     "docs": "typedoc",
     "prepublishOnly": "npm run build",
     "create-docs": "npm run create-docs:generate && npm run create-docs:process",

@@ -9,6 +9,10 @@ import {
 } from "./modules/connectors.js";
 import { getAccessToken } from "./utils/auth-utils.js";
 import { createFetchWithAuth } from "./utils/fetch-with-auth.js";
+import {
+  BUILD_COMMIT_HEADER,
+  getBuildCommitHeaders,
+} from "./utils/build-commit.js";
 import { createFunctionsModule } from "./modules/functions.js";
 import { createAgentsModule } from "./modules/agents.js";
 import { createAiGatewayModule } from "./modules/ai-gateway.js";
@@ -79,6 +83,13 @@ export type {
  * ```
  */
 export function createClient(config: CreateClientConfig): Base44Client {
+  return buildClient(config, { sendBuildCommit: true });
+}
+
+function buildClient(
+  config: CreateClientConfig,
+  { sendBuildCommit }: { sendBuildCommit: boolean }
+): Base44Client {
   const {
     serverUrl = "https://base44.app",
     appId,
@@ -114,7 +125,21 @@ export function createClient(config: CreateClientConfig): Base44Client {
     return socket;
   };
 
+  // The build commit goes on every API call, so the backend can tell which
+  // frontend bundle a request came from. One set by the caller, in any
+  // casing, replaces it; resolving that once here keeps every call path,
+  // functions.fetch() included, reporting the same build.
+  const callerBuildCommit = Object.entries(optionalHeaders ?? {}).find(
+    ([name]) => name.toLowerCase() === BUILD_COMMIT_HEADER.toLowerCase()
+  );
+  const buildCommitHeaders: Record<string, string> = callerBuildCommit
+    ? { [BUILD_COMMIT_HEADER]: callerBuildCommit[1] }
+    : sendBuildCommit
+      ? getBuildCommitHeaders()
+      : {};
+
   const headers = {
+    ...(callerBuildCommit ? {} : buildCommitHeaders),
     ...optionalHeaders,
     "X-App-Id": String(appId),
   };
@@ -241,7 +266,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     auth: userAuthModule,
     functions: createFunctionsModule(functionsAxiosClient, appId, {
       getAuthHeaders: () => {
-        const headers: Record<string, string> = {};
+        const headers: Record<string, string> = { ...buildCommitHeaders };
         // Get current token from storage or initial config
         const currentToken = token || getAccessToken();
         if (currentToken) {
@@ -544,12 +569,14 @@ export function createClientFromRequest(request: Request): Base44Client {
     additionalHeaders["X-Data-Env"] = dataEnvHeader;
   }
 
-  return createClient({
+  // A backend function isn't the browser bundle, so it never reports a build
+  // commit, whatever its runtime looks like.
+  return buildClient({
     serverUrl: serverUrlHeader || "https://base44.app",
     appId,
     token: userToken,
     serviceToken: serviceRoleToken,
     functionsVersion: functionsVersion ?? undefined,
     headers: additionalHeaders,
-  });
+  }, { sendBuildCommit: false });
 }
