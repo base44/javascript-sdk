@@ -192,11 +192,4 @@ export type {
   GetLoginUrlOptions,
 } from "./utils/auth-utils.types.js";
 
-// Server error capture, for full-stack apps' server middleware
-export {
-  recordServerError,
-  annotateServerResponse,
-  serverErrorResponse,
-  getAnonymousVisitorId,
-  type RecordServerErrorOptions,
-} from "./server-errors.js";
+export { getAnonymousVisitorId } from "./modules/analytics.js";
