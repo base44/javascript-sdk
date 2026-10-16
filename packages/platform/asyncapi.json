@@ -3641,12 +3641,18 @@
       },
       "JoinMessage": {
         "description": "Join an app's room, once per app after every connect. An `app.snapshot` follows, then its live events. Refused with `room.access_denied` when the app is not on the session's allowlist, or past 30 joins a minute.",
+        "examples": [
+          "/apps/6820f3a4e7b91d003c45a1f2"
+        ],
         "pattern": "^/apps/[0-9a-f]{24}$",
         "title": "JoinMessage",
         "type": "string"
       },
       "LeaveMessage": {
         "description": "Leave an app's room. Its events stop.",
+        "examples": [
+          "/apps/6820f3a4e7b91d003c45a1f2"
+        ],
         "pattern": "^/apps/[0-9a-f]{24}$",
         "title": "LeaveMessage",
         "type": "string"
