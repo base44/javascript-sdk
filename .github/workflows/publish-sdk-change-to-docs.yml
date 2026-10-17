@@ -1,0 +1,200 @@
+name: Publish SDK Change to Docs
+
+# Opens a mintlify-docs PR containing the docs impact of one SDK commit range:
+# regenerates the reference at base and head, applies only that diff to the
+# published pages (English + locale mirrors). Runs when a model-sync PR merges;
+# can be dispatched for any commit.
+#
+# Needs the GitHub App installed on base44-dev (mintlify-docs: contents + pull
+# requests write).
+
+on:
+  pull_request:
+    types: [closed, opened, synchronize] # TEMP: opened/synchronize for verification on PR #284, revert before merge
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      head_sha:
+        description: "javascript-sdk commit whose docs impact to publish (default: main)"
+        required: false
+        default: ""
+        type: string
+      base_sha:
+        description: "Commit to compare against (default: first parent of head)"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-sdk-change-to-docs-${{ github.event.pull_request.merge_commit_sha || inputs.head_sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  DOCS_REPO: base44-dev/mintlify-docs
+  DOCS_DIR: mintlify-docs
+  SYNC_BRANCH: bot/sync-runtime-models
+
+jobs:
+  publish:
+    # Merged model-sync PRs and manual runs only.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'bot/sync-runtime-models') ||
+      github.event.action == 'opened' || github.event.action == 'synchronize'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout javascript-sdk
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.merged && github.event.pull_request.base.ref || github.event.pull_request.head.sha || github.ref }} # TEMP: head.sha for open-PR verification
+          fetch-depth: 0
+
+      - name: Wix gateway proxy (mandatory)
+        uses: ./.github/actions/wix-gateway-proxy
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20.x"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Resolve commit range
+        id: range
+        env:
+          INPUT_HEAD: ${{ github.event.pull_request.merge_commit_sha || inputs.head_sha }}
+          INPUT_BASE: ${{ inputs.base_sha }}
+        run: |
+          set -euo pipefail
+          # A PR merge commit lives under refs/pull/*, which the checkout does not fetch.
+          for sha in "$INPUT_HEAD" "$INPUT_BASE"; do [ -n "$sha" ] && git fetch -q origin "$sha" 2>/dev/null || true; done
+          head="$(git rev-parse --verify "${INPUT_HEAD:-HEAD}^{commit}")"
+          base="$(git rev-parse --verify "${INPUT_BASE:-${head}^1}^{commit}")"
+          git merge-base --is-ancestor "$base" "$head" || { echo "::error::${base} is not an ancestor of ${head}"; exit 1; }
+          # Both regenerations share this checkout's node_modules.
+          if ! git diff --quiet "$base" "$head" -- package.json package-lock.json; then
+            echo "::error::package.json or package-lock.json changed between ${base:0:7} and ${head:0:7}; regenerate with create-docs-local by hand"
+            exit 1
+          fi
+          subject="$(git log -1 --format=%s "$head")"
+          # "fix(types): do X (#12)" -> "do X"
+          plain="$(printf '%s' "$subject" | sed -E 's/^[a-z]+(\([^)]*\))?!?: //; s/ \(#[0-9]+\)$//')"
+          {
+            echo "head=${head}"
+            echo "short=${head:0:7}"
+            echo "base=${base}"
+            echo "subject=${subject}"
+            echo "plain_subject=${plain}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Publishing docs impact of ${base:0:7}..${head:0:7}: ${subject}"
+
+      - name: Generate reference at base and head
+        env:
+          BASE: ${{ steps.range.outputs.base }}
+          HEAD: ${{ steps.range.outputs.head }}
+        run: |
+          set -euo pipefail
+          for side in base head; do
+            sha="$BASE"; [ "$side" = head ] && sha="$HEAD"
+            git worktree add --detach "$RUNNER_TEMP/$side" "$sha"
+            ln -s "$GITHUB_WORKSPACE/node_modules" "$RUNNER_TEMP/$side/node_modules"
+            npm run --prefix "$RUNNER_TEMP/$side" create-docs
+            test -d "$RUNNER_TEMP/$side/docs/content"
+          done
+
+      - name: Generate mintlify-docs write token
+        id: docs-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ vars.BASE44_GITHUB_ACTIONS_APP_ID }}
+          private-key: ${{ secrets.BASE44_GITHUB_ACTIONS_APP_PRIVATE_KEY }}
+          owner: base44-dev
+          repositories: mintlify-docs
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Checkout mintlify-docs
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: ${{ env.DOCS_REPO }}
+          ref: main
+          token: ${{ steps.docs-token.outputs.token }}
+          path: ${{ env.DOCS_DIR }}
+
+      - name: Apply only this change to the published docs
+        id: patch
+        run: |
+          set -euo pipefail
+          node scripts/scoped-docs-patch.mjs \
+            --base "$RUNNER_TEMP/base/docs/content" \
+            --head "$RUNNER_TEMP/head/docs/content" \
+            --target "$GITHUB_WORKSPACE/$DOCS_DIR" \
+            --apply \
+            --summary "$RUNNER_TEMP/summary.md"
+
+      - name: Compose PR body
+        env:
+          HEAD: ${{ steps.range.outputs.head }}
+          SHORT: ${{ steps.range.outputs.short }}
+          BASE: ${{ steps.range.outputs.base }}
+          SUBJECT: ${{ steps.range.outputs.subject }}
+          SOURCE_PR: ${{ github.event.pull_request.html_url }}
+        run: |
+          set -euo pipefail
+          {
+            echo "Docs impact of [\`base44/javascript-sdk@${SHORT}\`](https://github.com/base44/javascript-sdk/commit/${HEAD}), compared against \`${BASE:0:7}\`:"
+            echo
+            echo '```'
+            echo "$SUBJECT"
+            echo '```'
+            if [ -n "$SOURCE_PR" ]; then
+              echo
+              echo "Source PR: ${SOURCE_PR}"
+            fi
+            echo
+            cat "$RUNNER_TEMP/summary.md"
+            echo
+            echo "_Opened by the \`publish-sdk-change-to-docs\` workflow in javascript-sdk. Generated output: review the rendered page, not the raw diff._"
+          } > "$RUNNER_TEMP/pr-body.md"
+          cat "$RUNNER_TEMP/pr-body.md"
+
+      # One branch per source commit.
+      - name: Open pull request
+        id: pr
+        uses: ./.github/actions/open-or-update-pr
+        with:
+          path: ${{ env.DOCS_DIR }}
+          token: ${{ steps.docs-token.outputs.token }}
+          bot-slug: ${{ steps.docs-token.outputs.app-slug }}
+          add-paths: |
+            developers/references/sdk/docs
+            */developers/references/sdk/docs/*
+          branch: bot/sdk-docs/${{ steps.range.outputs.short }}
+          base: main
+          title: "docs(sdk): ${{ steps.range.outputs.plain_subject }} (javascript-sdk@${{ steps.range.outputs.short }})"
+          body-path: ${{ runner.temp }}/pr-body.md
+          commit-message: |
+            docs(sdk): ${{ steps.range.outputs.plain_subject }}
+
+            Source: https://github.com/base44/javascript-sdk/commit/${{ steps.range.outputs.head }}
+
+      - name: Report
+        env:
+          CHANGED: ${{ steps.patch.outputs.changed }}
+          OPERATION: ${{ steps.pr.outputs.operation }}
+          URL: ${{ steps.pr.outputs.url }}
+        run: |
+          {
+            echo "## Publish SDK Change to Docs"
+            echo
+            echo "- Docs changed: \`${CHANGED}\`"
+            echo "- Pull request: \`${OPERATION:-none}\` ${URL}"
+            echo
+            cat "$RUNNER_TEMP/summary.md"
+          } >> "$GITHUB_STEP_SUMMARY"
