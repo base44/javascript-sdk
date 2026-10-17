@@ -170,3 +170,30 @@ exceptions, payloads and credentials are never attached.
 
 No SDK dependency, package version or lockfile changes are required. Socket.IO
 remains the existing SDK dependency. Chat commands and HTTP APIs are outside this entry point.
+
+## React
+
+`@base44/platform/react` adds one hook, `useBase44Chat`, that runs a builder chat for one
+app on top of this client: it opens the live session and renews it, turns messages into items
+made for rendering, binds every question the builder asks to the step it belongs to. It renders nothing. React is an optional peer dependency, loaded only by this
+entry; the root entry stays framework-free.
+
+```tsx
+import { useBase44Chat } from "@base44/platform/react";
+
+const chat = useBase44Chat({ appId, backend, onAppCreated });
+chat.items.map((item) =>
+  item.steps.map((step) => step.question?.kind === "approval" && <button onClick={step.question.approve}>Allow</button>),
+);
+```
+
+`backend` is four functions your backend provides, in any language behind them: `createApp`,
+`openLiveSession`, `sendMessage` and `submitToolCallInput`, each wrapping one Base44 REST
+call with your credentials, so the browser never holds a key. The hook returns `items`, a
+`status` (`ready`, `submitted`, `building`, `waiting`, `error`), a `connection` (`connecting`,
+`connected`, `disconnected`), an `error`, and the actions `send`, `create` and `clearError`. `send` needs an app; `create` makes
+the first, and the chat watches it while `appId` is `null`. A sent prompt shows at once as a
+`pending` item until Base44's own message arrives; a prompt sent mid-build waits in Base44's
+queue meanwhile. A question is a union on `kind` (`choice`, `secrets`, `approval`) and carries only the
+actions its kind allows, and declining is always one of them. As in Base44's builder, only the
+last assistant message makes the chat wait; a kind this release doesn't know is declined for you. Every shape has JSDoc in `src/react/chat.types.ts`.
