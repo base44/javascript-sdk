@@ -1,6 +1,6 @@
-import type { Message, QuestionArguments, SetSecretsArguments } from "../client/modules/builder.events.generated.js";
+import type { Message, QuestionArguments, QuestionInput, SetSecretsArguments } from "../client/modules/builder.events.generated.js";
 import type { ToolCall } from "../client/modules/builder.events.types.js";
-import type { ChatItem, ChatQuestion, ChatStep } from "./chat.types.js";
+import type { ApprovalDetails, ChatAnswer, ChatItem, ChatQuestion, ChatStep } from "./chat.types.js";
 
 /** @internal Sends the answer to the one tool call a question belongs to. */
 export type AnswerToolCall = (approve: boolean, extraUserInput?: Record<string, unknown>) => Promise<void>;
@@ -66,14 +66,50 @@ export function toItems(sortedMessages: Message[], answeredToolCallIds: string[]
   }));
 }
 
+// What a tool's display projection may carry; each tool declares only some of it.
+type ToolDisplay = { file_paths?: string[]; summary?: string; entity_name?: string; record_count?: number };
+
 function toStep(toolCall: ToolCall, answerToolCall: AnswerToolCall | undefined): ChatStep {
   const toolName = toolCall.name ?? "";
-  // Only file tools carry `display.file_paths`.
-  const display = "display" in toolCall ? (toolCall.display as { file_paths?: string[] } | null | undefined) : undefined;
+  const display = "display" in toolCall ? (toolCall.display as ToolDisplay | null | undefined) : undefined;
   const files = display?.file_paths ?? [];
+  const summary = display?.summary ?? (toolArguments(toolCall) as { summary?: string } | undefined)?.summary;
   const status = stepStatus(toolCall);
   const question = status === "waiting" && answerToolCall ? toQuestion(toolCall, answerToolCall) : undefined;
-  return { id: toolCall.id!, tool: toolName, files, label: [toolName, ...files].join(" "), status, ...(question && { question }) };
+  const answered = answersOf(toolCall);
+  return {
+    id: toolCall.id!,
+    tool: toolName,
+    files,
+    label: stepLabel(toolName, files, summary, display),
+    status,
+    ...(summary && { summary }),
+    ...(question && { question }),
+    ...(answered && { answered }),
+  };
+}
+
+// Base44's own description of the step reads best; then the entity it touched; then the files.
+function stepLabel(toolName: string, files: string[], summary: string | undefined, display: ToolDisplay | null | undefined): string {
+  if (summary) return summary;
+  const entityName = display?.entity_name;
+  if (entityName) {
+    const recordCount = display?.record_count;
+    return recordCount === undefined ? `${toolName} ${entityName}` : `${toolName} ${entityName} (${recordCount})`;
+  }
+  return [toolName, ...files].join(" ");
+}
+
+// What the user answered on a choice, each answer next to the question it answers.
+function answersOf(toolCall: ToolCall): ChatAnswer[] | undefined {
+  const userInput = "user_input" in toolCall ? (toolCall.user_input as QuestionInput | null | undefined) : undefined;
+  if (!userInput?.answers?.length) return undefined;
+  const questions = (toolArguments(toolCall) as QuestionArguments | undefined)?.questions ?? [];
+  return userInput.answers.map(answer => {
+    const labels = answer.selected_labels ?? (answer.selected_label ? [answer.selected_label] : []);
+    const question = questions[answer.question_index ?? -1]?.question ?? "";
+    return { question, labels, ...(answer.custom_text && { text: answer.custom_text }) };
+  });
 }
 
 /** @internal Base44's tool call status, as a step's. */
@@ -187,12 +223,37 @@ export function toQuestion(toolCall: ToolCall, answerToolCall: AnswerToolCall): 
     };
   }
   if (kind === "approval") {
-    // Guards that declare a reason or a summary carry them; the others name only themselves.
-    const approval = toolCall.approval as { reason?: string | null; details?: { summary?: string | null } | null } | null | undefined;
+    // Guards that declare a reason or details carry them; the others name only themselves.
+    const approval = toolCall.approval as GuardApproval | null | undefined;
     const reason = approval?.reason ?? approval?.details?.summary ?? "";
-    return { kind, action: toolCall.name ?? "", reason, approve: () => answerToolCall(true), decline };
+    const guard = approval?.guard ?? "";
+    return { kind, action: toolCall.name ?? "", reason, guard, details: approvalDetails(approval?.details), approve: () => answerToolCall(true), decline };
   }
   return undefined;
+}
+
+// Every detail a guard may publish, across Base44's guards.
+type GuardApproval = {
+  guard?: string;
+  reason?: string | null;
+  details?: {
+    summary?: string; entity_name?: string; change_type?: string; changed_ops?: string[];
+    function_name?: string; method?: string; inspection_failed?: boolean;
+  } | null;
+};
+
+function approvalDetails(details: GuardApproval["details"]): ApprovalDetails {
+  if (!details) return {};
+  const mapped: ApprovalDetails = {
+    summary: details.summary,
+    entityName: details.entity_name,
+    changeType: details.change_type,
+    changedOps: details.changed_ops,
+    functionName: details.function_name,
+    method: details.method,
+    inspectionFailed: details.inspection_failed,
+  };
+  return Object.fromEntries(Object.entries(mapped).filter(([, value]) => value !== undefined)) as ApprovalDetails;
 }
 
 // The waiting kind says which arguments a call carries; the tool's name only narrows the union.

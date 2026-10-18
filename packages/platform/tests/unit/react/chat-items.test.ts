@@ -128,6 +128,42 @@ describe("items", () => {
   });
 });
 
+describe("steps", () => {
+  const step = (toolCall: Record<string, unknown>) => toItems([message("m", "1", { tool_calls: [toolCall as ToolCall] })], [], vi.fn())[0].steps[0];
+
+  test("a step's label is Base44's summary, then the entity it touched, then the tool and files", () => {
+    expect(step({ id: "t1", name: "run_shell_command", status: "success", display: { summary: "Installed the date library" } }))
+      .toMatchObject({ label: "Installed the date library", summary: "Installed the date library" });
+    expect(step({ id: "t2", name: "update_entities", status: "success", arguments: { summary: "Marked three tasks done" }, display: { entity_name: "Task" } }))
+      .toMatchObject({ label: "Marked three tasks done", summary: "Marked three tasks done" });
+    expect(step({ id: "t3", name: "delete_entities", status: "success", display: { entity_name: "Task", record_count: 3 } }))
+      .toMatchObject({ label: "delete_entities Task (3)" });
+    const plain = step({ id: "t4", name: "write_file", status: "success", display: { file_paths: ["src/App.jsx"] } });
+    expect(plain.label).toBe("write_file src/App.jsx");
+    expect("summary" in plain).toBe(false);
+  });
+
+  test("an answered choice keeps what the user answered, next to each question", () => {
+    const answered = step({
+      id: "t1",
+      name: "ask_clarifying_questions",
+      status: "success",
+      arguments: { questions: [{ question: "Which colour?" }, { question: "Which pages?", multi_select: true }, { question: "Name it" }] },
+      user_input: { answers: [
+        { question_index: 0, selected_label: "Blue", custom_text: "a calm one" },
+        { question_index: 1, selected_labels: ["Home", "About"] },
+        { question_index: 2, custom_text: "Sip" },
+      ] },
+    });
+    expect(answered.answered).toEqual([
+      { question: "Which colour?", labels: ["Blue"], text: "a calm one" },
+      { question: "Which pages?", labels: ["Home", "About"] },
+      { question: "Name it", labels: [], text: "Sip" },
+    ]);
+    expect(answered.question).toBeUndefined();
+  });
+});
+
 describe("pending prompts", () => {
   const pending = (id: string, content: string, appId = "a") => ({ id, content, createdAt: "", appId });
 
@@ -215,7 +251,17 @@ describe("questions", () => {
     expect(withReason).toMatchObject({ kind: "approval", action: "send_email", reason: "Sends mail" });
     const withSummary = toQuestion(waiting("t", { name: "bash", waiting_on: { kind: "approval" }, approval: { guard: "g", details: { summary: "Lists files" } } }), reply);
     expect(withSummary).toMatchObject({ kind: "approval", reason: "Lists files" });
+    const guarded = toQuestion(waiting("t", {
+      name: "update_entity_rules",
+      waiting_on: { kind: "approval" },
+      approval: { guard: "entity_rls_guard", reason: "Opens Task to everyone", details: { entity_name: "Task", change_type: "loosen", changed_ops: ["read", "update"] } },
+    } as Partial<ToolCall>), reply);
+    expect(guarded).toMatchObject({
+      guard: "entity_rls_guard",
+      details: { entityName: "Task", changeType: "loosen", changedOps: ["read", "update"] },
+    });
     const bare = toQuestion(waiting("t", { waiting_on: { kind: "approval" } }), reply);
+    expect(bare).toMatchObject({ guard: "", details: {} });
     expect(bare).toMatchObject({ kind: "approval", action: "tool", reason: "" });
     if (bare?.kind !== "approval") return;
     await bare.approve();

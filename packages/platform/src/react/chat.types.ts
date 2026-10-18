@@ -117,8 +117,10 @@ export interface ChatStep {
   tool: string;
   /** The file paths the tool call touched. */
   files: string[];
-  /** The tool name and its files, ready to show. */
+  /** A line ready to show. It's Base44's description of the step when there is one, then the entity it touched, then the tool name and its files. */
   label: string;
+  /** Base44's description of what the step did, such as what a command or code run did. */
+  summary?: string;
   /**
    * Where the tool call is. A `waiting` step waits on the user. A `stopped` step was declined, or the
    * turn was stopped.
@@ -130,6 +132,18 @@ export interface ChatStep {
    * once answered, and is absent for a question kind this release doesn't know.
    */
   question?: ChatQuestion;
+  /** What the user answered on a choice question, once answered. It stays after the question closes, so the chat's history shows it. */
+  answered?: ChatAnswer[];
+}
+
+/** One answer to a choice question, next to the question it answers. */
+export interface ChatAnswer {
+  /** The question text. */
+  question: string;
+  /** The labels the user picked. */
+  labels: string[];
+  /** The free text the user wrote, if any. */
+  text?: string;
 }
 
 /**
@@ -217,6 +231,10 @@ export interface ApprovalQuestion {
   action: string;
   /** Why the action needs approval, when Base44 gives a reason. Empty otherwise. */
   reason: string;
+  /** The check that paused the action, such as `exec_tool_send_email` or `entity_rls_guard`. */
+  guard: string;
+  /** What the action would do, as far as the check publishes it. Show it so the user knows what they approve. */
+  details: ApprovalDetails;
   /**
    * Lets the action run.
    *
@@ -229,6 +247,24 @@ export interface ApprovalQuestion {
    * @returns Promise resolving once the decline is sent.
    */
   decline(): Promise<void>;
+}
+
+/** What an action that waits for approval would do. Each check publishes only some of these. */
+export interface ApprovalDetails {
+  /** The AI's summary of what the code does. */
+  summary?: string;
+  /** The entity whose records or access rules change. */
+  entityName?: string;
+  /** How the access rules change. */
+  changeType?: string;
+  /** The access operations whose rules change. */
+  changedOps?: string[];
+  /** The backend function under test. */
+  functionName?: string;
+  /** The entity method the code calls, such as `delete`. */
+  method?: string;
+  /** Whether the check couldn't verify the function's source. */
+  inspectionFailed?: boolean;
 }
 
 /**
