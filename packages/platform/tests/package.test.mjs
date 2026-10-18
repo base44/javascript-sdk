@@ -51,7 +51,7 @@ test("the server entrypoint resolves from the installed package", () => {
 });
 
 test("the React modules that use hooks or context keep their \"use client\" directive", () => {
-  for (const file of ['dist/react/useBase44Chat.js']) {
+  for (const file of ['dist/react/useBase44Chat.js', 'dist/react/context.js', 'dist/react/Base44ChatProvider.js', 'dist/react/Message.js', 'dist/react/fallbacks.js']) {
     assert.match(readFileSync(path.join(installed, file), "utf8"), /^"use client";/, file);
   }
 });
@@ -62,8 +62,8 @@ test("react is an optional peer of the /react entry, never a dependency of the c
   assert.deepEqual(manifest.peerDependenciesMeta, { react: { optional: true } });
   run(process.execPath, ["--input-type=module", "--eval", `
     import assert from "node:assert/strict";
-    import { useBase44Chat } from "@base44/platform/react";
-    assert.equal(typeof useBase44Chat, "function");
+    import { Base44ChatProvider, Message, Question, useBase44Chat, useChatActions, useChatState } from "@base44/platform/react";
+    for (const fn of [Base44ChatProvider, Message, Question, useBase44Chat, useChatActions, useChatState]) assert.equal(typeof fn, "function");
   `]);
 });
 
@@ -72,7 +72,7 @@ import { createPlatformServer, type PlatformServer } from "@base44/platform/serv
 const server: PlatformServer = createPlatformServer({ serverUrl: "https://example.test", apiKey: "key" });
 void server;
 
-import { useBase44Chat, type Base44ChatBackend, type ChatQuestion } from "@base44/platform/react";
+import { Base44ChatProvider, Message, useBase44Chat, useChatActions, useChatState, type Base44ChatBackend, type ChatComponents, type ChatQuestion } from "@base44/platform/react";
 const backend: Base44ChatBackend = {
   async createApp(prompt) { return { id: "a".repeat(24), name: prompt }; },
   async openLiveSession() { return { session_token: "token", socket_url: "https://example.test", socket_path: "/ws/socket.io/" }; },
@@ -83,7 +83,11 @@ declare const question: ChatQuestion;
 if (question.kind === "choice") void question.answer([["A"]]);
 // @ts-expect-error A choice is answered, not approved.
 if (question.kind === "choice") question.approve();
-void useBase44Chat; void backend;
+// A question part receives the question itself, actions included.
+const parts: ChatComponents = { question: { Choice: ({ answer }) => { void answer; return null; }, Secrets: ({ submit }) => { void submit; return null; }, Approval: ({ action, approve }) => { void action; void approve; return null; } } };
+// @ts-expect-error Every question kind needs a part.
+const missing: ChatComponents = { question: { Approval: () => null } };
+void useBase44Chat; void backend; void parts; void missing; void Base44ChatProvider; void Message; void useChatState; void useChatActions;
 
 import { createPlatformClient, type PlatformEvent } from "@base44/platform";
 const platform = createPlatformClient();

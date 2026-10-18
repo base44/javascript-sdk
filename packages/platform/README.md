@@ -197,3 +197,33 @@ the first, and the chat watches it while `appId` is `null`. A sent prompt shows 
 queue meanwhile. A question is a union on `kind` (`choice`, `secrets`, `approval`) and carries only the
 actions its kind allows, and declining is always one of them. As in Base44's builder, only the
 last assistant message makes the chat wait; a kind this release doesn't know is declined for you. Every shape has JSDoc in `src/react/chat.types.ts`.
+
+### Provider and parts
+
+`<Base44ChatProvider>` calls the hook once and shares the chat through context. Any component
+below it reads the chat with `useChatState()` (`items`, `status`, `connection`, `error`) or
+`useChatActions()` (`send`, `create`, `clearError`), and `<Message>` draws an item with your parts.
+
+```tsx
+import { Base44ChatProvider, Message, useChatState } from "@base44/platform/react";
+
+<Base44ChatProvider appId={appId} backend={backend} onAppCreated={selectApp} components={{ question: { Choice, Secrets, Approval } }}>
+  <Messages />
+</Base44ChatProvider>
+
+function Messages() {
+  const { items } = useChatState();
+  return items.map((item) => <div key={item.id} className={item.role}><Message item={item} /></div>);
+}
+```
+
+- **A part for every question kind is required.** TypeScript refuses a `components.question`
+  without `Choice`, `Secrets` and `Approval`, and a release that adds a kind adds a part, so an
+  upgrade tells you what to write. Until then the chat declines the new kind for you.
+- **Message parts are optional.** `Text` and `Step` left out are drawn as plain HTML, with no
+  classes and a `data-base44` attribute for CSS.
+- **A fixed order.** `<Message>` draws the text, then each step followed by its open question, if
+  it has one. It adds no element of its own. `<Question>` draws a question anywhere else below the provider.
+- **Stable actions.** `useChatActions()` keeps its identity while the app stays the same, also with
+  an inline `backend` and `onAppCreated`, so a component that reads only actions doesn't re-render
+  when a message arrives.

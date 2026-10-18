@@ -10,5 +10,5 @@
       "@base44/platform/react": ["src/react/index.ts"]
     }
   },
-  "include": ["src/**/*.ts", "tests/types/**/*.ts", "examples/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/types/**/*.ts", "tests/types/**/*.tsx", "examples/**/*.ts", "examples/**/*.tsx"]
 }
