@@ -68,6 +68,46 @@ describe("Browser module", () => {
     expect(scope.isDone()).toBe(true);
   });
 
+  test("getSession forwards sessionTimeoutSeconds", async () => {
+    scope
+      .post("/api/v1/browser-sessions", {
+        capture_debug_artifacts: true,
+        session_timeout_seconds: 600,
+      })
+      .reply(201, {
+        session_id: sessionId,
+        connection_url: connectionUrl,
+        connection_scope: "browser",
+      });
+
+    await base44.asServiceRole.browser.getSession({
+      sessionTimeoutSeconds: 600,
+    });
+
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test("getSession omits session_timeout_seconds when not set", async () => {
+    let body: Record<string, unknown> = {};
+    scope
+      .post("/api/v1/browser-sessions", (b) => {
+        body = b;
+        return true;
+      })
+      .reply(201, {
+        session_id: sessionId,
+        connection_url: connectionUrl,
+        connection_scope: "browser",
+      });
+
+    await base44.asServiceRole.browser.getSession({
+      captureDebugArtifacts: false,
+    });
+
+    expect(body).toEqual({ capture_debug_artifacts: false });
+    expect(scope.isDone()).toBe(true);
+  });
+
   test("getSession surfaces the error code and doesn't retry", async () => {
     scope.post("/api/v1/browser-sessions").once().reply(429, {
       error: {

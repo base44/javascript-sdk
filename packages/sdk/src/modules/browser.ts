@@ -36,7 +36,13 @@ export function createBrowserModule(axios: AxiosInstance): BrowserModule {
       // The app is derived from the service token, so the route isn't app-scoped.
       const response = await axios.post<BrowserSessionResponse>(
         "/v1/browser-sessions",
-        { capture_debug_artifacts: options.captureDebugArtifacts ?? true }
+        {
+          capture_debug_artifacts: options.captureDebugArtifacts ?? true,
+          // Omit when unset so the backend applies its configured default.
+          ...(options.sessionTimeoutSeconds !== undefined && {
+            session_timeout_seconds: options.sessionTimeoutSeconds,
+          }),
+        }
       );
 
       const data = response as unknown as BrowserSessionResponse;

@@ -8,6 +8,12 @@ export interface BrowserSessionOptions {
    * Captured artifacts stay with the remote browser provider and can't be retrieved through the SDK. Defaults to `true`.
    */
   captureDebugArtifacts?: boolean;
+  /**
+   * Session timeout in seconds.
+   *
+   * Base44 sets minimum and maximum allowed values and clamps the timeout to that range. When omitted, Base44 applies a default timeout. Depending on the remote browser provider, the timeout applies either to the session's total lifetime or to how long an idle session stays alive.
+   */
+  sessionTimeoutSeconds?: number;
 }
 
 /**
@@ -88,6 +94,14 @@ export interface BrowserModule {
    * // Turn off recordings and diagnostic logs
    * const session = await base44.asServiceRole.browser.getSession({
    *   captureDebugArtifacts: false,
+   * });
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Request a custom session timeout
+   * const session = await base44.asServiceRole.browser.getSession({
+   *   sessionTimeoutSeconds: 600,
    * });
    * ```
    */
