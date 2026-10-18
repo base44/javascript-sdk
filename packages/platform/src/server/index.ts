@@ -1,4 +1,4 @@
-/** Server platform modules, authenticated with a workspace API key. */
+/** Server platform modules, such as webhook verification. */
 export { createPlatformServer } from "./server.js";
 export { WebhookConfigurationError, WebhookVerificationError } from "./errors.js";
 export type { WebhookConfigurationErrorCode, WebhookVerificationErrorCode } from "./errors.types.js";
