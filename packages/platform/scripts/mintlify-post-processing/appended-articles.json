@@ -8,5 +8,15 @@
   "classes/PlatformSocketError": [
     "type-aliases/SessionErrorCode",
     "type-aliases/AppErrorCode"
+  ],
+  "interfaces/webhooks": [
+    "type-aliases/WebhookEvent",
+    "interfaces/UnknownWebhookEvent"
+  ],
+  "classes/WebhookVerificationError": [
+    "type-aliases/WebhookVerificationErrorCode"
+  ],
+  "classes/WebhookConfigurationError": [
+    "type-aliases/WebhookConfigurationErrorCode"
   ]
 }

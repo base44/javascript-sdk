@@ -3,7 +3,7 @@
 | Package | Directory | What it's for |
 | :- | :- | :- |
 | [`@base44/sdk`](https://www.npmjs.com/package/@base44/sdk) | [`packages/sdk`](packages/sdk) | Apps built on Base44: entities, functions, auth and integrations |
-| [`@base44/platform`](https://www.npmjs.com/package/@base44/platform) | [`packages/platform`](packages/platform) | White-label platforms: watch the builder of your apps from your own frontend |
+| [`@base44/platform`](https://www.npmjs.com/package/@base44/platform) | [`packages/platform`](packages/platform) | White-label platforms: watch the builder of your apps from your own frontend, and receive Base44 webhooks on your server |
 
 Each package is versioned and released on its own (tags `v…` for the SDK, `platform-v…` for the Platform SDK) through the **Manual Package Publish** workflow.
 

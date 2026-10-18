@@ -1,10 +1,11 @@
-/** Shared configuration for server platform modules. */
-export interface PlatformServerOptions {
-  /** Origin of the platform service, e.g. https://base44.app. No path/query/credentials. */
-  serverUrl: string;
-  /** Workspace API key. Keep it on your server; never ship it to a browser. */
-  apiKey: string;
-}
+import type { WebhooksModule } from "./modules/webhooks.types.js";
 
-/** Server platform client, returned by `createPlatformServer`. Modules are added as properties. */
-export interface PlatformServer {}
+/**
+ * The platform server client.
+ *
+ * Provides access to the platform's server modules.
+ */
+export interface PlatformServer {
+  /** [Webhooks module](/developers/references/platform-sdk/docs/interfaces/webhooks) for receiving the events Base44 sends to your server. */
+  readonly webhooks: WebhooksModule;
+}
