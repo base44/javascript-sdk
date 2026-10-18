@@ -1,4 +1,4 @@
-import type { BuilderModule } from "./modules/builder.types.js";
+import type { ChatModule } from "./modules/chat.types.js";
 
 /**
  * The platform client.
@@ -6,6 +6,11 @@ import type { BuilderModule } from "./modules/builder.types.js";
  * Provides access to the platform's modules.
  */
 export interface PlatformClient {
-  /** [Builder module](/developers/references/platform-sdk/docs/interfaces/builder) for following the AI chat in your users' apps live. */
-  readonly builder: BuilderModule;
+  /** [Chat module](/developers/references/platform-sdk/docs/interfaces/chat) for following the AI chat in your users' apps live. */
+  readonly chat: ChatModule;
+  /**
+   * @deprecated Renamed to {@linkcode chat}, the same module. Removed in 1.0.
+   * @hidden
+   */
+  readonly builder: ChatModule;
 }

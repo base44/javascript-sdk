@@ -1,7 +1,7 @@
 import type { PlatformSocketErrorCode } from "./errors.types.js";
 
 /**
- * The error the SDK reports when something goes wrong in a builder session.
+ * The error the SDK reports when something goes wrong in a chat session.
  *
  * You don't create it. The SDK passes it to your `onError` callbacks, `connect()` rejects with it,
  * and `subscribe()` throws it. Check `code` to see what happened, then look the code up below:
@@ -15,14 +15,14 @@ import type { PlatformSocketErrorCode } from "./errors.types.js";
  * @example
  * ```typescript
  * // Handle session and app errors
- * const builder = client.builder.init({
+ * const chat = client.chat.init({
  *   // Session error codes: the whole session is affected
  *   onError(error) {
  *     if (error.code === 'session_revoked') showSignedOut();
  *   },
  * });
  *
- * builder.subscribe(appId, {
+ * chat.subscribe(appId, {
  *   onSnapshot: renderChat,
  *   onEvent: applyEvent,
  *   // App error codes: only this app is affected, and error.appId says which

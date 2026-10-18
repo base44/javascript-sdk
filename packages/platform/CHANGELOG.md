@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Renamed: `builder` is now `chat`
+
+The client follows the AI chat, so the module and its types say so. The old names still work and
+are deprecated; they will be removed in 1.0.
+
+| Before | After |
+| --- | --- |
+| `client.builder` | `client.chat` |
+| `BuilderModule` | `ChatModule` |
+| `BuilderSession` | `ChatSession` |
+| `BuilderInitOptions` | `ChatInitOptions` |
+
+```ts
+const chat = client.chat.init({ getSession, onError });
+```
+
 ## 0.2.0
 
 **Breaking.** The client, its options and the event type names change, and events the SDK doesn't

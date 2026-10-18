@@ -30,7 +30,7 @@ test("real Socket.IO handshake, join, snapshot, reconnect and session renewal", 
     });
   });
   await new Promise(resolve => http.listen(0, "127.0.0.1", resolve));
-  const builder = createPlatformClient().builder.init({
+  const chat = createPlatformClient().chat.init({
     getSession: async () => ({
       session_id: `id-${tokenCalls}`, session_token: `session-${++tokenCalls}`, expires_in: 3600,
       socket_url: `http://127.0.0.1:${http.address().port}`, socket_path: "/live/socket.io/",
@@ -38,8 +38,8 @@ test("real Socket.IO handshake, join, snapshot, reconnect and session renewal", 
     onError: error => errors.push(error),
   });
   try {
-    builder.subscribe(appId, { onSnapshot: s => { snapshots.push(s.messages[0].id); }, onEvent: vi.fn(), onError: error => errors.push(error) });
-    await builder.connect();
+    chat.subscribe(appId, { onSnapshot: s => { snapshots.push(s.messages[0].id); }, onEvent: vi.fn(), onError: error => errors.push(error) });
+    await chat.connect();
     await vi.waitFor(() => expect(snapshots).toEqual(["m1"]));
     peers[0].terminate();
     await vi.waitFor(() => expect(snapshots).toEqual(["m1", "m2"]), { timeout: 6000 });
@@ -56,7 +56,7 @@ test("real Socket.IO handshake, join, snapshot, reconnect and session renewal", 
     }
     expect(errors).toEqual([]);
   } finally {
-    builder.close();
+    chat.close();
     for (const peer of peers) peer.terminate();
     await new Promise(resolve => server.close(resolve));
     await new Promise(resolve => http.close(resolve));

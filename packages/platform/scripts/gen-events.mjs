@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Generates src/client/modules/builder.events.generated.ts from asyncapi.json. `--check` fails on drift instead.
+// Generates src/client/modules/chat.events.generated.ts from asyncapi.json. `--check` fails on drift instead.
 import { readFile, writeFile } from "node:fs/promises";
 import { compile } from "json-schema-to-typescript";
 
 const source = new URL("../asyncapi.json", import.meta.url);
-const target = new URL("../src/client/modules/builder.events.generated.ts", import.meta.url);
+const target = new URL("../src/client/modules/chat.events.generated.ts", import.meta.url);
 const doc = JSON.parse(await readFile(source, "utf8"));
 const schemas = doc.components.schemas;
 const refName = (ref) => ref.split("/").pop();
@@ -85,10 +85,10 @@ export const serverEventNames = ${JSON.stringify(serverEvents.map((event) => eve
 if (process.argv.includes("--check")) {
   const committed = await readFile(target, "utf8").catch(() => "");
   if (committed !== output) {
-    console.error("builder.events.generated.ts is out of date with asyncapi.json. Run `npm run gen:events -w @base44/platform` and commit the result.");
+    console.error("chat.events.generated.ts is out of date with asyncapi.json. Run `npm run gen:events -w @base44/platform` and commit the result.");
     process.exit(1);
   }
-  console.log("builder.events.generated.ts is up to date.");
+  console.log("chat.events.generated.ts is up to date.");
 } else {
   await writeFile(target, output);
   console.log(`Wrote ${Object.keys(schemas).length} schemas and ${serverEvents.length} server events.`);

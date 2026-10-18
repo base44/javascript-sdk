@@ -2,9 +2,9 @@
 import { createElement, act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import type { Message, QueueItem } from "../../../src/client/modules/builder.events.generated.js";
-import type { PlatformSnapshot } from "../../../src/client/modules/builder.events.types.js";
-import type { SocketSession } from "../../../src/client/modules/builder.types.js";
+import type { Message, QueueItem } from "../../../src/client/modules/chat.events.generated.js";
+import type { PlatformSnapshot } from "../../../src/client/modules/chat.events.types.js";
+import type { SocketSession } from "../../../src/client/modules/chat.types.js";
 import { useBase44Chat } from "../../../src/react/index.js";
 import type { Base44Chat, Base44ChatOptions, Base44ChatBackend } from "../../../src/react/index.js";
 
@@ -17,7 +17,7 @@ type FakeSession = { subs: Record<string, SubOptions>; init: InitOptions; closed
 const fake = vi.hoisted(() => ({ sessions: [] as FakeSession[] }));
 vi.mock("../../../src/client/client.js", () => ({
   createPlatformClient: () => ({
-    builder: {
+    chat: {
       init(init: InitOptions) {
         const session: FakeSession & { subscribe(appId: string, opts: SubOptions): unknown; close(): void } = {
           subs: {},
@@ -43,10 +43,10 @@ vi.mock("../../../src/client/client.js", () => ({
 }));
 vi.mock("../../../src/client.js", () => ({
   Base44PlatformClient: class {
-    builder: { init(options: InitOptions): FakeSession };
+    chat: { init(options: InitOptions): FakeSession };
     constructor(options: ClientOptions) {
       fake.clients.push(options);
-      this.builder = {
+      this.chat = {
         init(init) {
           const session: FakeSession & { subscribe(appId: string, opts: SubOptions): unknown; close(): void } = {
             subs: {},

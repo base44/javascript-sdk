@@ -1,17 +1,17 @@
 import { io, type Socket } from "socket.io-client";
 import { PlatformSocketError } from "../errors.js";
-import { appFromRoom, appPattern, decode, decodeSession, decodeSnapshot, eventNames, isUnknownEvent, object, roomFor, roomNotices, sessionEndings } from "./builder-protocol.js";
-import { notify, Subscription } from "./builder-subscription.js";
-import type { BuilderInitOptions, BuilderSession, PlatformSubscription, SocketSession, SubscriptionOptions } from "./builder.types.js";
+import { appFromRoom, appPattern, decode, decodeSession, decodeSnapshot, eventNames, isUnknownEvent, object, roomFor, roomNotices, sessionEndings } from "./chat-protocol.js";
+import { notify, Subscription } from "./chat-subscription.js";
+import type { ChatInitOptions, ChatSession, PlatformSubscription, SocketSession, SubscriptionOptions } from "./chat.types.js";
 
 const MAX_DENIAL_RETRIES = 5;
 
 /** @internal */
-export class BuilderSocket implements BuilderSession {
+export class ChatSocket implements ChatSession {
   private socket?: Socket;
   private address?: string;
   private readonly subscriptions = new Map<string, Subscription>();
-  private readonly options: BuilderInitOptions;
+  private readonly options: ChatInitOptions;
   private closed = false;
   // The session outlives reconnects; it is replaced only when the server rejects or expires its token.
   private session?: SocketSession;
@@ -25,7 +25,7 @@ export class BuilderSocket implements BuilderSession {
   private resolveConnect?: () => void;
   private rejectConnect?: (error: PlatformSocketError) => void;
 
-  constructor(options: BuilderInitOptions) {
+  constructor(options: ChatInitOptions) {
     this.options = { getSession: options.getSession, onError: options.onError };
   }
 
@@ -55,7 +55,7 @@ export class BuilderSocket implements BuilderSession {
   subscribe(appId: string, options: SubscriptionOptions): PlatformSubscription {
     if (this.closed) throw new PlatformSocketError("client_closed");
     if (!appPattern.test(appId)) throw new TypeError("appId must be 24 lowercase hexadecimal characters");
-    if (this.subscriptions.has(appId)) throw new TypeError("An app may only have one subscription per builder session");
+    if (this.subscriptions.has(appId)) throw new TypeError("An app may only have one subscription per chat session");
     if (this.subscriptions.size >= 8) throw new PlatformSocketError("subscription_limit", appId);
     const subscription = new Subscription(appId, { ...options }, () => {
       this.subscriptions.delete(appId);

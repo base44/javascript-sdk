@@ -1,5 +1,5 @@
-import type { Message, QuestionArguments, QuestionInput, SetSecretsArguments } from "../client/modules/builder.events.generated.js";
-import type { ToolCall } from "../client/modules/builder.events.types.js";
+import type { Message, QuestionArguments, QuestionInput, SetSecretsArguments } from "../client/modules/chat.events.generated.js";
+import type { ToolCall } from "../client/modules/chat.events.types.js";
 import type { ApprovalDetails, ChatAnswer, ChatItem, ChatQuestion, ChatStep } from "./chat.types.js";
 
 /** @internal Sends the answer to the one tool call a question belongs to. */
@@ -40,7 +40,7 @@ function isTurnReply(message: Message | undefined): boolean {
   return message?.role === "assistant" && !message.additional_message_params?.skip_ai_response;
 }
 
-/** @internal The last assistant message that answers a turn, as Base44's own builder finds it. */
+/** @internal The last assistant message that answers a turn, as Base44's app editor finds it. */
 function lastTurnReply(sortedMessages: Message[]): Message | undefined {
   return [...sortedMessages].reverse().find(isTurnReply);
 }
@@ -120,7 +120,7 @@ export function stepStatus(toolCall: ToolCall): ChatStep["status"] {
   return "done";
 }
 
-/** @internal Whether the chat waits on the user. Like Base44's builder, only the last turn reply
+/** @internal Whether the chat waits on the user. Like Base44's app editor, only the last turn reply
  * counts, and a call answered or declined here stops counting. */
 export function isWaitingForUser(sortedMessages: Message[], answeredToolCallIds: string[]): boolean {
   const lastReply = lastTurnReply(sortedMessages);
@@ -180,7 +180,7 @@ export function pendingPromptItems(pendingPrompts: PendingPrompt[]): ChatItem[] 
 
 /** @internal Base44's question formats, as one simple shape per kind, each bound to the call that
  * answers it. Base44 keys choice answers by position, so `picked` and `texts` follow `questions`,
- * and like Base44's builder a single pick goes in `selected_label`, several in `selected_labels`,
+ * and like Base44's app editor a single pick goes in `selected_label`, several in `selected_labels`,
  * and free text in `custom_text`. A kind this release doesn't know has no shape. */
 export function toQuestion(toolCall: ToolCall, answerToolCall: AnswerToolCall): ChatQuestion | undefined {
   const kind = toolCall.waiting_on?.kind;

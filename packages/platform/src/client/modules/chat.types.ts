@@ -1,4 +1,4 @@
-import type { PlatformEvent, PlatformSnapshot } from "./builder.events.types.js";
+import type { PlatformEvent, PlatformSnapshot } from "./chat.events.types.js";
 import type { PlatformSocketError } from "../errors.js";
 
 /**
@@ -16,8 +16,8 @@ export interface SocketSession {
   socket_path: string;
 }
 
-/** Options for {@linkcode BuilderModule.init | init()}. */
-export interface BuilderInitOptions {
+/** Options for {@linkcode ChatModule.init | init()}. */
+export interface ChatInitOptions {
   /**
    * Returns a new socket session from your server.
    *
@@ -39,7 +39,7 @@ export interface BuilderInitOptions {
 }
 
 /**
- * Builder module for following the AI chat in your users' apps live.
+ * Chat module for following the AI chat in your users' apps live.
  *
  * Each session holds one socket and up to eight app subscriptions. For each app you get a
  * snapshot of its chat, then every change as it happens:
@@ -49,11 +49,11 @@ export interface BuilderInitOptions {
  *
  * The module does nothing until you call {@linkcode init | init()}.
  */
-export interface BuilderModule {
+export interface ChatModule {
   /**
-   * Creates a builder session without connecting it.
+   * Creates a chat session without connecting it.
    *
-   * Call {@linkcode BuilderSession.connect | connect()} on the returned session to open the socket.
+   * Call {@linkcode ChatSession.connect | connect()} on the returned session to open the socket.
    * Each session is independent, with its own socket, socket session and subscriptions.
    *
    * @param options - Session options.
@@ -62,26 +62,26 @@ export interface BuilderModule {
    * @example
    * ```typescript
    * // Create and connect a session
-   * const builder = client.builder.init({
+   * const chat = client.chat.init({
    *   async getSession() {
-   *     const response = await fetch('/api/builder-socket-session', { method: 'POST' });
+   *     const response = await fetch('/api/chat-socket-session', { method: 'POST' });
    *     return response.json();
    *   },
    *   onError(error) {
-   *     console.error('Builder session error', error.code);
+   *     console.error('Chat session error', error.code);
    *   },
    * });
-   * await builder.connect();
+   * await chat.connect();
    * ```
    */
-  init(options: BuilderInitOptions): BuilderSession;
+  init(options: ChatInitOptions): ChatSession;
 }
 
 /**
- * A `BuilderSession`: one socket with its app subscriptions and its reconnection. Use its methods
+ * A `ChatSession`: one socket with its app subscriptions and its reconnection. Use its methods
  * to connect, follow apps and close.
  */
-export interface BuilderSession {
+export interface ChatSession {
   /**
    * Connects the session's socket.
    *
@@ -98,7 +98,7 @@ export interface BuilderSession {
    * ```typescript
    * // Connect and handle failure
    * try {
-   *   await builder.connect();
+   *   await chat.connect();
    * } catch (error) {
    *   console.error('Could not connect', error.code);
    * }
@@ -125,7 +125,7 @@ export interface BuilderSession {
    * @example
    * ```typescript
    * // Follow an app
-   * const subscription = builder.subscribe(appId, {
+   * const subscription = chat.subscribe(appId, {
    *   onSnapshot(snapshot) {
    *     renderChat(snapshot.messages);
    *   },
@@ -143,13 +143,13 @@ export interface BuilderSession {
    * Closes the session.
    *
    * Ends every subscription, stops reconnecting and disconnects the socket. Calling it again does
-   * nothing. A closed session can't be reused, so call [`init()`](/developers/references/platform-sdk/docs/interfaces/builder#init)
+   * nothing. A closed session can't be reused, so call [`init()`](/developers/references/platform-sdk/docs/interfaces/chat#init)
    * for a new one.
    *
    * @example
    * ```typescript
    * // Close a session
-   * builder.close();
+   * chat.close();
    * ```
    */
   close(): void;
@@ -197,3 +197,21 @@ export interface PlatformSubscription {
    */
   unsubscribe(): void;
 }
+
+/**
+ * @deprecated Renamed to {@linkcode ChatModule}. Removed in 1.0.
+ * @hidden
+ */
+export type BuilderModule = ChatModule;
+
+/**
+ * @deprecated Renamed to {@linkcode ChatSession}. Removed in 1.0.
+ * @hidden
+ */
+export type BuilderSession = ChatSession;
+
+/**
+ * @deprecated Renamed to {@linkcode ChatInitOptions}. Removed in 1.0.
+ * @hidden
+ */
+export type BuilderInitOptions = ChatInitOptions;

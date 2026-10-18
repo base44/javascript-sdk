@@ -1,20 +1,20 @@
-import { createPlatformClient, type SocketSession, type PlatformEvent, type PlatformEventMap, type PlatformSnapshot, type ToolCall, type GuardApproval, type Message, type StatusObject } from "@base44/platform";
+import { createPlatformClient, type SocketSession, type PlatformEvent, type PlatformEventMap, type PlatformSnapshot, type ToolCall, type GuardApproval, type Message, type StatusObject, type BuilderSession, type ChatSession } from "@base44/platform";
 const client = createPlatformClient();
-const builder = client.builder.init({
+const chat = client.chat.init({
   // The Create socket session body passes through, extra keys included.
   getSession: async () => ({ session_id: "s1", session_token: "t", socket_url: "https://example.test", socket_path: "/ws/socket.io/", expires_in: 3600 }),
   onError: error => { void error.code; },
 });
-client.builder.init({ getSession: async () => (await fetch("/session")).json(), onError() {} });
+client.chat.init({ getSession: async () => (await fetch("/session")).json(), onError() {} });
 const body: SocketSession = { session_token: "t", socket_url: "https://example.test", socket_path: "/ws/socket.io/" };
 void body;
 // @ts-expect-error The session needs its socket path.
-client.builder.init({ getSession: async () => ({ session_token: "t", socket_url: "https://example.test" }), onError() {} });
+client.chat.init({ getSession: async () => ({ session_token: "t", socket_url: "https://example.test" }), onError() {} });
 // @ts-expect-error The session comes from init, not the client.
 createPlatformClient({ socketUrl: "https://example.test", getSessionToken: async () => "token" });
 // @ts-expect-error A session is required.
-client.builder.init({ onError() {} });
-const subscription = builder.subscribe("a".repeat(24), {
+client.chat.init({ onError() {} });
+const subscription = chat.subscribe("a".repeat(24), {
   onSnapshot(snapshot: PlatformSnapshot) {
     const state: "ready" | "processing" | "error" | null | undefined = snapshot.status?.state;
     const room: string = snapshot.room;
@@ -58,12 +58,16 @@ void subscription.active;
 // @ts-expect-error There is no replay cursor.
 void subscription.cursor;
 // @ts-expect-error Subscriptions take snapshots, not cursors.
-builder.subscribe("a".repeat(24), { afterSeq: "saved", onSnapshot() {}, onEvent() {}, onError() {} });
+chat.subscribe("a".repeat(24), { afterSeq: "saved", onSnapshot() {}, onEvent() {}, onError() {} });
 // @ts-expect-error No browser mutation channel.
 client.send("write_file", {});
 // @ts-expect-error API keys are not browser credentials.
 createPlatformClient({ apiKey: "private" });
-// @ts-expect-error Socket methods belong to the builder session.
+// The deprecated names still type-check.
+const legacy: BuilderSession = client.builder.init({ getSession: async () => (await fetch("/session")).json(), onError() {} });
+const renamed: ChatSession = legacy;
+void renamed;
+// @ts-expect-error Socket methods belong to the chat session.
 client.connect();
 
 const tool: ToolCall = {

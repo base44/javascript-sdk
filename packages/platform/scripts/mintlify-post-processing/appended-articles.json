@@ -1,6 +1,6 @@
 {
-  "interfaces/builder": [
-    "interfaces/BuilderSession",
+  "interfaces/chat": [
+    "interfaces/ChatSession",
     "interfaces/SocketSession",
     "type-aliases/PlatformEvent",
     "interfaces/PlatformSnapshot"

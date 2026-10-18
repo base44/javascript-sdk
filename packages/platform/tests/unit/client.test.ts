@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { createPlatformClient, PlatformSocketError, type BuilderSession } from "../../src/client/index.js";
+import { createPlatformClient, PlatformSocketError, type ChatSession } from "../../src/client/index.js";
 
 const fake = vi.hoisted(() => {
   const handlers: Record<string, (...args: any[]) => void> = {};
@@ -16,7 +16,7 @@ const fake = vi.hoisted(() => {
 vi.mock("socket.io-client", () => ({ io: fake.io }));
 
 const app = "a".repeat(24), other = "b".repeat(24), room = `/apps/${app}`;
-const clients: BuilderSession[] = [];
+const clients: ChatSession[] = [];
 const settle = async () => { for (let i = 0; i < 100; i++) await Promise.resolve(); };
 const snapshot = (messages: unknown[] = []) => fake.handlers["app.snapshot"]({ room, data: { status: { state: "ready" }, messages } });
 const update = (data: unknown = { status: null }) => fake.handlers["app.status_changed"]({ room, data });
@@ -30,14 +30,14 @@ const auth = async () => {
 };
 function setup(getSession = vi.fn(async (): Promise<any> => session())) {
   const onError = vi.fn();
-  const client = createPlatformClient().builder.init({ getSession, onError });
+  const client = createPlatformClient().chat.init({ getSession, onError });
   clients.push(client);
   return { client, getSession, onError };
 }
-async function begin(client: BuilderSession) {
+async function begin(client: ChatSession) {
   client.connect().catch(() => {}); await settle();
 }
-async function connected(client: BuilderSession) {
+async function connected(client: ChatSession) {
   const ready = client.connect(); await settle(); fake.socket.connected = true; fake.handlers.connect(); await ready; await settle();
 }
 const joins = () => fake.socket.emit.mock.calls.filter(c => c[0] === "join");
@@ -48,15 +48,20 @@ describe("platform client", () => {
   test("creating the client and initializing sessions opens no socket and fetches no session", () => {
     const getSession = vi.fn(async () => session());
     const platform = createPlatformClient();
-    const first = platform.builder.init({ getSession, onError: vi.fn() });
-    const second = platform.builder.init({ getSession, onError: vi.fn() });
+    const first = platform.chat.init({ getSession, onError: vi.fn() });
+    const second = platform.chat.init({ getSession, onError: vi.fn() });
     clients.push(first, second);
     expect(first).not.toBe(second);
     expect(fake.io).not.toHaveBeenCalled();
     expect(getSession).not.toHaveBeenCalled();
   });
 
-  test("closing one initialized builder does not close another or the root module", async () => {
+  test("the deprecated builder module is the chat module", () => {
+    const platform = createPlatformClient();
+    expect(platform.builder).toBe(platform.chat);
+  });
+
+  test("closing one initialized chat session does not close another or the root module", async () => {
     const firstSocket = { ...fake.socket, disconnect: vi.fn() };
     const secondSocket = { ...fake.socket, disconnect: vi.fn() };
     fake.io.mockReturnValueOnce(firstSocket).mockReturnValueOnce(secondSocket);
