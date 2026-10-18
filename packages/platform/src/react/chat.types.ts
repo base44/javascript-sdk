@@ -119,8 +119,6 @@ export interface ChatStep {
   files: string[];
   /** A line ready to show. It's Base44's description of the step when there is one, then the entity it touched, then the tool name and its files. */
   label: string;
-  /** Base44's description of what the step did, such as what a command or code run did. */
-  summary?: string;
   /**
    * Where the tool call is. A `waiting` step waits on the user. A `stopped` step was declined, or the
    * turn was stopped.

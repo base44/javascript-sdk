@@ -133,14 +133,12 @@ describe("steps", () => {
 
   test("a step's label is Base44's summary, then the entity it touched, then the tool and files", () => {
     expect(step({ id: "t1", name: "run_shell_command", status: "success", display: { summary: "Installed the date library" } }))
-      .toMatchObject({ label: "Installed the date library", summary: "Installed the date library" });
+      .toMatchObject({ label: "Installed the date library" });
     expect(step({ id: "t2", name: "update_entities", status: "success", arguments: { summary: "Marked three tasks done" }, display: { entity_name: "Task" } }))
-      .toMatchObject({ label: "Marked three tasks done", summary: "Marked three tasks done" });
+      .toMatchObject({ label: "Marked three tasks done" });
     expect(step({ id: "t3", name: "delete_entities", status: "success", display: { entity_name: "Task", record_count: 3 } }))
       .toMatchObject({ label: "delete_entities Task (3)" });
-    const plain = step({ id: "t4", name: "write_file", status: "success", display: { file_paths: ["src/App.jsx"] } });
-    expect(plain.label).toBe("write_file src/App.jsx");
-    expect("summary" in plain).toBe(false);
+    expect(step({ id: "t4", name: "write_file", status: "success", display: { file_paths: ["src/App.jsx"] } }).label).toBe("write_file src/App.jsx");
   });
 
   test("an answered choice keeps what the user answered, next to each question", () => {

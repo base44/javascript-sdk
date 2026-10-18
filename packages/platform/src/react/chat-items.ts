@@ -83,7 +83,6 @@ function toStep(toolCall: ToolCall, answerToolCall: AnswerToolCall | undefined):
     files,
     label: stepLabel(toolName, files, summary, display),
     status,
-    ...(summary && { summary }),
     ...(question && { question }),
     ...(answered && { answered }),
   };
