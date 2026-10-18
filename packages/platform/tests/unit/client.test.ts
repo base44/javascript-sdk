@@ -56,11 +56,6 @@ describe("platform client", () => {
     expect(getSession).not.toHaveBeenCalled();
   });
 
-  test("the deprecated builder module is the chat module", () => {
-    const platform = createPlatformClient();
-    expect(platform.builder).toBe(platform.chat);
-  });
-
   test("closing one initialized chat session does not close another or the root module", async () => {
     const firstSocket = { ...fake.socket, disconnect: vi.fn() };
     const secondSocket = { ...fake.socket, disconnect: vi.fn() };

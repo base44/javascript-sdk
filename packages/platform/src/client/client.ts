@@ -30,6 +30,5 @@ import { createChat } from "./modules/chat.js";
  * ```
  */
 export function createPlatformClient(): PlatformClient {
-  const chat = Object.freeze(createChat());
-  return Object.freeze({ chat, builder: chat });
+  return Object.freeze({ chat: Object.freeze(createChat()) });
 }

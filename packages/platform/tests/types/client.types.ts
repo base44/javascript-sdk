@@ -1,4 +1,4 @@
-import { createPlatformClient, type SocketSession, type PlatformEvent, type PlatformEventMap, type PlatformSnapshot, type ToolCall, type GuardApproval, type Message, type StatusObject, type BuilderSession, type ChatSession } from "@base44/platform";
+import { createPlatformClient, type SocketSession, type PlatformEvent, type PlatformEventMap, type PlatformSnapshot, type ToolCall, type GuardApproval, type Message, type StatusObject } from "@base44/platform";
 const client = createPlatformClient();
 const chat = client.chat.init({
   // The Create socket session body passes through, extra keys included.
@@ -63,10 +63,8 @@ chat.subscribe("a".repeat(24), { afterSeq: "saved", onSnapshot() {}, onEvent() {
 client.send("write_file", {});
 // @ts-expect-error API keys are not browser credentials.
 createPlatformClient({ apiKey: "private" });
-// The deprecated names still type-check.
-const legacy: BuilderSession = client.builder.init({ getSession: async () => (await fetch("/session")).json(), onError() {} });
-const renamed: ChatSession = legacy;
-void renamed;
+// @ts-expect-error The module is `chat`; `builder` was its name before 0.4.0.
+client.builder;
 // @ts-expect-error Socket methods belong to the chat session.
 client.connect();
 

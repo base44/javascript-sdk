@@ -161,7 +161,7 @@ their exceptions are isolated so they cannot interrupt another app's delivery.
 
 ## Public shapes
 
-- `PlatformClient` (`client.types.ts`): the `chat` module (`builder` is a deprecated alias).
+- `PlatformClient` (`client.types.ts`): the `chat` module.
 - `ChatModule` (`modules/chat.types.ts`): lazy `init(options)` factory.
 - `ChatInitOptions`: `getSession` and the connection-level `onError` observer.
 - `SocketSession`: the `session_token`, `socket_url` and `socket_path` that `getSession` returns.

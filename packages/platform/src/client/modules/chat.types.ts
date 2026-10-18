@@ -197,21 +197,3 @@ export interface PlatformSubscription {
    */
   unsubscribe(): void;
 }
-
-/**
- * @deprecated Renamed to {@linkcode ChatModule}. Removed in 1.0.
- * @hidden
- */
-export type BuilderModule = ChatModule;
-
-/**
- * @deprecated Renamed to {@linkcode ChatSession}. Removed in 1.0.
- * @hidden
- */
-export type BuilderSession = ChatSession;
-
-/**
- * @deprecated Renamed to {@linkcode ChatInitOptions}. Removed in 1.0.
- * @hidden
- */
-export type BuilderInitOptions = ChatInitOptions;
