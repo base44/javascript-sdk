@@ -73,6 +73,8 @@ export function useBase44Chat({ appId, backend, onAppCreated }: Base44ChatOption
   // Tool calls declined for the user, and those whose decline failed and may try again.
   const declinedToolCalls = useRef(new Set<string>());
   const failedDeclines = useRef(new Set<string>());
+  // Tool calls answered from here whose submission ends when Base44 stops reporting them waiting.
+  const answersAwaitingBase44 = useRef(new Set<string>());
 
   // The app `create` made, shown while `appId` is null. Any change to `appId` forgets it.
   const [createdAppId, setCreatedAppId] = useState<string | null>(null);
@@ -97,7 +99,10 @@ export function useBase44Chat({ appId, backend, onAppCreated }: Base44ChatOption
     setConnectionError(null);
     setAnsweredToolCallIds([]);
     if (submittedTo !== currentAppId && submittedTo !== NEW_APP) setSubmittedTo(null);
-    setPendingPrompts(pendingPrompts.filter(prompt => prompt.appId === currentAppId || prompt.appId === NEW_APP));
+    // Only the app `create` just handed over keeps its first prompt; any other is dropped, so it
+    // can't reappear when that app is picked later.
+    const handedOver = submittedTo !== null && submittedTo === currentAppId;
+    setPendingPrompts(pendingPrompts.filter(prompt => prompt.appId === NEW_APP || (handedOver && prompt.appId === currentAppId)));
   }
 
   // The backend is read through a ref, kept current after every render, so an inline
@@ -106,6 +111,12 @@ export function useBase44Chat({ appId, backend, onAppCreated }: Base44ChatOption
   useEffect(() => {
     backendRef.current = backend;
   });
+  // The app the chat follows now, so a call that finishes after a switch doesn't touch the new app.
+  const followedAppIdRef = useRef(currentAppId);
+  useEffect(() => {
+    followedAppIdRef.current = currentAppId;
+  }, [currentAppId]);
+  const stillFollowing = (targetAppId: string | null) => followedAppIdRef.current === targetAppId;
 
   const reportActionError = useCallback(
     (error: unknown) => setActionError({ message: (error as Error)?.message || "Something went wrong", cause: error }),
@@ -129,13 +140,13 @@ export function useBase44Chat({ appId, backend, onAppCreated }: Base44ChatOption
     // A new reply ends the submission. A new user message is Base44's copy of a prompt, which
     // settles the pending one.
     const seenMessageIds = new Set<string>();
-    const handleIncomingMessages = (incomingMessages: Message[], settleOldestIfUnmatched: boolean) => {
+    const handleIncomingMessages = (incomingMessages: Message[]) => {
       const newMessages = incomingMessages.filter(message => message.id && !seenMessageIds.has(message.id));
       for (const message of incomingMessages) if (message.id) seenMessageIds.add(message.id);
       if (newMessages.some(message => message.role !== "user")) setSubmittedTo(null);
       const arrivedPrompts = newMessages.filter(message => message.role === "user").map(message => message.content ?? "");
       if (arrivedPrompts.length) {
-        setPendingPrompts(prompts => settlePendingPrompts(prompts, followedAppId, arrivedPrompts, settleOldestIfUnmatched));
+        setPendingPrompts(prompts => settlePendingPrompts(prompts, followedAppId, arrivedPrompts));
       }
     };
     // A snapshot replaces the conversation when it is the first, or follows a rewrite of main
@@ -144,13 +155,15 @@ export function useBase44Chat({ appId, backend, onAppCreated }: Base44ChatOption
     // Base44 can resend an earlier turn's status after the next turn has started: one older than
     // the newest seen is stale.
     let latestStatusDate = "";
+    // A newer status, whatever its state, means Base44 has reacted, which ends the submission.
     const applyBuildStatus = (buildStatus: StatusObject | null | undefined) => {
       const statusDate = buildStatus?.last_updated_date ?? "";
       if (statusDate && statusDate < latestStatusDate) return;
+      const isNewer = !!statusDate && statusDate > latestStatusDate;
       if (statusDate) latestStatusDate = statusDate;
       const state = buildStatus?.state;
       setBuildState(state);
-      if (state === "processing" || state === "error") setSubmittedTo(null);
+      if (isNewer || state === "processing" || state === "error") setSubmittedTo(null);
     };
 
     // The client asks for a session on the first connect and whenever one expires, and forwards
@@ -178,7 +191,7 @@ export function useBase44Chat({ appId, backend, onAppCreated }: Base44ChatOption
     builderSession.subscribe(followedAppId, {
       onSnapshot: snapshot => {
         // A snapshot holds old prompts too, so only an exact match settles one.
-        handleIncomingMessages(snapshot.messages, false);
+        handleIncomingMessages(snapshot.messages);
         const replaceMessages = nextSnapshotReplaces;
         nextSnapshotReplaces = false;
         setMessages(heldMessages => (replaceMessages ? snapshot.messages : mergeSnapshot(heldMessages, snapshot.messages)));
@@ -190,7 +203,7 @@ export function useBase44Chat({ appId, backend, onAppCreated }: Base44ChatOption
       },
       onEvent: event => {
         if (event.type === "message.updated") {
-          handleIncomingMessages([event.data.message], true);
+          handleIncomingMessages([event.data.message]);
           setMessages(heldMessages => mergeMessage(heldMessages, event.data.message));
         }
         if (event.type === "message.removed") {
@@ -219,11 +232,15 @@ export function useBase44Chat({ appId, backend, onAppCreated }: Base44ChatOption
   const submitAnswer = useCallback(
     (toolCallId: string, messageId: string, approve: boolean, extraUserInput?: Record<string, unknown>) => {
       if (!currentAppId) return Promise.resolve();
+      const targetAppId = currentAppId;
       setActionError(null);
-      setSubmittedTo(currentAppId);
+      setSubmittedTo(targetAppId);
       setAnsweredToolCallIds(ids => [...ids, toolCallId]);
+      answersAwaitingBase44.current.add(toolCallId);
       const answer = { toolCallId, messageId, approve, extraUserInput };
-      return backendRef.current.submitToolCallInput(currentAppId, answer).catch((error: unknown) => {
+      return backendRef.current.submitToolCallInput(targetAppId, answer).catch((error: unknown) => {
+        answersAwaitingBase44.current.delete(toolCallId);
+        if (!stillFollowing(targetAppId)) return;
         setAnsweredToolCallIds(ids => ids.filter(answeredId => answeredId !== toolCallId));
         setSubmittedTo(null);
         reportActionError(error);
@@ -263,9 +280,17 @@ export function useBase44Chat({ appId, backend, onAppCreated }: Base44ChatOption
 
   // An answered call stays hidden while Base44 still reports it waiting, and is forgotten once it
   // doesn't: if Base44 parks it again, its question comes back.
+  // An answer's submission ends there too: Base44 has taken it once the call no longer waits.
   useEffect(() => {
     const stillWaiting = waitingToolCallIds(sortedMessages);
     setAnsweredToolCallIds(ids => (ids.every(answeredId => stillWaiting.has(answeredId)) ? ids : ids.filter(answeredId => stillWaiting.has(answeredId))));
+    let answerTaken = false;
+    for (const toolCallId of answersAwaitingBase44.current) {
+      if (stillWaiting.has(toolCallId)) continue;
+      answersAwaitingBase44.current.delete(toolCallId);
+      answerTaken = true;
+    }
+    if (answerTaken) setSubmittedTo(target => (target === followedAppIdRef.current ? null : target));
   }, [sortedMessages]);
 
   const submissionInFlight = (submittedTo === NEW_APP && !currentAppId) || (submittedTo !== null && submittedTo === currentAppId);
@@ -287,12 +312,14 @@ export function useBase44Chat({ appId, backend, onAppCreated }: Base44ChatOption
         setActionError({ message: "There is no app to send to yet: create one first" });
         return Promise.resolve();
       }
+      const targetAppId = currentAppId;
       setActionError(null);
-      setSubmittedTo(currentAppId);
-      const pendingPrompt = addPendingPrompt(prompt, currentAppId);
-      return backendRef.current.sendMessage(currentAppId, prompt).catch((error: unknown) => {
-        setSubmittedTo(null);
+      setSubmittedTo(targetAppId);
+      const pendingPrompt = addPendingPrompt(prompt, targetAppId);
+      return backendRef.current.sendMessage(targetAppId, prompt).catch((error: unknown) => {
         setPendingPrompts(prompts => prompts.filter(other => other !== pendingPrompt));
+        if (!stillFollowing(targetAppId)) return;
+        setSubmittedTo(null);
         reportActionError(error);
       });
     },
@@ -301,6 +328,8 @@ export function useBase44Chat({ appId, backend, onAppCreated }: Base44ChatOption
 
   const create = useCallback(
     async (prompt: string) => {
+      const startedFrom = followedAppIdRef.current;
+      const followsSetApp = appId !== null;
       setActionError(null);
       setSubmittedTo(NEW_APP);
       const pendingPrompt = addPendingPrompt(prompt, NEW_APP);
@@ -308,15 +337,19 @@ export function useBase44Chat({ appId, backend, onAppCreated }: Base44ChatOption
         const app = await backendRef.current.createApp(prompt);
         setCreatedAppId(app.id);
         setSubmittedTo(app.id);
-        setPendingPrompts(prompts => prompts.map(other => (other === pendingPrompt ? { ...other, appId: app.id } : other)));
+        // With appId set, the chat doesn't follow the new app, so its first prompt has nowhere to
+        // show; the new app's own snapshot holds it once someone opens it.
+        if (followsSetApp) setPendingPrompts(prompts => prompts.filter(other => other !== pendingPrompt));
+        else setPendingPrompts(prompts => prompts.map(other => (other === pendingPrompt ? { ...other, appId: app.id } : other)));
         onAppCreated?.(app);
       } catch (error) {
-        setSubmittedTo(null);
         setPendingPrompts(prompts => prompts.filter(other => other !== pendingPrompt));
+        if (!stillFollowing(startedFrom)) return;
+        setSubmittedTo(null);
         reportActionError(error);
       }
     },
-    [onAppCreated, reportActionError, addPendingPrompt],
+    [appId, onAppCreated, reportActionError, addPendingPrompt],
   );
 
   const clearError = useCallback(() => {

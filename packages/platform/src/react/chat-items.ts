@@ -127,20 +127,12 @@ export interface PendingPrompt {
 }
 
 /** @internal Prompts that arrived from Base44 as messages settle the pending ones with the same
- * text. Base44's public send carries no client id, so text is the only link. With
- * `settleOldestIfUnmatched`, an arrival that matches none settles the oldest, so a prompt Base44
- * changed on the way never stays pending. */
-export function settlePendingPrompts(
-  pendingPrompts: PendingPrompt[],
-  appId: string,
-  arrivedPrompts: string[],
-  settleOldestIfUnmatched: boolean,
-): PendingPrompt[] {
+ * text. Base44's public send carries no client id, so text is the only link, and a prompt someone
+ * else sent to the same app never settles one of ours. */
+export function settlePendingPrompts(pendingPrompts: PendingPrompt[], appId: string, arrivedPrompts: string[]): PendingPrompt[] {
   let stillPending = pendingPrompts;
   for (const arrivedPrompt of arrivedPrompts) {
-    const pendingForApp = stillPending.filter(prompt => prompt.appId === appId);
-    const exactMatch = pendingForApp.find(prompt => prompt.content.trim() === arrivedPrompt.trim());
-    const settled = exactMatch ?? (settleOldestIfUnmatched ? pendingForApp[0] : undefined);
+    const settled = stillPending.find(prompt => prompt.appId === appId && prompt.content.trim() === arrivedPrompt.trim());
     if (settled) stillPending = stillPending.filter(prompt => prompt !== settled);
   }
   return stillPending;
@@ -152,8 +144,9 @@ export function pendingPromptItems(pendingPrompts: PendingPrompt[]): ChatItem[] 
 }
 
 /** @internal Base44's question formats, as one simple shape per kind, each bound to the call that
- * answers it. Base44 keys choice answers by position, so `picked` follows `questions`. A kind this
- * release doesn't know has no shape. */
+ * answers it. Base44 keys choice answers by position, so `picked` and `texts` follow `questions`,
+ * and like Base44's builder a single pick goes in `selected_label`, several in `selected_labels`,
+ * and free text in `custom_text`. A kind this release doesn't know has no shape. */
 export function toQuestion(toolCall: ToolCall, answerToolCall: AnswerToolCall): ChatQuestion | undefined {
   const kind = toolCall.waiting_on?.kind;
   const decline = () => answerToolCall(false);
@@ -164,13 +157,21 @@ export function toQuestion(toolCall: ToolCall, answerToolCall: AnswerToolCall): 
       questions: questions.map(question => ({
         text: question.question ?? "",
         description: question.description,
+        type: question.type,
         options: (question.options ?? []).map(option => (typeof option === "string" ? option : option.label ?? "")),
         multi: !!question.multi_select,
       })),
-      answer: picked => {
-        const answers = picked
-          .map((labels, questionIndex) => ({ question_index: questionIndex, selected_labels: labels }))
-          .filter(answer => answer.selected_labels.length);
+      answer: (picked, texts = []) => {
+        const answers = questions.flatMap((question, questionIndex) => {
+          const labels = picked[questionIndex] ?? [];
+          const customText = texts[questionIndex]?.trim();
+          if (!labels.length && !customText) return [];
+          const answer: Record<string, unknown> = { question_index: questionIndex };
+          if (question.multi_select && labels.length) answer.selected_labels = labels;
+          if (!question.multi_select && labels.length) answer.selected_label = labels[0];
+          if (customText) answer.custom_text = customText;
+          return [answer];
+        });
         return answerToolCall(true, { answers });
       },
       decline,

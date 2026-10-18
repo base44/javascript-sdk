@@ -334,6 +334,47 @@ describe("status", () => {
     expect(latest.status).toBe("ready");
   });
 
+  test("an answer ends submitted once its call stops waiting, even when Base44 stayed processing", async () => {
+    // Recorded shape from the review: processing while the question waits, then ready.
+    await mount({ appId: app, backend: makeBackend() });
+    await snapshot([message("m1", "1", { tool_calls: [waiting("t1")] })], "processing");
+    await act(async () => { await (latest.items[0].steps[0].question as { approve(): Promise<void> }).approve(); });
+    await updated(message("m1", "1", { tool_calls: [{ ...waiting("t1"), status: "success" }] }));
+    await statusChanged("ready");
+    expect(latest.status).toBe("ready");
+  });
+
+  test("a newer status of any state ends submitted", async () => {
+    const at = (state: string, updated: string) =>
+      event({ type: "app.status_changed", appId: app, data: { status: { state, last_updated_date: `2026-10-18T10:00:${updated}` } } });
+    await mount({ appId: app, backend: makeBackend() });
+    await snapshot([]);
+    await at("ready", "01");
+    await act(async () => { await latest.send("hello"); });
+    expect(latest.status).toBe("submitted");
+    // The same status sent again is not Base44 reacting.
+    await at("ready", "01");
+    expect(latest.status).toBe("submitted");
+    await at("ready", "05");
+    expect(latest.status).toBe("ready");
+  });
+
+  test("a call that fails after a switch leaves the new app alone", async () => {
+    const backend = makeBackend();
+    const call = pending();
+    backend.sendMessage.mockReturnValueOnce(call.promise);
+    const { render } = await mount({ appId: app, backend });
+    await snapshot([]);
+    let done!: Promise<void>;
+    await act(async () => { done = latest.send("to the first app"); });
+    await render({ appId: other, backend });
+    await snapshot([], "ready", {}, other);
+    await act(async () => { await latest.send("to the second app"); });
+    await act(async () => { call.reject(new Error("Send message failed: 500")); await done; });
+    expect(latest.error).toBeNull();
+    expect(latest.status).toBe("submitted");
+  });
+
   test("precedence: error over waiting over building", async () => {
     await mount({ appId: app, backend: makeBackend() });
     await snapshot([message("m1", "1", { tool_calls: [waiting("t1")] })], "error");
@@ -419,12 +460,12 @@ describe("pending prompts", () => {
     expect(shown()).toEqual([["hello", false], ["make it blue", false]]);
   });
 
-  test("a prompt Base44 echoes with other text still settles, oldest first", async () => {
+  test("a prompt someone else sends to the same app does not settle ours", async () => {
     await mount({ appId: app, backend: makeBackend() });
     await snapshot([]);
-    await act(async () => { await latest.send("first"); await latest.send("second"); });
-    await updated(message("u1", "1", { role: "user", content: "first (edited)" }));
-    expect(shown()).toEqual([["first (edited)", false], ["second", true]]);
+    await act(async () => { await latest.send("mine"); });
+    await updated(message("u1", "1", { role: "user", content: "theirs" }));
+    expect(shown()).toEqual([["theirs", false], ["mine", true]]);
   });
 
   test("a prompt Base44 queues stays pending, in the order sent, until it runs", async () => {
@@ -473,6 +514,16 @@ describe("pending prompts", () => {
     expect(shown()).toEqual([["older", false], ["again", true]]);
   });
 
+  test("create while following a set app leaves no hidden prompt behind", async () => {
+    const backend = makeBackend();
+    const { render } = await mount({ appId: app, backend });
+    await snapshot([]);
+    await act(async () => { await latest.create("Another app"); });
+    expect(latest.items).toEqual([]);
+    await render({ appId: other, backend });
+    expect(latest.items).toEqual([]);
+  });
+
   test("switching apps drops the pending prompts", async () => {
     const backend = makeBackend();
     const { render } = await mount({ appId: app, backend });
@@ -489,7 +540,7 @@ describe("questions", () => {
     const backend = makeBackend();
     await mount({ appId: app, backend });
     await snapshot([
-      message("m1", "1", { tool_calls: [waiting("t1"), waiting("t2", "choice"), { id: "t3", name: "write_file", status: "success" }] }),
+      message("m1", "1", { tool_calls: [waiting("t1"), { ...waiting("t2", "choice"), arguments: { questions: [{ question: "Which?", options: ["A", "B"] }] } }, { id: "t3", name: "write_file", status: "success" }] }),
     ]);
     expect(latest.status).toBe("waiting");
     expect(latest.items[0].steps.map(s => s.question?.kind)).toEqual(["approval", "choice", undefined]);
@@ -497,7 +548,7 @@ describe("questions", () => {
     if (choice.kind !== "choice") throw new Error("expected a choice");
     await act(async () => { await choice.answer([["A"]]); });
     expect(backend.submitToolCallInput).toHaveBeenCalledWith(app, {
-      toolCallId: "t2", messageId: "m1", approve: true, extraUserInput: { answers: [{ question_index: 0, selected_labels: ["A"] }] },
+      toolCallId: "t2", messageId: "m1", approve: true, extraUserInput: { answers: [{ question_index: 0, selected_label: "A" }] },
     });
     expect(latest.items[0].steps.map(s => s.question?.kind)).toEqual(["approval", undefined, undefined]);
     expect(latest.items[0].steps[1].status).toBe("waiting");

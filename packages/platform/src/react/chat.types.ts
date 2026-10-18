@@ -150,6 +150,8 @@ export interface ChoiceEntry {
   text: string;
   /** Supporting text for the question. */
   description?: string;
+  /** Base44's type of question, such as `text_input` for one that takes only a free-text answer. */
+  type?: string;
   /** The option labels to pick from. */
   options: string[];
   /** Whether more than one option can be picked. */
@@ -163,12 +165,13 @@ export interface ChoiceQuestion {
   /** The questions, in order. */
   questions: ChoiceEntry[];
   /**
-   * Answers with the picked labels.
+   * Answers with the picked labels, and free text where the user wrote some.
    *
-   * @param picked - One list of picked labels per question, in the order of `questions`. An empty list skips that question.
+   * @param picked - One list of picked labels per question, in the order of `questions`.
+   * @param texts - One free-text answer per question, in the same order. Use it for a `text_input` question, or as a note beside a pick. A question with no pick and no text is skipped.
    * @returns Promise resolving once the answer is sent.
    */
-  answer(picked: string[][]): Promise<void>;
+  answer(picked: string[][], texts?: string[]): Promise<void>;
   /**
    * Declines the question. The AI continues without the answer.
    *

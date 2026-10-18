@@ -137,8 +137,8 @@ describe("pending prompts", () => {
     expect(settlePendingPrompts(all, "a", ["three"], false).map(p => p.id)).toEqual(["p1", "p2", "p3"]);
   });
 
-  test("an arrival that matches none settles the oldest, when asked", () => {
-    expect(settlePendingPrompts([pending("p1", "one"), pending("p2", "two")], "a", ["One!"], true).map(p => p.id)).toEqual(["p2"]);
+  test("an arrival that matches none, such as another client's prompt, settles nothing", () => {
+    expect(settlePendingPrompts([pending("p1", "one"), pending("p2", "two")], "a", ["someone else's"]).map(p => p.id)).toEqual(["p1", "p2"]);
   });
 
   test("a pending prompt is a user item with no steps", () => {
@@ -159,6 +159,7 @@ describe("questions", () => {
           questions: [
             { question: "Which?", description: "Pick one", options: ["A", { label: "B" }, {}], multi_select: false },
             { question: "Extras?", options: ["X", "Y"], multi_select: true },
+            { question: "Name it", type: "text_input" },
           ],
         },
       }),
@@ -167,18 +168,28 @@ describe("questions", () => {
     expect(question?.kind).toBe("choice");
     if (question?.kind !== "choice") return;
     expect(question.questions).toEqual([
-      { text: "Which?", description: "Pick one", options: ["A", "B", ""], multi: false },
-      { text: "Extras?", description: undefined, options: ["X", "Y"], multi: true },
+      { text: "Which?", description: "Pick one", type: undefined, options: ["A", "B", ""], multi: false },
+      { text: "Extras?", description: undefined, type: undefined, options: ["X", "Y"], multi: true },
+      { text: "Name it", description: undefined, type: "text_input", options: [], multi: false },
     ]);
+    // As in Base44's builder: one pick in selected_label, several in selected_labels.
     await question.answer([["A"], ["X", "Y"]]);
     expect(reply).toHaveBeenCalledWith(true, {
       answers: [
-        { question_index: 0, selected_labels: ["A"] },
+        { question_index: 0, selected_label: "A" },
         { question_index: 1, selected_labels: ["X", "Y"] },
       ],
     });
     await question.answer([[], ["Y"]]);
     expect(reply).toHaveBeenLastCalledWith(true, { answers: [{ question_index: 1, selected_labels: ["Y"] }] });
+    // Free text answers a text_input question, or rides beside a pick; blank text is no answer.
+    await question.answer([["B"], [], []], ["  make it warmer ", "", "Sip"]);
+    expect(reply).toHaveBeenLastCalledWith(true, {
+      answers: [
+        { question_index: 0, selected_label: "B", custom_text: "make it warmer" },
+        { question_index: 2, custom_text: "Sip" },
+      ],
+    });
     await question.decline();
     expect(reply).toHaveBeenLastCalledWith(false);
   });
