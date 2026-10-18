@@ -1,5 +1,6 @@
 import {
-  createPlatformServer, type AppCreatedV1Data, type WebhookEvent, type WebhookEventMap, type WebhookTestV1Data,
+  createPlatformServer, type AppCreatedV1Data, type WebhookEvent, type WebhookEventMap, type WebhookEventType,
+  type WebhookTestV1Data,
 } from "@base44/platform/server";
 
 const platform = createPlatformServer();
@@ -27,8 +28,8 @@ async function handle(body: string, headers: Headers) {
       break;
     }
     default: {
-      // A default branch still sees the event (the remaining known types), so it can be logged.
-      const type: "app.unpublished.v1" | "app.restored.v1" = event.type;
+      // A default branch still sees the event (the known types not handled above), so it can be logged.
+      const type: Exclude<WebhookEventType, "app.created.v1" | "app.published.v1" | "app.deleted.v1" | "webhook.test.v1"> = event.type;
       void type;
     }
   }
@@ -45,7 +46,7 @@ platform.webhooks.createHandler({
 // Examples published with the schemas must stay assignable to the generated types.
 const created: AppCreatedV1Data = {
   app_id: "68b0c1d2e3f4a5b6c7d8e9f0", workspace_id: "68a1b2c3d4e5f6a7b8c9d0e1", owner_id: "6899aabbccddeeff00112233",
-  owner_service_external_id: "sunny-9f2c4a", app_type: "user_app", created_at: "2026-09-01T10:15:30.123Z",
+  app_type: "user_app", created_at: "2026-09-01T10:15:30.123Z",
 };
 const probe: WebhookTestV1Data = { endpoint_id: "e", workspace_id: "w", sent_at: "2026-09-01T10:15:30.123Z", challenge: "8f14e45f" };
 const map: Pick<WebhookEventMap, "app.created.v1" | "webhook.test.v1"> = { "app.created.v1": created, "webhook.test.v1": probe };
