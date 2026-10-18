@@ -45,7 +45,8 @@
     "copy-docs-local": "node ../sdk/scripts/mintlify-post-processing/copy-to-local-docs.js --package-dir .",
     "create-docs:generate": "node -e \"fs.rmSync('docs',{recursive:true,force:true})\" && typedoc --options typedoc.mintlify.json",
     "create-docs:process": "node ../sdk/scripts/mintlify-post-processing/file-processing/file-processing.js --package-dir .",
-    "generate:webhooks": "node scripts/generate-webhook-types.mjs"
+    "generate:webhooks": "node scripts/generate-webhook-types.mjs",
+    "sync:webhooks": "node scripts/sync-webhook-event-types.mjs"
   },
   "dependencies": {
     "socket.io-client": "^4.8.3"
