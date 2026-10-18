@@ -17,8 +17,8 @@ const installed = path.join(scratch, "node_modules/@base44/platform");
 mkdirSync(installed, { recursive: true });
 run("tar", ["-xzf", path.join(scratch, packed.filename), "--strip-components=1", "-C", installed]);
 const manifest = JSON.parse(readFileSync(path.join(installed, "package.json"), "utf8"));
-// Use the already-installed, lockfile-pinned dependencies; never resolve or install in this fixture.
-for (const name of Object.keys(manifest.dependencies)) {
+// Use the already-installed, lockfile-pinned dependencies and peers; never resolve or install in this fixture.
+for (const name of [...Object.keys(manifest.dependencies), ...Object.keys(manifest.peerDependencies), "@types/react"]) {
   const destination = path.join(scratch, "node_modules", name);
   mkdirSync(path.dirname(destination), { recursive: true });
   symlinkSync(path.dirname(require.resolve(`${name}/package.json`)), destination, "dir");
@@ -26,7 +26,7 @@ for (const name of Object.keys(manifest.dependencies)) {
 
 test("the tarball contains the compiled entry point and no source or test trees", () => {
   const files = new Set(packed.files.map(file => file.path));
-  for (const file of ["dist/client/index.js", "dist/client/index.d.ts", "dist/server/index.js", "dist/server/index.d.ts", "README.md"]) assert.ok(files.has(file), file);
+  for (const file of ["dist/client/index.js", "dist/client/index.d.ts", "dist/server/index.js", "dist/server/index.d.ts", "dist/react/index.js", "dist/react/index.d.ts", "README.md"]) assert.ok(files.has(file), file);
   assert.equal([...files].some(file => /^(src|tests|examples)\//.test(file)), false);
 });
 
@@ -67,12 +67,42 @@ test("the server entrypoint verifies a signed webhook and its handler answers th
   `]);
 });
 
+test("the React modules that use hooks or context keep their \"use client\" directive", () => {
+  for (const file of ['dist/react/useBase44Chat.js']) {
+    assert.match(readFileSync(path.join(installed, file), "utf8"), /^"use client";/, file);
+  }
+});
+
+test("react is an optional peer of the /react entry, never a dependency of the client", () => {
+  assert.equal("react" in manifest.dependencies, false);
+  assert.deepEqual(manifest.peerDependencies, { react: "^18.0.0 || ^19.0.0" });
+  assert.deepEqual(manifest.peerDependenciesMeta, { react: { optional: true } });
+  run(process.execPath, ["--input-type=module", "--eval", `
+    import assert from "node:assert/strict";
+    import { useBase44Chat } from "@base44/platform/react";
+    assert.equal(typeof useBase44Chat, "function");
+  `]);
+});
+
 const consumer = `
 import { createPlatformServer, WebhookVerificationError, type WebhookEvent } from "@base44/platform/server";
 const server = createPlatformServer();
 server.webhooks.verifyEvent("{}", new Headers(), { publicKeys: "whpk_x" }).then((event: WebhookEvent) => {
   if (event.type === "app.deleted.v1") { const id: string = event.data.app_id; void id; }
 }, (error: unknown) => error instanceof WebhookVerificationError && error.code);
+
+import { useBase44Chat, type Base44ChatBackend, type ChatQuestion } from "@base44/platform/react";
+const backend: Base44ChatBackend = {
+  async createApp(prompt) { return { id: "a".repeat(24), name: prompt }; },
+  async openLiveSession() { return { session_token: "token", socket_url: "https://example.test", socket_path: "/ws/socket.io/" }; },
+  async sendMessage() {},
+  async submitToolCallInput() {},
+};
+declare const question: ChatQuestion;
+if (question.kind === "choice") void question.answer([["A"]]);
+// @ts-expect-error A choice is answered, not approved.
+if (question.kind === "choice") question.approve();
+void useBase44Chat; void backend;
 
 import { createPlatformClient, type PlatformEvent } from "@base44/platform";
 const platform = createPlatformClient();

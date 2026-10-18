@@ -2,7 +2,8 @@
   "$schema": "https://typedoc.org/schema.json",
   "entryPoints": [
     "./src/client/index.ts",
-    "./src/server/index.ts"
+    "./src/server/index.ts",
+    "./src/react/index.ts"
   ],
   "tsconfig": "./tsconfig.json",
   "out": "docs",
