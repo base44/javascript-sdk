@@ -18,10 +18,6 @@ export interface AppCreatedV1Data {
    */
   owner_id: string;
   /**
-   * Your own handle for the owner: the `service_external_id` you gave when you created that service user. Absent when the owner is not a service user.
-   */
-  owner_service_external_id?: string;
-  /**
    * The kind of app. New values arrive as a new event version.
    */
   app_type: "imported_app" | "user_agent" | "user_app" | "user_game";
@@ -47,10 +43,6 @@ export interface AppPublishedV1Data {
    */
   owner_id: string;
   /**
-   * Your own handle for the owner: the `service_external_id` you gave when you created that service user. Absent when the owner is not a service user.
-   */
-  owner_service_external_id?: string;
-  /**
    * Id of the version now live.
    */
   published_version: string;
@@ -75,10 +67,6 @@ export interface AppUnpublishedV1Data {
    * Opaque platform id of the app's current owner.
    */
   owner_id: string;
-  /**
-   * Your own handle for the owner: the `service_external_id` you gave when you created that service user. Absent when the owner is not a service user.
-   */
-  owner_service_external_id?: string;
   /**
    * When the app was taken offline (UTC).
    */
@@ -106,10 +94,6 @@ export interface AppDeletedV1Data {
    */
   owner_id: string;
   /**
-   * Your own handle for the owner: the `service_external_id` you gave when you created that service user. Absent when the owner is not a service user.
-   */
-  owner_service_external_id?: string;
-  /**
    * When the app was moved to trash (UTC). It can still be restored.
    */
   deleted_at: string;
@@ -130,10 +114,6 @@ export interface AppRestoredV1Data {
    * Opaque platform id of the app's current owner.
    */
   owner_id: string;
-  /**
-   * Your own handle for the owner: the `service_external_id` you gave when you created that service user. Absent when the owner is not a service user.
-   */
-  owner_service_external_id?: string;
   /**
    * When the app was restored (UTC).
    */
@@ -160,6 +140,81 @@ export interface WebhookTestV1Data {
    */
   challenge: string;
 }
+/**
+ * Sent when the builder picks the message up, not when it is received: a
+ * message sent while another turn runs waits in the queue until then.
+ */
+export interface BuilderTurnStartedV1Data {
+  /**
+   * The app the event is about.
+   */
+  app_id: string;
+  /**
+   * The workspace the app belongs to.
+   */
+  workspace_id: string;
+  /**
+   * Opaque platform id of the app's current owner.
+   */
+  owner_id: string;
+  /**
+   * The message that started the turn: the id returned when you sent it, and the app's `status.turn_id` while the turn runs.
+   */
+  message_id: string;
+  /**
+   * The conversation the message belongs to.
+   */
+  conversation_id?: string;
+  /**
+   * When the builder started working on the message (UTC).
+   */
+  started_at: string;
+  /**
+   * Set when this turn continues one that was interrupted: the `message_id` of that turn. Follow it back to add up the time the whole response took.
+   */
+  continues_message_id?: string;
+}
+/**
+ * The `data` object of `builder.turn_ended.v1`. The builder finished responding to a message.
+ */
+export interface BuilderTurnEndedV1Data {
+  /**
+   * The app the event is about.
+   */
+  app_id: string;
+  /**
+   * The workspace the app belongs to.
+   */
+  workspace_id: string;
+  /**
+   * Opaque platform id of the app's current owner.
+   */
+  owner_id: string;
+  /**
+   * The message that started the turn: the id returned when you sent it, and the app's `status.turn_id` while the turn runs.
+   */
+  message_id: string;
+  /**
+   * The conversation the message belongs to.
+   */
+  conversation_id?: string;
+  /**
+   * When the builder started working on the message (UTC).
+   */
+  started_at: string;
+  /**
+   * Set when this turn continues one that was interrupted: the `message_id` of that turn. Follow it back to add up the time the whole response took.
+   */
+  continues_message_id?: string;
+  /**
+   * How the turn ended. `finished`: the builder replied and has nothing pending. `waiting_for_user_input`: the builder stopped to ask something, such as a clarifying question or a plan to approve, and continues when the next message answers it. `failed`: the turn hit an error. `cancelled`: the turn was stopped before it ended. `interrupted`: the builder was interrupted, for example by a restart, and continues the work in a new turn whose `continues_message_id` is this message.
+   */
+  status: "finished" | "waiting_for_user_input" | "failed" | "cancelled" | "interrupted";
+  /**
+   * When the turn ended (UTC).
+   */
+  ended_at: string;
+}
 /** Every event type Base44 sends, mapped to the shape of its `data` object. */
 export interface WebhookEventMap {
   /** An app was created. */
@@ -174,7 +229,11 @@ export interface WebhookEventMap {
   "app.restored.v1": AppRestoredV1Data;
   /** Carries no domain data — its only job is to be verifiable and echoed. */
   "webhook.test.v1": WebhookTestV1Data;
+  /** Sent when the builder picks the message up, not when it is received: a */
+  "builder.turn_started.v1": BuilderTurnStartedV1Data;
+  /** The builder finished responding to a message. */
+  "builder.turn_ended.v1": BuilderTurnEndedV1Data;
 }
 
 /** Every event type in {@link WebhookEventMap}, so events from a newer Base44 can be told apart at runtime. @internal */
-export const WEBHOOK_EVENT_TYPES = ["app.created.v1","app.published.v1","app.unpublished.v1","app.deleted.v1","app.restored.v1","webhook.test.v1"] as const;
+export const WEBHOOK_EVENT_TYPES = ["app.created.v1","app.published.v1","app.unpublished.v1","app.deleted.v1","app.restored.v1","webhook.test.v1","builder.turn_started.v1","builder.turn_ended.v1"] as const;

@@ -4,5 +4,7 @@
   "app.unpublished.v1",
   "app.deleted.v1",
   "app.restored.v1",
-  "webhook.test.v1"
+  "webhook.test.v1",
+  "builder.turn_started.v1",
+  "builder.turn_ended.v1"
 ]
