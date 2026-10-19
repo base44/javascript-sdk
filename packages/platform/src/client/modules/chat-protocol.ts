@@ -1,7 +1,7 @@
-import { serverEventNames, type ServerEventMap, type SessionEnded } from "./builder.events.generated.js";
+import { serverEventNames, type ServerEventMap, type SessionEnded } from "./chat.events.generated.js";
 import type { PlatformSocketErrorCode } from "../errors.types.js";
-import type { PlatformEvent, PlatformEventMap, PlatformSnapshot } from "./builder.events.types.js";
-import type { SocketSession } from "./builder.types.js";
+import type { PlatformEvent, PlatformEventMap, PlatformSnapshot } from "./chat.events.types.js";
+import type { SocketSession } from "./chat.types.js";
 
 const sessionEvents: readonly string[] = ["app.snapshot", "session.ended"];
 /** App events delivered to `onEvent`: every server event except the session events the socket handles. */

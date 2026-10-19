@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPlatformClient } from "../client/client.js";
-import type { Message, StatusObject } from "../client/modules/builder.events.generated.js";
+import type { Message, StatusObject } from "../client/modules/chat.events.generated.js";
 import { isWaitingForUser, mergeMessage, mergeSnapshot, pendingPromptItems, settlePendingPrompts, sortMessages, toItems, unknownKindToolCalls, waitingToolCallIds, type PendingPrompt } from "./chat-items.js";
 import type { Base44Chat, Base44ChatOptions, ChatConnection, ChatError, ChatStatus } from "./chat.types.js";
 
@@ -169,7 +169,7 @@ export function useBase44Chat({ appId, backend, onAppCreated }: Base44ChatOption
     // The client asks for a session on the first connect and whenever one expires, and forwards
     // no detail of a failed call, so the backend's own error is kept to report.
     let lastSessionError: unknown;
-    const builderSession = createPlatformClient().builder.init({
+    const chatSession = createPlatformClient().chat.init({
       getSession: () =>
         backendRef.current.openLiveSession(followedAppId).then(
           socketSession => {
@@ -188,7 +188,7 @@ export function useBase44Chat({ appId, backend, onAppCreated }: Base44ChatOption
         setConnection("disconnected");
       },
     });
-    builderSession.subscribe(followedAppId, {
+    chatSession.subscribe(followedAppId, {
       onSnapshot: snapshot => {
         // A snapshot holds old prompts too, so only an exact match settles one.
         handleIncomingMessages(snapshot.messages);
@@ -219,11 +219,11 @@ export function useBase44Chat({ appId, backend, onAppCreated }: Base44ChatOption
       onError: error => ((error as { code?: string }).code === "snapshot_unavailable" ? reportConnectionError(error) : endLiveUpdates(error)),
     });
     // A failed connect also reaches onError, which reports it.
-    builderSession.connect().catch(() => {});
+    chatSession.connect().catch(() => {});
 
     return () => {
       closed = true;
-      builderSession.close();
+      chatSession.close();
     };
   }, [currentAppId]);
 

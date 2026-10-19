@@ -1,4 +1,4 @@
-import type { Message, QueueState, ServerEventMap, Snapshot } from "./builder.events.generated.js";
+import type { Message, QueueState, ServerEventMap, Snapshot } from "./chat.events.generated.js";
 
 /**
  * Maps each live event name to the type of its `data` payload.

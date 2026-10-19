@@ -36,8 +36,8 @@ test("the client resolves from the installed package without the runtime SDK", (
     import assert from "node:assert/strict";
     import { createPlatformClient } from "@base44/platform";
     const client = createPlatformClient();
-    assert.equal(typeof client.builder.init, "function");
-    client.builder.init({ getSession: async () => ({ session_token: "t", socket_url: "https://example.test", socket_path: "/ws/socket.io/" }), onError() {} }).close();
+    assert.equal(typeof client.chat.init, "function");
+    client.chat.init({ getSession: async () => ({ session_token: "t", socket_url: "https://example.test", socket_path: "/ws/socket.io/" }), onError() {} }).close();
   `]);
 });
 
@@ -106,7 +106,7 @@ void useBase44Chat; void backend;
 
 import { createPlatformClient, type PlatformEvent } from "@base44/platform";
 const platform = createPlatformClient();
-platform.builder.init({ getSession: async () => (await fetch("/session")).json(), onError() {} }).subscribe("a".repeat(24), {
+platform.chat.init({ getSession: async () => (await fetch("/session")).json(), onError() {} }).subscribe("a".repeat(24), {
   onSnapshot(snapshot) { void snapshot.messages; },
   onEvent(event: PlatformEvent) {
     if (event.type === "message.updated") {

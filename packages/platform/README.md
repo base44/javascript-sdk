@@ -7,8 +7,8 @@ npm install @base44/platform
 The Platform SDK for white-label platforms built on Base44. It is independent of the app SDK
 (`@base44/sdk`) and has two entrypoints:
 
-- `@base44/platform`, for the browser: implements the read-only white-label builder socket
-  contract. A partner's browser watches the builder chat of up to eight apps over the platform's
+- `@base44/platform`, for the browser: implements the read-only white-label live AI chat
+  contract. A partner's browser watches the AI chat of up to eight apps over the platform's
   shared socket. The workspace must have white-label sockets enabled; this SDK does not open sessions.
 - `@base44/platform/server`, for your backend: verify the webhooks Base44 sends when apps are
   created, published, unpublished, trashed or restored. See
@@ -18,24 +18,24 @@ The Platform SDK for white-label platforms built on Base44. It is independent of
 import { createPlatformClient } from "@base44/platform";
 
 const client = createPlatformClient();
-const builder = client.builder.init({
+const chat = client.chat.init({
   // Returns the body of POST /api/service/socket-sessions, unchanged.
   async getSession() {
-    const response = await fetch("/api/builder-socket-session", { method: "POST" });
+    const response = await fetch("/api/chat-socket-session", { method: "POST" });
     if (!response.ok) throw new Error("Session request failed");
     return response.json();
   },
   onError(error) { showConnectionError(error.code); },
 });
-const subscription = builder.subscribe(appId, {
+const subscription = chat.subscribe(appId, {
   onSnapshot(snapshot) { replaceAppState(snapshot); },
   async onEvent(event) { await applyEvent(event); }, // awaited before the next event
   onError(error) { showSubscriptionError(error.code); },
 });
-await builder.connect();
+await chat.connect();
 // On view teardown:
 subscription.unsubscribe();
-builder.close();
+chat.close();
 ```
 
 ## Receiving webhooks (server)
@@ -97,7 +97,7 @@ Delivery is at least once with no ordering guarantee: deduplicate on `event.id`,
 
 ## Sessions
 
-`/api/builder-socket-session` is your backend's route, not an SDK endpoint. It opens a
+`/api/chat-socket-session` is your backend's route, not an SDK endpoint. It opens a
 socket session with its workspace key (`apps:watch` scope) through
 `POST /api/service/socket-sessions` with `{ app_ids }`, and returns the response body
 to the browser. `getSession` returns that body unchanged: the SDK reads `session_token`,
@@ -107,7 +107,7 @@ backend adds or removes apps with `PUT`/`DELETE /api/service/socket-sessions/{se
 
 A session lasts one hour and is never extended. The token goes exclusively in
 CONNECT `auth.session_token`, never a URL, and the SDK keeps it in memory only. It
-is reused across automatic reconnects. `getSession` is called when a builder
+is reused across automatic reconnects. `getSession` is called when a chat
 session first connects, and again only when the server rejects the cached token or
 expires the session; the SDK then reconnects once with the new session. If the new
 session has a different `socket_url` or `socket_path`, the SDK closes the old socket,
@@ -123,26 +123,26 @@ older one, which stops with `session_replaced`. Open one session per page.
 
 `createPlatformClient()` creates a lightweight module container: no Socket.IO
 instance, timers, session request or network activity. It takes no options. Its
-`builder` module follows the server SDK's module-factory pattern.
+`chat` module follows the server SDK's module-factory pattern.
 
-`client.builder.init({ getSession, onError })` synchronously creates an independent
-`BuilderSession` without connecting or creating a socket. Repeated calls create separate sessions, each owning its own
+`client.chat.init({ getSession, onError })` synchronously creates an independent
+`ChatSession` without connecting or creating a socket. Repeated calls create separate sessions, each owning its own
 socket, listeners, subscriptions and cleanup. Close the returned session when its
 view is disposed; the root client and other sessions remain usable.
 
-`builder.connect()` fetches the first session, creates the socket at its address and
+`chat.connect()` fetches the first session, creates the socket at its address and
 resolves on CONNECT, before any snapshot. The socket uses the default namespace on the
 session's `socket_path`, WebSocket only, with a dedicated manager.
 Transport reconnection uses five attempts, starting at one second and capped at ten
 seconds with jitter; each attempt has a twenty-second timeout. A temporary server
 refusal is retried the same way. After exhaustion, a refusal or `session_replaced`,
-fix the cause and call `builder.connect()`.
+fix the cause and call `chat.connect()`.
 
-`builder.subscribe(appId, options)` returns a handle with `appId`, `active` and
+`chat.subscribe(appId, options)` returns a handle with `appId`, `active` and
 idempotent `unsubscribe()`. App IDs are 24 lowercase hexadecimal characters. One
-subscription per app and at most eight subscriptions are allowed per builder session.
-Subscriptions can be created before connecting. `builder.close()` is terminal for that
-session; call `client.builder.init(...)` again to start another.
+subscription per app and at most eight subscriptions are allowed per chat session.
+Subscriptions can be created before connecting. `chat.close()` is terminal for that
+session; call `client.chat.init(...)` again to start another.
 
 ## Snapshots and events
 
@@ -161,15 +161,15 @@ their exceptions are isolated so they cannot interrupt another app's delivery.
 
 ## Public shapes
 
-- `PlatformClient` (`client.types.ts`): the `builder` module.
-- `BuilderModule` (`modules/builder.types.ts`): lazy `init(options)` factory.
-- `BuilderInitOptions`: `getSession` and the connection-level `onError` observer.
+- `PlatformClient` (`client.types.ts`): the `chat` module.
+- `ChatModule` (`modules/chat.types.ts`): lazy `init(options)` factory.
+- `ChatInitOptions`: `getSession` and the connection-level `onError` observer.
 - `SocketSession`: the `session_token`, `socket_url` and `socket_path` that `getSession` returns.
-- `BuilderSession`: `connect()`, `subscribe(appId, options)`, `close()`.
+- `ChatSession`: `connect()`, `subscribe(appId, options)`, `close()`.
 - `SubscriptionOptions`: required `onSnapshot`, `onEvent` and `onError`.
 - `PlatformSubscription`: read-only `appId`, `active`, and `unsubscribe()`.
 - `PlatformEvent`, `PlatformEventMap`, `PlatformSnapshot`, `ToolCall`, `GuardApproval`
-  (`modules/builder.events.types.ts`), derived from the generated event types.
+  (`modules/chat.events.types.ts`), derived from the generated event types.
 - Error codes in `errors.types.ts`.
 
 `PlatformEvent` is a **discriminated union**: switch on `event.type` to narrow
@@ -186,7 +186,7 @@ redaction of generated prose or user content.
 ## Event types
 
 The socket protocol is defined by the service's AsyncAPI document, committed as
-`asyncapi.json`. `src/client/modules/builder.events.generated.ts` is generated from it with
+`asyncapi.json`. `src/client/modules/chat.events.generated.ts` is generated from it with
 `json-schema-to-typescript`: one type per schema, named after the backend model
 (`Message`, `StatusObject`, `QueueState`, one `*Call` per tool, one `*Approval` per
 guard), plus `ServerEventMap` and `ClientMessageMap`. Never edit it by hand.
@@ -229,16 +229,16 @@ exceptions, payloads and credentials are never attached.
 | `delivery_overflow` | 1,000 deliveries queued for the app; subscribe again for a fresh snapshot. |
 | `protocol_error` | Invalid routing or envelope. Stop and investigate. |
 | `handler_failed` | An application callback failed; fix it and subscribe again. |
-| `client_closed` | The builder session was explicitly closed; initialize another session. |
+| `client_closed` | The chat session was explicitly closed; initialize another session. |
 
 No SDK dependency, package version or lockfile changes are required. Socket.IO
 remains the existing SDK dependency. Chat commands and HTTP APIs are outside this entry point.
 
 ## React
 
-`@base44/platform/react` adds one hook, `useBase44Chat`, that runs a builder chat for one
+`@base44/platform/react` adds one hook, `useBase44Chat`, that runs the AI chat for one
 app on top of this client: it opens the live session and renews it, turns messages into items
-made for rendering, binds every question the builder asks to the step it belongs to. It renders nothing. React is an optional peer dependency, loaded only by this
+made for rendering, binds every question the AI asks to the step it belongs to. It renders nothing. React is an optional peer dependency, loaded only by this
 entry; the root entry stays framework-free.
 
 ```tsx
@@ -258,5 +258,5 @@ call with your credentials, so the browser never holds a key. The hook returns `
 the first, and the chat watches it while `appId` is `null`. A sent prompt shows at once as a
 `pending` item until Base44's own message arrives; a prompt sent mid-build waits in Base44's
 queue meanwhile. A question is a union on `kind` (`choice`, `secrets`, `approval`) and carries only the
-actions its kind allows, and declining is always one of them. As in Base44's builder, only the
+actions its kind allows, and declining is always one of them. As in Base44's app editor, only the
 last assistant message makes the chat wait; a kind this release doesn't know is declined for you. Every shape has JSDoc in `src/react/chat.types.ts`.
