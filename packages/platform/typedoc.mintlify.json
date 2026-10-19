@@ -15,5 +15,6 @@
   "maxTypeConversionDepth": 3,
   "hideBreadcrumbs": true,
   "disableSources": true,
-  "hidePageTitle": true
+  "hidePageTitle": true,
+  "intentionallyNotExported": ["src/client/modules/chat.events.generated.ts:SecretField"]
 }
