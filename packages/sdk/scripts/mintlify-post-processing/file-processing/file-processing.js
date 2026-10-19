@@ -2587,7 +2587,7 @@ function applyClassPageCleanup(dir) {
 }
 
 /**
- * A Returns type line such as `BuilderSession` becomes a link when the same page documents that type:
+ * A Returns type line such as `ChatSession` becomes a link when the same page documents that type:
  * its methods section (page-sections.json `typesWithOwnMethods`) or its own ### heading.
  */
 function linkReturnTypes(content) {

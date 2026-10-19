@@ -62,7 +62,7 @@ jobs:
       - name: Check for changes
         id: changes
         run: |
-          if git diff --quiet -- packages/platform/asyncapi.json packages/platform/src/client/modules/builder.events.generated.ts; then
+          if git diff --quiet -- packages/platform/asyncapi.json packages/platform/src/client/modules/chat.events.generated.ts; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "✅ asyncapi.json and the event types are up to date"
           else
@@ -91,7 +91,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -B "$BRANCH"
-          git add packages/platform/asyncapi.json packages/platform/src/client/modules/builder.events.generated.ts
+          git add packages/platform/asyncapi.json packages/platform/src/client/modules/chat.events.generated.ts
           git commit -m "chore(platform): sync asyncapi.json and the event types from production"
 
           pr=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')
@@ -103,7 +103,7 @@ jobs:
           # Rebuilt from main every run, so the branch never drifts or conflicts.
           git push --force origin "$BRANCH"
 
-          body="Refreshes \`packages/platform/asyncapi.json\` from $ASYNCAPI_URL and regenerates \`builder.events.generated.ts\`. The docs build and the Platform SDK tests passed on this change. Checked against production every hour."
+          body="Refreshes \`packages/platform/asyncapi.json\` from $ASYNCAPI_URL and regenerates \`chat.events.generated.ts\`. The docs build and the Platform SDK tests passed on this change. Checked against production every hour."
           if [ -z "$pr" ]; then
             gh pr create --head "$BRANCH" --base main --title "Sync Platform SDK events from production" --body "$body"
           fi

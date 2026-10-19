@@ -1,4 +1,4 @@
-import type { SocketSession } from "../client/modules/builder.types.js";
+import type { SocketSession } from "../client/modules/chat.types.js";
 
 /** An app the AI chat works on. */
 export interface Base44App {

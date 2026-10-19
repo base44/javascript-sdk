@@ -1,6 +1,6 @@
 {
   "typesWithOwnMethods": {
-    "BuilderSession": "Session methods"
+    "ChatSession": "Session methods"
   },
   "typeDefinitionGroups": [
     ["SocketSession", "PlatformEvent", "PlatformSnapshot"],

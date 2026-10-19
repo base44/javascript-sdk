@@ -1,7 +1,7 @@
 [
   "AppErrorCode",
-  "BuilderModule",
-  "BuilderSession",
+  "ChatModule",
+  "ChatSession",
   "PlatformEvent",
   "PlatformSnapshot",
   "PlatformSocketError",

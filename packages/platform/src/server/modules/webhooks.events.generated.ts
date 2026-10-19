@@ -141,10 +141,10 @@ export interface WebhookTestV1Data {
   challenge: string;
 }
 /**
- * Sent when the builder picks the message up, not when it is received: a
+ * Sent when the AI picks the message up, not when it is received: a
  * message sent while another turn runs waits in the queue until then.
  */
-export interface BuilderTurnStartedV1Data {
+export interface ChatTurnStartedV1Data {
   /**
    * The app the event is about.
    */
@@ -166,7 +166,7 @@ export interface BuilderTurnStartedV1Data {
    */
   conversation_id?: string;
   /**
-   * When the builder started working on the message (UTC).
+   * When the AI started working on the message (UTC).
    */
   started_at: string;
   /**
@@ -175,9 +175,9 @@ export interface BuilderTurnStartedV1Data {
   continues_message_id?: string;
 }
 /**
- * The `data` object of `builder.turn_ended.v1`. The builder finished responding to a message.
+ * The `data` object of `chat.turn_ended.v1`. The AI finished responding to a message.
  */
-export interface BuilderTurnEndedV1Data {
+export interface ChatTurnEndedV1Data {
   /**
    * The app the event is about.
    */
@@ -199,7 +199,7 @@ export interface BuilderTurnEndedV1Data {
    */
   conversation_id?: string;
   /**
-   * When the builder started working on the message (UTC).
+   * When the AI started working on the message (UTC).
    */
   started_at: string;
   /**
@@ -207,7 +207,7 @@ export interface BuilderTurnEndedV1Data {
    */
   continues_message_id?: string;
   /**
-   * How the turn ended. `finished`: the builder replied and has nothing pending. `waiting_for_user_input`: the builder stopped to ask something, such as a clarifying question or a plan to approve, and continues when the next message answers it. `failed`: the turn hit an error. `cancelled`: the turn was stopped before it ended. `interrupted`: the builder was interrupted, for example by a restart, and continues the work in a new turn whose `continues_message_id` is this message.
+   * How the turn ended. `finished`: the AI replied and has nothing pending. `waiting_for_user_input`: the AI stopped to ask something, such as a clarifying question or a plan to approve, and continues when the next message answers it. `failed`: the turn hit an error. `cancelled`: the turn was stopped before it ended. `interrupted`: the AI was interrupted, for example by a restart, and continues the work in a new turn whose `continues_message_id` is this message.
    */
   status: "finished" | "waiting_for_user_input" | "failed" | "cancelled" | "interrupted";
   /**
@@ -229,11 +229,11 @@ export interface WebhookEventMap {
   "app.restored.v1": AppRestoredV1Data;
   /** Carries no domain data — its only job is to be verifiable and echoed. */
   "webhook.test.v1": WebhookTestV1Data;
-  /** Sent when the builder picks the message up, not when it is received: a */
-  "builder.turn_started.v1": BuilderTurnStartedV1Data;
-  /** The builder finished responding to a message. */
-  "builder.turn_ended.v1": BuilderTurnEndedV1Data;
+  /** Sent when the AI picks the message up, not when it is received: a */
+  "chat.turn_started.v1": ChatTurnStartedV1Data;
+  /** The AI finished responding to a message. */
+  "chat.turn_ended.v1": ChatTurnEndedV1Data;
 }
 
 /** Every event type in {@link WebhookEventMap}, so events from a newer Base44 can be told apart at runtime. @internal */
-export const WEBHOOK_EVENT_TYPES = ["app.created.v1","app.published.v1","app.unpublished.v1","app.deleted.v1","app.restored.v1","webhook.test.v1","builder.turn_started.v1","builder.turn_ended.v1"] as const;
+export const WEBHOOK_EVENT_TYPES = ["app.created.v1","app.published.v1","app.unpublished.v1","app.deleted.v1","app.restored.v1","webhook.test.v1","chat.turn_started.v1","chat.turn_ended.v1"] as const;

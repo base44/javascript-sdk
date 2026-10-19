@@ -1,17 +1,17 @@
 import { createPlatformClient, type PlatformEvent } from "@base44/platform";
 
 const client = createPlatformClient();
-const builder = client.builder.init({
+const chat = client.chat.init({
   // Your backend opens the session with its workspace key and returns the Create socket session body.
   async getSession() {
-    const response = await fetch("/api/builder-socket-session", { method: "POST" });
+    const response = await fetch("/api/chat-socket-session", { method: "POST" });
     if (!response.ok) throw new Error("Unable to open a socket session");
     return response.json();
   },
   onError(error) { console.error(error.code); },
 });
 
-const subscription = builder.subscribe("0123456789abcdef01234567", {
+const subscription = chat.subscribe("0123456789abcdef01234567", {
   onSnapshot(snapshot) {
     // Replace this app's state; merge messages by id to keep history older than the last 50.
     console.log(snapshot.status?.state, snapshot.messages.length);
@@ -27,7 +27,7 @@ const subscription = builder.subscribe("0123456789abcdef01234567", {
   },
 });
 
-await builder.connect();
+await chat.connect();
 // Later, during teardown:
 subscription.unsubscribe();
-builder.close();
+chat.close();

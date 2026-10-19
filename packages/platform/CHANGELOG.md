@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased
+
+**Breaking.** Base44 calls it the AI chat, so the client and the webhook events say `chat`, not
+`builder`.
+
+### Client
+
+| Before | After |
+| --- | --- |
+| `client.builder` | `client.chat` |
+| `BuilderModule` | `ChatModule` |
+| `BuilderSession` | `ChatSession` |
+| `BuilderInitOptions` | `ChatInitOptions` |
+
+```ts
+const chat = client.chat.init({ getSession, onError });
+```
+
+### Webhooks
+
+`chat.turn_started.v1` and `chat.turn_ended.v1` replace `builder.turn_started.v1` and
+`builder.turn_ended.v1`, with the same payloads. Their types are `ChatTurnStartedV1Data` and
+`ChatTurnEndedV1Data`. Base44 no longer sends the old names, so an endpoint that selected them
+must select `chat.turn_*` instead.
+
 ## 0.2.0
 
 **Breaking.** The client, its options and the event type names change, and events the SDK doesn't

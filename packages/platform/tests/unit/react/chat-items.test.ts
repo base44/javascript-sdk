@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
-import type { Message } from "../../../src/client/modules/builder.events.generated.js";
-import type { ToolCall } from "../../../src/client/modules/builder.events.types.js";
+import type { Message } from "../../../src/client/modules/chat.events.generated.js";
+import type { ToolCall } from "../../../src/client/modules/chat.events.types.js";
 import { toQuestion, isWaitingForUser, mergeMessage, mergeSnapshot, pendingPromptItems, settlePendingPrompts, SNAPSHOT_SIZE, sortMessages, stepStatus, toItems, unknownKindToolCalls, waitingToolCallIds } from "../../../src/react/chat-items.js";
 
 const message = (id: string, created: string, extra: Partial<Message> = {}): Message => ({ id, role: "assistant", metadata: { created_date: created }, ...extra });
@@ -115,7 +115,7 @@ describe("items", () => {
     expect(waitingToolCallIds(sorted)).toEqual(new Set(["t0", "t1", "t2", "t3"]));
   });
 
-  test("the chat waits only on the last assistant message, as in Base44's builder", () => {
+  test("the chat waits only on the last assistant message, as in Base44's app editor", () => {
     const sorted = [message("m1", "1", { tool_calls: [{ id: "t0", status: "running" }] }), message("m2", "2", { tool_calls: [waiting("t1"), waiting("t2")] })];
     expect(isWaitingForUser(sorted, [])).toBe(true);
     expect(isWaitingForUser(sorted, ["t1"])).toBe(true);
@@ -206,7 +206,7 @@ describe("questions", () => {
       { text: "Extras?", description: undefined, type: undefined, options: ["X", "Y"], multi: true },
       { text: "Name it", description: undefined, type: "text_input", options: [], multi: false },
     ]);
-    // As in Base44's builder: one pick in selected_label, several in selected_labels.
+    // As in Base44's app editor: one pick in selected_label, several in selected_labels.
     await question.answer([["A"], ["X", "Y"]]);
     expect(reply).toHaveBeenCalledWith(true, {
       answers: [
