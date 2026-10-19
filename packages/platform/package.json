@@ -1,6 +1,6 @@
 {
   "name": "@base44/platform",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Base44 Platform SDK for white-label platforms: a browser client for following the AI chat and a server entrypoint for webhooks",
   "main": "dist/client/index.js",
   "types": "dist/client/index.d.ts",
