@@ -19,7 +19,7 @@ import { createPlatformClient } from "@base44/platform";
 
 const client = createPlatformClient();
 const chat = client.chat.init({
-  // Returns the body of POST /api/service/socket-sessions, unchanged.
+  // Returns the body of POST /api/v1/socket-sessions, unchanged.
   async getSession() {
     const response = await fetch("/api/chat-socket-session", { method: "POST" });
     if (!response.ok) throw new Error("Session request failed");
@@ -98,12 +98,13 @@ Delivery is at least once with no ordering guarantee: deduplicate on `event.id`,
 ## Sessions
 
 `/api/chat-socket-session` is your backend's route, not an SDK endpoint. It opens a
-socket session with its workspace key (`apps:watch` scope) through
-`POST /api/service/socket-sessions` with `{ app_ids }`, and returns the response body
-to the browser. `getSession` returns that body unchanged: the SDK reads `session_token`,
+socket session through `POST /api/v1/socket-sessions` with `{ app_ids }`, and returns the
+response body to the browser. It authenticates as `Authorization: Bearer` with either a
+personal access token, which can watch the apps its owner can edit in its workspace, or a
+workspace API key with the `apps:watch` scope. The workspace needs the Builder plan or higher. `getSession` returns that body unchanged: the SDK reads `session_token`,
 `socket_url` and `socket_path` and ignores other keys such as `session_id` and
-`expires_in`. Never pass the workspace key or any other server credential to this client. Subscribe only to apps on the session's allowlist; your
-backend adds or removes apps with `PUT`/`DELETE /api/service/socket-sessions/{session_id}/rooms/{app_id}`.
+`expires_in`. Never pass the token, the workspace key or any other server credential to this client. Subscribe only to apps on the session's allowlist; your
+backend adds or removes apps with `PUT`/`DELETE /api/v1/socket-sessions/{session_id}/apps/{app_id}`.
 
 A session lasts one hour and is never extended. The token goes exclusively in
 CONNECT `auth.session_token`, never a URL, and the SDK keeps it in memory only. It
