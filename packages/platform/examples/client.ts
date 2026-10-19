@@ -2,7 +2,7 @@ import { createPlatformClient, type PlatformEvent } from "@base44/platform";
 
 const client = createPlatformClient();
 const chat = client.chat.init({
-  // Your backend opens the session with its workspace key and returns the Create socket session body.
+  // Your backend opens the session with its personal access token or workspace key and returns the Create socket session body.
   async getSession() {
     const response = await fetch("/api/chat-socket-session", { method: "POST" });
     if (!response.ok) throw new Error("Unable to open a socket session");
