@@ -16,5 +16,5 @@
   "hideBreadcrumbs": true,
   "disableSources": true,
   "hidePageTitle": true,
-  "intentionallyNotExported": ["src/client/modules/builder.events.generated.ts:SecretField"]
+  "intentionallyNotExported": ["src/client/modules/chat.events.generated.ts:SecretField"]
 }
