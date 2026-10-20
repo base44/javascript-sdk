@@ -17,10 +17,10 @@ You write JSDoc. The tooling produces the final pages.
 
 | File pattern | Role |
 |---|---|
-| `src/modules/*.types.ts` | **Public API surface** — JSDoc here becomes the published docs |
-| `src/modules/*.ts` | Implementation — mark with `@internal` to hide from docs |
-| `src/client.types.ts` | Client factory types |
-| `src/types.ts` | Shared types |
+| `packages/sdk/src/modules/*.types.ts` | **Public API surface** — JSDoc here becomes the published docs |
+| `packages/sdk/src/modules/*.ts` | Implementation — mark with `@internal` to hide from docs |
+| `packages/sdk/src/client.types.ts` | Client factory types |
+| `packages/sdk/src/types.ts` | Shared types |
 
 Only types and functions **not** marked `@internal` appear in the generated docs. Implementation files should mark their exports `@internal`.
 
@@ -80,6 +80,9 @@ Every public method needs: description, `@param` tags, `@returns`, and at least 
 - **State environment constraints** when a method is browser-only: "Requires a browser environment and can't be used in the backend."
 - **Document side effects** explicitly (e.g., "automatically sets the token for subsequent requests").
 - **Link method references.** When mentioning another SDK method or module by name in JSDoc prose, always use `{@link}` or `{@linkcode}` to create a cross-reference.
+- **Never use a colon as a sentence break.** Write "Use this when you sync data from another system. Name the field..." not "...another system: name the field...". Reserve colons for `label: description` bullet-list items, not prose sentences.
+- **Never start a sentence with a lowercase inline-code term.** If the natural phrasing would open with one (e.g., "`week` is only supported on..."), restructure so a capitalized word leads instead (e.g., "Every date field supports `day`, `month` and `year`. The `created_date` and `updated_date` fields also support `week`.").
+- **Name the place and the AI correctly.** Write "app editor" (lowercase) for the place where you build, and "the AI" or "the AI chat" for the assistant doing the work ("The AI inserts this ID", "ask the AI chat to fix it"). Never use "builder" for either. It stays only for the Builder plan, the Base44 Builder GitHub App, people who build apps ("builders", "app builders"), and exact UI labels or code names.
 
 ## References
 
@@ -93,4 +96,4 @@ Every public method needs: description, `@param` tags, `@returns`, and at least 
 2. **`@internal` on implementation:** Factory functions, config interfaces, and helpers are marked `@internal`.
 3. **Examples work:** Code examples are syntactically valid TypeScript and use the `base44.` call path.
 4. **Pipeline config:** New public types are in `types-to-expose.json`. Helper types that belong on another page are in `appended-articles.json`.
-5. **Generate and review:** Run `npm run create-docs` and check the output renders correctly.
+5. **Generate and review:** Run `npm run create-docs -w @base44/sdk` and check the output renders correctly.

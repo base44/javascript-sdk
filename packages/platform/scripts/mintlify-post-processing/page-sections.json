@@ -1,0 +1,9 @@
+{
+  "typesWithOwnMethods": {
+    "ChatSession": "Session methods"
+  },
+  "typeDefinitionGroups": [
+    ["SocketSession", "PlatformEvent", "PlatformSnapshot"],
+    { "title": "Error codes", "types": ["SessionErrorCode", "AppErrorCode"] }
+  ]
+}

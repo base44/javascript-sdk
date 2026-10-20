@@ -32,6 +32,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The embargo gateway does not carry npm's advisory API. npm POSTs to
+      # /-/npm/v1/security/advisories/bulk, that fails through the gateway, and
+      # the fallback to the retired /-/npm/v1/security/audits/quick answers 400
+      # ("Invalid request payload JSON format"), so both steps below exit 1
+      # before reading a single advisory. Every run since the gateway landed in
+      # #248 has failed this way; the last green one predates it.
+      #
+      # Auditing downloads no package code, so resolving the registry publicly
+      # here costs nothing: the install above already ran through the gateway,
+      # and it is the only step that fetches tarballs. Remove this once the
+      # gateway proxies the advisory endpoints.
+      - name: Unpin the registry for the advisory API
+        run: |
+          sudo sed -i "/registry\.npmjs\.org/d" /etc/hosts
+          getent hosts registry.npmjs.org
+
       # Gating check: fail the build on high/critical vulnerabilities in
       # the production dependencies declared in package.json. These are the
       # ones that ship to consumers of the SDK (and show up in their Wiz

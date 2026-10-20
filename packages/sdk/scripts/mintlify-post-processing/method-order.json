@@ -1,0 +1,23 @@
+{
+  "entities": [
+    "get",
+    "list",
+    "filter",
+    "count",
+    "aggregate",
+    "create",
+    "bulkCreate",
+    "importEntities",
+    "upsert",
+    "update",
+    "updateMany",
+    "bulkUpdate",
+    "delete",
+    "deleteMany",
+    "subscribe"
+  ],
+  "functions": [
+    "invoke",
+    "fetch"
+  ]
+}

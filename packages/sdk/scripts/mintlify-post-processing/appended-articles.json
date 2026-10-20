@@ -1,0 +1,42 @@
+{
+  "interfaces/ConnectorsModule": [
+    "type-aliases/ConnectorIntegrationType",
+    "interfaces/ConnectorIntegrationTypeRegistry",
+    "interfaces/UserConnectorsModule"
+  ],
+  "type-aliases/EntitiesModule": [
+    "interfaces/EntityHandler",
+    "type-aliases/EntityRecord",
+    "interfaces/EntityTypeRegistry",
+    "type-aliases/SortField",
+    "type-aliases/EntityFilterQuery"
+  ],
+  "interfaces/FunctionsModule": [
+    "type-aliases/FunctionName",
+    "interfaces/FunctionNameRegistry"
+  ],
+  "interfaces/AgentsModule": [
+    "type-aliases/AgentName",
+    "interfaces/AgentNameRegistry"
+  ],
+  "type-aliases/integrations": [
+    "interfaces/CoreIntegrations",
+    "interfaces/CustomIntegrationsModule"
+  ],
+  "interfaces/AppModule": [
+    "type-aliases/AppPublicSettings"
+  ],
+  "type-aliases/ActorsModule": [
+    "interfaces/ActorRef",
+    "interfaces/Connection",
+    "interfaces/ActorSubscription",
+    "interfaces/ActorClient",
+    "interfaces/ActorRegistry",
+    "interfaces/ActorNameRegistry"
+  ],
+  "interfaces/PaymentsModule": [
+    "type-aliases/PaymentsErrorCode",
+    "type-aliases/PurchaseStatus",
+    "type-aliases/PaymentsRecurringFrequency"
+  ]
+}

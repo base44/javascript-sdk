@@ -1,0 +1,569 @@
+import { AxiosInstance } from "axios";
+
+/**
+ * An authenticated user.
+ */
+export interface User {
+  /** Unique user identifier. */
+  id: string;
+  /** When the user was created. */
+  created_date: string;
+  /** When the user was last updated. */
+  updated_date: string;
+  /** User's email address. */
+  email: string;
+  /** User's full name. */
+  full_name: string | null;
+  /** Whether the user is disabled. */
+  disabled: boolean | null;
+  /** Whether the user's email has been verified. */
+  is_verified: boolean;
+  /** The app ID this user belongs to. */
+  app_id: string;
+  /** Whether this is a service account. */
+  is_service: boolean;
+  /** Internal app role.
+   * @internal
+   */
+  _app_role: string;
+  /**
+   * User's role in the app. Roles are configured in the app settings and determine the user's permissions and access levels.
+   */
+  role: string;
+  /**
+   * Additional custom fields defined in the user schema. Any custom properties added to the user schema in the app will be available here with their configured types and values.
+   */
+  [key: string]: any;
+}
+
+/**
+ * Response from login endpoints containing user information and access token.
+ */
+export interface LoginResponse {
+  /** JWT access token for authentication. */
+  access_token: string;
+  /** User information. */
+  user: User;
+}
+
+/**
+ * Payload for user registration.
+ */
+export interface RegisterParams {
+  /** User's email address. */
+  email: string;
+  /** User's password. */
+  password: string;
+  /** Optional {@link https://developers.cloudflare.com/turnstile/ | Cloudflare Turnstile CAPTCHA token} for bot protection. */
+  turnstile_token?: string | null;
+  /** Optional {@link https://docs.base44.com/Getting-Started/Referral-program | referral code} from an existing user. */
+  referral_code?: string | null;
+}
+
+/**
+ * Parameters for OTP verification.
+ */
+export interface VerifyOtpParams {
+  /** User's email address. */
+  email: string;
+  /** One-time password code received by email. */
+  otpCode: string;
+}
+
+/**
+ * Parameters for changing a user's password.
+ */
+export interface ChangePasswordParams {
+  /** User ID. */
+  userId: string;
+  /** Current password for verification. */
+  currentPassword: string;
+  /** New password to set. */
+  newPassword: string;
+}
+
+/**
+ * Parameters for resetting a password with a token.
+ */
+export interface ResetPasswordParams {
+  /** Reset token received by email. */
+  resetToken: string;
+  /** New password to set. */
+  newPassword: string;
+}
+
+/**
+ * Configuration options for the auth module.
+ */
+export interface AuthModuleOptions {
+  /** Server URL for API requests. */
+  serverUrl: string;
+  /** Base URL for the app (used for login redirects). */
+  appBaseUrl: string;
+  /**
+   * Access token the client was constructed with, if any. Seeds the module's
+   * view of whether a session exists before {@link AuthModule.setToken} runs,
+   * which is how the server-side SDK reports a token it never sets explicitly.
+   */
+  token?: string;
+}
+
+/**
+ * Authentication module for managing user authentication and authorization. The module automatically stores tokens in local storage when available and manages authorization headers for API requests.
+ *
+ * ## Features
+ *
+ * This module provides comprehensive authentication functionality including:
+ * - Email/password login and registration
+ * - Token management
+ * - User profile access and updates
+ * - Password reset flows
+ * - OTP verification
+ * - User invitations
+ *
+ * ## Authentication Modes
+ *
+ * The auth module is only available in user authentication mode (`base44.auth`).
+ */
+export interface AuthModule {
+  /**
+   * Gets the current authenticated user's information.
+   *
+   * @returns Promise resolving to the user's profile data.
+   *
+   * @example
+   * ```typescript
+   * // Get current user information
+   * const user = await base44.auth.me();
+   * console.log(`Logged in as: ${user.email}`);
+   * console.log(`User ID: ${user.id}`);
+   * ```
+   */
+  me(): Promise<User>;
+
+  /**
+   * Updates the current authenticated user's information.
+   *
+   * You can update any [custom fields](/developers/backend/resources/entities/user-schema#custom-fields)
+   * defined in your User entity schema.
+   *
+   * Updating `role` requires editor access on the app.
+   *
+   * <Note>
+   * These fields can't be changed with this method:
+   * `id`, `email`, `full_name`, `created_date`, `updated_date`, `created_by`,
+   * and `collaborator_role`.
+   * </Note>
+   *
+   * @param data - Object containing the fields to update.
+   * @returns Promise resolving to the updated user data.
+   *
+   * @example
+   * ```typescript
+   * // Update custom fields defined in your User entity
+   * await base44.auth.updateMe({
+   *   bio: 'Software developer',
+   *   preferences: { theme: 'dark' }
+   * });
+   * ```
+   */
+  updateMe(
+    data: Record<string, any>
+  ): Promise<User>;
+
+  /**
+   * Redirects the user to the app's login page.
+   *
+   * Redirects with a callback URL to return to after successful authentication. Requires a browser environment and can't be used in the backend.
+   *
+   * @param nextUrl - URL to redirect to after successful login.
+   * @throws {Error} When not in a browser environment.
+   *
+   * @example
+   * ```typescript
+   * // Redirect to login and come back to current page
+   * base44.auth.redirectToLogin(window.location.href);
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Redirect to login and then go to the dashboard page
+   * base44.auth.redirectToLogin('/dashboard');
+   * ```
+   */
+  redirectToLogin(nextUrl: string): void;
+
+  /**
+   * Redirects the user to a third-party authentication provider's login page.
+   *
+   * Initiates an OAuth login flow with one of the built-in providers. Requires a browser environment and can't be used in the backend.
+   *
+   * Supported providers:
+   * - `'google'`: {@link https://developers.google.com/identity/protocols/oauth2 | Google OAuth}. Enabled by default.
+   * - `'microsoft'`: {@link https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow | Microsoft OAuth}. Enable Microsoft in your app's authentication settings before specifying this provider.
+   * - `'facebook'`: {@link https://developers.facebook.com/docs/facebook-login | Facebook Login}. Enable Facebook in your app's authentication settings before using.
+   * - `'apple'`: {@link https://developer.apple.com/sign-in-with-apple/ | Sign in with Apple}. Enable Apple in your app's authentication settings before using this provider.
+   * - `'sso'`: Enterprise SSO. {@link https://docs.base44.com/Setting-up-your-app/Setting-up-SSO | Set up an SSO provider} in your app's authentication settings before using this provider.
+   *
+   * @param provider - The authentication provider to use: `'google'`, `'microsoft'`, `'facebook'`, `'apple'`, or `'sso'`.
+   * @param fromUrl - URL to redirect to after successful authentication. Defaults to `'/'`.
+   *
+   * @example
+   * ```typescript
+   * // Google
+   * base44.auth.loginWithProvider('google', window.location.pathname);
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Microsoft
+   * base44.auth.loginWithProvider('microsoft', '/dashboard');
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Apple
+   * base44.auth.loginWithProvider('apple', '/dashboard');
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // SSO
+   * base44.auth.loginWithProvider('sso', '/dashboard');
+   * ```
+   *
+   */
+  loginWithProvider(provider: string, fromUrl?: string): void;
+
+  /**
+   * Logs out the current user.
+   *
+   * Removes the authentication token from local storage and Axios headers, then optionally redirects to a URL or reloads the page. Requires a browser environment and can't be used in the backend.
+   *
+   * @param redirectUrl - Optional URL to redirect to after logout. Reloads the page if not provided.
+   *
+   * @example
+   * ```typescript
+   * // Logout and reload page
+   * base44.auth.logout();
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Logout and redirect to login page
+   * base44.auth.logout('/login');
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Logout and redirect to home
+   * base44.auth.logout('/');
+   * ```
+   */
+  logout(redirectUrl?: string): void;
+
+  /**
+   * Sets the authentication token.
+   *
+   * Updates the authorization header for API requests and optionally saves the token to local storage for persistence. Saving to local storage requires a browser environment and is automatically skipped in backend environments.
+   *
+   * @param token - JWT authentication token.
+   * @param saveToStorage - Whether to save the token to local storage. Defaults to true.
+   *
+   * @example
+   * ```typescript
+   * // Set token and save to local storage
+   * base44.auth.setToken('eyJhbGciOiJIUzI1NiIs...');
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Set token without saving to local storage
+   * base44.auth.setToken('eyJhbGciOiJIUzI1NiIs...', false);
+   * ```
+   */
+  setToken(token: string, saveToStorage?: boolean): void;
+
+  /**
+   * Logs in a registered user using email and password.
+   *
+   * Authenticates a user with email and password credentials. The user must already have a registered account. For new users, use {@linkcode register | register()} first to create an account. On successful login, automatically sets the token for subsequent requests.
+   *
+   * @param email - User's email address.
+   * @param password - User's password.
+   * @param turnstileToken - Optional {@link https://developers.cloudflare.com/turnstile/ | Cloudflare Turnstile CAPTCHA token} for bot protection.
+   * @returns Promise resolving to login response with access token and user data.
+   * @throws Error if the email and password combination is invalid or the user is not registered.
+   *
+   * @example
+   * ```typescript
+   * // Login with email and password
+   * try {
+   *   const { access_token, user } = await base44.auth.loginViaEmailPassword(
+   *     'user@example.com',
+   *     'securePassword123'
+   *   );
+   *   console.log('Login successful!', user);
+   * } catch (error) {
+   *   console.error('Login failed:', error);
+   * }
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // With captcha token
+   * const response = await base44.auth.loginViaEmailPassword(
+   *   'user@example.com',
+   *   'securePassword123',
+   *   'captcha-token-here'
+   * );
+   * ```
+   */
+  loginViaEmailPassword(
+    email: string,
+    password: string,
+    turnstileToken?: string
+  ): Promise<LoginResponse>;
+
+  /**
+   * Checks if the current user is authenticated.
+   *
+   * @returns Promise resolving to true if authenticated, false otherwise.
+   *
+   * @example
+   * ```typescript
+   * // Check authentication status
+   * const isAuthenticated = await base44.auth.isAuthenticated();
+   * if (isAuthenticated) {
+   *   console.log('User is logged in');
+   * } else {
+   *   // Redirect to login page
+   *   base44.auth.redirectToLogin(window.location.href);
+   * }
+   * ```
+   */
+  isAuthenticated(): Promise<boolean>;
+
+  /**
+   * Checks whether an access token is currently set on the client.
+   *
+   * Reports only that a token is present, not that it's valid: an expired or revoked token still returns `true`. Use it to skip requests that can't succeed without a session, such as {@linkcode me | me()} for an anonymous visitor, and use {@linkcode isAuthenticated | isAuthenticated()} to confirm a session with the server. The token is the one passed to {@linkcode createClient | createClient()} or set with {@linkcode setToken | setToken()}, and {@linkcode logout | logout()} clears it. A session held only in an HTTP-only cookie isn't visible to the client and returns `false`.
+   *
+   * @returns `true` if the client has an access token, `false` otherwise.
+   *
+   * @example
+   * ```typescript
+   * // Skip the user lookup for anonymous visitors
+   * const user = base44.auth.hasToken() ? await base44.auth.me() : null;
+   * ```
+   */
+  hasToken(): boolean;
+
+  /**
+   * Invites a user to the app.
+   *
+   * Sends an invitation email to a potential user with a specific role.
+   * Roles are configured in the app settings and determine
+   * the user's permissions and access levels.
+   *
+   * @param userEmail - Email address of the user to invite.
+   * @param role - Role to assign to the invited user. Must match a role defined in the app. For example, `'admin'` or `'user'`.
+   * @returns Promise that resolves when the invitation is sent successfully. Throws an error if the invitation fails.
+   *
+   * @example
+   * ```typescript
+   * try {
+   *   await base44.auth.inviteUser('newuser@example.com', 'user');
+   *   console.log('Invitation sent successfully!');
+   * } catch (error) {
+   *   console.error('Failed to send invitation:', error);
+   * }
+   * ```
+   */
+  inviteUser(userEmail: string, role: string): Promise<any>;
+
+  /**
+   * Registers a new user account.
+   *
+   * Creates a new user account with email and password. Registration sends an OTP
+   * code to the user's email. Pass that code to
+   * {@linkcode verifyOtp | verifyOtp()} to complete verification, then log the user
+   * in with {@linkcode loginViaEmailPassword | loginViaEmailPassword()}.
+   *
+   * @param params - Registration details including email, password, and optional fields.
+   * @returns Promise resolving to the registration response.
+   *
+   * @example
+   * ```typescript
+   * // Register a new user
+   * await base44.auth.register({
+   *   email: 'newuser@example.com',
+   *   password: 'securePassword123',
+   *   referral_code: 'FRIEND2024'
+   * });
+   *
+   * // Verify with the OTP code from the user's email
+   * await base44.auth.verifyOtp({
+   *   email: 'newuser@example.com',
+   *   otpCode: '123456'
+   * });
+   *
+   * // Log the user in after verification
+   * const { access_token, user } = await base44.auth.loginViaEmailPassword(
+   *   'newuser@example.com',
+   *   'securePassword123'
+   * );
+   * ```
+   */
+  register(params: RegisterParams): Promise<any>;
+
+  /**
+   * Verifies an OTP (one-time password) code.
+   *
+   * Confirms that the user owns the email address by checking the code sent to
+   * their inbox during {@linkcode register | register()}. After a successful
+   * call, log the user in with
+   * {@linkcode loginViaEmailPassword | loginViaEmailPassword()}. If the code
+   * has expired or the user didn't receive it, send a fresh one with
+   * {@linkcode resendOtp | resendOtp()}.
+   *
+   * @param params - The email being verified and the OTP code the user entered.
+   * @returns Promise resolving to the verification response, which includes an
+   * access token for the now-verified user.
+   * @throws Error if the OTP code is invalid or expired.
+   *
+   * @example
+   * ```typescript
+   * // Verify the code the user entered from their email
+   * try {
+   *   await base44.auth.verifyOtp({
+   *     email: 'user@example.com',
+   *     otpCode: '123456'
+   *   });
+   *   console.log('Email verified successfully!');
+   * } catch (error) {
+   *   console.error('Invalid or expired OTP code');
+   * }
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Full registration flow
+   * await base44.auth.register({
+   *   email: 'newuser@example.com',
+   *   password: 'securePassword123'
+   * });
+   *
+   * // The user receives an OTP code by email. Collect it and verify.
+   * await base44.auth.verifyOtp({
+   *   email: 'newuser@example.com',
+   *   otpCode: '123456'
+   * });
+   *
+   * // Log the user in after verification
+   * const { access_token, user } = await base44.auth.loginViaEmailPassword(
+   *   'newuser@example.com',
+   *   'securePassword123'
+   * );
+   * ```
+   */
+  verifyOtp(params: VerifyOtpParams): Promise<any>;
+
+  /**
+   * Resends an OTP code to the user's email address.
+   *
+   * Call this when the user didn't receive the original code sent by
+   * {@linkcode register | register()}, or when the previous code has expired.
+   * The new code replaces the previous one. Pass it to
+   * {@linkcode verifyOtp | verifyOtp()} to complete verification.
+   *
+   * @param email - Email address to send the new OTP to.
+   * @returns Promise resolving once the new OTP has been sent, with a
+   * confirmation message and the new code's expiration window.
+   * @throws Error if the email is invalid or the request fails.
+   *
+   * @example
+   * ```typescript
+   * // Resend the OTP when the user didn't receive the original
+   * try {
+   *   await base44.auth.resendOtp('user@example.com');
+   *   console.log('OTP resent! Please check your email.');
+   * } catch (error) {
+   *   console.error('Failed to resend OTP:', error);
+   * }
+   * ```
+   */
+  resendOtp(email: string): Promise<any>;
+
+  /**
+   * Requests a password reset.
+   *
+   * Sends a password reset email to the specified email address.
+   *
+   * @param email - Email address for the account to reset.
+   * @returns Promise resolving when the password reset email is sent successfully.
+   * @throws Error if the email is invalid or the request fails.
+   *
+   * @example
+   * ```typescript
+   * try {
+   *   await base44.auth.resetPasswordRequest('user@example.com');
+   *   console.log('Password reset email sent!');
+   * } catch (error) {
+   *   console.error('Failed to send password reset email:', error);
+   * }
+   * ```
+   */
+  resetPasswordRequest(email: string): Promise<any>;
+
+  /**
+   * Resets password using a reset token.
+   *
+   * Completes the password reset flow by setting a new password
+   * using the token received by email.
+   *
+   * @param params - Object containing the reset token and new password.
+   * @returns Promise resolving when the password is reset successfully.
+   * @throws Error if the reset token is invalid, expired, or the request fails.
+   *
+   * @example
+   * ```typescript
+   * try {
+   *   await base44.auth.resetPassword({
+   *     resetToken: 'token-from-email',
+   *     newPassword: 'newSecurePassword456'
+   *   });
+   *   console.log('Password reset successful!');
+   * } catch (error) {
+   *   console.error('Failed to reset password:', error);
+   * }
+   * ```
+   */
+  resetPassword(params: ResetPasswordParams): Promise<any>;
+
+  /**
+   * Changes the user's password.
+   *
+   * Updates the password for an authenticated user by verifying
+   * the current password and setting a new one.
+   *
+   * @param params - Object containing user ID, current password, and new password.
+   * @returns Promise resolving when the password is changed successfully.
+   * @throws Error if the current password is incorrect or the request fails.
+   *
+   * @example
+   * ```typescript
+   * try {
+   *   await base44.auth.changePassword({
+   *     userId: 'user-123',
+   *     currentPassword: 'oldPassword123',
+   *     newPassword: 'newSecurePassword456'
+   *   });
+   *   console.log('Password changed successfully!');
+   * } catch (error) {
+   *   console.error('Failed to change password:', error);
+   * }
+   * ```
+   */
+  changePassword(params: ChangePasswordParams): Promise<any>;
+}

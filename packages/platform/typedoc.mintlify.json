@@ -1,0 +1,20 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "extends": ["./typedoc.json"],
+  "entryPoints": ["./scripts/mintlify-post-processing/reference.ts"],
+  "tsconfig": "./tsconfig.docs.json",
+  "out": "docs/content",
+  "plugin": [
+    "typedoc-plugin-markdown",
+    "../sdk/scripts/mintlify-post-processing/typedoc-plugin/typedoc-mintlify-plugin.js"
+  ],
+  "fileExtension": ".mdx",
+  "gitRevision": "main",
+  "sort": ["source-order"],
+  "entryFileName": "README.mdx",
+  "maxTypeConversionDepth": 3,
+  "hideBreadcrumbs": true,
+  "disableSources": true,
+  "hidePageTitle": true,
+  "intentionallyNotExported": ["src/client/modules/chat.events.generated.ts:SecretField"]
+}

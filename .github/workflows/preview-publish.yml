@@ -11,8 +11,40 @@ on:
 # so dropping the gateway does not widen what it can pull. Exemption lives in
 # .github/scripts/check_wix_proxy_steps.py.
 jobs:
-  publish-preview:
+  # Which packages get a preview. @base44/sdk always does (unchanged behaviour);
+  # @base44/platform only when the PR touches packages/platform/. It installs
+  # nothing, so it needs no gateway either.
+  changes:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      packages: ${{ steps.packages.outputs.packages }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Select packages
+        id: packages
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          PACKAGES='"sdk"'
+          if ! git diff --quiet "$BASE_SHA" HEAD -- packages/platform; then
+            PACKAGES="$PACKAGES,\"platform\""
+          fi
+          echo "packages=[$PACKAGES]" >> "$GITHUB_OUTPUT"
+          echo "Previewing: [$PACKAGES]"
+
+  publish-preview:
+    needs: changes
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(needs.changes.outputs.packages) }}
     permissions:
       # id-token: write for npm trusted publishing (OIDC).
       # pull-requests: write for the install-instructions comment.
@@ -45,9 +77,10 @@ jobs:
         run: npm ci
 
       - name: Build package
-        run: npm run build
+        run: npm run build -w @base44/${{ matrix.package }}
 
       - name: Generate preview package name and version
+        working-directory: packages/${{ matrix.package }}
         id: preview_info
         run: |
           PR_NUMBER="${{ github.event.number }}"
@@ -66,10 +99,12 @@ jobs:
           fi
 
           echo "version=$PREVIEW_VERSION" >> $GITHUB_OUTPUT
-          echo "package_name=@base44-preview/sdk" >> $GITHUB_OUTPUT
-          echo "full_package=@base44-preview/sdk@$PREVIEW_VERSION" >> $GITHUB_OUTPUT
+          echo "package_name=@base44-preview/${{ matrix.package }}" >> $GITHUB_OUTPUT
+          echo "full_package=@base44-preview/${{ matrix.package }}@$PREVIEW_VERSION" >> $GITHUB_OUTPUT
+          echo "official_package=$(node -p "require('./package.json').name")" >> $GITHUB_OUTPUT
 
       - name: Update package.json for preview
+        working-directory: packages/${{ matrix.package }}
         run: |
           # Create a backup of original package.json
           cp package.json package.json.bak
@@ -103,6 +138,7 @@ jobs:
           echo "✅ Package.json updated successfully"
 
       - name: Final safety check before publish
+        working-directory: packages/${{ matrix.package }}
         run: |
           # Double-check package name one more time before publishing
           CURRENT_PACKAGE_NAME=$(node -p "require('./package.json').name")
@@ -119,8 +155,9 @@ jobs:
           echo "✅ Safety check passed. Package name is safe to publish."
 
       - name: Publish preview package
+        working-directory: packages/${{ matrix.package }}
         # Authenticates via npm trusted publishing (OIDC), so no NPM_TOKEN reaches
-        # the build. Needs a trusted publisher for `@base44-preview/sdk` on
+        # the build. Needs a trusted publisher for each `@base44-preview/<package>` on
         # npmjs.com registered against this repo and this workflow filename — the
         # registry keys on the filename, so this needs its own entry, separate from
         # manual-publish.yml.
@@ -133,6 +170,7 @@ jobs:
           fi
 
       - name: Restore original package.json
+        working-directory: packages/${{ matrix.package }}
         if: always()
         run: |
           if [ -f package.json.bak ]; then
@@ -148,10 +186,17 @@ jobs:
         with:
           script: |
             const fullPackage = '${{ steps.preview_info.outputs.full_package }}';
+            const officialPackage = '${{ steps.preview_info.outputs.official_package }}';
             const installCmd = `npm i ${fullPackage}`;
-            const aliasInstallCmd = `npm i "@base44/sdk@npm:${fullPackage}"`;
+            const aliasInstallCmd = `npm i "${officialPackage}@npm:${fullPackage}"`;
+            // One comment per package. The SDK keeps its old header so open PRs update their existing comment.
+            const marker = `<!-- package-preview:${{ matrix.package }} -->`;
+            const header = officialPackage === '@base44/sdk'
+              ? '### 🚀 Package Preview Available!'
+              : `### 🚀 Package Preview Available! (\`${officialPackage}\`)`;
 
-            const body = `### 🚀 Package Preview Available!
+            const body = `${marker}
+            ${header}
 
             ---
 
@@ -161,7 +206,7 @@ jobs:
             ${installCmd}
             \`\`\`
 
-            **Prefer not to change any import paths? Install using npm alias so your code still imports \`@base44/sdk\`:**
+            **Prefer not to change any import paths? Install using npm alias so your code still imports \`${officialPackage}\`:**
 
             \`\`\`sh
             ${aliasInstallCmd}
@@ -172,7 +217,7 @@ jobs:
             \`\`\`json
             {
               "dependencies": {
-                "@base44/sdk": "npm:${fullPackage}"
+                "${officialPackage}": "npm:${fullPackage}"
               }
             }
             \`\`\`
@@ -183,17 +228,18 @@ jobs:
             ---
             <sub>Preview published to npm registry — try new features instantly!</sub>`;
 
-            const botCommentIdentifier = '### 🚀 Package Preview Available!';
-
             async function findBotComment(issueNumber) {
               if (!issueNumber) return null;
               const comments = await github.rest.issues.listComments({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: issueNumber,
+                per_page: 100,
               });
               return comments.data.find((comment) =>
-                comment.body.includes(botCommentIdentifier)
+                comment.body.includes(marker) ||
+                // SDK comments posted before the marker existed.
+                (officialPackage === '@base44/sdk' && !comment.body.includes('<!-- package-preview:') && comment.body.includes(header))
               );
             }
 

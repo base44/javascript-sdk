@@ -1,0 +1,102 @@
+name: Sync Platform SDK webhook events
+
+# Adds the webhook event types production publishes to packages/platform/scripts/webhook-event-types.json
+# and regenerates every type from the published schemas, so it picks up a new event and a changed
+# schema alike. Changes go to one rolling PR; closing it
+# without merging only skips that run, since the next one proposes the same changes again.
+# The sibling of sync-asyncapi.yml, which does the same for the builder socket events.
+
+on:
+  schedule:
+    - cron: "45 * * * *" # Every hour, apart from sync-asyncapi's :15
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-webhook-events
+  cancel-in-progress: false
+
+env:
+  BRANCH: bot/platform-webhook-events-sync
+  WEBHOOKS_OPENAPI_URL: https://app.base44.com/api/v1/outbound-webhooks/openapi.json
+  EVENT_LIST: packages/platform/scripts/webhook-event-types.json
+  GENERATED: packages/platform/src/server/modules/webhooks.events.generated.ts
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+
+      - name: Wix gateway proxy (mandatory)
+        uses: ./.github/actions/wix-gateway-proxy
+
+      - name: Use Node.js 20.x
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20.x"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Sync the event list and regenerate the types
+        run: |
+          npm run sync:webhooks -w @base44/platform -- "$WEBHOOKS_OPENAPI_URL"
+          npm run generate:webhooks -w @base44/platform
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet -- "$EVENT_LIST" "$GENERATED"; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "✅ The webhook event types are up to date"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Close a stale sync PR
+        if: steps.changes.outputs.changed == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pr=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')
+          if [ -n "$pr" ]; then gh pr close "$pr" --delete-branch --comment "main already has every published event type."; fi
+
+      - name: Build the docs and test the Platform SDK
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          npm run create-docs -w @base44/platform
+          npm test -w @base44/platform
+
+      - name: Update the sync PR
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH"
+          git add "$EVENT_LIST" "$GENERATED"
+          git commit -m "chore(platform): sync the webhook event types from production"
+
+          pr=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')
+          # An open sync PR whose branch already has this exact tree needs no new commit or force-push.
+          if [ -n "$pr" ] && git fetch --depth=1 origin "$BRANCH" && [ "$(git rev-parse 'HEAD^{tree}')" = "$(git rev-parse 'FETCH_HEAD^{tree}')" ]; then
+            echo "✅ #$pr already has these changes"
+            exit 0
+          fi
+          # Rebuilt from main every run, so the branch never drifts or conflicts.
+          git push --force origin "$BRANCH"
+
+          body="Adds any new webhook event types published at $WEBHOOKS_OPENAPI_URL to \`webhook-event-types.json\` and regenerates \`webhooks.events.generated.ts\` from https://base44.com/webhooks/schemas, which also picks up changed schemas. The docs build and the Platform SDK tests passed on this change. Checked against production every hour."
+          if [ -z "$pr" ]; then
+            gh pr create --head "$BRANCH" --base main --title "Sync Platform SDK webhook events from production" --body "$body"
+          fi

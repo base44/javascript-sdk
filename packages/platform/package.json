@@ -1,0 +1,97 @@
+{
+  "name": "@base44/platform",
+  "version": "0.4.0",
+  "description": "Base44 Platform SDK for white-label platforms: a browser client for following the AI chat and a server entrypoint for webhooks",
+  "main": "dist/client/index.js",
+  "types": "dist/client/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/client/index.d.ts",
+      "default": "./dist/client/index.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "default": "./dist/server/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "default": "./dist/react/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "server": [
+        "dist/server/index.d.ts"
+      ],
+      "react": [
+        "dist/react/index.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc",
+    "gen:events": "node scripts/gen-events.mjs",
+    "check:events": "node scripts/gen-events.mjs --check",
+    "sync:asyncapi": "node scripts/sync-asyncapi.mjs",
+    "docs": "typedoc",
+    "test": "npm run test:types && npm run test:unit && npm run docs && npm run test:package",
+    "test:types": "tsc --noEmit -p tsconfig.type-tests.json",
+    "test:unit": "vitest run",
+    "test:package": "npm run build && node --test tests/package.test.mjs",
+    "prepublishOnly": "npm run build",
+    "create-docs": "npm run create-docs:generate && npm run create-docs:process",
+    "create-docs-local": "npm run create-docs && npm run copy-docs-local",
+    "copy-docs-local": "node ../sdk/scripts/mintlify-post-processing/copy-to-local-docs.js --package-dir .",
+    "create-docs:generate": "node -e \"fs.rmSync('docs',{recursive:true,force:true})\" && typedoc --options typedoc.mintlify.json",
+    "create-docs:process": "node ../sdk/scripts/mintlify-post-processing/file-processing/file-processing.js --package-dir .",
+    "generate:webhooks": "node scripts/generate-webhook-types.mjs",
+    "sync:webhooks": "node scripts/sync-webhook-event-types.mjs"
+  },
+  "dependencies": {
+    "socket.io-client": "^4.8.3"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "jsdom": "^26.0.0",
+    "json-schema-to-typescript": "16.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "keywords": [
+    "base44",
+    "platform",
+    "white-label",
+    "webhooks"
+  ],
+  "author": "Base44",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/base44/javascript-sdk.git",
+    "directory": "packages/platform"
+  },
+  "bugs": {
+    "url": "https://github.com/base44/javascript-sdk/issues"
+  },
+  "homepage": "https://github.com/base44/javascript-sdk/tree/main/packages/platform#readme",
+  "engines": {
+    "node": ">=20"
+  }
+}

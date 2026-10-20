@@ -1,0 +1,19 @@
+[
+  "AiGatewayConnection",
+  "ActorConnectOptions",
+  "AppPublicSettingsResponse",
+  "DeleteManyResult",
+  "DeleteResult",
+  "EntityAggregateResult",
+  "EntityAggregateSpec",
+  "EntityDateBucket",
+  "EntityDistinctOptions",
+  "EntityListOptions",
+  "EntityPage",
+  "EntityUpsertOptions",
+  "EntityUpsertResult",
+  "ImportResult",
+  "SortField",
+  "UpdateManyResult",
+  "user-connectors"
+]

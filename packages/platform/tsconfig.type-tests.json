@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "@base44/platform": ["src/client/index.ts"],
+      "@base44/platform/server": ["src/server/index.ts"],
+      "@base44/platform/react": ["src/react/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "tests/types/**/*.ts", "examples/**/*.ts"]
+}

@@ -26,5 +26,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run type tests
+        run: npm run test:types -w @base44/sdk
+
       - name: Run unit tests
-        run: npm run test:unit
+        run: npm run test:unit -w @base44/sdk
+
+      - name: Check the Platform SDK event types match asyncapi.json
+        run: npm run check:events -w @base44/platform
+
+      - name: Test the Platform SDK
+        run: npm test -w @base44/platform

@@ -1,0 +1,45 @@
+{
+  "interfaces/chat": [
+    "interfaces/ChatSession",
+    "interfaces/SocketSession",
+    "type-aliases/PlatformEvent",
+    "interfaces/PlatformSnapshot"
+  ],
+  "classes/PlatformSocketError": [
+    "type-aliases/SessionErrorCode",
+    "type-aliases/AppErrorCode"
+  ],
+  "interfaces/webhooks": [
+    "type-aliases/WebhookEvent",
+    "interfaces/UnknownWebhookEvent"
+  ],
+  "classes/WebhookVerificationError": [
+    "type-aliases/WebhookVerificationErrorCode"
+  ],
+  "classes/WebhookConfigurationError": [
+    "type-aliases/WebhookConfigurationErrorCode"
+  ],
+  "functions/useBase44Chat": [
+    "interfaces/Base44ChatOptions",
+    "interfaces/Base44Chat",
+    "type-aliases/ChatStatus",
+    "type-aliases/ChatConnection",
+    "interfaces/ChatError"
+  ],
+  "interfaces/Base44ChatBackend": [
+    "interfaces/Base44App",
+    "interfaces/ToolCallAnswer"
+  ],
+  "interfaces/ChatItem": [
+    "interfaces/ChatStep",
+    "interfaces/ChatAnswer"
+  ],
+  "type-aliases/ChatQuestion": [
+    "interfaces/ChoiceQuestion",
+    "interfaces/ChoiceEntry",
+    "interfaces/SecretsQuestion",
+    "interfaces/SecretField",
+    "interfaces/ApprovalQuestion",
+    "interfaces/ApprovalDetails"
+  ]
+}
