@@ -388,6 +388,11 @@ function rewriteReturnSections(content, options) {
     if (trimmed.match(/^#{2,7}\s+Examples?/i) || trimmed === "***") {
       return true;
     }
+    // A "Throws" section sits beside Returns. Without this stop it was read as part of Returns,
+    // and a rewritten Returns section replaced it.
+    if (trimmed.match(/^#{2,7}\s+Throws\b/)) {
+      return true;
+    }
     if (heading !== "## Returns" && trimmed.startsWith("## ")) {
       return true;
     }

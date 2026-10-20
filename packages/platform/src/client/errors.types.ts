@@ -1,30 +1,34 @@
 /**
- * Codes of errors that affect the whole session. They go to the `onError` you pass to `init()`, and
- * `connect()` rejects with them. Retryable means the same call can succeed again without changing anything.
+ * Codes of errors that affect the whole session. They go to the `onError()` you pass to `init()`,
+ * and `connect()` rejects with them. A retryable error is one where the same call can succeed again
+ * without changing anything.
  */
 export type SessionErrorCode =
   /**
-   * `getSession` threw, took longer than 20 seconds, or returned a session without a valid
-   * `session_token`, `socket_url` (an HTTP or HTTPS origin) or `socket_path` (an absolute path).
+   * The `getSession()` callback threw, took longer than 20 seconds, or returned a session without a
+   * valid `session_token`, a `socket_url` that is an HTTP or HTTPS origin, or a `socket_path` that is
+   * an absolute path.
    *
-   * Check the endpoint that opens sessions, then call `connect()` again. Retryable, except that an
-   * invalid field needs a fix on your server first.
+   * Check the endpoint that opens sessions, then call `connect()` again. Retryable. If a field is
+   * invalid, fix it on your server first.
    */
   | "session_unavailable"
   /**
-   * Base44 refused the session even with a fresh token: the token is invalid, or live updates aren't enabled for the workspace.
+   * Base44 refused the session even with a fresh token. Either the token is invalid, or live updates
+   * aren't turned on for the workspace.
    *
    * Check that your server opens a new session on every call. Not retryable.
    */
   | "connection_denied"
   /**
-   * The socket couldn't connect after five retries, or the server closed it.
+   * The socket couldn't connect after five retries, or the server closed the connection.
    *
    * Call `connect()` again, for example when the tab next gets focus. Retryable.
    */
   | "connection_failed"
   /**
-   * Your server or an admin ended the session, or its key lost access.
+   * Your server or an admin ended the session, or the workspace API key that opened the session lost
+   * access.
    *
    * Open a new session from your server if the page should still follow apps. Not retryable.
    */
@@ -32,11 +36,12 @@ export type SessionErrorCode =
   /**
    * Another socket connected with the same session token.
    *
-   * Use one session per tab. Don't reconnect automatically; call `connect()` only to take the session back on purpose. Not retryable.
+   * Use one session per tab. Don't reconnect automatically. Call `connect()` only to take the
+   * session back on purpose. Not retryable.
    */
   | "session_replaced"
   /**
-   * A session frame didn't match the protocol.
+   * A message about the whole session didn't match the protocol.
    *
    * Update the SDK, then call `connect()` again. Not retryable.
    */
@@ -49,26 +54,27 @@ export type SessionErrorCode =
   | "client_closed";
 
 /**
- * Codes of errors for one app. They go to the subscription's `onError`, and `subscribe()` throws
- * `subscription_limit`. Every one ends the subscription except `snapshot_unavailable`.
+ * Codes of errors for a single app. They go to the subscription's `onError()`, and `subscribe()`
+ * throws `subscription_limit`. Every one ends the subscription except `snapshot_unavailable`.
  */
 export type AppErrorCode =
   /**
-   * The app isn't on the session's allowlist, or the socket joins too often.
+   * The session doesn't have access to the app, or the connection subscribed to apps too often.
    *
    * Add the app to the session from your server, then subscribe again. Not retryable.
    */
   | "access_denied"
   /**
-   * The app left the session's allowlist, or its workspace.
+   * The session lost access to the app. Your server removed the app from the session, or the app
+   * left the workspace.
    *
    * Stop showing the app's live updates. Not retryable.
    */
   | "access_revoked"
   /**
-   * The subscription is active but its snapshot failed. Events keep arriving.
+   * The subscription is active, but its snapshot failed. Events keep arriving.
    *
-   * Load the app's messages over the Apps API instead.
+   * Load the app's messages from the Apps API instead.
    */
   | "snapshot_unavailable"
   /**
@@ -78,13 +84,13 @@ export type AppErrorCode =
    */
   | "subscription_limit"
   /**
-   * More than 1,000 deliveries waited for your callbacks.
+   * More than 1,000 snapshots and events were waiting for your callbacks.
    *
    * Make the callbacks faster, then subscribe again for a fresh snapshot. Retryable.
    */
   | "delivery_overflow"
   /**
-   * Your `onSnapshot` or `onEvent` callback threw or rejected.
+   * Your `onSnapshot()` or `onEvent()` callback threw or rejected.
    *
    * Fix the callback, then subscribe again. Not retryable.
    */

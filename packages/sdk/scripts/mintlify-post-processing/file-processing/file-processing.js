@@ -1557,55 +1557,36 @@ function applyIntroSectionGrouping(dir) {
  * of "Type Definitions" instead of nested under it.
  */
 function groupTypeDefinitions(content) {
-  let modified = false;
-  
   const typeGroups = TYPE_DEFINITION_GROUPS.map((group) => {
-    const { title = "Type Definitions", types } = Array.isArray(group) ? { types: group } : group;
-    return { types, indicator: types[0], title };
+    const { title = "Type Definitions", types, nested = [] } = Array.isArray(group) ? { types: group } : group;
+    return { types, nested, indicator: types[0], title };
   });
-  
-  // Find which type group exists in this file
-  let matchedGroup = null;
-  for (const group of typeGroups) {
-    if (content.includes(`## ${group.indicator}`)) {
-      matchedGroup = group;
-      break;
+
+  // A page can hold several groups, such as its type definitions and then its errors. Each group
+  // covers the stretch from its first type to the next group's first type.
+  const matched = typeGroups
+    .map((group) => ({ ...group, index: content.search(new RegExp(`^## ${group.indicator}$`, "m")) }))
+    .filter((group) => group.index !== -1)
+    .sort((a, b) => a.index - b.index);
+  if (matched.length === 0) {
+    return { content, modified: false };
+  }
+
+  let updatedContent = content.slice(0, matched[0].index);
+  matched.forEach((group, i) => {
+    let section = content.slice(group.index, i + 1 < matched.length ? matched[i + 1].index : content.length);
+    for (const typeName of group.types) {
+      section = section.replace(new RegExp(`^## ${typeName}$`, "m"), `### ${typeName}`);
     }
-  }
-  
-  if (!matchedGroup) {
-    return { content, modified: false };
-  }
-  
-  // Find the position of the first type definition section
-  const firstTypeIndex = content.indexOf(`## ${matchedGroup.indicator}`);
-  if (firstTypeIndex === -1) {
-    return { content, modified: false };
-  }
-  
-  // Insert "## Type Definitions" heading before the first type
-  const beforeTypeDefinitions = content.slice(0, firstTypeIndex);
-  const typeDefinitionsSection = content.slice(firstTypeIndex);
-  
-  // Demote all types in this group from ## to ###
-  let demotedSection = typeDefinitionsSection;
-  for (const typeName of matchedGroup.types) {
-    const regex = new RegExp(`^## ${typeName}$`, "m");
-    demotedSection = demotedSection.replace(regex, `### ${typeName}`);
-  }
+    // Any "##" heading still left in this slice belongs to one of the types
+    // above it (e.g. "## Properties" from an appended interface with members,
+    // since normalizeHeadings() clamps an appended article's own headings to
+    // the same H2 floor as its title). Bump these so they nest under their
+    // now-H3 type heading instead of rendering as a sibling of it.
+    section = section.replace(/^## (.+)$/gm, "#### $1");
+    updatedContent += `## ${group.title}\n\n` + section;
+  });
 
-  // Any "##" heading still left in this slice belongs to one of the types
-  // above it (e.g. "## Properties" from an appended interface with members,
-  // since normalizeHeadings() clamps an appended article's own headings to
-  // the same H2 floor as its title). Bump these so they nest under their
-  // now-H3 type heading instead of rendering as a sibling of it.
-  demotedSection = demotedSection.replace(/^## (.+)$/gm, "#### $1");
-
-  const updatedContent =
-    beforeTypeDefinitions +
-    `## ${matchedGroup.title}\n\n` +
-    demotedSection;
-  
   return { content: updatedContent, modified: true };
 }
 
@@ -2517,10 +2498,9 @@ function applyOverloadPresentation(dir) {
 }
 
 /**
- * Tidy the generated actors page. TypeDoc inlines the ActorSubscription return
- * type under `subscribe()`, which adds a duplicate `unsubscribe()` block. This
- * drops the duplicate and points links to `ActorRef` at its renamed heading, Actor methods. A page
- * without the expected shape is left unchanged.
+ * Tidy the generated actors page. Points links to `ActorRef` at its renamed heading, Actor methods,
+ * and drops a duplicate `unsubscribe()` block under `subscribe()` if the ActorSubscription return
+ * type was inlined there.
  */
 function restructureActorsPage() {
   const file = path.join(DOCS_DIR, "content", "type-aliases", "actors.mdx");
@@ -2528,15 +2508,10 @@ function restructureActorsPage() {
 
   const duplicateUnsubscribe = /\n## Methods\n\n### unsubscribe\(\)[\s\S]*?<\/CodeGroup>\n/;
   const content = fs.readFileSync(file, "utf-8");
-  if (!duplicateUnsubscribe.test(content)) {
-    console.warn("Warning: actors page has an unexpected structure and was left unchanged");
-    return;
-  }
-
   const tidied = content
     .replace(duplicateUnsubscribe, "\n")
     .replace("](#actorref)", "](#actor-methods)");
-  fs.writeFileSync(file, tidied, "utf-8");
+  if (tidied !== content) fs.writeFileSync(file, tidied, "utf-8");
 }
 
 /** Class pages: no "Extends Error", which tells a reader nothing. */
@@ -2577,6 +2552,100 @@ function applyPropertiesAsFields(dir) {
   }
 }
 
+/**
+ * TypeDoc writes one Throws heading per `@throws` tag. Consecutive Throws sections become one
+ * heading with a bullet per error, so a method with several errors doesn't repeat the heading.
+ */
+function mergeThrowsSections(content) {
+  const lines = content.split("\n");
+  const out = [];
+  let i = 0;
+  while (i < lines.length) {
+    const heading = lines[i].match(/^(#{2,6}) Throws\s*$/);
+    if (!heading) {
+      out.push(lines[i++]);
+      continue;
+    }
+    const bodies = [];
+    while (i < lines.length && lines[i].trim() === `${heading[1]} Throws`) {
+      i++;
+      const body = [];
+      while (i < lines.length && !/^#{1,6} /.test(lines[i]) && lines[i].trim() !== "***") body.push(lines[i++]);
+      bodies.push(body.map((line) => line.trim()).filter(Boolean).join(" "));
+    }
+    out.push(`${heading[1]} Throws`, "");
+    if (bodies.length === 1) out.push(bodies[0], "");
+    else out.push(...bodies.map((body) => `- ${body}`), "");
+  }
+  return out.join("\n");
+}
+
+/**
+ * A group's nested types, such as an error's code list, move into an accordion under the `code`
+ * field of the type before them, the way Returns and options show their properties. `nested` maps
+ * each such type to its accordion title. This runs after the properties become fields, so the
+ * `code` field exists to attach to.
+ */
+function nestGroupedTypes(content) {
+  let nested = content;
+  for (const group of TYPE_DEFINITION_GROUPS) {
+    if (Array.isArray(group) || !group.nested) continue;
+    let host = null;
+    for (const typeName of group.types) {
+      const title = group.nested[typeName];
+      if (!title) {
+        host = typeName;
+        continue;
+      }
+      const heading = new RegExp(`^### ${typeName}\\n`, "m");
+      const start = nested.search(heading);
+      if (start === -1 || !host) continue;
+      const rest = nested.slice(start).replace(heading, "");
+      const next = rest.search(/^#{1,3} /m);
+      const body = (next === -1 ? rest : rest.slice(0, next)).replace(/^\s*\*\*\*\s*/, "").trim();
+      nested = nested.slice(0, start) + (next === -1 ? "" : rest.slice(next));
+      const hostStart = nested.search(new RegExp(`^### ${host}$`, "m"));
+      const field = nested.indexOf('<ResponseField name="code"', hostStart);
+      const fieldEnd = field === -1 ? -1 : nested.indexOf("</ResponseField>", field);
+      if (hostStart === -1 || fieldEnd === -1) continue;
+      const insertAt = fieldEnd + "</ResponseField>".length;
+      // Accordions for one field go after any already added there.
+      let after = insertAt;
+      while (nested.startsWith("\n\n<Accordion title=", after)) {
+        after = nested.indexOf("</Accordion>", after) + "</Accordion>".length;
+      }
+      nested = nested.slice(0, after) + `\n\n<Accordion title="${title}">\n\n${body}\n\n</Accordion>` + nested.slice(after);
+      // The type no longer has its own section, so a link to it would go nowhere.
+      nested = nested.replaceAll(`[${typeName}](#${typeName.toLowerCase()})`, typeName);
+    }
+  }
+  return nested;
+}
+
+function applyGroupedTypeNesting(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) applyGroupedTypeNesting(entryPath);
+    else if (entry.name.endsWith(".mdx")) {
+      const content = fs.readFileSync(entryPath, "utf-8");
+      const nested = nestGroupedTypes(content);
+      if (nested !== content) fs.writeFileSync(entryPath, nested, "utf-8");
+    }
+  }
+}
+
+function applyThrowsMerging(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) applyThrowsMerging(entryPath);
+    else if (entry.name.endsWith(".mdx")) {
+      const content = fs.readFileSync(entryPath, "utf-8");
+      const merged = mergeThrowsSections(content);
+      if (merged !== content) fs.writeFileSync(entryPath, merged, "utf-8");
+    }
+  }
+}
+
 function applyClassPageCleanup(dir) {
   const classesDir = path.join(dir, "content", "classes");
   if (!fs.existsSync(classesDir)) return;
@@ -2602,10 +2671,15 @@ function linkReturnTypes(content) {
   const headings = [...Object.entries(TYPES_WITH_OWN_METHODS).map(([type, title]) => [type, `## ${title}`]),
     ...[...anchors.keys()].map((type) => [type, `### ${type}`])];
   for (const [type, heading] of headings) {
-    const start = content.indexOf(`\n${heading}\n\n***\n\n`);
+    // Interface sections have a *** under the heading; type alias sections have none.
+    const separated = `\n${heading}\n\n***\n\n`;
+    const plain = `\n${heading}\n\n`;
+    let start = content.indexOf(separated);
+    if (start !== -1) content = content.replace(separated, plain);
+    else start = content.indexOf(plain);
     if (start === -1) continue;
-    content = content.replace(`\n${heading}\n\n***\n\n`, `\n${heading}\n\n`);
-    const body = content.slice(start + heading.length + 3);
+    // A type alias section opens with its `> **Name** = ...` declaration, which isn't description.
+    const body = content.slice(start + plain.length).replace(/^> \*\*.*\n\n/, "");
     descriptions.set(type, body.slice(0, body.search(/\n(#|> |<|```)/)).trim());
   }
   return content.replace(/(^#{4,5} Returns\n\n)`(\w+)`$/gm, (match, heading, type) =>
@@ -2681,6 +2755,8 @@ function main() {
 
   applyClassPageCleanup(DOCS_DIR);
   applyPropertiesAsFields(DOCS_DIR);
+  applyThrowsMerging(DOCS_DIR);
+  applyGroupedTypeNesting(DOCS_DIR);
 
   // Reorder methods according to method-order.json
   applyMethodOrdering(DOCS_DIR);

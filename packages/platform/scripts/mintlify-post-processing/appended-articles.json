@@ -3,20 +3,17 @@
     "interfaces/ChatSession",
     "interfaces/SocketSession",
     "type-aliases/PlatformEvent",
-    "interfaces/PlatformSnapshot"
-  ],
-  "classes/PlatformSocketError": [
+    "interfaces/PlatformSnapshot",
+    "classes/PlatformSocketError",
     "type-aliases/SessionErrorCode",
     "type-aliases/AppErrorCode"
   ],
   "interfaces/webhooks": [
     "type-aliases/WebhookEvent",
-    "interfaces/UnknownWebhookEvent"
-  ],
-  "classes/WebhookVerificationError": [
-    "type-aliases/WebhookVerificationErrorCode"
-  ],
-  "classes/WebhookConfigurationError": [
+    "interfaces/UnknownWebhookEvent",
+    "classes/WebhookVerificationError",
+    "type-aliases/WebhookVerificationErrorCode",
+    "classes/WebhookConfigurationError",
     "type-aliases/WebhookConfigurationErrorCode"
   ],
   "functions/useBase44Chat": [

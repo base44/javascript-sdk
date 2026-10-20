@@ -141,7 +141,7 @@ fix the cause and call `chat.connect()`.
 
 `chat.subscribe(appId, options)` returns a handle with `appId`, `active` and
 idempotent `unsubscribe()`. App IDs are 24 lowercase hexadecimal characters. One
-subscription per app and at most eight subscriptions are allowed per chat session.
+subscription per app and at most eight subscriptions are allowed per session.
 Subscriptions can be created before connecting. `chat.close()` is terminal for that
 session; call `client.chat.init(...)` again to start another.
 
@@ -230,7 +230,7 @@ exceptions, payloads and credentials are never attached.
 | `delivery_overflow` | 1,000 deliveries queued for the app; subscribe again for a fresh snapshot. |
 | `protocol_error` | Invalid routing or envelope. Stop and investigate. |
 | `handler_failed` | An application callback failed; fix it and subscribe again. |
-| `client_closed` | The chat session was explicitly closed; initialize another session. |
+| `client_closed` | The session was explicitly closed; initialize another session. |
 
 No SDK dependency, package version or lockfile changes are required. Socket.IO
 remains the existing SDK dependency. Chat commands and HTTP APIs are outside this entry point.

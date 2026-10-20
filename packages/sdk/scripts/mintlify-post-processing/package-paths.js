@@ -16,7 +16,7 @@ export function packagePaths(argv = process.argv.slice(2)) {
   // Where the reference lands in mintlify-docs. `group` creates the nav group when it is missing.
   const target = {
     path: "developers/references/sdk/docs",
-    dropdown: "SDK",
+    dropdown: "SDKs",
     ...(fs.existsSync(targetFile) ? JSON.parse(fs.readFileSync(targetFile, "utf8")) : {}),
   };
   return { packageDir, docsDir: path.join(packageDir, "docs"), configDir, target };

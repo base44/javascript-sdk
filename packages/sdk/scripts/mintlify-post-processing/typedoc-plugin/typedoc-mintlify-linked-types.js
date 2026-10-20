@@ -479,9 +479,11 @@ function parsePropertiesFromTypeFile(content) {
   
   const lines = contentWithoutFrontmatter.split("\n");
 
-  // Collect intro description until Properties section
+  // Collect the intro description, which ends at the page's first heading. A type alias page
+  // has no Properties section, so stopping only there pulled its declaration and examples in too.
   const introLines = [];
   let descriptionCaptured = false;
+  let introDone = false;
 
   // Extract Indexable section if present (use content without frontmatter)
   const indexSignature = parseIndexableSection(contentWithoutFrontmatter);
@@ -500,7 +502,11 @@ function parsePropertiesFromTypeFile(content) {
       continue;
     }
 
-    if (!inPropertiesSection) {
+    if (!inPropertiesSection && line.match(/^#{1,6}\s+/)) {
+      introDone = true;
+    }
+
+    if (!inPropertiesSection && !introDone && !line.startsWith("> **")) {
       if (line.trim()) {
         introLines.push(line);
         descriptionCaptured = true;

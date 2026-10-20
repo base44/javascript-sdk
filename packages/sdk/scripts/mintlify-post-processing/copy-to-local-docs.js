@@ -137,7 +137,7 @@ function updateDocsJson(repoDir, sdkFiles) {
 
     return Array.from(groupMap.entries()).map(([group, pages]) => ({
       group,
-      expanded: true,
+      expanded: false,
       // Sort by basename, not full path: a plain .sort() groups all
       // "interfaces/..." entries before "type-aliases/..." entries (since
       // "i" < "t"), instead of interleaving both kinds alphabetically by
@@ -172,6 +172,23 @@ function updateDocsJson(repoDir, sdkFiles) {
     const localePathPrefix = `${prefix}${basePath}/`;
     const groupReferencesSdkDocs = (group) =>
       JSON.stringify(group).includes(localePathPrefix);
+    const isGroup = (node) => node !== null && typeof node === "object" && "group" in node;
+    // The reference group holds the generated subgroups, and those hold only pages.
+    const holdsOnlyPagesInSubgroups = (group) =>
+      (group.pages ?? []).every(
+        (page) => !isGroup(page) || (page.pages ?? []).every((leaf) => !isGroup(leaf))
+      );
+    // The nav can nest the reference group inside a group per SDK, as the SDKs dropdown does,
+    // so look through the groups that wrap it.
+    const findReferenceGroup = (groups) => {
+      for (const group of groups) {
+        if (!isGroup(group) || !groupReferencesSdkDocs(group)) continue;
+        if (holdsOnlyPagesInSubgroups(group)) return group;
+        const nested = findReferenceGroup(group.pages ?? []);
+        if (nested) return nested;
+      }
+      return null;
+    };
     const sdkReferencePages = buildSdkReferencePages(prefix);
 
     for (const tab of tabs) {
@@ -180,13 +197,12 @@ function updateDocsJson(repoDir, sdkFiles) {
         tab.anchors?.find((a) => a.anchor === TARGET.dropdown);
       if (!sdkAnchor?.groups) continue;
 
-      let sdkRefIndex = sdkAnchor.groups.findIndex(groupReferencesSdkDocs);
-      if (sdkRefIndex === -1 && TARGET.group) {
-        sdkRefIndex = sdkAnchor.groups.push({ group: TARGET.group, icon: TARGET.icon, pages: [] }) - 1;
+      let existing = findReferenceGroup(sdkAnchor.groups);
+      if (!existing && TARGET.group) {
+        existing = { group: TARGET.group, icon: TARGET.icon, pages: [] };
+        sdkAnchor.groups.push(existing);
       }
-      if (sdkRefIndex === -1) continue;
-
-      const existing = sdkAnchor.groups[sdkRefIndex];
+      if (!existing) continue;
 
       // Preserve existing subgroup labels (translated per locale) by position.
       // Falls back to the English category-map label when no existing subgroup
@@ -197,13 +213,9 @@ function updateDocsJson(repoDir, sdkFiles) {
         group: existingSubgroups[i]?.group ?? g.group,
       }));
 
-      sdkAnchor.groups[sdkRefIndex] = {
-        ...existing,
-        group: existing.group,
-        icon: existing.icon ?? "brackets-curly",
-        expanded: true,
-        pages: localizedPages,
-      };
+      existing.icon = existing.icon ?? "brackets-curly";
+      existing.expanded = false;
+      existing.pages = localizedPages;
       updatedCount++;
     }
   }
