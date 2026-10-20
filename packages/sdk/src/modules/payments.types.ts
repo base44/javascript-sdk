@@ -204,7 +204,7 @@ export interface Purchase {
   metadata?: Record<string, string> | null;
   /** ID of the subscription, for recurring purchases. */
   subscription_id?: string | null;
-  /** ID of the payment to pass to [`refund()`](/developers/references/sdk/docs/interfaces/service-role-payments#refund). It's `null` where the provider doesn't name a single payment, such as PayPal subscriptions. */
+  /** ID of the payment to pass to [`refund()`](/developers/references/sdk/docs/interfaces/service-role-payments#refund). For a PayPal subscription it's the latest charge, returned only with the service role: read it when you start a refund and reuse it on retries. It's `null` where the provider doesn't name a payment, such as a PayPal subscription whose latest charge is already refunded. */
   payment_id?: string | null;
 }
 
