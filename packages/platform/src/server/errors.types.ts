@@ -4,13 +4,13 @@
  */
 export type WebhookVerificationErrorCode =
   /**
-   * The request is missing one of the `webhook-id`, `webhook-timestamp` or `webhook-signature` headers.
+   * The request is missing one of the `webhook-id`, `webhook-timestamp`, or `webhook-signature` headers.
    *
    * Check that a proxy in front of your endpoint forwards all request headers.
    */
   | "missing_headers"
   /**
-   * The `webhook-timestamp` header is more than `toleranceSeconds` (300 by default) away from your server's clock, or isn't a number.
+   * The `webhook-timestamp` header isn't a number, or is further from your server's clock than `toleranceSeconds`, which defaults to 300.
    *
    * Check your server's clock. A replayed old delivery fails this way too.
    */
@@ -38,7 +38,7 @@ export type WebhookVerificationErrorCode =
 /**
  * Codes of errors that stop verification before it starts, because the public keys you passed can't
  * be used. They're about your deployment, not the request, so answer them with a 500. Base44 retries
- * the delivery, as it does for any answer that isn't 2xx, and it succeeds once you fix the problem.
+ * the delivery, as it does for any answer that isn't 2xx, and the retry succeeds once you fix the problem.
  */
 export type WebhookConfigurationErrorCode =
   /**

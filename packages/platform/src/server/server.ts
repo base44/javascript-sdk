@@ -9,7 +9,7 @@ import type { PlatformServer } from "./server.types.js";
  * such as [`webhooks`](/developers/references/platform-sdk/docs/interfaces/webhooks). It takes no
  * options and makes no network requests. Each module takes what it needs when you call it.
  *
- * @returns A server client with access to the platform's server modules.
+ * @returns A new platform server client.
  *
  * @example
  * ```typescript

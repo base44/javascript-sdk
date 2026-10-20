@@ -52,9 +52,9 @@ export interface UnknownWebhookEvent extends Omit<CloudEvent<string, Record<stri
  * A verified webhook event.
  *
  * Check `type` to narrow `data` to that event's payload. An event added to Base44 after this version
- * of the SDK arrives with `type: "unknown"`, its type in `name` and an unchecked `data`, so check a
- * field before using it. After you upgrade, it arrives under its own `type`. Answer it with a 2xx
- * too: Base44 retries any answer that isn't 2xx.
+ * of the SDK arrives with `type: "unknown"`, its type in `name`, and an unchecked `data`, so check a
+ * field before using it. After you upgrade, the event arrives under its own `type`. Answer it with a
+ * 2xx too, because Base44 retries any answer that isn't 2xx.
  *
  * @example
  * ```typescript
@@ -92,7 +92,7 @@ export interface VerifyEventOptions {
   toleranceSeconds?: number;
 }
 
-/** An event your callbacks receive. Every event except the `webhook.test.v1` activation probe, which the handler answers itself. */
+/** An event your callbacks receive. Every event except the `webhook.test.v1` test event, which `createHandler()` answers itself. */
 export type DeliveredWebhookEvent = Exclude<WebhookEvent, CloudEvent<"webhook.test.v1", WebhookTestV1Data>>;
 
 /**
@@ -110,7 +110,7 @@ export interface CreateHandlerOptions extends VerifyEventOptions {
   /** Called for every verified event, before its handler in `on`. */
   onEvent?: (event: DeliveredWebhookEvent) => unknown;
   /**
-   * Called after `onEvent` and the event's handler finish without throwing.
+   * Called after `onEvent()` and the event's handler finish without throwing.
    *
    * Return a `Response` to replace the default empty 204.
    */
@@ -119,23 +119,24 @@ export interface CreateHandlerOptions extends VerifyEventOptions {
    * Called when a delivery fails.
    *
    * The handler answers a `WebhookVerificationError` with a 400, and a `WebhookConfigurationError`, a
-   * failed body read or anything a callback throws with a 500. Base44 retries either way, because it
-   * retries any answer that isn't 2xx. The status only shows in its delivery log whether the delivery
-   * or your side failed. The `event` argument is set when the delivery verified and a callback failed.
+   * failed body read, or anything a callback throws with a 500. Base44 retries both, because it retries
+   * every answer that isn't 2xx. The two codes only differ in Base44's delivery log, where a 400
+   * points to the delivery and a 500 points to your server. The `event` argument is set when the
+   * delivery verified and a callback failed.
    * Return a `Response` to replace the default answer.
    */
   onError?: (error: unknown, event?: DeliveredWebhookEvent) => Response | void | Promise<Response | void>;
 }
 
 /**
- * Webhooks module for receiving the events Base44 sends to your server.
+ * Webhooks module for receiving and verifying Base44's webhooks.
  *
- * Base44 sends a signed event to your endpoint when something happens in your workspace:
- * - An app is created, published, unpublished, moved to trash or restored.
- * - Base44 tests a new endpoint before activating it.
+ * Base44 sends a signed event to your endpoint:
+ * - When an app is created, published, unpublished, moved to trash, or restored.
+ * - When you add the endpoint, to test it.
  *
- * The module verifies each delivery's signature with your workspace's public keys, and gives you
- * the event with its payload typed. It runs on Node.js 20 and later and on edge runtimes, and makes
+ * The module verifies each delivery's signature with your workspace's public keys and returns the
+ * event with a typed payload. It runs on Node.js 20 and later and on edge runtimes, and makes
  * no network requests.
  *
  * Use {@linkcode createHandler | createHandler()} for a ready-made route handler, or
@@ -149,15 +150,17 @@ export interface WebhooksModule {
    * Pass the request body exactly as received, before any JSON parsing, because the signature covers
    * its exact bytes. Nothing is parsed until the signature checks out.
    *
-   * To activate a new endpoint, answer the `webhook.test.v1` event with
-   * `{ "challenge": event.data.challenge }` within 5 seconds. Answer every other event with a 2xx.
+   * Unlike {@linkcode createHandler | createHandler()}, `verifyEvent()` doesn't answer the request for
+   * you. When you add an endpoint, Base44 sends it a `webhook.test.v1` event and activates the endpoint
+   * only if you answer with `{ "challenge": event.data.challenge }` within 5 seconds. Answer every
+   * other event with a 2xx, or Base44 retries it.
    *
    * @param body - The raw request body, as text or bytes.
    * @param headers - The request headers.
    * @param options - Verification options, including your public keys.
-   * @returns Promise resolving to the verified event.
-   * @throws {WebhookVerificationError} When the delivery can't be trusted. Answer with a 400.
-   * @throws {WebhookConfigurationError} When the public keys are missing or malformed, or the runtime can't use them. Answer with a 500.
+   * @returns A promise that resolves to the verified event.
+   * @throws {WebhookVerificationError} The promise rejects with a `WebhookVerificationError` when the delivery can't be trusted. Answer with a 400.
+   * @throws {WebhookConfigurationError} The promise rejects with a `WebhookConfigurationError` when the public keys are missing or malformed, or the runtime can't use them. Answer with a 500.
    *
    * @example
    * ```typescript
@@ -176,6 +179,7 @@ export interface WebhooksModule {
    *
    *   switch (event.type) {
    *     case 'webhook.test.v1':
+   *       // Answer the test event so Base44 activates the endpoint
    *       return Response.json({ challenge: event.data.challenge });
    *     case 'app.deleted.v1':
    *       await removeApp(event.data.app_id);
@@ -190,24 +194,25 @@ export interface WebhooksModule {
   /**
    * Creates a route handler that verifies deliveries and calls your handlers.
    *
-   * The handler takes a fetch `Request` and returns a `Response`, so it works as a Next.js route
-   * handler and in Hono, Cloudflare Workers, Deno and Bun. For each request it reads the raw body,
-   * verifies it, answers the activation probe itself, and then calls `onEvent`, the event's handler in
-   * `on`, and `onSuccess`, in that order.
+   * The returned function takes a standard Fetch API `Request` and returns a `Response`, so you can
+   * use it with any framework built on the Fetch API, such as Next.js route handlers, Hono,
+   * Cloudflare Workers, Deno, and Bun. For each request, it reads the raw body and
+   * verifies it. It answers the test event itself, and for every other event it calls `onEvent()`,
+   * then the event's handler in `on`, then `onSuccess()`.
    *
    * It answers with:
-   * - 204 when the event was handled, including events with no handler and unknown events.
-   * - 400 when the delivery doesn't verify, with the error code in the body.
-   * - 500 when the public keys are misconfigured (`receiver_misconfigured`), the body can't be read
-   *   (`request_failed`) or a callback throws (`handler_failed`).
+   * - **204**: Event was handled, including events with no handler and unknown events.
+   * - **400**: Delivery doesn't verify. Body carries the error code.
+   * - **500**: Public keys are misconfigured (`receiver_misconfigured`), body can't be read
+   *   (`request_failed`), or a callback throws (`handler_failed`).
    *
-   * Base44 retries any answer that isn't 2xx, 400 and 500 alike. The status only shows in its delivery
-   * log whether the delivery or your side failed.
+   * Base44 retries every answer that isn't 2xx, so it retries both 400 and 500. The two codes only
+   * differ in Base44's delivery log, where a 400 points to the delivery and a 500 points to your server.
    *
-   * Base44 can deliver the same event more than once, so make your handlers safe to run twice for the
+   * Base44 might deliver the same event more than once, so make your handlers safe to run twice for the
    * same `event.id`.
    *
-   * @param options - Your public keys, handlers and callbacks.
+   * @param options - Your public keys, handlers, and callbacks.
    * @returns A function that takes a `Request` and resolves to the `Response` to send.
    *
    * @example

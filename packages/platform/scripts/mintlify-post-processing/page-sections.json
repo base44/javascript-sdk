@@ -4,6 +4,19 @@
   },
   "typeDefinitionGroups": [
     ["SocketSession", "PlatformEvent", "PlatformSnapshot"],
-    { "title": "Error codes", "types": ["SessionErrorCode", "AppErrorCode"] }
+    {
+      "title": "Errors",
+      "types": ["PlatformSocketError", "SessionErrorCode", "AppErrorCode"],
+      "nested": { "SessionErrorCode": "Session error codes", "AppErrorCode": "App error codes" }
+    },
+    ["WebhookEvent", "UnknownWebhookEvent"],
+    {
+      "title": "Errors",
+      "types": ["WebhookVerificationError", "WebhookVerificationErrorCode", "WebhookConfigurationError", "WebhookConfigurationErrorCode"],
+      "nested": {
+        "WebhookVerificationErrorCode": "Verification error codes",
+        "WebhookConfigurationErrorCode": "Configuration error codes"
+      }
+    }
   ]
 }

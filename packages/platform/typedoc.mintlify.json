@@ -10,11 +10,17 @@
   ],
   "fileExtension": ".mdx",
   "gitRevision": "main",
-  "sort": ["source-order"],
+  "sort": [
+    "source-order"
+  ],
   "entryFileName": "README.mdx",
-  "maxTypeConversionDepth": 3,
+  "maxTypeConversionDepth": 5,
   "hideBreadcrumbs": true,
   "disableSources": true,
   "hidePageTitle": true,
-  "intentionallyNotExported": ["src/client/modules/chat.events.generated.ts:SecretField"]
+  "intentionallyNotExported": ["src/client/modules/chat.events.generated.ts:SecretField"],
+  "validation": {
+    "notDocumented": true,
+    "notExported": false
+  }
 }
