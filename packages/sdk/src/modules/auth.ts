@@ -1,6 +1,6 @@
 import { AxiosInstance } from "axios";
 
-import { removeAccessToken } from "../utils/auth-utils.js";
+import { getAccessToken, removeAccessToken } from "../utils/auth-utils.js";
 import {
   AuthModuleOptions,
   AuthModule,
@@ -85,6 +85,22 @@ function removeStoredAccessTokens() {
   removeAccessToken({ storageKey: "token" });
 }
 
+const isStoredAccessToken = (authorization: unknown) =>
+  authorization ===
+  `Bearer ${getAccessToken({ saveToStorage: false, removeFromUrl: false })}`;
+
+// A rejected token left in storage boots the next page with it, and an app
+// whose own /login does that loops 401 → /login. A token stored since the
+// request went out (a login in this or another tab) is not the rejected one.
+function clearTokenOnRejection(
+  error: { status?: number },
+  sentAuthorization: unknown
+) {
+  if (error.status === 401 && isStoredAccessToken(sentAuthorization)) {
+    removeStoredAccessTokens();
+  }
+}
+
 /**
  * Creates the auth module for the Base44 SDK.
  *
@@ -128,15 +144,22 @@ export function createAuthModule(
 
     // Get current user information
     async me() {
+      const sentAuthorization = axios.defaults.headers.common["Authorization"];
       const request: Promise<User> =
         pendingMe ??
-        axios.get<any, User>(`/apps/${appId}/entities/User/me`).finally(() => {
-          // Only retire this request if it is still the shared one. An identity
-          // change mid-flight clears `pendingMe` and the next caller starts a
-          // fresh request; an unconditional clear here would retire that newer
-          // request instead, so a third caller would issue a duplicate.
-          if (pendingMe === request) pendingMe = null;
-        });
+        axios
+          .get<any, User>(`/apps/${appId}/entities/User/me`)
+          .catch((error) => {
+            clearTokenOnRejection(error, sentAuthorization);
+            throw error;
+          })
+          .finally(() => {
+            // Only retire this request if it is still the shared one. An identity
+            // change mid-flight clears `pendingMe` and the next caller starts a
+            // fresh request; an unconditional clear here would retire that newer
+            // request instead, so a third caller would issue a duplicate.
+            if (pendingMe === request) pendingMe = null;
+          });
       pendingMe = request;
       return request;
     },
@@ -163,9 +186,7 @@ export function createAuthModule(
       // Build the login URL
       const loginUrl = `${options.appBaseUrl}/login?from_url=${encodeURIComponent(redirectUrl)}`;
 
-      // The login page must not boot with the token that just got us here,
-      // or a rejected token redirects to /login forever.
-      removeStoredAccessTokens();
+      // Redirect to the login page
       window.location.href = loginUrl;
     },
 

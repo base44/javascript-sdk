@@ -132,6 +132,67 @@ describe('Auth Module', () => {
       expect(scope.isDone()).toBe(true);
     });
 
+    describe('stored token', () => {
+      let originalWindow;
+      let storage;
+
+      const storeToken = (token) => {
+        storage = new Map([['base44_access_token', token], ['token', token]]);
+        global.window = {
+          location: { search: '', href: 'https://example.com/' },
+          localStorage: {
+            getItem: (key) => storage.get(key) ?? null,
+            setItem: (key, value) => storage.set(key, value),
+            removeItem: (key) => storage.delete(key),
+            clear: () => storage.clear(),
+          },
+        };
+        base44.auth.setToken(token, false);
+      };
+
+      beforeEach(() => {
+        originalWindow = global.window;
+      });
+
+      afterEach(() => {
+        global.window = originalWindow;
+      });
+
+      test('is forgotten when me() rejects it with a 401', async () => {
+        storeToken('dead-token');
+        scope.get(`/api/apps/${appId}/entities/User/me`).reply(401, { detail: 'Unauthorized' });
+
+        await expect(base44.auth.me()).rejects.toThrow();
+
+        expect(storage.has('base44_access_token')).toBe(false);
+        expect(storage.has('token')).toBe(false);
+      });
+
+      test('is kept when me() fails for another reason', async () => {
+        storeToken('valid-token');
+        scope.get(`/api/apps/${appId}/entities/User/me`).reply(503, { detail: 'Unavailable' });
+
+        await expect(base44.auth.me()).rejects.toThrow();
+
+        expect(storage.get('base44_access_token')).toBe('valid-token');
+      });
+
+      test('is kept when a login replaced it while me() was in flight', async () => {
+        storeToken('dead-token');
+        scope
+          .get(`/api/apps/${appId}/entities/User/me`)
+          .delay(50)
+          .reply(401, { detail: 'Unauthorized' });
+
+        const staleRequest = base44.auth.me();
+        storage.set('base44_access_token', 'new-token');
+
+        await expect(staleRequest).rejects.toThrow();
+
+        expect(storage.get('base44_access_token')).toBe('new-token');
+      });
+    });
+
     test('setToken() drops an in-flight request from the previous identity', async () => {
       scope
         .get(`/api/apps/${appId}/entities/User/me`)
@@ -287,7 +348,7 @@ describe('Auth Module', () => {
       global.window = originalWindow;
     });
 
-    test('should drop the stored token before redirecting to login', () => {
+    test('should keep a valid stored token when redirecting to login', () => {
       const mockLocalStorage = { removeItem: vi.fn(), getItem: vi.fn(), setItem: vi.fn(), clear: vi.fn() };
       const mockLocation = { href: 'https://example.com/current-page' };
       const originalWindow = global.window;
@@ -295,8 +356,7 @@ describe('Auth Module', () => {
 
       base44.auth.redirectToLogin();
 
-      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('base44_access_token');
-      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('token');
+      expect(mockLocalStorage.removeItem).not.toHaveBeenCalled();
       expect(mockLocation.href).toContain('/login?from_url=');
 
       global.window = originalWindow;
