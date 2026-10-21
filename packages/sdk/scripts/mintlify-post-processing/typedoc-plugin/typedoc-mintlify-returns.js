@@ -10,6 +10,17 @@ import {
 } from "./typedoc-mintlify-linked-types.js";
 import { escapeAttribute } from "./typedoc-mintlify-utils.js";
 
+// The name of a return with no fields of its own. Such a return renders as its description alone.
+const PLAIN_RETURN = "result";
+
+// Whether a Returns section already shows this text, ignoring how its lines wrap. The @returns
+// sentence can reach a section more than once: as the section's own text, from the reflection,
+// and as a plain return's description.
+function isShown(text, shown) {
+  const normalize = (value) => value.replace(/\s+/g, " ").trim();
+  return shown.some((part) => normalize(part) === normalize(text));
+}
+
 const PRIMITIVE_TYPES = [
   "any",
   "string",
@@ -501,7 +512,7 @@ function rewriteReturnSections(content, options) {
             descriptionParts.push(leadingText);
           }
           const returnsDescription = extractReturnsDescription(page);
-          if (returnsDescription && !descriptionParts.includes(returnsDescription)) {
+          if (returnsDescription && !isShown(returnsDescription, descriptionParts)) {
             descriptionParts.push(returnsDescription);
           }
           if (descriptionParts.length > 0) {
@@ -515,7 +526,7 @@ function rewriteReturnSections(content, options) {
             writeLinkedTypesFile,
             indexSignature
           );
-          if (fieldsBlock) {
+          if (fieldsBlock && !isShown(fieldsBlock, descriptionParts)) {
             result.push("");
             result.push(fieldsBlock);
             result.push("");
@@ -588,7 +599,7 @@ function rewriteReturnSections(content, options) {
         // The section's own leading type is the fallback when the signature gave no type, as for a
         // property whose type is a function.
         const plainType =
-          fields.length === 1 && fields[0].name === "result" && fields[0].type !== "any"
+          fields.length === 1 && fields[0].name === PLAIN_RETURN && fields[0].type !== "any"
             ? fields[0].type
             : null;
         const typeNameForDisplay = enrichTypeNameWithGenerics(
@@ -617,7 +628,7 @@ function rewriteReturnSections(content, options) {
           writeLinkedTypesFile,
           indexSignature
         );
-        if (fieldsBlock) {
+        if (fieldsBlock && !isShown(fieldsBlock, descriptionParts)) {
           result.push("");
           result.push(fieldsBlock);
           result.push("");
@@ -868,11 +879,10 @@ function parseReturnFields(
       }
     }
 
-    // A plain return has no name of its own. "result" renders as its description alone.
     return {
       fields: [
         {
-          name: "result",
+          name: PLAIN_RETURN,
           type,
           description,
           optional: false,
@@ -1122,7 +1132,7 @@ function formatReturnFieldsOutput(
 
   const isSingleSimpleField =
     fields.length === 1 &&
-    fields[0].name === "result" &&
+    fields[0].name === PLAIN_RETURN &&
     (!fields[0].nested || fields[0].nested.length === 0) &&
     !indexSignature;
 

@@ -1280,8 +1280,6 @@ function demoteNonCallableHeadings(content) {
   const lines = content.split("\n");
   let inFence = false;
   let modified = false;
-  let section = null;
-  let inCallableProperty = false;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
@@ -1290,27 +1288,6 @@ function demoteNonCallableHeadings(content) {
       continue;
     }
     if (inFence) {
-      continue;
-    }
-    if (line.startsWith("## ")) {
-      section = line.slice(3).trim();
-    }
-    if (line.startsWith("### ") || line.startsWith("## ") || trimmed === "***") {
-      inCallableProperty = false;
-    }
-    // A property whose type is a function renders as "### name()?", like a method. Under
-    // "## Properties" it is a property: give it the same #### heading as its siblings, without
-    // the parentheses, and nest its Parameters and Returns under it.
-    if (inCallableProperty && /^#### (Parameters|Returns)$/.test(line)) {
-      lines[i] = `#${line}`;
-      modified = true;
-      continue;
-    }
-    const callableProperty = line.match(/^### (.+?)\(\)(\??)$/);
-    if (callableProperty && section === "Properties") {
-      lines[i] = `#### ${callableProperty[1]}${callableProperty[2]}`;
-      inCallableProperty = true;
-      modified = true;
       continue;
     }
     // Demote ### headings that don't have parentheses (not methods) to ####
@@ -2838,4 +2815,9 @@ function main() {
   console.log(`  Documentation directory: ${DOCS_DIR}`);
 }
 
-main();
+// Run as a script; tests import the helpers without processing anything.
+if (process.argv[1] && fs.realpathSync(process.argv[1]) === fs.realpathSync(__filename)) {
+  main();
+}
+
+export { removeNonExposedTypeLinks };

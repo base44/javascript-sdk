@@ -21,6 +21,7 @@ import {
   convertExamplesToCodeGroup,
   addMintlifyFrontmatter,
   addHeadingsToCodeGroups,
+  nameCallableProperties,
 } from "./typedoc-mintlify-content.js";
 
 // Shared flag with the post-processing script so Panel output can be toggled.
@@ -91,6 +92,10 @@ export function load(app) {
         writeLinkedTypesFile
       );
     }
+
+    // 2a. A property whose type is a function is a property, not a method. After step 2, which
+    // finds Parameters and Returns at their usual levels.
+    content = nameCallableProperties(content, page.model);
 
     // 2a. Document each value of a literal union; typedoc-plugin-markdown drops their comments
     if (page.model?.kind === ReflectionKind.TypeAlias) {

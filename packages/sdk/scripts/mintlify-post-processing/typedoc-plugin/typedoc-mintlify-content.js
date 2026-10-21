@@ -2,6 +2,8 @@
  * Content transformation functions (examples, frontmatter, etc.)
  */
 
+import { ReflectionKind } from "typedoc";
+
 /**
  * Add headings to CodeGroups that don't have them
  */
@@ -131,3 +133,48 @@ title: "${escapeYaml(title)}"
   return frontmatter + processedContent;
 }
 
+
+/**
+ * typedoc-plugin-markdown renders a property whose type is a function like a method: "name()" at
+ * the level of the other members, with its Parameters and Returns one level below. Post-processing
+ * then moves the other properties down a level and leaves these alone, because their heading has
+ * "()". Name it as the property it is, and move its own subsection down with it, so it reads and
+ * nests like its siblings. Which members are such properties comes from the reflection, not from
+ * the heading text.
+ */
+export function nameCallableProperties(content, model) {
+  const callable = new Set(
+    (model?.children ?? [])
+      .filter(
+        (child) =>
+          child.kind === ReflectionKind.Property &&
+          child.type?.type === "reflection" &&
+          (child.type.declaration?.signatures?.length ?? 0) > 0
+      )
+      .map((child) => child.name)
+  );
+  if (callable.size === 0) return content;
+
+  const lines = content.split("\n");
+  let inFence = false;
+  // The level of the callable property being rewritten, while inside its subsection.
+  let propertyLevel = null;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim().startsWith("```")) inFence = !inFence;
+    if (inFence) continue;
+    const heading = lines[i].match(/^(#{1,6}) (.*)$/);
+    if (!heading) continue;
+    const level = heading[1].length;
+    if (propertyLevel !== null && level > propertyLevel) {
+      if (level < 6) lines[i] = `#${lines[i]}`;
+      continue;
+    }
+    propertyLevel = null;
+    const property = heading[2].match(/^(\w+)\(\)(\??)$/);
+    if (property && callable.has(property[1])) {
+      lines[i] = `${heading[1]} ${property[1]}${property[2]}`;
+      propertyLevel = level;
+    }
+  }
+  return lines.join("\n");
+}
