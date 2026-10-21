@@ -3,6 +3,7 @@ import { createEntitiesModule } from "./modules/entities.js";
 import { createIntegrationsModule } from "./modules/integrations.js";
 import { createAuthModule } from "./modules/auth.js";
 import { createSsoModule } from "./modules/sso.js";
+import { createBrowserModule } from "./modules/browser.js";
 import {
   createConnectorsModule,
   createUserConnectorsModule,
@@ -293,6 +294,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     }),
     integrations: createIntegrationsModule(serviceRoleAxiosClient, appId),
     sso: createSsoModule(serviceRoleAxiosClient, appId),
+    browser: createBrowserModule(serviceRoleAxiosClient),
     connectors: createConnectorsModule(serviceRoleAxiosClient, appId),
     functions: createFunctionsModule(serviceRoleFunctionsAxiosClient, appId, {
       getAuthHeaders: () => {

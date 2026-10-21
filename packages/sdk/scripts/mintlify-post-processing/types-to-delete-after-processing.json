@@ -2,6 +2,8 @@
   "AiGatewayConnection",
   "ActorConnectOptions",
   "AppPublicSettingsResponse",
+  "BrowserSession",
+  "BrowserSessionOptions",
   "DeleteManyResult",
   "DeleteResult",
   "EntityAggregateResult",
