@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+The React entry drops the `Base44` prefix: the package name already says it. The old names stay as
+deprecated aliases of the new ones and are removed in 0.6.0.
+
+| Before | After |
+| --- | --- |
+| `useBase44Chat` | `useChat` |
+| `Base44Chat` | `UseChatResult` |
+| `Base44ChatOptions` | `ChatOptions` |
+| `Base44ChatBackend` | `ChatBackend` |
+| `Base44App` | `ChatApp` |
+
+```ts
+import { useChat, type ChatBackend } from "@base44/platform/react";
+```
+
+## 0.4.0
+
 **Breaking.** Base44 calls it the AI chat, so the client and the webhook events say `chat`, not
 `builder`.
 

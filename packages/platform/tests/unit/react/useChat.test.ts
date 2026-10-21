@@ -5,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { Message, QueueItem } from "../../../src/client/modules/chat.events.generated.js";
 import type { PlatformSnapshot } from "../../../src/client/modules/chat.events.types.js";
 import type { SocketSession } from "../../../src/client/modules/chat.types.js";
-import { useBase44Chat } from "../../../src/react/index.js";
-import type { Base44Chat, Base44ChatOptions, Base44ChatBackend } from "../../../src/react/index.js";
+import { useChat } from "../../../src/react/index.js";
+import type { UseChatResult, ChatOptions, ChatBackend } from "../../../src/react/index.js";
 
 // The platform client is replaced by a recorder: the test plays snapshots, events and connection
 // changes into the session the hook opened, and checks which sessions were opened and closed.
@@ -70,7 +70,7 @@ const app = "a".repeat(24), other = "b".repeat(24);
 const message = (id: string, created: string, extra: Partial<Message> = {}): Message => ({ id, role: "assistant", metadata: { created_date: created }, ...extra });
 const waiting = (id: string, kind: string = "approval") => ({ id, name: "tool", status: "waiting_for_user_input" as const, waiting_on: { kind: kind as "approval" } });
 
-function makeBackend(): { [K in keyof Base44ChatBackend]: ReturnType<typeof vi.fn> & Base44ChatBackend[K] } {
+function makeBackend(): { [K in keyof ChatBackend]: ReturnType<typeof vi.fn> & ChatBackend[K] } {
   return {
     createApp: vi.fn(async (prompt: string) => ({ id: other, name: prompt })),
     openLiveSession: vi.fn(async (): Promise<SocketSession> => ({ session_token: "session-token", socket_url: "https://socket.test", socket_path: "/ws/socket.io/" })),
@@ -79,19 +79,19 @@ function makeBackend(): { [K in keyof Base44ChatBackend]: ReturnType<typeof vi.f
   };
 }
 
-let latest!: Base44Chat;
+let latest!: UseChatResult;
 let renders = 0;
-function Probe(props: Base44ChatOptions) {
+function Probe(props: ChatOptions) {
   renders++;
-  latest = useBase44Chat(props);
+  latest = useChat(props);
   return null;
 }
 const roots: Root[] = [];
 const settle = () => act(async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); });
-async function mount(props: Base44ChatOptions) {
+async function mount(props: ChatOptions) {
   const root = createRoot(document.createElement("div"));
   roots.push(root);
-  const render = async (next: Base44ChatOptions) => { await act(async () => root.render(createElement(Probe, next))); await settle(); };
+  const render = async (next: ChatOptions) => { await act(async () => root.render(createElement(Probe, next))); await settle(); };
   await render(props);
   return { render, unmount: () => act(async () => root.unmount()) };
 }
@@ -661,7 +661,7 @@ describe("creating", () => {
     const backend = makeBackend();
     const call = pending<{ id: string; name: string }>();
     backend.createApp.mockReturnValueOnce(call.promise);
-    let render!: (next: Base44ChatOptions) => Promise<void>;
+    let render!: (next: ChatOptions) => Promise<void>;
     const onAppCreated = vi.fn((created: { id: string }) => { void render({ appId: created.id, backend, onAppCreated }); });
     ({ render } = await mount({ appId: null, backend, onAppCreated }));
     let done!: Promise<void>;

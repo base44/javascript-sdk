@@ -237,15 +237,15 @@ remains the existing SDK dependency. Chat commands and HTTP APIs are outside thi
 
 ## React
 
-`@base44/platform/react` adds one hook, `useBase44Chat`, that runs the AI chat for one
+`@base44/platform/react` adds one hook, `useChat`, that runs the AI chat for one
 app on top of this client: it opens the live session and renews it, turns messages into items
 made for rendering, binds every question the AI asks to the step it belongs to. It renders nothing. React is an optional peer dependency, loaded only by this
 entry; the root entry stays framework-free.
 
 ```tsx
-import { useBase44Chat } from "@base44/platform/react";
+import { useChat } from "@base44/platform/react";
 
-const chat = useBase44Chat({ appId, backend, onAppCreated });
+const chat = useChat({ appId, backend, onAppCreated });
 chat.items.map((item) =>
   item.steps.map((step) => step.question?.kind === "approval" && <button onClick={step.question.approve}>Allow</button>),
 );

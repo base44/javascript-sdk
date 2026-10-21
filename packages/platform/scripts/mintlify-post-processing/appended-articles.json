@@ -16,15 +16,15 @@
     "classes/WebhookConfigurationError",
     "type-aliases/WebhookConfigurationErrorCode"
   ],
-  "functions/useBase44Chat": [
-    "interfaces/Base44ChatOptions",
-    "interfaces/Base44Chat",
+  "functions/useChat": [
+    "interfaces/ChatOptions",
+    "interfaces/UseChatResult",
     "type-aliases/ChatStatus",
     "type-aliases/ChatConnection",
     "interfaces/ChatError"
   ],
-  "interfaces/Base44ChatBackend": [
-    "interfaces/Base44App",
+  "interfaces/ChatBackend": [
+    "interfaces/ChatApp",
     "interfaces/ToolCallAnswer"
   ],
   "interfaces/ChatItem": [

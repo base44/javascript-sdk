@@ -1,16 +1,17 @@
-import { useBase44Chat, type Base44Chat, type Base44ChatBackend, type ChatItem, type ChatQuestion } from "@base44/platform/react";
+import { useChat, type UseChatResult, type ChatBackend, type ChatItem, type ChatQuestion } from "@base44/platform/react";
+import { useBase44Chat, type Base44App, type Base44Chat, type Base44ChatBackend, type Base44ChatOptions } from "@base44/platform/react";
 
-const backend: Base44ChatBackend = {
+const backend: ChatBackend = {
   async createApp(prompt) { return { id: "a".repeat(24), name: prompt }; },
   async openLiveSession() { return { session_token: "token", socket_url: "https://example.test", socket_path: "/ws/socket.io/" }; },
   async sendMessage() {},
   async submitToolCallInput(appId, answer) { void answer.toolCallId; void answer.messageId; void answer.approve; void answer.extraUserInput; },
 };
 // @ts-expect-error All four calls are required.
-const partial: Base44ChatBackend = { createApp: backend.createApp };
+const partial: ChatBackend = { createApp: backend.createApp };
 void partial;
 
-declare const chat: Base44Chat;
+declare const chat: UseChatResult;
 const status: "ready" | "submitted" | "building" | "waiting" | "error" = chat.status;
 void status;
 const connection: "connecting" | "connected" | "disconnected" = chat.connection;
@@ -67,6 +68,13 @@ void exhaustive;
 void question.toolCallId;
 
 // @ts-expect-error The calls are the backend; there is no server option.
-void useBase44Chat({ appId: null, server: backend });
+void useChat({ appId: null, server: backend });
 // @ts-expect-error appId is required, as null when there is no app yet.
-void useBase44Chat({ backend });
+void useChat({ backend });
+
+// The names before 0.5.0 still type-check as the new ones, until 0.6.0.
+const oldBackend: Base44ChatBackend = backend;
+const oldOptions: Base44ChatOptions = { appId: null, backend: oldBackend };
+const oldChat: Base44Chat = useBase44Chat(oldOptions);
+const oldApp: Base44App = { id: "a".repeat(24), name: "App" };
+void oldChat; void oldApp;

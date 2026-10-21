@@ -68,7 +68,7 @@ test("the server entrypoint verifies a signed webhook and its handler answers th
 });
 
 test("the React modules that use hooks or context keep their \"use client\" directive", () => {
-  for (const file of ['dist/react/useBase44Chat.js']) {
+  for (const file of ['dist/react/useChat.js']) {
     assert.match(readFileSync(path.join(installed, file), "utf8"), /^"use client";/, file);
   }
 });
@@ -79,8 +79,9 @@ test("react is an optional peer of the /react entry, never a dependency of the c
   assert.deepEqual(manifest.peerDependenciesMeta, { react: { optional: true } });
   run(process.execPath, ["--input-type=module", "--eval", `
     import assert from "node:assert/strict";
-    import { useBase44Chat } from "@base44/platform/react";
-    assert.equal(typeof useBase44Chat, "function");
+    import { useChat, useBase44Chat } from "@base44/platform/react";
+    assert.equal(typeof useChat, "function");
+    assert.equal(useBase44Chat, useChat, "the deprecated name is the same hook until 0.6.0");
   `]);
 });
 
@@ -91,8 +92,8 @@ server.webhooks.verifyEvent("{}", new Headers(), { publicKeys: "whpk_x" }).then(
   if (event.type === "app.deleted.v1") { const id: string = event.data.app_id; void id; }
 }, (error: unknown) => error instanceof WebhookVerificationError && error.code);
 
-import { useBase44Chat, type Base44ChatBackend, type ChatQuestion } from "@base44/platform/react";
-const backend: Base44ChatBackend = {
+import { useChat, type ChatBackend, type ChatQuestion } from "@base44/platform/react";
+const backend: ChatBackend = {
   async createApp(prompt) { return { id: "a".repeat(24), name: prompt }; },
   async openLiveSession() { return { session_token: "token", socket_url: "https://example.test", socket_path: "/ws/socket.io/" }; },
   async sendMessage() {},
@@ -102,7 +103,7 @@ declare const question: ChatQuestion;
 if (question.kind === "choice") void question.answer([["A"]]);
 // @ts-expect-error A choice is answered, not approved.
 if (question.kind === "choice") question.approve();
-void useBase44Chat; void backend;
+void useChat; void backend;
 
 import { createPlatformClient, type PlatformEvent } from "@base44/platform";
 const platform = createPlatformClient();
