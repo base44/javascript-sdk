@@ -56,7 +56,8 @@ function renderCommentParts(parts) {
         case "text":
           return part.text || "";
         case "code":
-          return part.text ? "`" + part.text + "`" : "";
+          // TypeDoc keeps the backticks in a code part's text.
+          return part.text || "";
         case "inline-tag":
           if (part.tag === "@link") {
             return (part.text || part.target?.name || "").trim();
@@ -500,7 +501,7 @@ function rewriteReturnSections(content, options) {
             descriptionParts.push(leadingText);
           }
           const returnsDescription = extractReturnsDescription(page);
-          if (returnsDescription) {
+          if (returnsDescription && !descriptionParts.includes(returnsDescription)) {
             descriptionParts.push(returnsDescription);
           }
           if (descriptionParts.length > 0) {
@@ -584,11 +585,16 @@ function rewriteReturnSections(content, options) {
       if (fields.length === 0 && !indexSignature) {
         result.push(...sectionLines);
       } else {
-        // The section's own leading type link is the fallback when the signature gave no type.
+        // The section's own leading type is the fallback when the signature gave no type, as for a
+        // property whose type is a function.
+        const plainType =
+          fields.length === 1 && fields[0].name === "result" && fields[0].type !== "any"
+            ? fields[0].type
+            : null;
         const typeNameForDisplay = enrichTypeNameWithGenerics(
           extractedTypeName || returnTypeName,
           returnTypeFromSignature
-        ) || sectionContent.match(/^\[`([^`]+)`\]\(/)?.[1];
+        ) || sectionContent.match(/^\[`([^`]+)`\]\(/)?.[1] || plainType;
         if (typeNameForDisplay) {
           result.push("");
           result.push(`\`${typeNameForDisplay}\``);
@@ -850,9 +856,10 @@ function parseReturnFields(
           });
         }
 
+        // The section's own text is the @returns description; keep it above the properties.
         return {
           fields: resultFields,
-          leadingText: "",
+          leadingText: description,
           extractedTypeName: typeInfoToUse.typeName, // Pass the type name for display
           typeDescription:
             getLinkedTypeDescription(typeInfoToUse, context) || "",
@@ -861,19 +868,11 @@ function parseReturnFields(
       }
     }
 
-    // Use 'result' as default name, or extract from description
-    let name = "result";
-    if (description) {
-      // Check if description contains a type hint
-      const typeHint = description.match(/(\w+)\s+(?:instance|object|value)/i);
-      if (typeHint) {
-        name = typeHint[1].toLowerCase();
-      }
-    }
+    // A plain return has no name of its own. "result" renders as its description alone.
     return {
       fields: [
         {
-          name,
+          name: "result",
           type,
           description,
           optional: false,
