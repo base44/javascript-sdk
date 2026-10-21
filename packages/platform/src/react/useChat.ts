@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPlatformClient } from "../client/client.js";
 import type { Message, StatusObject } from "../client/modules/chat.events.generated.js";
 import { isWaitingForUser, mergeMessage, mergeSnapshot, pendingPromptItems, settlePendingPrompts, sortMessages, toItems, unknownKindToolCalls, waitingToolCallIds, type PendingPrompt } from "./chat-items.js";
-import type { Base44Chat, Base44ChatOptions, ChatConnection, ChatError, ChatStatus } from "./chat.types.js";
+import type { UseChatResult, ChatOptions, ChatConnection, ChatError, ChatStatus } from "./chat.types.js";
 
 // Base44's public status carries no reason, so a failed build has one error.
 const BUILD_FAILED_ERROR: ChatError = { message: "The build failed", code: "build_failed" };
@@ -16,16 +16,16 @@ const NEW_APP = "new-app";
  * The hook renders nothing. It gives you the conversation and the actions, and you draw them:
  * - Follows the app live, and renews its socket session when it expires.
  * - Turns Base44's messages into {@link ChatItem | items}, with each open question bound to the step it belongs to.
- * - Reports what the AI is doing in {@link Base44Chat.status}, and the live connection in {@link Base44Chat.connection}.
- * - Sends prompts, creates apps and answers questions through the {@link Base44ChatBackend | backend} you pass, so no credential reaches the browser.
+ * - Reports what the AI is doing in {@link UseChatResult.status}, and the live connection in {@link UseChatResult.connection}.
+ * - Sends prompts, creates apps and answers questions through the {@link ChatBackend | backend} you pass, so no credential reaches the browser.
  *
- * The actions never throw. A failure sets {@link Base44Chat.error}, and a question whose answer
+ * The actions never throw. A failure sets {@link UseChatResult.error}, and a question whose answer
  * failed opens again. The chat declines a question kind this release doesn't know.
  *
  * Requires a browser environment and can't be used in the backend.
  *
  * The chat follows `appId` when it's set. While `appId` is `null`, it follows the app
- * {@link Base44Chat.create} made, so passing the new ID back is optional. Any change to `appId`
+ * {@link UseChatResult.create} made, so passing the new ID back is optional. Any change to `appId`
  * forgets that app, so setting it back to `null` starts a new chat. Switching apps closes the old
  * session and starts over.
  *
@@ -35,7 +35,7 @@ const NEW_APP = "new-app";
  * @example
  * ```typescript
  * // Draw the chat and answer an approval
- * const chat = useBase44Chat({ appId, backend, onAppCreated: selectApp });
+ * const chat = useChat({ appId, backend, onAppCreated: selectApp });
  * return (
  *   <>
  *     {chat.items.map((item) => (
@@ -56,7 +56,7 @@ const NEW_APP = "new-app";
  * );
  * ```
  */
-export function useBase44Chat({ appId, backend, onAppCreated }: Base44ChatOptions): Base44Chat {
+export function useChat({ appId, backend, onAppCreated }: ChatOptions): UseChatResult {
   const [messages, setMessages] = useState<Message[]>([]);
   const [buildState, setBuildState] = useState<StatusObject["state"]>();
   const [connection, setConnection] = useState<ChatConnection>("connecting");

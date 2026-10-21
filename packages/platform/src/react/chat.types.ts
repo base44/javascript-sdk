@@ -1,7 +1,7 @@
 import type { SocketSession } from "../client/modules/chat.types.js";
 
 /** An app the AI chat works on. */
-export interface Base44App {
+export interface ChatApp {
   /** ID of the app, 24 lowercase hexadecimal characters. */
   id: string;
   /** Display name of the app. */
@@ -35,7 +35,7 @@ export interface ToolCallAnswer {
  *
  * Base44 keeps the Send chat message and Submit tool-call input requests open until the AI
  * finishes the turn. Resolve your call once Base44 accepts the request, not when it returns. The
- * chat follows the rest live. A rejected promise from any call sets `error` on the {@link useBase44Chat | chat}.
+ * chat follows the rest live. A rejected promise from any call sets `error` on the {@link useChat | chat}.
  *
  * @example
  * ```typescript
@@ -46,7 +46,7 @@ export interface ToolCallAnswer {
  *   return response.json();
  * }
  *
- * const backend: Base44ChatBackend = {
+ * const backend: ChatBackend = {
  *   createApp: (prompt) => post("/api/chat/apps", { prompt }),
  *   openLiveSession: (appId) => post("/api/chat/session", { appId }),
  *   sendMessage: (appId, content) => post("/api/chat/message", { appId, content }),
@@ -54,14 +54,14 @@ export interface ToolCallAnswer {
  * };
  * ```
  */
-export interface Base44ChatBackend {
+export interface ChatBackend {
   /**
    * Creates an app from its first prompt. The AI starts building inside this call.
    *
    * @param prompt - The first prompt, which describes the app.
    * @returns Promise resolving to the new app.
    */
-  createApp(prompt: string): Promise<Base44App>;
+  createApp(prompt: string): Promise<ChatApp>;
   /**
    * Opens a read-only socket session for one app. The chat calls it on the first connect and again
    * whenever the session expires. Sessions last one hour.
@@ -148,7 +148,7 @@ export interface ChatAnswer {
  * An open question, with the actions that answer this question and no other.
  *
  * Each kind carries only the actions that make sense for it, and every kind can be declined. The
- * actions never throw. A failure sets `error` on the {@link useBase44Chat | chat}, and the question opens again.
+ * actions never throw. A failure sets `error` on the {@link useChat | chat}, and the question opens again.
  *
  * The chat declines a question kind this release doesn't know, once per tool call, when Base44
  * names that kind on the last assistant message. If the decline fails, the chat's `error` says
@@ -282,7 +282,7 @@ export type ChatStatus = "ready" | "submitted" | "building" | "waiting" | "error
  * - `connecting`: until the first snapshot arrives.
  * - `connected`: after the first snapshot.
  * - `disconnected`: live updates stopped for good. The session couldn't open, the retries ran out,
- *   or Base44 ended the session or the app's subscription. {@link Base44Chat.error} says why.
+ *   or Base44 ended the session or the app's subscription. {@link UseChatResult.error} says why.
  *
  * Watching another app, or mounting the chat again, starts over.
  */
@@ -301,24 +301,24 @@ export interface ChatError {
   cause?: unknown;
 }
 
-/** Options for {@link useBase44Chat}. */
-export interface Base44ChatOptions {
+/** Options for {@link useChat}. */
+export interface ChatOptions {
   /**
    * ID of the app to follow, or `null` until an app exists. While it's `null`, the chat follows the
-   * app {@link Base44Chat.create} made. Any change to `appId` forgets that app.
+   * app {@link UseChatResult.create} made. Any change to `appId` forgets that app.
    */
   appId: string | null;
   /** The four calls your backend makes to Base44. The chat reads the latest on every action, so an inline object works. */
-  backend: Base44ChatBackend;
+  backend: ChatBackend;
   /**
-   * Called with the new app after {@link Base44Chat.create} succeeds. The chat already follows it.
+   * Called with the new app after {@link UseChatResult.create} succeeds. The chat already follows it.
    * Pass its ID back as `appId` to keep it in your own state.
    */
-  onAppCreated?: (app: Base44App) => void;
+  onAppCreated?: (app: ChatApp) => void;
 }
 
-/** The chat that {@link useBase44Chat} returns. */
-export interface Base44Chat {
+/** The chat that {@link useChat} returns. */
+export interface UseChatResult {
   /** The conversation, oldest first, with open questions bound to their steps. */
   items: ChatItem[];
   /** What the AI is doing. */
@@ -328,13 +328,13 @@ export interface Base44Chat {
   /**
    * The last failure. It's set whenever `status` is `error`, and on any failed call or connection
    * error. A failed call's error clears on the next action. A connection error stays until
-   * {@link Base44Chat.clearError}. A failed build stays while Base44 reports it.
+   * {@link UseChatResult.clearError}. A failed build stays while Base44 reports it.
    */
   error: ChatError | null;
   /**
    * Sends a prompt to the current app. Base44 queues it while the AI is working. The prompt shows
    * at once as a pending item, and the reply arrives through `items`. Without an app, it sets
-   * `error`. Use {@link Base44Chat.create} for the first prompt.
+   * `error`. Use {@link UseChatResult.create} for the first prompt.
    *
    * @param prompt - The prompt to send.
    * @returns Promise resolving once Base44 accepts the prompt. It never rejects.
@@ -347,6 +347,6 @@ export interface Base44Chat {
    * @returns Promise resolving once the app exists. It never rejects.
    */
   create(prompt: string): Promise<void>;
-  /** Clears {@link Base44Chat.error}. A failed build's error stays while Base44 reports it. */
+  /** Clears {@link UseChatResult.error}. A failed build's error stays while Base44 reports it. */
   clearError(): void;
 }
