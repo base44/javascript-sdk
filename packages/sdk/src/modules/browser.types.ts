@@ -9,9 +9,9 @@ export interface BrowserSessionOptions {
    */
   captureDebugArtifacts?: boolean;
   /**
-   * Session timeout in seconds.
+   * Maximum lifetime of the session, in whole seconds.
    *
-   * Base44 sets minimum and maximum allowed values and clamps the timeout to that range. When omitted, Base44 applies a default timeout. Depending on the remote browser provider, the timeout applies either to the session's total lifetime or to how long an idle session stays alive.
+   * The session ends when the timeout expires, even if it's still in use. Base44 sets minimum and maximum allowed values and clamps the timeout to that range. When omitted, Base44 applies a default timeout.
    */
   sessionTimeoutSeconds?: number;
 }
@@ -52,7 +52,7 @@ export interface BrowserSession {
 /**
  * Browser module for running browser automation from your backend.
  *
- * This module creates remote browser sessions that you can control with a CDP client library such as Playwright or Puppeteer. Base44 doesn't store browser state, so each session is independent. End each session when you're done with it. Otherwise it keeps running until the remote browser provider times it out.
+ * This module creates remote browser sessions that you can control with a CDP client library such as Playwright or Puppeteer. Base44 doesn't store browser state, so each session is independent. End each session when you're done with it. Otherwise it keeps running until its timeout expires. To change the timeout, pass the `sessionTimeoutSeconds` option to {@linkcode BrowserModule.getSession | getSession()}.
  *
  * This module is only available to use with a client in service role authentication mode, which means it can only be used in backend environments.
  */
@@ -77,7 +77,7 @@ export interface BrowserModule {
    *
    *   try {
    *     const browser = await chromium.connectOverCDP(session.connectionUrl);
-   *     const page = browser.contexts()[0].pages()[0] ?? (await browser.newPage());
+   *     const page = browser.contexts()[0]?.pages()[0] ?? (await browser.newPage());
    *     await page.goto('https://example.com');
    *     const title = await page.title();
    *     await browser.close();

@@ -182,10 +182,13 @@ describe("Browser module", () => {
   test.each([undefined, "", 123])(
     "endSession rejects %j without sending a request",
     async (invalid) => {
+      // Catch-all mock: if any delete request were sent, it would be consumed.
+      scope.delete(/^\/api\/v1\/browser-sessions/).reply(204);
+
       await expect(
         base44.asServiceRole.browser.endSession(invalid as unknown as string)
       ).rejects.toThrow("Session ID is required and must be a string");
-      expect(nock.pendingMocks()).toEqual([]);
+      expect(scope.isDone()).toBe(false);
     }
   );
 
