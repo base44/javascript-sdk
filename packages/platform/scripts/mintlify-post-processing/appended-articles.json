@@ -17,21 +17,17 @@
     "type-aliases/WebhookConfigurationErrorCode"
   ],
   "functions/useChat": [
-    "interfaces/ChatOptions",
     "interfaces/UseChatResult",
+    "interfaces/ChatBackend",
+    "interfaces/ChatItem",
+    "interfaces/ChatStep",
+    "interfaces/ChatAnswer",
     "type-aliases/ChatStatus",
     "type-aliases/ChatConnection",
-    "interfaces/ChatError"
-  ],
-  "interfaces/ChatBackend": [
+    "interfaces/ChatError",
     "interfaces/ChatApp",
-    "interfaces/ToolCallAnswer"
-  ],
-  "interfaces/ChatItem": [
-    "interfaces/ChatStep",
-    "interfaces/ChatAnswer"
-  ],
-  "type-aliases/ChatQuestion": [
+    "interfaces/ToolCallAnswer",
+    "type-aliases/ChatQuestion",
     "interfaces/ChoiceQuestion",
     "interfaces/ChoiceEntry",
     "interfaces/SecretsQuestion",

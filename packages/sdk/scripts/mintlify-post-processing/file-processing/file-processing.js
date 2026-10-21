@@ -1578,6 +1578,7 @@ function groupTypeDefinitions(content) {
     for (const typeName of group.types) {
       section = section.replace(new RegExp(`^## ${typeName}$`, "m"), `### ${typeName}`);
     }
+    section = nestUnderGroupTypes(section, new Set(group.types));
     // Any "##" heading still left in this slice belongs to one of the types
     // above it (e.g. "## Properties" from an appended interface with members,
     // since normalizeHeadings() clamps an appended article's own headings to
@@ -1588,6 +1589,41 @@ function groupTypeDefinitions(content) {
   });
 
   return { content: updatedContent, modified: true };
+}
+
+/**
+ * Inside a group, a type's own methods arrive at the level of the types themselves: a "## Methods"
+ * label, then "### method()" with its "#### Parameters" and "#### Returns". Nest them under their
+ * type instead. A "###" heading that isn't one of the group's types belongs to the type above it,
+ * so it moves down a level with everything under it, and the bare "Methods" label goes.
+ */
+function nestUnderGroupTypes(section, typeNames) {
+  const lines = section.split("\n");
+  const result = [];
+  let inFence = false;
+  let inMember = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim().startsWith("```")) inFence = !inFence;
+    const heading = inFence ? null : line.match(/^(#{2,6}) (.+)$/);
+    if (!heading) {
+      result.push(line);
+      continue;
+    }
+    const level = heading[1].length;
+    if (level <= 3) inMember = false;
+    if (level === 3 && typeNames.has(heading[2])) {
+      result.push(line);
+      continue;
+    }
+    if (level === 2 && heading[2] === "Methods") {
+      if (lines[i + 1]?.trim() === "") i++;
+      continue;
+    }
+    if (level === 3) inMember = true;
+    result.push(inMember && level < 6 ? `#${line}` : line);
+  }
+  return result.join("\n");
 }
 
 /**
@@ -2551,7 +2587,8 @@ function propertiesAsFields(content, classPage) {
     .replace(/^#### Inherited from\n\n.*\n\n?/gm, "")
     .replace(/^#### Extends\n\n(- .*\n)+\n?/gm, "")
     .replace(classPage ? /^## Properties\n([\s\S]*?)(?=^## |(?![\s\S]))/m : /(?!)/, (section, body) => `## Properties\n\n${fieldsOf(body)}\n\n`)
-    .replace(/^#### Properties\n([\s\S]*?)(?=^#{1,3} |(?![\s\S]))/gm, (section, body) => `${fieldsOf(body)}\n\n`);
+    // A type's properties end at its first method ("name()"), which keeps its heading.
+    .replace(/^#### Properties\n([\s\S]*?)(?=^#{1,3} |^#{4,6} \S+\(\)$|(?![\s\S]))/gm, (section, body) => `${fieldsOf(body)}\n\n`);
 }
 
 function applyPropertiesAsFields(dir) {
@@ -2706,6 +2743,51 @@ function linkReturnTypes(content) {
     });
 }
 
+/** The anchor Mintlify gives a heading: lowercase, punctuation dropped, spaces as hyphens. */
+function headingAnchor(text) {
+  return text.toLowerCase().replace(/[^a-z0-9 -]/g, "").trim().replace(/ /g, "-");
+}
+
+/**
+ * Point every in-page link at a heading or explicit anchor that exists. A type whose section was renamed
+ * (page-sections.json `typesWithOwnMethods`) is linked by its new heading. A link to anything
+ * else the page no longer has, such as a property now shown as a field, keeps its text and loses
+ * the link, so it can't jump nowhere.
+ */
+function fixInPageAnchors(content) {
+  const anchors = new Set();
+  let inFence = false;
+  for (const line of content.split("\n")) {
+    if (line.trim().startsWith("```")) inFence = !inFence;
+    if (inFence) continue;
+    const heading = line.match(/^#{1,6} (.+)$/);
+    if (heading) anchors.add(headingAnchor(heading[1]));
+    // An explicit anchor, such as an overload's <a id="..." /> label
+    for (const [, id] of line.matchAll(/\bid="([^"]+)"/g)) anchors.add(id);
+  }
+  const renamed = new Map(
+    Object.entries(TYPES_WITH_OWN_METHODS).map(([type, title]) => [headingAnchor(type), headingAnchor(title ?? type)])
+  );
+  return content.replace(/\[([^\]]+)\]\(#([^)\s]+)\)/g, (link, text, anchor) => {
+    if (anchors.has(anchor)) return link;
+    const target = renamed.get(anchor);
+    if (target && anchors.has(target)) return `[${text}](#${target})`;
+    return text;
+  });
+}
+
+function applyInPageAnchorFixes(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) applyInPageAnchorFixes(entryPath);
+    else if (entry.name.endsWith(".mdx")) {
+      const content = fs.readFileSync(entryPath, "utf-8");
+      const fixed = fixInPageAnchors(content);
+      if (fixed !== content) fs.writeFileSync(entryPath, fixed, "utf-8");
+    }
+  }
+}
+
 function applyReturnTypeLinks(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const entryPath = path.join(dir, entry.name);
@@ -2795,6 +2877,9 @@ function main() {
   // that method ordering splits on.
   applyReturnTypeLinks(DOCS_DIR);
 
+  // Last, so every heading the page ends up with counts
+  applyInPageAnchorFixes(DOCS_DIR);
+
   // Clean up the linked types file
   try {
     if (fs.existsSync(LINKED_TYPES_FILE)) {
@@ -2820,4 +2905,4 @@ if (process.argv[1] && fs.realpathSync(process.argv[1]) === fs.realpathSync(__fi
   main();
 }
 
-export { removeNonExposedTypeLinks };
+export { fixInPageAnchors, nestUnderGroupTypes, propertiesAsFields, removeNonExposedTypeLinks };

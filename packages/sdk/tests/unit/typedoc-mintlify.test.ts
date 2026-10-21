@@ -5,7 +5,12 @@ import { Application, ReflectionKind } from "typedoc";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { nameCallableProperties } from "../../scripts/mintlify-post-processing/typedoc-plugin/typedoc-mintlify-content.js";
-import { removeNonExposedTypeLinks } from "../../scripts/mintlify-post-processing/file-processing/file-processing.js";
+import {
+  fixInPageAnchors,
+  nestUnderGroupTypes,
+  propertiesAsFields,
+  removeNonExposedTypeLinks,
+} from "../../scripts/mintlify-post-processing/file-processing/file-processing.js";
 
 // Runs TypeDoc with the Mintlify plugin on a small fixture, so each case is checked on the pages
 // the plugin really writes.
@@ -167,5 +172,75 @@ describe("removeNonExposedTypeLinks", () => {
 
     expect(removeNonExposedTypeLinks(content, exposed, new Set(["Gone"]))).toEqual({ content, modified: false });
     expect(removeNonExposedTypeLinks(content, exposed)).toEqual({ content, modified: false });
+  });
+});
+
+describe("nestUnderGroupTypes", () => {
+  test("nests a grouped type's methods under it, and drops the bare Methods label", () => {
+    const section = [
+      "### Question",
+      "#### Properties",
+      "## Methods",
+      "",
+      "### answer()",
+      "#### Parameters",
+      "### Entry",
+      "#### Properties",
+    ].join("\n");
+
+    expect(nestUnderGroupTypes(section, new Set(["Question", "Entry"])).split("\n")).toEqual([
+      "### Question",
+      "#### Properties",
+      "#### answer()",
+      "##### Parameters",
+      "### Entry",
+      "#### Properties",
+    ]);
+  });
+});
+
+describe("propertiesAsFields", () => {
+  test("turns a type's properties into fields and keeps its methods as headings", () => {
+    const content = [
+      "#### Properties",
+      "",
+      "#### kind",
+      "",
+      "> **kind**: `\"choice\"`",
+      "",
+      "Kind of question.",
+      "",
+      "***",
+      "",
+      "#### answer()",
+      "",
+      "Answers.",
+    ].join("\n");
+
+    const converted = propertiesAsFields(content, false);
+    expect(converted).toContain(`<ResponseField name="kind" type="'choice'" required>`);
+    expect(converted).not.toContain('name="answer()"');
+    const method = converted.search(/^#### answer\(\)$/m);
+    expect(method).toBeGreaterThan(converted.lastIndexOf("</ResponseField>"));
+  });
+});
+
+describe("fixInPageAnchors", () => {
+  test("keeps links to headings and explicit anchors", () => {
+    const content = ["## Send", "<a id=\"list-records\" />", "See [send](#send) and [records](#list-records)."].join("\n");
+
+    expect(fixInPageAnchors(content)).toBe(content);
+  });
+
+  test("follows a type's section to its new heading", () => {
+    const content = ["## Entity Handler Methods", "See [EntityHandler](#entityhandler)."].join("\n");
+
+    expect(fixInPageAnchors(content)).toContain("[EntityHandler](#entity-handler-methods)");
+  });
+
+  test("unlinks an anchor the page doesn't have, and leaves other links alone", () => {
+    const content = "The [status](#status) and the [guide](/guide#status).";
+
+    expect(fixInPageAnchors(content)).toBe("The status and the [guide](/guide#status).");
   });
 });
