@@ -1,5 +1,4 @@
 import { useChat, type UseChatResult, type ChatBackend, type ChatItem, type ChatQuestion } from "@base44/platform/react";
-import { useBase44Chat, type Base44App, type Base44Chat, type Base44ChatBackend, type Base44ChatOptions } from "@base44/platform/react";
 
 const backend: ChatBackend = {
   async createApp(prompt) { return { id: "a".repeat(24), name: prompt }; },
@@ -71,10 +70,3 @@ void question.toolCallId;
 void useChat({ appId: null, server: backend });
 // @ts-expect-error appId is required, as null when there is no app yet.
 void useChat({ backend });
-
-// The names before 0.5.0 still type-check as the new ones, until 0.6.0.
-const oldBackend: Base44ChatBackend = backend;
-const oldOptions: Base44ChatOptions = { appId: null, backend: oldBackend };
-const oldChat: Base44Chat = useBase44Chat(oldOptions);
-const oldApp: Base44App = { id: "a".repeat(24), name: "App" };
-void oldChat; void oldApp;

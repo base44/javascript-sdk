@@ -79,9 +79,8 @@ test("react is an optional peer of the /react entry, never a dependency of the c
   assert.deepEqual(manifest.peerDependenciesMeta, { react: { optional: true } });
   run(process.execPath, ["--input-type=module", "--eval", `
     import assert from "node:assert/strict";
-    import { useChat, useBase44Chat } from "@base44/platform/react";
+    import { useChat } from "@base44/platform/react";
     assert.equal(typeof useChat, "function");
-    assert.equal(useBase44Chat, useChat, "the deprecated name is the same hook until 0.6.0");
   `]);
 });
 

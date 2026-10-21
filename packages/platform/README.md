@@ -5,11 +5,13 @@ npm install @base44/platform
 ```
 
 The Platform SDK for white-label platforms built on Base44. It is independent of the app SDK
-(`@base44/sdk`) and has two entrypoints:
+(`@base44/sdk`) and has three entrypoints:
 
 - `@base44/platform`, for the browser: implements the read-only white-label live AI chat
   contract. A partner's browser watches the AI chat of up to eight apps over the platform's
   shared socket. The workspace must have white-label sockets enabled; this SDK does not open sessions.
+- `@base44/platform/react`: `useChat`, a hook that runs the AI chat for one app on top of the
+  browser client. See [React](#react).
 - `@base44/platform/server`, for your backend: verify the webhooks Base44 sends when apps are
   created, published, unpublished, trashed or restored. See
   [Receiving webhooks](#receiving-webhooks-server).
