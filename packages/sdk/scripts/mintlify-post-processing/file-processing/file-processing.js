@@ -1996,7 +1996,7 @@ function applyTypeDefinitionGrouping(dir) {
  * Remove links to types that are not in the exposed types list.
  * Converts [TypeName](path) or [`TypeName`](path) to just TypeName or `TypeName`.
  */
-function removeNonExposedTypeLinks(content, exposedTypeNames) {
+function removeNonExposedTypeLinks(content, exposedTypeNames, deletedTypeNames = new Set()) {
   // Match markdown links where the link text is a type name (with or without backticks)
   // Pattern: [TypeName](some/path/TypeName) or [`TypeName`](some/path/TypeName)
   const linkRegex = /\[(`?)([A-Z][A-Za-z0-9]*)\1\]\(([^)]+)\)/g;
@@ -2027,19 +2027,31 @@ function removeNonExposedTypeLinks(content, exposedTypeNames) {
     }
   );
 
-  return { content: updatedContent, modified };
+  // A type deleted after processing has no page, whatever the link's text says.
+  const withoutDeletedLinks = updatedContent.replace(
+    /\[([^\]]+)\]\(([^)\s]+)\)/g,
+    (match, text, linkPath) => {
+      if (/^https?:\/\//.test(linkPath)) return match;
+      const pathEnd = linkPath.split("#")[0].split("/").pop().replace(/\.mdx?$/, "");
+      if (!deletedTypeNames.has(pathEnd)) return match;
+      modified = true;
+      return text;
+    }
+  );
+
+  return { content: withoutDeletedLinks, modified };
 }
 
 /**
  * Apply non-exposed type link removal to all files
  */
-function applyNonExposedTypeLinkRemoval(dir, exposedTypeNames) {
+function applyNonExposedTypeLinkRemoval(dir, exposedTypeNames, deletedTypeNames) {
   if (!fs.existsSync(dir)) return;
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   for (const entry of entries) {
     const entryPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      applyNonExposedTypeLinkRemoval(entryPath, exposedTypeNames);
+      applyNonExposedTypeLinkRemoval(entryPath, exposedTypeNames, deletedTypeNames);
     } else if (
       entry.isFile() &&
       (entry.name.endsWith(".mdx") || entry.name.endsWith(".md"))
@@ -2047,7 +2059,8 @@ function applyNonExposedTypeLinkRemoval(dir, exposedTypeNames) {
       const content = fs.readFileSync(entryPath, "utf-8");
       const { content: updated, modified } = removeNonExposedTypeLinks(
         content,
-        exposedTypeNames
+        exposedTypeNames,
+        deletedTypeNames
       );
       if (modified) {
         fs.writeFileSync(entryPath, updated, "utf-8");
@@ -2182,22 +2195,23 @@ function cleanupTruncatedParamTypes(dir) {
 /**
  * Main function
  */
+/** The types listed in types-to-delete-after-processing.json. */
+function loadTypesToDelete() {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(TYPES_TO_DELETE_PATH, "utf-8"));
+    return new Set(Array.isArray(parsed) ? parsed : []);
+  } catch (e) {
+    // No types to delete, that's fine
+    return new Set();
+  }
+}
+
 /**
  * Delete types that should not appear in navigation but were needed for inline rendering.
  * These types are listed in types-to-delete-after-processing.json
  */
 function deleteTypesAfterProcessing(docsDir) {
-  let typesToDelete = new Set();
-  try {
-    const content = fs.readFileSync(TYPES_TO_DELETE_PATH, "utf-8");
-    const parsed = JSON.parse(content);
-    if (Array.isArray(parsed)) {
-      typesToDelete = new Set(parsed);
-    }
-  } catch (e) {
-    // No types to delete, that's fine
-    return;
-  }
+  const typesToDelete = loadTypesToDelete();
 
   if (typesToDelete.size === 0) {
     return;
@@ -2772,7 +2786,7 @@ function main() {
   applyTypeDeclarationLinking(DOCS_DIR);
 
   // Remove links to types that aren't exposed (would 404)
-  applyNonExposedTypeLinkRemoval(DOCS_DIR, exposedTypeNames);
+  applyNonExposedTypeLinkRemoval(DOCS_DIR, exposedTypeNames, loadTypesToDelete());
 
   // Delete types that should not appear in navigation but were needed for inline rendering
   deleteTypesAfterProcessing(DOCS_DIR);
@@ -2801,4 +2815,9 @@ function main() {
   console.log(`  Documentation directory: ${DOCS_DIR}`);
 }
 
-main();
+// Run as a script; tests import the helpers without processing anything.
+if (process.argv[1] && fs.realpathSync(process.argv[1]) === fs.realpathSync(__filename)) {
+  main();
+}
+
+export { removeNonExposedTypeLinks };

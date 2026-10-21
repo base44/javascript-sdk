@@ -847,7 +847,8 @@ function renderCommentPart(part, context) {
     case "text":
       return part.text || "";
     case "code":
-      return part.text ? `\`${part.text}\`` : "";
+      // TypeDoc keeps the backticks in a code part's text.
+      return part.text || "";
     case "inline-tag":
       if (part.tag === "@link") {
         const linkText = (part.text || part.target?.name || "").trim();

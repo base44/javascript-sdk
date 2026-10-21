@@ -313,6 +313,8 @@ export interface ChatOptions {
   /**
    * Called with the new app after {@link UseChatResult.create} succeeds. The chat already follows it.
    * Pass its ID back as `appId` to keep it in your own state.
+   *
+   * @param app - The app that was created.
    */
   onAppCreated?: (app: ChatApp) => void;
 }
