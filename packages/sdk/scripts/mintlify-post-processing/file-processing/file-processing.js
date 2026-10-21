@@ -2743,9 +2743,18 @@ function linkReturnTypes(content) {
     });
 }
 
-/** The anchor Mintlify gives a heading: lowercase, punctuation dropped, spaces as hyphens. */
+/**
+ * The anchor Mintlify gives a heading: lowercase, with backticks and parentheses dropped, dots and
+ * spaces as hyphens, and underscores kept, so `pull_request.changed` becomes `pull_request-changed`.
+ */
 function headingAnchor(text) {
-  return text.toLowerCase().replace(/[^a-z0-9 -]/g, "").trim().replace(/ /g, "-");
+  return text
+    .toLowerCase()
+    .replace(/[`()]/g, "")
+    .replace(/[.\s]+/g, "-")
+    .replace(/[^a-z0-9_-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 /**
@@ -2765,6 +2774,12 @@ function fixInPageAnchors(content) {
     // An explicit anchor, such as an overload's <a id="..." /> label
     for (const [, id] of line.matchAll(/\bid="([^"]+)"/g)) anchors.add(id);
   }
+  // Mintlify anchors a field as `param-<name>`. Only a name that one field on the page uses is
+  // a safe target, because a repeated name gets numbered anchors in page order.
+  const fieldCounts = new Map();
+  for (const [, name] of content.matchAll(/<(?:ResponseField|ParamField) (?:name|body)="([^"]+)"/g)) {
+    fieldCounts.set(name, (fieldCounts.get(name) ?? 0) + 1);
+  }
   const renamed = new Map(
     Object.entries(TYPES_WITH_OWN_METHODS).map(([type, title]) => [headingAnchor(type), headingAnchor(title ?? type)])
   );
@@ -2772,6 +2787,8 @@ function fixInPageAnchors(content) {
     if (anchors.has(anchor)) return link;
     const target = renamed.get(anchor);
     if (target && anchors.has(target)) return `[${text}](#${target})`;
+    const field = [...fieldCounts].find(([name, count]) => count === 1 && headingAnchor(name) === anchor);
+    if (field) return `[${text}](#param-${headingAnchor(field[0])})`;
     return text;
   });
 }

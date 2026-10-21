@@ -243,4 +243,21 @@ describe("fixInPageAnchors", () => {
 
     expect(fixInPageAnchors(content)).toBe("The status and the [guide](/guide#status).");
   });
+
+  test("matches Mintlify's anchors for headings with dots and underscores", () => {
+    const content = ["### `pull_request.changed`", "See [the event](#pull_request-changed)."].join("\n");
+
+    expect(fixInPageAnchors(content)).toBe(content);
+  });
+
+  test("links to a field only when one field on the page has that name", () => {
+    const content = [
+      '<ResponseField name="error" type="ChatError">',
+      '<ResponseField name="status" type="ChatStatus">',
+      '<ResponseField name="status" type="string">',
+      "See [error](#error) and [status](#status).",
+    ].join("\n");
+
+    expect(fixInPageAnchors(content)).toContain("See [error](#param-error) and status.");
+  });
 });
