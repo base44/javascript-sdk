@@ -408,6 +408,20 @@ function generateDocsJson(docsContent) {
     }
   }
 
+  // A category map key that names one page, such as "functions/useChat", moves that page out of
+  // its kind's group into its own, after the kind groups.
+  for (const [key, groupName] of Object.entries(categoryMap)) {
+    if (!key.includes("/")) continue;
+    for (const group of groups) {
+      const index = group.pages.findIndex((page) => page.endsWith(`/${key}`));
+      if (index === -1) continue;
+      const [page] = group.pages.splice(index, 1);
+      const target = groups.find((g) => g.group === groupName) ?? groups[groups.push({ group: groupName, expanded: true, pages: [] }) - 1];
+      target.pages.push(page);
+    }
+  }
+  for (let i = groups.length - 1; i >= 0; i--) if (groups[i].pages.length === 0) groups.splice(i, 1);
+
   // Find or create SDK Reference tab
   let sdkTab = template.navigation.tabs.find(
     (tab) => tab.tab === "SDK Reference"

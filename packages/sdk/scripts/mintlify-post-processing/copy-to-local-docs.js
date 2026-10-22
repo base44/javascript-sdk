@@ -130,9 +130,18 @@ function updateDocsJson(repoDir, sdkFiles) {
     };
     const p = (kind, file) => `${prefix}${basePath}/${kind}/${file}`;
 
-    // Groups follow the category map's key order.
+    // Groups follow the category map's key order. A key that names one page, such as
+    // "functions/useChat", moves that page out of its kind's group into its own.
+    const pageGroups = Object.entries(categoryMap).filter(([key]) => key.includes("/"));
+    const movedPages = new Set(pageGroups.map(([key]) => key));
     for (const [kind, group] of Object.entries(categoryMap)) {
-      if (sdkFiles[kind]?.length > 0) addToGroup(group, sdkFiles[kind].map((f) => p(kind, f)));
+      if (kind.includes("/")) {
+        const [pageKind, file] = kind.split("/");
+        if (sdkFiles[pageKind]?.includes(file)) addToGroup(group, [p(pageKind, file)]);
+        continue;
+      }
+      const files = (sdkFiles[kind] ?? []).filter((f) => !movedPages.has(`${kind}/${f}`));
+      if (files.length > 0) addToGroup(group, files.map((f) => p(kind, f)));
     }
 
     return Array.from(groupMap.entries()).map(([group, pages]) => ({
