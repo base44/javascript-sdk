@@ -310,11 +310,14 @@ export interface ChatOptions {
    * Switching to another app closes the old session and starts over.
    */
   appId: string | null;
-  /** The four calls your backend makes to Base44. The chat reads the latest on every action, so an inline object works. */
+  /**
+   * The four calls your backend makes to Base44. The hook uses the `backend` from the latest render,
+   * so you can pass an inline object without memoizing it.
+   */
   backend: ChatBackend;
   /**
-   * Called with the new app after {@link UseChatResult.create} succeeds. The chat already follows it.
-   * Pass its ID back as `appId` to keep it in your own state.
+   * Called with the new app after [`create()`](#create) succeeds. The chat already follows the new
+   * app. To keep its ID in your own state, pass it back as `appId`.
    *
    * @param app - The app that was created.
    */
