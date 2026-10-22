@@ -1457,10 +1457,13 @@ function applyTypeDeclarationLinking(dir) {
 // types nested under "## Type Definitions" (the first type of a group starts the section). A group
 // is a list of type names, or `{ "title": "...", "types": [...] }` for another section heading.
 // A function's return type in `returnedState` also gets its properties a section, by title, in
-// place of the function's Returns: one heading per property, as its methods have.
+// place of the function's Returns: one heading per property, as its methods have. A type in
+// `inlineTypes` moves into the field that uses it, and a group's `intro` type opens its section
+// with no heading of its own.
 const {
   typesWithOwnMethods: TYPES_WITH_OWN_METHODS = {},
   returnedState: RETURNED_STATE = {},
+  inlineTypes: INLINE_TYPES = [],
   typeDefinitionGroups: TYPE_DEFINITION_GROUPS = [],
 } = fs.existsSync(PAGE_SECTIONS_PATH) ? JSON.parse(fs.readFileSync(PAGE_SECTIONS_PATH, "utf-8")) : {};
 
@@ -2804,6 +2807,76 @@ function applyReturnedStateSections(dir) {
   }
 }
 
+/**
+ * A type's section, from its heading to the next heading at its level or above: the heading
+ * level, the section's text, and where it starts.
+ */
+function typeSection(content, typeName) {
+  const heading = content.match(new RegExp(`^(#{2,3}) ${typeName}\\n`, "m"));
+  if (!heading) return null;
+  const level = heading[1].length;
+  const rest = content.slice(heading.index + heading[0].length);
+  const end = rest.search(new RegExp(`^#{1,${level}} `, "m"));
+  return { level, index: heading.index, text: content.slice(heading.index, heading.index + heading[0].length + (end === -1 ? rest.length : end)) };
+}
+
+/**
+ * Each type in page-sections.json `inlineTypes` that a field on the page uses, as `type="T"` or
+ * `type="T[]"`, moves into that field as a Properties accordion, the way Returns shows a nested
+ * type, and its own section goes. The field describes it, so the type's comment goes too.
+ */
+function inlineTypesIntoFields(content, typeNames = INLINE_TYPES) {
+  for (const typeName of typeNames) {
+    const section = typeSection(content, typeName);
+    if (!section) continue;
+    const fieldsAt = section.text.indexOf("<ResponseField ");
+    if (fieldsAt === -1) continue;
+    const fields = section.text.slice(fieldsAt).trim();
+    const user = new RegExp(`(<ResponseField [^>]*type="${typeName}(?:\\[\\])?"[^>]*>)([\\s\\S]*?)\\n*(</ResponseField>)`);
+    const field = content.match(user);
+    // Only a field with no fields of its own takes the type in.
+    if (!field || field[2].includes("<ResponseField ")) continue;
+    content = content.replace(section.text, "");
+    content = content.replace(user, (_m, open, body, close) =>
+      `${open}${body.trimEnd()}\n\n<Accordion title="Properties">\n\n${fields}\n\n</Accordion>\n\n${close}`);
+  }
+  return content;
+}
+
+/**
+ * A type definition group's `intro` type opens the group's section: its heading goes, so its text
+ * follows the section heading, and each type its signature names that has a heading on the page
+ * is linked to it.
+ */
+function groupIntroTypes(content, groups = TYPE_DEFINITION_GROUPS) {
+  for (const group of groups) {
+    const intro = !Array.isArray(group) && group.intro;
+    if (!intro) continue;
+    const section = typeSection(content, intro);
+    if (!section) continue;
+    const headings = new Set([...content.matchAll(/^#{2,4} (\w+)$/gm)].map((m) => m[1]));
+    const text = section.text
+      .replace(/^#{2,3} .*\n+(?:\*{3}\n+)?/, "")
+      .replace(new RegExp(`^> \\*\\*${intro}\\*\\* = .*$`, "m"), (signature) =>
+        signature.replace(/`(\w+)`/g, (code, name) => (headings.has(name) && name !== intro ? `[\`${name}\`](#${name.toLowerCase()})` : code)));
+    content = content.replace(section.text, text);
+  }
+  return content;
+}
+
+function applyInlineTypesAndGroupIntros(dir) {
+  if (INLINE_TYPES.length === 0 && !TYPE_DEFINITION_GROUPS.some((group) => !Array.isArray(group) && group.intro)) return;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) applyInlineTypesAndGroupIntros(entryPath);
+    else if (entry.name.endsWith(".mdx")) {
+      const content = fs.readFileSync(entryPath, "utf-8");
+      const converted = groupIntroTypes(inlineTypesIntoFields(content));
+      if (converted !== content) fs.writeFileSync(entryPath, converted, "utf-8");
+    }
+  }
+}
+
 function applyPropertiesAsFields(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const entryPath = path.join(dir, entry.name);
@@ -2993,9 +3066,12 @@ function fixInPageAnchors(content) {
   for (const [, name] of content.matchAll(/<(?:ResponseField|ParamField) (?:name|body)="([^"]+)"/g)) {
     fieldCounts.set(name, (fieldCounts.get(name) ?? 0) + 1);
   }
-  const renamed = new Map(
-    Object.entries(TYPES_WITH_OWN_METHODS).map(([type, title]) => [headingAnchor(type), headingAnchor(title ?? type)])
-  );
+  const renamed = new Map([
+    ...Object.entries(TYPES_WITH_OWN_METHODS).map(([type, title]) => [headingAnchor(type), headingAnchor(title ?? type)]),
+    // A group's intro type has no heading of its own, so a link to it goes to the group's.
+    ...TYPE_DEFINITION_GROUPS.filter((group) => !Array.isArray(group) && group.intro && group.title)
+      .map((group) => [headingAnchor(group.intro), headingAnchor(group.title)]),
+  ]);
   return content.replace(/\[([^\]]+)\]\(#([^)\s]+)\)/g, (link, text, anchor) => {
     if (anchors.has(anchor)) return link;
     const target = renamed.get(anchor);
@@ -3107,6 +3183,9 @@ function main() {
   // Returns. After the inlining, so each property keeps the values its field was given.
   applyReturnedStateSections(DOCS_DIR);
 
+  // Types inlined into the field that uses them, and groups that open with their intro type
+  applyInlineTypesAndGroupIntros(DOCS_DIR);
+
   // Remove links to types that aren't exposed (would 404)
   applyNonExposedTypeLinkRemoval(
     DOCS_DIR,
@@ -3151,6 +3230,8 @@ if (process.argv[1] && fs.realpathSync(process.argv[1]) === fs.realpathSync(__fi
 
 export {
   fixInPageAnchors,
+  groupIntroTypes,
+  inlineTypesIntoFields,
   inlineStringUnions,
   nestUnderGroupTypes,
   parseStringUnion,

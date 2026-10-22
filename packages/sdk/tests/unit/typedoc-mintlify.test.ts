@@ -7,6 +7,8 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { nameCallableProperties } from "../../scripts/mintlify-post-processing/typedoc-plugin/typedoc-mintlify-content.js";
 import {
   fixInPageAnchors,
+  groupIntroTypes,
+  inlineTypesIntoFields,
   inlineStringUnions,
   nestUnderGroupTypes,
   parseStringUnion,
@@ -310,6 +312,48 @@ describe("topLevelResponseFields", () => {
       ["status", "&quot;ready&quot; | &quot;error&quot;"],
     ]);
     expect(fields[0].inner).toContain('<ResponseField name="id" type="string" required>');
+  });
+});
+
+describe("inlineTypesIntoFields", () => {
+  test("moves a type's fields into the field that uses it, and drops its section", () => {
+    const content = [
+      "## Questions",
+      "### Choice",
+      '<ResponseField name="entries" type="Entry[]" required>',
+      "",
+      "The entries.",
+      "",
+      "</ResponseField>",
+      "### Entry",
+      "",
+      "One entry of a Choice.",
+      "",
+      '<ResponseField name="text" type="string" required>',
+      "",
+      "The text.",
+      "",
+      "</ResponseField>",
+      "### Other",
+    ].join("\n");
+
+    const inlined = inlineTypesIntoFields(content, ["Entry"]);
+    expect(inlined).not.toContain("### Entry");
+    expect(inlined).not.toContain("One entry of a Choice.");
+    expect(inlined).toContain(
+      'The entries.\n\n<Accordion title="Properties">\n\n<ResponseField name="text" type="string" required>\n\nThe text.\n\n</ResponseField>\n\n</Accordion>\n\n</ResponseField>'
+    );
+    expect(inlined).toContain("### Other");
+  });
+});
+
+describe("groupIntroTypes", () => {
+  test("opens the group's section with the intro type, and links the types it names", () => {
+    const content = ["## Questions", "", "### Question", "", "***", "", "> **Question** = `Choice` | `Unknown`", "", "An open question.", "", "### Choice", ""].join("\n");
+
+    expect(groupIntroTypes(content, [{ title: "Questions", intro: "Question", types: ["Question", "Choice"] }])).toBe(
+      ["## Questions", "", "> **Question** = [`Choice`](#choice) | `Unknown`", "", "An open question.", "", "### Choice", ""].join("\n")
+    );
   });
 });
 

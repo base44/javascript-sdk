@@ -16,7 +16,7 @@ const NEW_APP = "new-app";
  *
  * The hook is headless. It gives you the conversation and the [actions](#returned-actions), and your components render them:
  * - Follows the app live, and renews its socket session when it expires.
- * - Turns Base44's messages into [items](#items), and shows each open question with the step that asked it.
+ * - Turns Base44's messages into [items](#items), and shows each open [question](#questions) with the step that asked it.
  * - Reports what the AI is doing in [`status`](#status), and the live connection in [`connection`](#connection).
  * - Sends prompts, creates apps, and answers questions through the {@link ChatBackend | backend} you pass, so no credential reaches the browser.
  *
