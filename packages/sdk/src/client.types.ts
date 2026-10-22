@@ -25,10 +25,12 @@ import type { FetchWithAuthInit } from "./utils/fetch-with-auth.js";
  */
 export interface CreateClientOptions {
   /**
-   * Optional error handler that will be called whenever an API error occurs.
+   * Optional error handler that the SDK calls when:
    *
-   * Also receives {@link ActorsModule | actors} connection failures. Errors
-   * are usually {@linkcode Base44Error} instances — check `error.status`.
+   * - An API request fails.
+   * - A client can't connect to an {@link ActorsModule | actor}.
+   *
+   * Errors are usually {@linkcode Base44Error} instances. Check `error.status` for the HTTP status code. Returns `undefined` for network errors.
    */
   onError?: (error: Error) => void;
   /**
@@ -138,7 +140,7 @@ export interface Base44Client {
   appLogs: AppLogsModule;
   /** {@link AppModule | App module} for reading the app's own public configuration. */
   app: AppModule;
-  /** {@link ActorsModule | Actors module} for subscribing to and sending messages via Cloudflare Durable Object-backed Actors. */
+  /** {@link ActorsModule | Actors module} for connecting to actor sessions and exchanging messages with actors. */
   actors: ActorsModule;
   /** {@link AuthModule | Auth module} for user authentication and management. */
   auth: AuthModule;
