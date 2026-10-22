@@ -21,7 +21,7 @@ const NEW_APP = "new-app";
  * - Sends prompts, creates apps, and answers questions through the {@link ChatBackend | backend} you pass, so no credential reaches the browser.
  *
  * @param options - The app to follow, your backend's calls, and what to do with a created app.
- * @returns The conversation, its `status`, `connection`, and `error`, and the [actions](#actions) `send()`, `create()`, and `clearError()`.
+ * @returns The chat's state, `items`, `status`, `connection`, and `error`, and its actions `send()`, `create()`, and `clearError()`.
  *
  * @example
  * ```tsx
