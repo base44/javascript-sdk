@@ -197,3 +197,5 @@ export type {
   RemoveAccessTokenOptions,
   GetLoginUrlOptions,
 } from "./utils/auth-utils.types.js";
+
+export { getAnonymousVisitorId } from "./modules/analytics.js";
