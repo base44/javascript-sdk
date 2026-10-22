@@ -280,20 +280,20 @@ export interface ApprovalDetails {
  * When several hold at once, the first in this list wins.
  *
  * - `error`: Base44 reports that the last build failed.
- * - `waiting`: a question waits on the user.
- * - `building`: the AI is working.
- * - `submitted`: a prompt, a new app or an answer is on its way. It lasts until Base44 reports work, a reply or a queue change, or the call fails.
- * - `ready`: none of the above.
+ * - `waiting`: A question waits for the user's answer.
+ * - `building`: The AI is working.
+ * - `submitted`: A prompt, a new app, or an answer is on its way. It lasts until Base44 reports work, a reply, or a queue change, or until the call fails.
+ * - `ready`: None of the above.
  */
 export type ChatStatus = "ready" | "submitted" | "building" | "waiting" | "error";
 
 /**
  * Whether the chat follows the app live.
  *
- * - `connecting`: until the first snapshot arrives.
- * - `connected`: after the first snapshot.
- * - `disconnected`: live updates stopped for good. The session couldn't open, the retries ran out,
- *   or Base44 ended the session or the app's subscription. {@link UseChatResult.error} says why.
+ * - `connecting`: The chat waits for the app's first snapshot.
+ * - `connected`: The first snapshot arrived, and updates follow live.
+ * - `disconnected`: Live updates stopped for good. The session couldn't open, the retries ran out,
+ *   or Base44 ended the session or the app's subscription. Check [`error`](#error) to see why.
  *
  * Watching another app, or mounting the chat again, starts over.
  */
