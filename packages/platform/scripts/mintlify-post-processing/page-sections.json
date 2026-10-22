@@ -39,16 +39,6 @@
         "WebhookConfigurationErrorCode": "Configuration error codes"
       }
     },
-    [
-      "ChatItem",
-      "ChatStep",
-      "ChatAnswer",
-      "ChatStatus",
-      "ChatConnection",
-      "ChatError",
-      "ChatApp",
-      "ToolCallAnswer"
-    ],
     {
       "title": "Questions",
       "types": [

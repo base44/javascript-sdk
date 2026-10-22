@@ -1,3 +1,9 @@
 [
-  "ChatOptions"
+  "ChatOptions",
+  "ChatItem",
+  "ChatStep",
+  "ChatAnswer",
+  "ChatError",
+  "ChatApp",
+  "ToolCallAnswer"
 ]

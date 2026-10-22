@@ -134,7 +134,7 @@ export interface ChatStep {
    */
   status: "running" | "waiting" | "done" | "stopped" | "error";
   /**
-   * The question the step needs answered, with the actions that answer it. It's present only on a
+   * The {@link ChatQuestion | question} the step needs answered, with the actions that answer it. It's present only on a
    * `waiting` step in the latest assistant reply, and goes away once answered. A `waiting` step in an
    * older message has no question. It's also absent for a question kind this release doesn't know.
    */
