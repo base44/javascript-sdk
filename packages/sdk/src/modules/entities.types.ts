@@ -773,6 +773,10 @@ export interface EntityHandler<T = any> {
    *
    * Permanently removes all records that match the provided query.
    *
+   * This isn't a transaction. Each record is deleted on its own, so if the call
+   * fails partway, the records already deleted stay deleted. Learn more about
+   * [concurrent updates](/developers/backend/resources/entities/entity-schemas#concurrent-updates).
+   *
    * @param query - Query matching {@linkcode EntityFilterQuery}. Every matching record is deleted.
    * @returns Promise resolving to the deletion result.
    *
@@ -793,6 +797,10 @@ export interface EntityHandler<T = any> {
    *
    * Efficiently creates multiple records at once. This is faster
    * than creating them individually.
+   *
+   * This isn't a transaction. Each record is written on its own, so if the call
+   * fails partway, the records already written stay written. Learn more about
+   * [concurrent updates](/developers/backend/resources/entities/entity-schemas#concurrent-updates).
    *
    * @param data - Array of record data objects.
    * @returns Promise resolving to an array of created records.
@@ -821,6 +829,15 @@ export interface EntityHandler<T = any> {
    * the next batch. Make sure the query excludes already-updated records
    * so you don't re-process the same entities on each iteration. For
    * example, filter by `status: 'pending'` when setting status to `'processed'`.
+   *
+   * Each matching record is updated on its own, and the call isn't a transaction.
+   * To claim one record safely, so that only one of 2 users acting at the same
+   * time succeeds, pass that record's `id` as a plain value plus the conditions
+   * that must still be true, then check `updated` in the response. The conditions
+   * are only checked again at write time when the query names a single `id`. Any
+   * other query, including several IDs in `$in` or `$or`, finds the matching
+   * records first and then updates them. Learn more about
+   * [concurrent updates](/developers/backend/resources/entities/entity-schemas#concurrent-updates).
    *
    * To update a single record by ID, use {@linkcode update | update()} instead. To update
    * multiple specific records with different data each, use {@linkcode bulkUpdate | bulkUpdate()}.
@@ -879,6 +896,21 @@ export interface EntityHandler<T = any> {
    *   );
    *   totalUpdated += result.updated;
    *   hasMore = result.has_more;
+   * }
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Claim a record
+   * // Only one user can claim the task, even if several try at the same time
+   * const result = await base44.entities.Task.updateMany(
+   *   { id: taskId, status: 'open' },
+   *   { $set: { status: 'claimed', claimed_by: user.email } }
+   * );
+   * if (result.updated === 1) {
+   *   // This user claimed the task
+   * } else {
+   *   // Someone else claimed it first, or it was no longer open
    * }
    * ```
    */
@@ -998,6 +1030,11 @@ export interface EntityHandler<T = any> {
    * key, the last one wins. Updates merge the given fields into the existing record, like
    * {@linkcode update | update()}.
    *
+   * This isn't a transaction. Each record is written on its own, so if the call
+   * fails partway, the records already written stay written. Concurrent calls with
+   * the same key can also create duplicate records. Learn more about
+   * [concurrent updates](/developers/backend/resources/entities/entity-schemas#concurrent-updates).
+   *
    * @param records - Array of record data objects. Each must carry a value, not an object or
    * array, for every field named in `options.key`, to find or create by. Other fields are
    * optional, and only the ones you include are merged into a matched record, like `update()`.
@@ -1037,6 +1074,10 @@ export interface EntityHandler<T = any> {
    * on three separate invoices in one call.
    *
    * You can update up to 500 records per request.
+   *
+   * This isn't a transaction. Each record is written on its own, so if the call
+   * fails partway, the records already written stay written. Learn more about
+   * [concurrent updates](/developers/backend/resources/entities/entity-schemas#concurrent-updates).
    *
    * To apply the same update to all records matching a query, use
    * {@linkcode updateMany | updateMany()}. To update a single record by ID, use
