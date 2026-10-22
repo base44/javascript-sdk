@@ -43,7 +43,7 @@ export interface CheckoutItem {
   amount: number;
   /** Number of units, from 1 to 1,000,000. Defaults to `1`. */
   quantity?: number;
-  /** Whether the item ships, so the provider collects a shipping address. */
+  /** Whether the item ships. The provider then collects a shipping address, unless you pass one in `shipping.address`. */
   shippable?: boolean;
   /** Billing terms. Set this to sell the item as a subscription. PayPal and Wix Payments allow one recurring item per checkout, and PayPal allows no other items with it. */
   recurring?: CheckoutItemRecurring;
