@@ -200,6 +200,23 @@ export interface ChoiceQuestion {
    * @param picked - One list of picked labels per question, in the order of `questions`.
    * @param texts - One free-text answer per question, in the same order. Use it for a `text_input` question, or as a note beside a pick. A question with no pick and no text is skipped.
    * @returns Promise resolving once Base44 accepts the answer, or once sending it fails and sets [`error`](#error). It never rejects.
+   *
+   * @example
+   * ```tsx
+   * // Answer a one-question choice with a button per option
+   * function ChoiceButtons({ question }: { question: ChoiceQuestion }) {
+   *   const [entry] = question.questions;
+   *   return (
+   *     <div>
+   *       <p>{entry.text}</p>
+   *       {entry.options.map((label) => (
+   *         <button key={label} onClick={() => question.answer([[label]])}>{label}</button>
+   *       ))}
+   *       <button onClick={question.decline}>Skip</button>
+   *     </div>
+   *   );
+   * }
+   * ```
    */
   answer(picked: string[][], texts?: string[]): Promise<void>;
   /**
@@ -229,6 +246,31 @@ export interface SecretsQuestion {
    *
    * @param values - The values, keyed by each field's `name`.
    * @returns Promise resolving once Base44 accepts the values, or once sending it fails and sets [`error`](#error). It never rejects.
+   *
+   * @example
+   * ```tsx
+   * // Ask for each secret, then submit the values by name
+   * function SecretsForm({ question }: { question: SecretsQuestion }) {
+   *   return (
+   *     <form
+   *       onSubmit={(event) => {
+   *         event.preventDefault();
+   *         const form = new FormData(event.currentTarget);
+   *         question.submit(Object.fromEntries(question.fields.map((field) => [field.name, String(form.get(field.name) ?? "")])));
+   *       }}
+   *     >
+   *       {question.fields.map((field) => (
+   *         <label key={field.name}>
+   *           {field.name}
+   *           <input name={field.name} type="password" placeholder={field.description} />
+   *         </label>
+   *       ))}
+   *       <button type="submit">Save</button>
+   *       <button type="button" onClick={question.decline}>Skip</button>
+   *     </form>
+   *   );
+   * }
+   * ```
    */
   submit(values: Record<string, string>): Promise<void>;
   /**
@@ -392,6 +434,19 @@ export interface UseChatResult {
    * @returns Promise resolving once the app exists, or once creating it fails and sets [`error`](#error). It never rejects.
    */
   create(prompt: string): Promise<void>;
-  /** Clears a failed call's or the connection's [`error`](#error). A failed build's error stays while Base44 reports it. */
+  /**
+   * Clears a failed call's or the connection's [`error`](#error). A failed build's error stays while Base44 reports it.
+   *
+   * @example
+   * ```tsx
+   * // Show the error, with a dismiss button unless the build failed
+   * {chat.error && (
+   *   <div role="alert">
+   *     {chat.error.message}
+   *     {chat.error.code !== "build_failed" && <button onClick={chat.clearError}>Dismiss</button>}
+   *   </div>
+   * )}
+   * ```
+   */
   clearError(): void;
 }
