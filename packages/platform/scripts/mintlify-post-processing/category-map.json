@@ -1,5 +1,6 @@
 {
   "functions": "Clients",
   "interfaces": "Modules",
-  "type-aliases": "Modules"
+  "type-aliases": "Modules",
+  "functions/useChat": "React"
 }

@@ -408,6 +408,20 @@ function generateDocsJson(docsContent) {
     }
   }
 
+  // A category map key that names one page, such as "functions/useChat", moves that page out of
+  // its kind's group into its own, after the kind groups.
+  for (const [key, groupName] of Object.entries(categoryMap)) {
+    if (!key.includes("/")) continue;
+    for (const group of groups) {
+      const index = group.pages.findIndex((page) => page.endsWith(`/${key}`));
+      if (index === -1) continue;
+      const [page] = group.pages.splice(index, 1);
+      const target = groups.find((g) => g.group === groupName) ?? groups[groups.push({ group: groupName, expanded: true, pages: [] }) - 1];
+      target.pages.push(page);
+    }
+  }
+  for (let i = groups.length - 1; i >= 0; i--) if (groups[i].pages.length === 0) groups.splice(i, 1);
+
   // Find or create SDK Reference tab
   let sdkTab = template.navigation.tabs.find(
     (tab) => tab.tab === "SDK Reference"
@@ -673,7 +687,7 @@ function prepareAppendedSection(appendPath) {
   return { section, headings: headingList };
 }
 
-function applyAppendedArticles(appendedArticles) {
+function applyAppendedArticles(appendedArticles, inlinedTypeNames = new Set()) {
   const hosts = Object.keys(appendedArticles);
   if (hosts.length === 0) {
     return;
@@ -714,6 +728,8 @@ function applyAppendedArticles(appendedArticles) {
       let effectiveAppendKey = appendKey;
       const appendParts = appendKey.split("/");
       const appendName = appendParts[appendParts.length - 1];
+      // Its values are in the fields that use it, so it gets no section of its own.
+      if (inlinedTypeNames.has(appendName)) continue;
       mergedTypeNames.push(appendName);
       const appendModuleRename = getModuleRename(appendName);
       if (appendModuleRename) {
@@ -775,26 +791,31 @@ function applyAppendedArticles(appendedArticles) {
     hostContent = hostContent.trimEnd() + combinedSections + "\n";
     hostContent = updatePanelWithHeadings(hostContent, collectedHeadings);
 
-    // Types merged onto this page no longer have their own file, so any link
-    // that still points at one — a `{@link Type.member}` cross-reference
-    // TypeDoc resolved to `.../Type.mdx#member`, or a plain `{@link Type}`
-    // resolved to `.../Type` with no fragment at all — now 404s. Rewrite
-    // every such link to a same-page anchor: `#member` when TypeDoc kept a
-    // fragment, otherwise `#<lowercased type name>` (Mintlify's own heading
-    // slug for a single-word PascalCase heading has no inserted hyphens).
-    for (const typeName of mergedTypeNames) {
-      const linkRegex = new RegExp(
-        `\\]\\((?:\\.\\./(?:interfaces|type-aliases|classes|functions)/)?${typeName}(?:\\.mdx|\\.md)?(#[\\w-]*)?\\)`,
-        "g"
-      );
-      hostContent = hostContent.replace(
-        linkRegex,
-        (_match, anchor) => `](${anchor || `#${typeName.toLowerCase()}`})`
-      );
-    }
-
+    hostContent = linkMergedTypesInPage(hostContent, mergedTypeNames);
     fs.writeFileSync(hostPath, hostContent, "utf-8");
   }
+}
+
+/**
+ * Types merged onto a page no longer have their own file, so any link that still points at one —
+ * a `{@link Type.member}` cross-reference TypeDoc resolved to `.../Type.mdx#member`, or a plain
+ * `{@link Type}` resolved to `.../Type` with no fragment at all — now 404s. Rewrites every such
+ * link to a same-page anchor: `#member` when TypeDoc kept a fragment, otherwise
+ * `#<lowercased type name>` (Mintlify's own heading slug for a single-word PascalCase heading has
+ * no inserted hyphens).
+ */
+function linkMergedTypesInPage(content, typeNames) {
+  for (const typeName of typeNames) {
+    const linkRegex = new RegExp(
+      `\\]\\((?:\\.\\./(?:interfaces|type-aliases|classes|functions)/)?${typeName}(?:\\.mdx|\\.md)?(#[\\w-]*)?\\)`,
+      "g"
+    );
+    content = content.replace(
+      linkRegex,
+      (_match, anchor) => `](${anchor || `#${typeName.toLowerCase()}`})`
+    );
+  }
+  return content;
 }
 
 /**
@@ -1435,8 +1456,16 @@ function applyTypeDeclarationLinking(dir) {
 // Appended types whose methods get their own section, by section title, and groups of appended
 // types nested under "## Type Definitions" (the first type of a group starts the section). A group
 // is a list of type names, or `{ "title": "...", "types": [...] }` for another section heading.
-const { typesWithOwnMethods: TYPES_WITH_OWN_METHODS = {}, typeDefinitionGroups: TYPE_DEFINITION_GROUPS = [] } =
-  fs.existsSync(PAGE_SECTIONS_PATH) ? JSON.parse(fs.readFileSync(PAGE_SECTIONS_PATH, "utf-8")) : {};
+// A function's return type in `returnedState` also gets its properties a section, by title, in
+// place of the function's Returns: one heading per property, as its methods have. A type in
+// `inlineTypes` moves into the field that uses it, and a group's `intro` type opens its section
+// with no heading of its own.
+const {
+  typesWithOwnMethods: TYPES_WITH_OWN_METHODS = {},
+  returnedState: RETURNED_STATE = {},
+  inlineTypes: INLINE_TYPES = [],
+  typeDefinitionGroups: TYPE_DEFINITION_GROUPS = [],
+} = fs.existsSync(PAGE_SECTIONS_PATH) ? JSON.parse(fs.readFileSync(PAGE_SECTIONS_PATH, "utf-8")) : {};
 
 /**
  * Group intro sections (like "Built-in User Entity", "Generated Types") under an "Overview" heading
@@ -1496,11 +1525,14 @@ function groupIntroSections(content) {
     return { content, modified: false };
   }
   
-  // Find all ## headings between insert point and main section (these are intro sections)
+  // Find all ## headings between insert point and main section (these are intro sections). A
+  // function page whose return has its own sections keeps its Parameters and Returns beside them.
+  const hasReturnedState = Object.keys(RETURNED_STATE).some((type) => lines.includes(`## ${type}`));
+  const keptHeadings = hasReturnedState ? ["## Parameters", "## Returns"] : [];
   const introHeadingIndices = [];
   for (let i = insertIndex; i < mainSectionIndex; i++) {
     const line = lines[i].trim();
-    if (line.startsWith("## ") && !line.startsWith("### ")) {
+    if (line.startsWith("## ") && !line.startsWith("### ") && !keptHeadings.includes(line)) {
       introHeadingIndices.push(i);
     }
   }
@@ -1578,6 +1610,7 @@ function groupTypeDefinitions(content) {
     for (const typeName of group.types) {
       section = section.replace(new RegExp(`^## ${typeName}$`, "m"), `### ${typeName}`);
     }
+    section = nestUnderGroupTypes(section, new Set(group.types));
     // Any "##" heading still left in this slice belongs to one of the types
     // above it (e.g. "## Properties" from an appended interface with members,
     // since normalizeHeadings() clamps an appended article's own headings to
@@ -1588,6 +1621,41 @@ function groupTypeDefinitions(content) {
   });
 
   return { content: updatedContent, modified: true };
+}
+
+/**
+ * Inside a group, a type's own methods arrive at the level of the types themselves: a "## Methods"
+ * label, then "### method()" with its "#### Parameters" and "#### Returns". Nest them under their
+ * type instead. A "###" heading that isn't one of the group's types belongs to the type above it,
+ * so it moves down a level with everything under it, and the bare "Methods" label goes.
+ */
+function nestUnderGroupTypes(section, typeNames) {
+  const lines = section.split("\n");
+  const result = [];
+  let inFence = false;
+  let inMember = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim().startsWith("```")) inFence = !inFence;
+    const heading = inFence ? null : line.match(/^(#{2,6}) (.+)$/);
+    if (!heading) {
+      result.push(line);
+      continue;
+    }
+    const level = heading[1].length;
+    if (level <= 3) inMember = false;
+    if (level === 3 && typeNames.has(heading[2])) {
+      result.push(line);
+      continue;
+    }
+    if (level === 2 && heading[2] === "Methods") {
+      if (lines[i + 1]?.trim() === "") i++;
+      continue;
+    }
+    if (level === 3) inMember = true;
+    result.push(inMember && level < 6 ? `#${line}` : line);
+  }
+  return result.join("\n");
 }
 
 /**
@@ -1835,7 +1903,17 @@ function mergeSectionWithMethods(content, filePath) {
         }
       }
 
-      if (methodsIndex !== -1) {
+      if (methodsIndex !== -1 && Object.hasOwn(RETURNED_STATE, typeName) && propertiesIndex !== -1) {
+        // A returned type's two groups become two sections, each opened by its
+        // @groupDescription: the properties' text, whose fields returnedStateSections()
+        // fills in from the function's Returns, and the methods. The type's own comment
+        // stays on the type.
+        const firstProperty = lines.findIndex((l, j) => j > propertiesIndex && j < methodsIndex && /^#{3,6} /.test(l));
+        const propertiesIntro = lines.slice(propertiesIndex + 1, firstProperty === -1 ? methodsIndex : firstProperty);
+        lines.splice(i, methodsIndex - i + 1,
+          `## ${RETURNED_STATE[typeName]}`, ...propertiesIntro, `## ${TYPES_WITH_OWN_METHODS[typeName] ?? typeName}`);
+        modified = true;
+      } else if (methodsIndex !== -1) {
         lines[i] = `## ${TYPES_WITH_OWN_METHODS[typeName] ?? typeName}`;
         // Drop the ## Properties section too: the heading and its content sit
         // between the type heading and ## Methods.
@@ -2188,6 +2266,112 @@ function cleanupTruncatedParamTypes(dir) {
         fs.writeFileSync(entryPath, content, "utf-8");
         console.log(`Cleaned truncated param type: ${path.relative(DOCS_DIR, entryPath)}`);
       }
+    }
+  }
+}
+
+/**
+ * A type alias page for a union of string literals, such as `type Status = "ready" | "error"`, as
+ * its values and its comment minus the first paragraph. The first paragraph sums up the type, and a
+ * field that uses the type has its own summary. Anything else, including a union whose comment
+ * documents each value as a field and so has no signature line, is null.
+ */
+function parseStringUnion(content, typeName) {
+  const signature = content.match(new RegExp(`^> \\*\\*${typeName}\\*\\* = (.+)$`, "m"));
+  if (!signature) return null;
+  const values = signature[1].split(" | ").map((part) => part.trim().match(/^`"([^"`]*)"`$/)?.[1]);
+  if (values.some((value) => value === undefined)) return null;
+  const comment = content.slice(signature.index + signature[0].length).trim();
+  return { values, details: comment.split(/\n\s*\n/).slice(1).join("\n\n").trim() };
+}
+
+/**
+ * A field whose type is the union, with the union's comment after the field's own description. The
+ * type label keeps the union's name, for the import. A comment that doesn't name every value in
+ * backticks gets a line that lists them.
+ */
+function inlineStringUnions(content, unions) {
+  let modified = false;
+  for (const [typeName, { values, details }] of unions) {
+    const field = new RegExp(
+      `(<(ResponseField|ParamField) [^>]*type=")(?:${typeName}|\\[${typeName}\\]\\([^)]*\\))("[^>]*>)([\\s\\S]*?)\\n*(</\\2>)`,
+      "g"
+    );
+    content = content.replace(field, (_match, open, _tag, attributes, description, close) => {
+      modified = true;
+      const namesEvery = values.every((value) => new RegExp(`\`'?${value}'?\``).test(details));
+      const quoted = values.map((value) => `\`'${value}'\``);
+      const valueLine = namesEvery
+        ? ""
+        : `It's ${quoted.length > 2 ? `${quoted.slice(0, -1).join(", ")}, or ${quoted.at(-1)}` : quoted.join(" or ")}.`;
+      const added = [details, valueLine].filter(Boolean).join("\n\n");
+      return `${open}${typeName}${attributes}\n\n${[description.trim(), added].filter(Boolean).join("\n\n")}\n\n${close}`;
+    });
+  }
+  return { content, modified };
+}
+
+/**
+ * The string unions that some field uses, read from TypeDoc's pages before anything is removed.
+ * Their pages go, so their values show only in the fields, and the returned map lets the fields
+ * take them in once every field on a page has its final form.
+ */
+function collectInlinedStringUnions(contentDir) {
+  const aliasDir = path.join(contentDir, "type-aliases");
+  if (!fs.existsSync(aliasDir)) return new Map();
+  const unions = new Map();
+  for (const file of fs.readdirSync(aliasDir)) {
+    if (!file.endsWith(".mdx")) continue;
+    const typeName = path.basename(file, ".mdx");
+    const union = parseStringUnion(fs.readFileSync(path.join(aliasDir, file), "utf-8"), typeName);
+    if (union) unions.set(typeName, union);
+  }
+
+  const used = new Set();
+  const scan = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const entryPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) scan(entryPath);
+      else if (entry.name.endsWith(".mdx")) {
+        const content = fs.readFileSync(entryPath, "utf-8");
+        for (const typeName of unions.keys()) {
+          // A field's type attribute, or a property's signature line before it becomes a field.
+          const usage = new RegExp(
+            `type="${typeName}"|^> \\*\\*[\\w$]+\\*\\*\\??: (?:\\[\`?${typeName}\`?\\]\\([^)]*\\)|\`${typeName}\`)\\s*$`,
+            "m"
+          );
+          if (usage.test(content)) used.add(typeName);
+        }
+      }
+    }
+  };
+  scan(contentDir);
+
+  const inlined = new Map([...unions].filter(([typeName]) => used.has(typeName)));
+  for (const typeName of inlined.keys()) {
+    fs.unlinkSync(path.join(aliasDir, `${typeName}.mdx`));
+    console.log(`Removed (inlined into its fields): content/type-aliases/${typeName}.mdx`);
+  }
+  return inlined;
+}
+
+function applyStringUnionInlining(dir, unions, appendedArticles) {
+  if (unions.size === 0) return;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) applyStringUnionInlining(entryPath, unions, appendedArticles);
+    else if (entry.name.endsWith(".mdx")) {
+      const result = inlineStringUnions(fs.readFileSync(entryPath, "utf-8"), unions);
+      if (!result.modified) continue;
+      // The comments come from TypeDoc's type-alias pages, so their links still carry the file
+      // extension and point at types this page may have merged in.
+      const hostKey = path.relative(CONTENT_DIR, entryPath).replace(/\.mdx$/, "");
+      const merged = Object.entries(appendedArticles)
+        .filter(([host]) => host === hostKey || host.replace(/[^/]+$/, (name) => getModuleRename(name) ?? name) === hostKey)
+        .flatMap(([, list]) => list.map((key) => key.split("/").pop()));
+      const content = linkMergedTypesInPage(result.content.replace(/\]\(([^)#]+?)\.mdx?(#[^)]*)?\)/g, "]($1$2)"), merged);
+      fs.writeFileSync(entryPath, content, "utf-8");
+      console.log(`Inlined string unions: ${path.relative(DOCS_DIR, entryPath)}`);
     }
   }
 }
@@ -2551,7 +2735,146 @@ function propertiesAsFields(content, classPage) {
     .replace(/^#### Inherited from\n\n.*\n\n?/gm, "")
     .replace(/^#### Extends\n\n(- .*\n)+\n?/gm, "")
     .replace(classPage ? /^## Properties\n([\s\S]*?)(?=^## |(?![\s\S]))/m : /(?!)/, (section, body) => `## Properties\n\n${fieldsOf(body)}\n\n`)
-    .replace(/^#### Properties\n([\s\S]*?)(?=^#{1,3} |(?![\s\S]))/gm, (section, body) => `${fieldsOf(body)}\n\n`);
+    // A type's properties end at its first method ("name()"), which keeps its heading.
+    .replace(/^#### Properties\n([\s\S]*?)(?=^#{1,3} |^#{4,6} \S+\(\)$|(?![\s\S]))/gm, (section, body) => `${fieldsOf(body)}\n\n`);
+}
+
+/** The outermost ResponseFields in a piece of a page, as name, type, and the markup inside each. */
+function topLevelResponseFields(text) {
+  const fields = [];
+  let depth = 0;
+  let start = 0;
+  let attributes = "";
+  for (const match of text.matchAll(/<ResponseField ([^>]*)>|<\/ResponseField>/g)) {
+    if (match[1] !== undefined) {
+      if (depth === 0) {
+        start = match.index + match[0].length;
+        attributes = match[1];
+      }
+      depth++;
+    } else if (--depth === 0) {
+      fields.push({
+        name: attributes.match(/name="([^"]*)"/)?.[1] ?? "",
+        type: attributes.match(/type="([^"]*)"/)?.[1] ?? "",
+        inner: text.slice(start, match.index).trim(),
+      });
+    }
+  }
+  return fields;
+}
+
+/**
+ * A function whose return type is in page-sections.json `returnedState` returns an object of state
+ * and actions, and its page shows them as two sections instead of a Returns section: the
+ * properties under their own heading each, and the methods, which `typesWithOwnMethods` already
+ * gives a section. Each property keeps what Returns showed for it, its type and description and
+ * any fields of its own, and the Returns example moves to the end of the Overview.
+ */
+function returnedStateSections(content) {
+  for (const [typeName, title] of Object.entries(RETURNED_STATE)) {
+    if (!content.includes(`\n## ${title}\n`)) continue;
+    const returns = content.match(new RegExp(`^## Returns\\n\\n\`${typeName}\`\\n[\\s\\S]*?(?=^## )`, "m"));
+    if (!returns) continue;
+    const exampleAt = returns[0].search(/^#{3,4} Examples?$/m);
+    const example = exampleAt === -1 ? "" : returns[0].slice(exampleAt).trim().replace(/^#{3,4} /, "### ");
+    const unescaped = (type) => type.replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+    const properties = topLevelResponseFields(exampleAt === -1 ? returns[0] : returns[0].slice(0, exampleAt))
+      .map(({ name, type, inner }) => `### ${name}\n\n\`${unescaped(type)}\`\n\n${inner}`)
+      .join("\n\n***\n\n");
+
+    content = content.replace(returns[0], "");
+    content = content.replace(
+      new RegExp(`^## ${title}\\n[\\s\\S]*?(?=^## )`, "m"),
+      (section) => `${section.trimEnd()}\n\n${properties}\n\n`
+    );
+    if (example) {
+      content = content.replace(/^## Overview\n[\s\S]*?(?=^## )/m, (overview) => `${overview.trimEnd()}\n\n${example}\n\n`);
+    }
+  }
+  return content;
+}
+
+function applyReturnedStateSections(dir) {
+  if (Object.keys(RETURNED_STATE).length === 0) return;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) applyReturnedStateSections(entryPath);
+    else if (entry.name.endsWith(".mdx")) {
+      const content = fs.readFileSync(entryPath, "utf-8");
+      const converted = returnedStateSections(content);
+      if (converted !== content) fs.writeFileSync(entryPath, converted, "utf-8");
+    }
+  }
+}
+
+/**
+ * A type's section, from its heading to the next heading at its level or above: the heading
+ * level, the section's text, and where it starts.
+ */
+function typeSection(content, typeName) {
+  const heading = content.match(new RegExp(`^(#{2,3}) ${typeName}\\n`, "m"));
+  if (!heading) return null;
+  const level = heading[1].length;
+  const rest = content.slice(heading.index + heading[0].length);
+  const end = rest.search(new RegExp(`^#{1,${level}} `, "m"));
+  return { level, index: heading.index, text: content.slice(heading.index, heading.index + heading[0].length + (end === -1 ? rest.length : end)) };
+}
+
+/**
+ * Each type in page-sections.json `inlineTypes` that a field on the page uses, as `type="T"` or
+ * `type="T[]"`, moves into that field as a Properties accordion, the way Returns shows a nested
+ * type, and its own section goes. The field describes it, so the type's comment goes too.
+ */
+function inlineTypesIntoFields(content, typeNames = INLINE_TYPES) {
+  for (const typeName of typeNames) {
+    const section = typeSection(content, typeName);
+    if (!section) continue;
+    const fieldsAt = section.text.indexOf("<ResponseField ");
+    if (fieldsAt === -1) continue;
+    const fields = section.text.slice(fieldsAt).trim();
+    const user = new RegExp(`(<ResponseField [^>]*type="${typeName}(?:\\[\\])?"[^>]*>)([\\s\\S]*?)\\n*(</ResponseField>)`);
+    const field = content.match(user);
+    // Only a field with no fields of its own takes the type in.
+    if (!field || field[2].includes("<ResponseField ")) continue;
+    content = content.replace(section.text, "");
+    content = content.replace(user, (_m, open, body, close) =>
+      `${open}${body.trimEnd()}\n\n<Accordion title="Properties">\n\n${fields}\n\n</Accordion>\n\n${close}`);
+  }
+  return content;
+}
+
+/**
+ * A type definition group's `intro` type opens the group's section: its heading goes, so its text
+ * follows the section heading, and each type its signature names that has a heading on the page
+ * is linked to it.
+ */
+function groupIntroTypes(content, groups = TYPE_DEFINITION_GROUPS) {
+  for (const group of groups) {
+    const intro = !Array.isArray(group) && group.intro;
+    if (!intro) continue;
+    const section = typeSection(content, intro);
+    if (!section) continue;
+    const headings = new Set([...content.matchAll(/^#{2,4} (\w+)$/gm)].map((m) => m[1]));
+    const text = section.text
+      .replace(/^#{2,3} .*\n+(?:\*{3}\n+)?/, "")
+      .replace(new RegExp(`^> \\*\\*${intro}\\*\\* = .*$`, "m"), (signature) =>
+        signature.replace(/`(\w+)`/g, (code, name) => (headings.has(name) && name !== intro ? `[\`${name}\`](#${name.toLowerCase()})` : code)));
+    content = content.replace(section.text, text);
+  }
+  return content;
+}
+
+function applyInlineTypesAndGroupIntros(dir) {
+  if (INLINE_TYPES.length === 0 && !TYPE_DEFINITION_GROUPS.some((group) => !Array.isArray(group) && group.intro)) return;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) applyInlineTypesAndGroupIntros(entryPath);
+    else if (entry.name.endsWith(".mdx")) {
+      const content = fs.readFileSync(entryPath, "utf-8");
+      const converted = groupIntroTypes(inlineTypesIntoFields(content));
+      if (converted !== content) fs.writeFileSync(entryPath, converted, "utf-8");
+    }
+  }
 }
 
 function applyPropertiesAsFields(dir) {
@@ -2706,6 +3029,71 @@ function linkReturnTypes(content) {
     });
 }
 
+/**
+ * The anchor Mintlify gives a heading: lowercase, with backticks and parentheses dropped, dots and
+ * spaces as hyphens, and underscores kept, so `pull_request.changed` becomes `pull_request-changed`.
+ */
+function headingAnchor(text) {
+  return text
+    .toLowerCase()
+    .replace(/[`()]/g, "")
+    .replace(/[.\s]+/g, "-")
+    .replace(/[^a-z0-9_-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+/**
+ * Point every in-page link at a heading or explicit anchor that exists. A type whose section was renamed
+ * (page-sections.json `typesWithOwnMethods`) is linked by its new heading. A link to anything
+ * else the page no longer has, such as a property now shown as a field, keeps its text and loses
+ * the link, so it can't jump nowhere.
+ */
+function fixInPageAnchors(content) {
+  const anchors = new Set();
+  let inFence = false;
+  for (const line of content.split("\n")) {
+    if (line.trim().startsWith("```")) inFence = !inFence;
+    if (inFence) continue;
+    const heading = line.match(/^#{1,6} (.+)$/);
+    if (heading) anchors.add(headingAnchor(heading[1]));
+    // An explicit anchor, such as an overload's <a id="..." /> label
+    for (const [, id] of line.matchAll(/\bid="([^"]+)"/g)) anchors.add(id);
+  }
+  // Mintlify anchors a field as `param-<name>`. Only a name that one field on the page uses is
+  // a safe target, because a repeated name gets numbered anchors in page order.
+  const fieldCounts = new Map();
+  for (const [, name] of content.matchAll(/<(?:ResponseField|ParamField) (?:name|body)="([^"]+)"/g)) {
+    fieldCounts.set(name, (fieldCounts.get(name) ?? 0) + 1);
+  }
+  const renamed = new Map([
+    ...Object.entries(TYPES_WITH_OWN_METHODS).map(([type, title]) => [headingAnchor(type), headingAnchor(title ?? type)]),
+    // A group's intro type has no heading of its own, so a link to it goes to the group's.
+    ...TYPE_DEFINITION_GROUPS.filter((group) => !Array.isArray(group) && group.intro && group.title)
+      .map((group) => [headingAnchor(group.intro), headingAnchor(group.title)]),
+  ]);
+  return content.replace(/\[([^\]]+)\]\(#([^)\s]+)\)/g, (link, text, anchor) => {
+    if (anchors.has(anchor)) return link;
+    const target = renamed.get(anchor);
+    if (target && anchors.has(target)) return `[${text}](#${target})`;
+    const field = [...fieldCounts].find(([name, count]) => count === 1 && headingAnchor(name) === anchor);
+    if (field) return `[${text}](#param-${headingAnchor(field[0])})`;
+    return text;
+  });
+}
+
+function applyInPageAnchorFixes(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) applyInPageAnchorFixes(entryPath);
+    else if (entry.name.endsWith(".mdx")) {
+      const content = fs.readFileSync(entryPath, "utf-8");
+      const fixed = fixInPageAnchors(content);
+      if (fixed !== content) fs.writeFileSync(entryPath, fixed, "utf-8");
+    }
+  }
+}
+
 function applyReturnTypeLinks(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const entryPath = path.join(dir, entry.name);
@@ -2731,6 +3119,9 @@ function main() {
   const linkedTypeNames = getLinkedTypeNames();
   const exposedTypeNames = getTypesToExpose();
 
+  // Read the string unions that fields use before their pages are removed or appended
+  const inlinedUnions = collectInlinedStringUnions(CONTENT_DIR);
+
   // First, perform module renames (EntitiesModule -> entities, etc.)
   performModuleRenames(DOCS_DIR);
 
@@ -2739,7 +3130,7 @@ function main() {
 
   // Append configured articles
   const appendedArticles = loadAppendedArticlesConfig();
-  applyAppendedArticles(appendedArticles);
+  applyAppendedArticles(appendedArticles, new Set(inlinedUnions.keys()));
 
   // Add clickable links for types in ParamFields
   addTypeLinksToParamFields(DOCS_DIR);
@@ -2785,8 +3176,22 @@ function main() {
   // Link type names in Type Declarations sections to their corresponding headings
   applyTypeDeclarationLinking(DOCS_DIR);
 
+  // Put each string union's values in the fields that use it, now that every field has its final form
+  applyStringUnionInlining(CONTENT_DIR, inlinedUnions, appendedArticles);
+
+  // A returned object of state and actions: its properties take the place of the function's
+  // Returns. After the inlining, so each property keeps the values its field was given.
+  applyReturnedStateSections(DOCS_DIR);
+
+  // Types inlined into the field that uses them, and groups that open with their intro type
+  applyInlineTypesAndGroupIntros(DOCS_DIR);
+
   // Remove links to types that aren't exposed (would 404)
-  applyNonExposedTypeLinkRemoval(DOCS_DIR, exposedTypeNames, loadTypesToDelete());
+  applyNonExposedTypeLinkRemoval(
+    DOCS_DIR,
+    exposedTypeNames,
+    new Set([...loadTypesToDelete(), ...inlinedUnions.keys()])
+  );
 
   // Delete types that should not appear in navigation but were needed for inline rendering
   deleteTypesAfterProcessing(DOCS_DIR);
@@ -2794,6 +3199,9 @@ function main() {
   // Link a Returns type to where the same page documents it. Last: it drops the *** separators
   // that method ordering splits on.
   applyReturnTypeLinks(DOCS_DIR);
+
+  // Last, so every heading the page ends up with counts
+  applyInPageAnchorFixes(DOCS_DIR);
 
   // Clean up the linked types file
   try {
@@ -2820,4 +3228,14 @@ if (process.argv[1] && fs.realpathSync(process.argv[1]) === fs.realpathSync(__fi
   main();
 }
 
-export { removeNonExposedTypeLinks };
+export {
+  fixInPageAnchors,
+  groupIntroTypes,
+  inlineTypesIntoFields,
+  inlineStringUnions,
+  nestUnderGroupTypes,
+  parseStringUnion,
+  propertiesAsFields,
+  removeNonExposedTypeLinks,
+  topLevelResponseFields,
+};

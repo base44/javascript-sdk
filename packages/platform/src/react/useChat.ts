@@ -11,36 +11,33 @@ const BUILD_FAILED_ERROR: ChatError = { message: "The build failed", code: "buil
 const NEW_APP = "new-app";
 
 /**
- * Runs the AI chat for one app in your own UI.
+ * Runs an app's AI chat in your own React UI. Requires a browser environment and can't be used in
+ * the backend.
  *
- * The hook renders nothing. It gives you the conversation and the actions, and you draw them:
+ * The hook is headless. It gives you the conversation and the [actions](#returned-actions), and your components render them:
  * - Follows the app live, and renews its socket session when it expires.
- * - Turns Base44's messages into {@link ChatItem | items}, with each open question bound to the step it belongs to.
- * - Reports what the AI is doing in {@link UseChatResult.status}, and the live connection in {@link UseChatResult.connection}.
- * - Sends prompts, creates apps and answers questions through the {@link ChatBackend | backend} you pass, so no credential reaches the browser.
- *
- * The actions never throw. A failure sets {@link UseChatResult.error}, and a question whose answer
- * failed opens again. The chat declines a question kind this release doesn't know.
- *
- * Requires a browser environment and can't be used in the backend.
- *
- * The chat follows `appId` when it's set. While `appId` is `null`, it follows the app
- * {@link UseChatResult.create} made, so passing the new ID back is optional. Any change to `appId`
- * forgets that app, so setting it back to `null` starts a new chat. Switching apps closes the old
- * session and starts over.
+ * - Turns Base44's messages into [items](#items), and shows each open [question](#questions) with the step that asked it.
+ * - Reports what the AI is doing in [`status`](#status), and the live connection in [`connection`](#connection).
+ * - Sends prompts, creates apps, and answers questions through the {@link ChatBackend | backend} you pass, so no credential reaches the browser.
  *
  * @param options - The app to follow, your backend's calls, and what to do with a created app.
- * @returns The conversation, its status, connection and error, and the actions `send`, `create` and `clearError`.
+ * @returns The chat's state, `items`, `status`, `connection`, and `error`, and its actions `send()`, `create()`, and `clearError()`.
  *
  * @example
- * ```typescript
- * // Draw the chat and answer an approval
+ * ```tsx
+ * // Render the chat and answer an approval
+ * import { useChat } from "@base44/platform/react";
+ * import Markdown from "react-markdown";
+ *
+ * // ...
+ *
+ * // Inside your component
  * const chat = useChat({ appId, backend, onAppCreated: selectApp });
  * return (
  *   <>
  *     {chat.items.map((item) => (
  *       <div key={item.id} className={item.role}>
- *         {item.text && <p>{item.text}</p>}
+ *         {item.text && <Markdown>{item.text}</Markdown>}
  *         {item.steps.map((step) =>
  *           step.question?.kind === "approval" ? (
  *             <button key={step.id} onClick={step.question.approve}>Allow {step.question.action}</button>

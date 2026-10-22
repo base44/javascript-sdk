@@ -1,22 +1,64 @@
 {
   "typesWithOwnMethods": {
-    "ChatSession": "Session methods"
+    "ChatSession": "Session methods",
+    "UseChatResult": "Returned actions",
+    "ChatBackend": "Backend calls"
   },
+  "returnedState": {
+    "UseChatResult": "Returned state"
+  },
+  "inlineTypes": [
+    "ChoiceEntry",
+    "SecretField",
+    "ApprovalDetails"
+  ],
   "typeDefinitionGroups": [
-    ["SocketSession", "PlatformEvent", "PlatformSnapshot"],
+    [
+      "SocketSession",
+      "PlatformEvent",
+      "PlatformSnapshot"
+    ],
     {
       "title": "Errors",
-      "types": ["PlatformSocketError", "SessionErrorCode", "AppErrorCode"],
-      "nested": { "SessionErrorCode": "Session error codes", "AppErrorCode": "App error codes" }
+      "types": [
+        "PlatformSocketError",
+        "SessionErrorCode",
+        "AppErrorCode"
+      ],
+      "nested": {
+        "SessionErrorCode": "Session error codes",
+        "AppErrorCode": "App error codes"
+      }
     },
-    ["WebhookEvent", "UnknownWebhookEvent"],
+    [
+      "WebhookEvent",
+      "UnknownWebhookEvent"
+    ],
     {
       "title": "Errors",
-      "types": ["WebhookVerificationError", "WebhookVerificationErrorCode", "WebhookConfigurationError", "WebhookConfigurationErrorCode"],
+      "types": [
+        "WebhookVerificationError",
+        "WebhookVerificationErrorCode",
+        "WebhookConfigurationError",
+        "WebhookConfigurationErrorCode"
+      ],
       "nested": {
         "WebhookVerificationErrorCode": "Verification error codes",
         "WebhookConfigurationErrorCode": "Configuration error codes"
       }
+    },
+    {
+      "title": "Questions",
+      "types": [
+        "ChatQuestion",
+        "ChoiceQuestion",
+        "ChoiceEntry",
+        "SecretsQuestion",
+        "SecretField",
+        "ApprovalQuestion",
+        "ApprovalDetails"
+      ],
+      "intro": "ChatQuestion"
     }
   ]
 }
