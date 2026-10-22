@@ -337,7 +337,17 @@ export interface ChatOptions {
   onAppCreated?: (app: ChatApp) => void;
 }
 
-/** The chat state and actions that `useChat()` returns. */
+/**
+ * The chat state and actions that `useChat()` returns.
+ *
+ * @groupDescription Properties
+ * The hook returns one object, of type `UseChatResult`. Its state is below, and its functions are
+ * under [Returned actions](#returned-actions).
+ *
+ * @groupDescription Methods
+ * Functions on the same object, which you call to act on the chat, as in `chat.send(prompt)`. They
+ * never throw. A failure sets [`error`](#error).
+ */
 export interface UseChatResult {
   /** The conversation, oldest first. Each open question appears with the step that asked it. */
   items: ChatItem[];

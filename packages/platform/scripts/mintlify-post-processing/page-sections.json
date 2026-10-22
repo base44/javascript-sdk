@@ -1,8 +1,11 @@
 {
   "typesWithOwnMethods": {
     "ChatSession": "Session methods",
-    "UseChatResult": "Actions",
+    "UseChatResult": "Returned actions",
     "ChatBackend": "Backend calls"
+  },
+  "returnedState": {
+    "UseChatResult": "Returned state"
   },
   "typeDefinitionGroups": [
     [

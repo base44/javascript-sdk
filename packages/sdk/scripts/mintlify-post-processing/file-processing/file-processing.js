@@ -1456,8 +1456,13 @@ function applyTypeDeclarationLinking(dir) {
 // Appended types whose methods get their own section, by section title, and groups of appended
 // types nested under "## Type Definitions" (the first type of a group starts the section). A group
 // is a list of type names, or `{ "title": "...", "types": [...] }` for another section heading.
-const { typesWithOwnMethods: TYPES_WITH_OWN_METHODS = {}, typeDefinitionGroups: TYPE_DEFINITION_GROUPS = [] } =
-  fs.existsSync(PAGE_SECTIONS_PATH) ? JSON.parse(fs.readFileSync(PAGE_SECTIONS_PATH, "utf-8")) : {};
+// A function's return type in `returnedState` also gets its properties a section, by title, in
+// place of the function's Returns: one heading per property, as its methods have.
+const {
+  typesWithOwnMethods: TYPES_WITH_OWN_METHODS = {},
+  returnedState: RETURNED_STATE = {},
+  typeDefinitionGroups: TYPE_DEFINITION_GROUPS = [],
+} = fs.existsSync(PAGE_SECTIONS_PATH) ? JSON.parse(fs.readFileSync(PAGE_SECTIONS_PATH, "utf-8")) : {};
 
 /**
  * Group intro sections (like "Built-in User Entity", "Generated Types") under an "Overview" heading
@@ -1517,11 +1522,14 @@ function groupIntroSections(content) {
     return { content, modified: false };
   }
   
-  // Find all ## headings between insert point and main section (these are intro sections)
+  // Find all ## headings between insert point and main section (these are intro sections). A
+  // function page whose return has its own sections keeps its Parameters and Returns beside them.
+  const hasReturnedState = Object.keys(RETURNED_STATE).some((type) => lines.includes(`## ${type}`));
+  const keptHeadings = hasReturnedState ? ["## Parameters", "## Returns"] : [];
   const introHeadingIndices = [];
   for (let i = insertIndex; i < mainSectionIndex; i++) {
     const line = lines[i].trim();
-    if (line.startsWith("## ") && !line.startsWith("### ")) {
+    if (line.startsWith("## ") && !line.startsWith("### ") && !keptHeadings.includes(line)) {
       introHeadingIndices.push(i);
     }
   }
@@ -1892,7 +1900,17 @@ function mergeSectionWithMethods(content, filePath) {
         }
       }
 
-      if (methodsIndex !== -1) {
+      if (methodsIndex !== -1 && Object.hasOwn(RETURNED_STATE, typeName) && propertiesIndex !== -1) {
+        // A returned type's two groups become two sections, each opened by its
+        // @groupDescription: the properties' text, whose fields returnedStateSections()
+        // fills in from the function's Returns, and the methods. The type's own comment
+        // stays on the type.
+        const firstProperty = lines.findIndex((l, j) => j > propertiesIndex && j < methodsIndex && /^#{3,6} /.test(l));
+        const propertiesIntro = lines.slice(propertiesIndex + 1, firstProperty === -1 ? methodsIndex : firstProperty);
+        lines.splice(i, methodsIndex - i + 1,
+          `## ${RETURNED_STATE[typeName]}`, ...propertiesIntro, `## ${TYPES_WITH_OWN_METHODS[typeName] ?? typeName}`);
+        modified = true;
+      } else if (methodsIndex !== -1) {
         lines[i] = `## ${TYPES_WITH_OWN_METHODS[typeName] ?? typeName}`;
         // Drop the ## Properties section too: the heading and its content sit
         // between the type heading and ## Methods.
@@ -2718,6 +2736,74 @@ function propertiesAsFields(content, classPage) {
     .replace(/^#### Properties\n([\s\S]*?)(?=^#{1,3} |^#{4,6} \S+\(\)$|(?![\s\S]))/gm, (section, body) => `${fieldsOf(body)}\n\n`);
 }
 
+/** The outermost ResponseFields in a piece of a page, as name, type, and the markup inside each. */
+function topLevelResponseFields(text) {
+  const fields = [];
+  let depth = 0;
+  let start = 0;
+  let attributes = "";
+  for (const match of text.matchAll(/<ResponseField ([^>]*)>|<\/ResponseField>/g)) {
+    if (match[1] !== undefined) {
+      if (depth === 0) {
+        start = match.index + match[0].length;
+        attributes = match[1];
+      }
+      depth++;
+    } else if (--depth === 0) {
+      fields.push({
+        name: attributes.match(/name="([^"]*)"/)?.[1] ?? "",
+        type: attributes.match(/type="([^"]*)"/)?.[1] ?? "",
+        inner: text.slice(start, match.index).trim(),
+      });
+    }
+  }
+  return fields;
+}
+
+/**
+ * A function whose return type is in page-sections.json `returnedState` returns an object of state
+ * and actions, and its page shows them as two sections instead of a Returns section: the
+ * properties under their own heading each, and the methods, which `typesWithOwnMethods` already
+ * gives a section. Each property keeps what Returns showed for it, its type and description and
+ * any fields of its own, and the Returns example moves to the end of the Overview.
+ */
+function returnedStateSections(content) {
+  for (const [typeName, title] of Object.entries(RETURNED_STATE)) {
+    if (!content.includes(`\n## ${title}\n`)) continue;
+    const returns = content.match(new RegExp(`^## Returns\\n\\n\`${typeName}\`\\n[\\s\\S]*?(?=^## )`, "m"));
+    if (!returns) continue;
+    const exampleAt = returns[0].search(/^#{3,4} Examples?$/m);
+    const example = exampleAt === -1 ? "" : returns[0].slice(exampleAt).trim().replace(/^#{3,4} /, "### ");
+    const unescaped = (type) => type.replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+    const properties = topLevelResponseFields(exampleAt === -1 ? returns[0] : returns[0].slice(0, exampleAt))
+      .map(({ name, type, inner }) => `### ${name}\n\n\`${unescaped(type)}\`\n\n${inner}`)
+      .join("\n\n***\n\n");
+
+    content = content.replace(returns[0], "");
+    content = content.replace(
+      new RegExp(`^## ${title}\\n[\\s\\S]*?(?=^## )`, "m"),
+      (section) => `${section.trimEnd()}\n\n${properties}\n\n`
+    );
+    if (example) {
+      content = content.replace(/^## Overview\n[\s\S]*?(?=^## )/m, (overview) => `${overview.trimEnd()}\n\n${example}\n\n`);
+    }
+  }
+  return content;
+}
+
+function applyReturnedStateSections(dir) {
+  if (Object.keys(RETURNED_STATE).length === 0) return;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) applyReturnedStateSections(entryPath);
+    else if (entry.name.endsWith(".mdx")) {
+      const content = fs.readFileSync(entryPath, "utf-8");
+      const converted = returnedStateSections(content);
+      if (converted !== content) fs.writeFileSync(entryPath, converted, "utf-8");
+    }
+  }
+}
+
 function applyPropertiesAsFields(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const entryPath = path.join(dir, entry.name);
@@ -3017,6 +3103,10 @@ function main() {
   // Put each string union's values in the fields that use it, now that every field has its final form
   applyStringUnionInlining(CONTENT_DIR, inlinedUnions, appendedArticles);
 
+  // A returned object of state and actions: its properties take the place of the function's
+  // Returns. After the inlining, so each property keeps the values its field was given.
+  applyReturnedStateSections(DOCS_DIR);
+
   // Remove links to types that aren't exposed (would 404)
   applyNonExposedTypeLinkRemoval(
     DOCS_DIR,
@@ -3059,4 +3149,12 @@ if (process.argv[1] && fs.realpathSync(process.argv[1]) === fs.realpathSync(__fi
   main();
 }
 
-export { fixInPageAnchors, inlineStringUnions, nestUnderGroupTypes, parseStringUnion, propertiesAsFields, removeNonExposedTypeLinks };
+export {
+  fixInPageAnchors,
+  inlineStringUnions,
+  nestUnderGroupTypes,
+  parseStringUnion,
+  propertiesAsFields,
+  removeNonExposedTypeLinks,
+  topLevelResponseFields,
+};

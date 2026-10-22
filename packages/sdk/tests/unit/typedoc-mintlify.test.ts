@@ -12,6 +12,7 @@ import {
   parseStringUnion,
   propertiesAsFields,
   removeNonExposedTypeLinks,
+  topLevelResponseFields,
 } from "../../scripts/mintlify-post-processing/file-processing/file-processing.js";
 
 // Runs TypeDoc with the Mintlify plugin on a small fixture, so each case is checked on the pages
@@ -282,6 +283,33 @@ describe("inlineStringUnions", () => {
     expect(inlineStringUnions(content, unions).content).toBe(
       "<ParamField body=\"unit\" type=\"Unit\" required>\n\nBilling unit.\n\nIt's `'day'`, `'week'`, or `'month'`.\n\n</ParamField>"
     );
+  });
+});
+
+describe("topLevelResponseFields", () => {
+  test("returns each outermost field with its nested fields inside", () => {
+    const content = [
+      '<Accordion title="Properties">',
+      '<ResponseField name="items" type="Item[]" required>',
+      "The items.",
+      '<Accordion title="Properties">',
+      '<ResponseField name="id" type="string" required>',
+      "ID.",
+      "</ResponseField>",
+      "</Accordion>",
+      "</ResponseField>",
+      '<ResponseField name="status" type="&quot;ready&quot; | &quot;error&quot;" required>',
+      "Status.",
+      "</ResponseField>",
+      "</Accordion>",
+    ].join("\n");
+
+    const fields = topLevelResponseFields(content);
+    expect(fields.map(({ name, type }) => [name, type])).toEqual([
+      ["items", "Item[]"],
+      ["status", "&quot;ready&quot; | &quot;error&quot;"],
+    ]);
+    expect(fields[0].inner).toContain('<ResponseField name="id" type="string" required>');
   });
 });
 
