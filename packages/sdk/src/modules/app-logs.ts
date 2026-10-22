@@ -1,5 +1,6 @@
 import { AxiosInstance } from "axios";
 import { AppLogsModule } from "./app-logs.types";
+import { isAnalyticsAllowed } from "./analytics.js";
 
 /**
  * Creates the app logs module for the Base44 SDK.
@@ -18,6 +19,8 @@ export function createAppLogsModule(
   return {
     // Log user activity in the app
     async logUserInApp(pageName: string): Promise<void> {
+      // A page visit feeds App Analytics, so it follows the same consent.
+      if (!isAnalyticsAllowed()) return;
       await axios.post(`${baseURL}/log-user-in-app/${pageName}`);
     },
 
