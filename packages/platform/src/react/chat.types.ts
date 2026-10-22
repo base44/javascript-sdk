@@ -21,7 +21,8 @@ export interface ToolCallAnswer {
 }
 
 /**
- * The four calls your backend makes to Base44 for the chat.
+ * The functions you write for the `backend` option. The hook calls them when it needs Base44, and
+ * each one usually forwards to a route on your own server, which adds your credentials.
  *
  * Each call wraps one Base44 API request with your credentials, so the browser never holds a
  * workspace API key or an access token. Your backend can be written in any language.
@@ -324,8 +325,9 @@ export interface ChatOptions {
    */
   appId: string | null;
   /**
-   * The four calls your backend makes to Base44. The hook uses the `backend` from the latest render,
-   * so you can pass an inline object without memoizing it.
+   * The functions the hook calls to reach Base44 through your backend, described in
+   * [Backend calls](#backend-calls). The hook uses the `backend` from the latest render, so you can
+   * pass an inline object without memoizing it.
    */
   backend: ChatBackend;
   /**
@@ -382,6 +384,6 @@ export interface UseChatResult {
    * @returns Promise resolving once the app exists, or once creating it fails and sets [`error`](#error). It never rejects.
    */
   create(prompt: string): Promise<void>;
-  /** Clears {@link UseChatResult.error}. A failed build's error stays while Base44 reports it. */
+  /** Clears a failed call's or the connection's [`error`](#error). A failed build's error stays while Base44 reports it. */
   clearError(): void;
 }
