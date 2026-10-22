@@ -754,7 +754,11 @@ export interface EntityHandler<T = any> {
   /**
    * Deletes a single record by ID.
    *
-   * Permanently removes a record from the database.
+   * The record moves to the entity's trash. To restore it or delete it permanently,
+   * use **Recently deleted** in the [Data tab](/Building-your-app/Managing-your-app-data)
+   * or the [Restore entity record](/api-reference/restore-entity-record) and
+   * [Permanently delete entity record](/api-reference/permanently-delete-entity-record)
+   * endpoints.
    *
    * @param id - The unique identifier of the record to delete.
    * @returns Promise resolving to the deletion result.
@@ -771,7 +775,12 @@ export interface EntityHandler<T = any> {
   /**
    * Deletes multiple records matching a query.
    *
-   * Permanently removes all records that match the provided query.
+   * The matching records move to the entity's trash. To restore them or delete them
+   * permanently, use **Recently deleted** in the
+   * [Data tab](/Building-your-app/Managing-your-app-data) or the
+   * [Restore entity records](/api-reference/restore-entity-records) and
+   * [Permanently delete entity record](/api-reference/permanently-delete-entity-record)
+   * endpoints.
    *
    * This isn't a transaction. Each record is deleted on its own, so if the call
    * fails partway, the records already deleted stay deleted. Learn more about
@@ -831,6 +840,8 @@ export interface EntityHandler<T = any> {
    * example, filter by `status: 'pending'` when setting status to `'processed'`.
    *
    * Each matching record is updated on its own, and the call isn't a transaction.
+   * All the update operators in a call, such as `$set`, `$inc`, and `$push`, are
+   * applied to each record in a single write.
    * To claim one record safely, so that only one of 2 users acting at the same
    * time succeeds, pass that record's `id` as a plain value plus the conditions
    * that must still be true, then check `updated` in the response. The conditions
@@ -911,6 +922,20 @@ export interface EntityHandler<T = any> {
    *   // This user claimed the task
    * } else {
    *   // Someone else claimed it first, or it was no longer open
+   * }
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Save only if the record hasn't changed
+   * // `version` is a number field defined in the Document schema.
+   * // The edit is saved only if the record is still at the version this user loaded.
+   * const result = await base44.entities.Document.updateMany(
+   *   { id: doc.id, version: doc.version },
+   *   { $set: { body: newBody }, $inc: { version: 1 } }
+   * );
+   * if (result.updated === 0) {
+   *   // Someone else saved a change first. Reload the record and try again.
    * }
    * ```
    */
@@ -1203,7 +1228,7 @@ type DynamicEntitiesModule = {
  *
  * Every app includes a built-in `User` entity that stores user account information. This entity has special security rules that can't be changed.
  *
- * Regular users can only read and update their own user record. With service role authentication, you can read, update, and delete any user. You can't create users using the entities module. Instead, use the functions of the {@link AuthModule | auth module} to invite or register new users.
+ * Regular users can only read and update their own user record. With service role authentication, you can read and update any user, and remove any user except the app owner. A removed user moves to **Recently deleted** for 30 days, where an app editor can restore them, and is then deleted permanently. You can't create users using the entities module. Instead, use the functions of the {@link AuthModule | auth module} to invite or register new users.
  *
  * ## Generated Types
  *
