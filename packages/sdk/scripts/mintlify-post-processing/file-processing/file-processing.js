@@ -687,7 +687,7 @@ function prepareAppendedSection(appendPath) {
   return { section, headings: headingList };
 }
 
-function applyAppendedArticles(appendedArticles) {
+function applyAppendedArticles(appendedArticles, inlinedTypeNames = new Set()) {
   const hosts = Object.keys(appendedArticles);
   if (hosts.length === 0) {
     return;
@@ -728,6 +728,8 @@ function applyAppendedArticles(appendedArticles) {
       let effectiveAppendKey = appendKey;
       const appendParts = appendKey.split("/");
       const appendName = appendParts[appendParts.length - 1];
+      // Its values are in the fields that use it, so it gets no section of its own.
+      if (inlinedTypeNames.has(appendName)) continue;
       mergedTypeNames.push(appendName);
       const appendModuleRename = getModuleRename(appendName);
       if (appendModuleRename) {
@@ -789,26 +791,31 @@ function applyAppendedArticles(appendedArticles) {
     hostContent = hostContent.trimEnd() + combinedSections + "\n";
     hostContent = updatePanelWithHeadings(hostContent, collectedHeadings);
 
-    // Types merged onto this page no longer have their own file, so any link
-    // that still points at one — a `{@link Type.member}` cross-reference
-    // TypeDoc resolved to `.../Type.mdx#member`, or a plain `{@link Type}`
-    // resolved to `.../Type` with no fragment at all — now 404s. Rewrite
-    // every such link to a same-page anchor: `#member` when TypeDoc kept a
-    // fragment, otherwise `#<lowercased type name>` (Mintlify's own heading
-    // slug for a single-word PascalCase heading has no inserted hyphens).
-    for (const typeName of mergedTypeNames) {
-      const linkRegex = new RegExp(
-        `\\]\\((?:\\.\\./(?:interfaces|type-aliases|classes|functions)/)?${typeName}(?:\\.mdx|\\.md)?(#[\\w-]*)?\\)`,
-        "g"
-      );
-      hostContent = hostContent.replace(
-        linkRegex,
-        (_match, anchor) => `](${anchor || `#${typeName.toLowerCase()}`})`
-      );
-    }
-
+    hostContent = linkMergedTypesInPage(hostContent, mergedTypeNames);
     fs.writeFileSync(hostPath, hostContent, "utf-8");
   }
+}
+
+/**
+ * Types merged onto a page no longer have their own file, so any link that still points at one —
+ * a `{@link Type.member}` cross-reference TypeDoc resolved to `.../Type.mdx#member`, or a plain
+ * `{@link Type}` resolved to `.../Type` with no fragment at all — now 404s. Rewrites every such
+ * link to a same-page anchor: `#member` when TypeDoc kept a fragment, otherwise
+ * `#<lowercased type name>` (Mintlify's own heading slug for a single-word PascalCase heading has
+ * no inserted hyphens).
+ */
+function linkMergedTypesInPage(content, typeNames) {
+  for (const typeName of typeNames) {
+    const linkRegex = new RegExp(
+      `\\]\\((?:\\.\\./(?:interfaces|type-aliases|classes|functions)/)?${typeName}(?:\\.mdx|\\.md)?(#[\\w-]*)?\\)`,
+      "g"
+    );
+    content = content.replace(
+      linkRegex,
+      (_match, anchor) => `](${anchor || `#${typeName.toLowerCase()}`})`
+    );
+  }
+  return content;
 }
 
 /**
@@ -2243,6 +2250,112 @@ function cleanupTruncatedParamTypes(dir) {
 }
 
 /**
+ * A type alias page for a union of string literals, such as `type Status = "ready" | "error"`, as
+ * its values and its comment minus the first paragraph. The first paragraph sums up the type, and a
+ * field that uses the type has its own summary. Anything else, including a union whose comment
+ * documents each value as a field and so has no signature line, is null.
+ */
+function parseStringUnion(content, typeName) {
+  const signature = content.match(new RegExp(`^> \\*\\*${typeName}\\*\\* = (.+)$`, "m"));
+  if (!signature) return null;
+  const values = signature[1].split(" | ").map((part) => part.trim().match(/^`"([^"`]*)"`$/)?.[1]);
+  if (values.some((value) => value === undefined)) return null;
+  const comment = content.slice(signature.index + signature[0].length).trim();
+  return { values, details: comment.split(/\n\s*\n/).slice(1).join("\n\n").trim() };
+}
+
+/**
+ * A field whose type is the union, with the union's comment after the field's own description. The
+ * type label keeps the union's name, for the import. A comment that doesn't name every value in
+ * backticks gets a line that lists them.
+ */
+function inlineStringUnions(content, unions) {
+  let modified = false;
+  for (const [typeName, { values, details }] of unions) {
+    const field = new RegExp(
+      `(<(ResponseField|ParamField) [^>]*type=")(?:${typeName}|\\[${typeName}\\]\\([^)]*\\))("[^>]*>)([\\s\\S]*?)\\n*(</\\2>)`,
+      "g"
+    );
+    content = content.replace(field, (_match, open, _tag, attributes, description, close) => {
+      modified = true;
+      const namesEvery = values.every((value) => new RegExp(`\`'?${value}'?\``).test(details));
+      const quoted = values.map((value) => `\`'${value}'\``);
+      const valueLine = namesEvery
+        ? ""
+        : `It's ${quoted.length > 2 ? `${quoted.slice(0, -1).join(", ")}, or ${quoted.at(-1)}` : quoted.join(" or ")}.`;
+      const added = [details, valueLine].filter(Boolean).join("\n\n");
+      return `${open}${typeName}${attributes}\n\n${[description.trim(), added].filter(Boolean).join("\n\n")}\n\n${close}`;
+    });
+  }
+  return { content, modified };
+}
+
+/**
+ * The string unions that some field uses, read from TypeDoc's pages before anything is removed.
+ * Their pages go, so their values show only in the fields, and the returned map lets the fields
+ * take them in once every field on a page has its final form.
+ */
+function collectInlinedStringUnions(contentDir) {
+  const aliasDir = path.join(contentDir, "type-aliases");
+  if (!fs.existsSync(aliasDir)) return new Map();
+  const unions = new Map();
+  for (const file of fs.readdirSync(aliasDir)) {
+    if (!file.endsWith(".mdx")) continue;
+    const typeName = path.basename(file, ".mdx");
+    const union = parseStringUnion(fs.readFileSync(path.join(aliasDir, file), "utf-8"), typeName);
+    if (union) unions.set(typeName, union);
+  }
+
+  const used = new Set();
+  const scan = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const entryPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) scan(entryPath);
+      else if (entry.name.endsWith(".mdx")) {
+        const content = fs.readFileSync(entryPath, "utf-8");
+        for (const typeName of unions.keys()) {
+          // A field's type attribute, or a property's signature line before it becomes a field.
+          const usage = new RegExp(
+            `type="${typeName}"|^> \\*\\*[\\w$]+\\*\\*\\??: (?:\\[\`?${typeName}\`?\\]\\([^)]*\\)|\`${typeName}\`)\\s*$`,
+            "m"
+          );
+          if (usage.test(content)) used.add(typeName);
+        }
+      }
+    }
+  };
+  scan(contentDir);
+
+  const inlined = new Map([...unions].filter(([typeName]) => used.has(typeName)));
+  for (const typeName of inlined.keys()) {
+    fs.unlinkSync(path.join(aliasDir, `${typeName}.mdx`));
+    console.log(`Removed (inlined into its fields): content/type-aliases/${typeName}.mdx`);
+  }
+  return inlined;
+}
+
+function applyStringUnionInlining(dir, unions, appendedArticles) {
+  if (unions.size === 0) return;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) applyStringUnionInlining(entryPath, unions, appendedArticles);
+    else if (entry.name.endsWith(".mdx")) {
+      const result = inlineStringUnions(fs.readFileSync(entryPath, "utf-8"), unions);
+      if (!result.modified) continue;
+      // The comments come from TypeDoc's type-alias pages, so their links still carry the file
+      // extension and point at types this page may have merged in.
+      const hostKey = path.relative(CONTENT_DIR, entryPath).replace(/\.mdx$/, "");
+      const merged = Object.entries(appendedArticles)
+        .filter(([host]) => host === hostKey || host.replace(/[^/]+$/, (name) => getModuleRename(name) ?? name) === hostKey)
+        .flatMap(([, list]) => list.map((key) => key.split("/").pop()));
+      const content = linkMergedTypesInPage(result.content.replace(/\]\(([^)#]+?)\.mdx?(#[^)]*)?\)/g, "]($1$2)"), merged);
+      fs.writeFileSync(entryPath, content, "utf-8");
+      console.log(`Inlined string unions: ${path.relative(DOCS_DIR, entryPath)}`);
+    }
+  }
+}
+
+/**
  * Main function
  */
 /** The types listed in types-to-delete-after-processing.json. */
@@ -2844,6 +2957,9 @@ function main() {
   const linkedTypeNames = getLinkedTypeNames();
   const exposedTypeNames = getTypesToExpose();
 
+  // Read the string unions that fields use before their pages are removed or appended
+  const inlinedUnions = collectInlinedStringUnions(CONTENT_DIR);
+
   // First, perform module renames (EntitiesModule -> entities, etc.)
   performModuleRenames(DOCS_DIR);
 
@@ -2852,7 +2968,7 @@ function main() {
 
   // Append configured articles
   const appendedArticles = loadAppendedArticlesConfig();
-  applyAppendedArticles(appendedArticles);
+  applyAppendedArticles(appendedArticles, new Set(inlinedUnions.keys()));
 
   // Add clickable links for types in ParamFields
   addTypeLinksToParamFields(DOCS_DIR);
@@ -2898,8 +3014,15 @@ function main() {
   // Link type names in Type Declarations sections to their corresponding headings
   applyTypeDeclarationLinking(DOCS_DIR);
 
+  // Put each string union's values in the fields that use it, now that every field has its final form
+  applyStringUnionInlining(CONTENT_DIR, inlinedUnions, appendedArticles);
+
   // Remove links to types that aren't exposed (would 404)
-  applyNonExposedTypeLinkRemoval(DOCS_DIR, exposedTypeNames, loadTypesToDelete());
+  applyNonExposedTypeLinkRemoval(
+    DOCS_DIR,
+    exposedTypeNames,
+    new Set([...loadTypesToDelete(), ...inlinedUnions.keys()])
+  );
 
   // Delete types that should not appear in navigation but were needed for inline rendering
   deleteTypesAfterProcessing(DOCS_DIR);
@@ -2936,4 +3059,4 @@ if (process.argv[1] && fs.realpathSync(process.argv[1]) === fs.realpathSync(__fi
   main();
 }
 
-export { fixInPageAnchors, nestUnderGroupTypes, propertiesAsFields, removeNonExposedTypeLinks };
+export { fixInPageAnchors, inlineStringUnions, nestUnderGroupTypes, parseStringUnion, propertiesAsFields, removeNonExposedTypeLinks };

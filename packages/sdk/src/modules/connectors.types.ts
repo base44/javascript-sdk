@@ -94,7 +94,7 @@ export interface ConnectorApiRequest {
 export interface ConnectorApiResponse<T = unknown> {
   /** `true` only when the upstream API returned a 2xx status. Proxy and upstream errors are `false`. */
   success: boolean;
-  /** How far the call progressed. Only `not_sent` proves the provider did not execute it. */
+  /** How far the call progressed. */
   phase: ConnectorApiResponsePhase;
   /** The upstream HTTP status code, or `null` when no response was received. */
   status: number | null;

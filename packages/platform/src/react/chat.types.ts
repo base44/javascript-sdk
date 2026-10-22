@@ -275,7 +275,9 @@ export interface ApprovalDetails {
 }
 
 /**
- * What the AI is doing. When several hold at once, the first in this list wins.
+ * What the AI is doing.
+ *
+ * When several hold at once, the first in this list wins.
  *
  * - `error`: Base44 reports that the last build failed.
  * - `waiting`: a question waits on the user.

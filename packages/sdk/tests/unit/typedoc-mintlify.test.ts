@@ -7,7 +7,9 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { nameCallableProperties } from "../../scripts/mintlify-post-processing/typedoc-plugin/typedoc-mintlify-content.js";
 import {
   fixInPageAnchors,
+  inlineStringUnions,
   nestUnderGroupTypes,
+  parseStringUnion,
   propertiesAsFields,
   removeNonExposedTypeLinks,
 } from "../../scripts/mintlify-post-processing/file-processing/file-processing.js";
@@ -222,6 +224,64 @@ describe("propertiesAsFields", () => {
     expect(converted).not.toContain('name="answer()"');
     const method = converted.search(/^#### answer\(\)$/m);
     expect(method).toBeGreaterThan(converted.lastIndexOf("</ResponseField>"));
+  });
+});
+
+describe("parseStringUnion", () => {
+  test("reads the values and the comment after its summary paragraph", () => {
+    const page = [
+      "***",
+      "",
+      '> **Status** = `"ready"` | `"error"`',
+      "",
+      "What the widget is doing.",
+      "",
+      "- `ready`: Nothing is wrong.",
+      "- `error`: The widget failed.",
+    ].join("\n");
+
+    expect(parseStringUnion(page, "Status")).toEqual({
+      values: ["ready", "error"],
+      details: "- `ready`: Nothing is wrong.\n- `error`: The widget failed.",
+    });
+  });
+
+  test("skips other aliases, and unions that document each value as a field", () => {
+    expect(parseStringUnion('> **Size** = `"s"` | `number`', "Size")).toBeNull();
+    expect(parseStringUnion('Codes.\n\n<ResponseField name="bad_input">', "Code")).toBeNull();
+  });
+});
+
+describe("inlineStringUnions", () => {
+  test("adds the union's comment to each field that uses it, keeping the type's name", () => {
+    const unions = new Map([["Status", { values: ["ready", "error"], details: "- `ready`: Fine.\n- `error`: Failed." }]]);
+    const content = [
+      '<ResponseField name="status" type="Status" required>',
+      "",
+      "What the widget is doing.",
+      "",
+      "</ResponseField>",
+      "",
+      '<ParamField body="other" type="Statuses">',
+      "",
+      "</ParamField>",
+    ].join("\n");
+
+    const { content: inlined, modified } = inlineStringUnions(content, unions);
+    expect(modified).toBe(true);
+    expect(inlined).toContain(
+      '<ResponseField name="status" type="Status" required>\n\nWhat the widget is doing.\n\n- `ready`: Fine.\n- `error`: Failed.\n\n</ResponseField>'
+    );
+    expect(inlined).toContain('<ParamField body="other" type="Statuses">\n\n</ParamField>');
+  });
+
+  test("lists the values when the comment doesn't name them all", () => {
+    const unions = new Map([["Unit", { values: ["day", "week", "month"], details: "" }]]);
+    const content = '<ParamField body="unit" type="Unit" required>\n\nBilling unit.\n\n</ParamField>';
+
+    expect(inlineStringUnions(content, unions).content).toBe(
+      "<ParamField body=\"unit\" type=\"Unit\" required>\n\nBilling unit.\n\nIt's `'day'`, `'week'`, or `'month'`.\n\n</ParamField>"
+    );
   });
 });
 
