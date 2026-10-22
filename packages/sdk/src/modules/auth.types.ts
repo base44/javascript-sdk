@@ -54,7 +54,7 @@ export interface RegisterParams {
   email: string;
   /** User's password. */
   password: string;
-  /** Optional {@link https://developers.cloudflare.com/turnstile/ | Cloudflare Turnstile CAPTCHA token} for bot protection. */
+  /** Has no effect. Base44 doesn't verify Turnstile tokens for app users. */
   turnstile_token?: string | null;
   /** Optional {@link https://docs.base44.com/Getting-Started/Referral-program | referral code} from an existing user. */
   referral_code?: string | null;
@@ -146,6 +146,11 @@ export interface AuthModule {
    *
    * You can update any [custom fields](/developers/backend/resources/entities/user-schema#custom-fields)
    * defined in your User entity schema.
+   *
+   * [Field-level security](/developers/backend/resources/entities/security#field-level-security-fls)
+   * `write` rules on custom User fields also apply to this method. If `data` includes a field
+   * the user isn't allowed to write, the call throws a permission error and no fields are
+   * updated.
    *
    * Updating `role` requires editor access on the app.
    *
@@ -291,7 +296,7 @@ export interface AuthModule {
    *
    * @param email - User's email address.
    * @param password - User's password.
-   * @param turnstileToken - Optional {@link https://developers.cloudflare.com/turnstile/ | Cloudflare Turnstile CAPTCHA token} for bot protection.
+   * @param turnstileToken - Has no effect. Base44 doesn't verify Turnstile tokens for app users.
    * @returns Promise resolving to login response with access token and user data.
    * @throws Error if the email and password combination is invalid or the user is not registered.
    *
