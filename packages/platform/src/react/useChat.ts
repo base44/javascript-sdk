@@ -26,14 +26,20 @@ const NEW_APP = "new-app";
  * @returns The conversation, its `status`, `connection`, and `error`, and the [actions](#actions) `send()`, `create()`, and `clearError()`.
  *
  * @example
- * ```typescript
- * // Draw the chat and answer an approval
+ * ```tsx
+ * // Render the chat and answer an approval
+ * import { useChat } from "@base44/platform/react";
+ * import Markdown from "react-markdown";
+ *
+ * // ...
+ *
+ * // Inside your component
  * const chat = useChat({ appId, backend, onAppCreated: selectApp });
  * return (
  *   <>
  *     {chat.items.map((item) => (
  *       <div key={item.id} className={item.role}>
- *         {item.text && <p>{item.text}</p>}
+ *         {item.text && <Markdown>{item.text}</Markdown>}
  *         {item.steps.map((step) =>
  *           step.question?.kind === "approval" ? (
  *             <button key={step.id} onClick={step.question.approve}>Allow {step.question.action}</button>
