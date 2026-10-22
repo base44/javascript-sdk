@@ -141,6 +141,14 @@ describe("steps", () => {
     expect(step({ id: "t4", name: "write_file", status: "success", display: { file_paths: ["src/App.jsx"] } }).label).toBe("write_file src/App.jsx");
   });
 
+  test("a 'present | past' summary shows the half that matches the step, as in Base44's builder", () => {
+    const summary = "Looking at your app | Looked at your app";
+    expect(step({ id: "t1", name: "exec_tool", status: "running", display: { summary } }).label).toBe("Looking at your app");
+    expect(step({ id: "t2", name: "exec_tool", status: "waiting_for_user_input", display: { summary } }).label).toBe("Looking at your app");
+    expect(step({ id: "t3", name: "exec_tool", status: "success", display: { summary } }).label).toBe("Looked at your app");
+    expect(step({ id: "t4", name: "exec_tool", status: "error", display: { summary } }).label).toBe("Looked at your app");
+  });
+
   test("an answered choice keeps what the user answered, next to each question", () => {
     const answered = step({
       id: "t1",
