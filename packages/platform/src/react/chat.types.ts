@@ -95,9 +95,13 @@ export interface ChatItem {
   id: string;
   /** Who wrote the message. */
   role: "user" | "assistant";
-  /** The message text, as raw markdown. It comes before the steps, and is empty when the message only holds tool calls. */
+  /** The message text, as raw markdown. Show it before the message's steps. It's empty when the message only holds tool calls. */
   text: string;
-  /** When the message was created, as an ISO timestamp. Base44's timestamps are UTC with no time zone. A pending prompt carries the browser's time. */
+  /**
+   * When the message was created, as an ISO 8601 timestamp in UTC. A timestamp from Base44 has no `Z`
+   * or offset, so add a `Z` before parsing it with `new Date()`. A pending prompt has the browser's
+   * time, which already ends in `Z`.
+   */
   createdAt: string;
   /** One step per tool call, in order. */
   steps: ChatStep[];
@@ -324,9 +328,9 @@ export interface ChatOptions {
   onAppCreated?: (app: ChatApp) => void;
 }
 
-/** The chat that {@link useChat} returns. */
+/** The chat state and actions that `useChat()` returns. */
 export interface UseChatResult {
-  /** The conversation, oldest first, with open questions bound to their steps. */
+  /** The conversation, oldest first. Each open question appears with the step that asked it. */
   items: ChatItem[];
   /** What the AI is doing. */
   status: ChatStatus;

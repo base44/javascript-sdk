@@ -23,7 +23,7 @@ const NEW_APP = "new-app";
  * The actions never throw. A failure sets {@linkcode UseChatResult.error}.
  *
  * @param options - The app to follow, your backend's calls, and what to do with a created app.
- * @returns The conversation, its status, connection and error, and the actions `send`, `create` and `clearError`.
+ * @returns The conversation, its `status`, `connection`, and `error`, and the [actions](#actions) `send()`, `create()`, and `clearError()`.
  *
  * @example
  * ```typescript
