@@ -3,7 +3,7 @@ import type { PlatformSocketError } from "../errors.js";
 
 /**
  * The three fields of a [Create socket session](/api-reference/create-socket-session) response that
- * your `getSession()` callback returns. Keep the response's `session_id` on your server.
+ * the browser needs. Keep the response's `session_id` on your server.
  */
 export interface SocketSession {
   /** Token that authenticates the socket. The client keeps it in memory and sends it only when the socket connects. */

@@ -70,7 +70,7 @@ export interface ChatBackend {
    * whenever the session expires. Sessions last one hour.
    *
    * @param appId - ID of the app to follow.
-   * @returns Promise resolving to the session's `session_token`, `socket_url`, and `socket_path`.
+   * @returns Promise resolving to the session.
    */
   openLiveSession(appId: string): Promise<SocketSession>;
   /**
