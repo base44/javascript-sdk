@@ -2,9 +2,8 @@ import type { PlatformEvent, PlatformSnapshot } from "./chat.events.types.js";
 import type { PlatformSocketError } from "../errors.js";
 
 /**
- * The response body of [Create socket session](/api-reference/create-socket-session), which your
- * `getSession()` callback returns. Pass the response through unchanged. The client reads the three
- * fields below.
+ * The three fields of a [Create socket session](/api-reference/create-socket-session) response that
+ * your `getSession()` callback returns. Keep the response's `session_id` on your server.
  */
 export interface SocketSession {
   /** Token that authenticates the socket. The client keeps it in memory and sends it only when the socket connects. */
@@ -20,13 +19,15 @@ export interface ChatInitOptions {
   /**
    * Returns a new socket session from your server.
    *
-   * Return the response body of [Create socket session](/api-reference/create-socket-session) as a
-   * [`SocketSession`](#socketsession), and return a new session on every call. The client calls
+   * Return the `session_token`, `socket_url`, and `socket_path` of a
+   * [Create socket session](/api-reference/create-socket-session) response as a
+   * [`SocketSession`](#socketsession), and keep its `session_id` on your server. Return a new
+   * session on every call. The client calls
    * `getSession()` on the first {@linkcode ChatSession.connect | connect()}, and again only when
    * the session expires or Base44 rejects its token. If a new session has a different `socket_url`
    * or `socket_path`, the client moves to it and rejoins every active subscription.
    *
-   * @returns The session, as your server received it.
+   * @returns The session's `session_token`, `socket_url`, and `socket_path`.
    */
   getSession: () => Promise<SocketSession>;
   /**
@@ -55,8 +56,7 @@ export interface ChatModule {
    *
    * Pass a `getSession()` callback in the options. The client calls it to get a
    * [socket session](/developers/references/apps-api/sections/socket-sessions), which your server
-   * opens with [Create socket session](/api-reference/create-socket-session) and returns as the
-   * response body. Each session is independent and gets its own socket session.
+   * opens with [Create socket session](/api-reference/create-socket-session). Each session is independent and gets its own socket session.
    *
    * Call {@linkcode ChatSession.connect | connect()} on the returned session to open the socket.
    *

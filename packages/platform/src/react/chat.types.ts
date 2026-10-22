@@ -30,7 +30,8 @@ export interface ToolCallAnswer {
  * Each function's route calls one Base44 endpoint:
  * - [`createApp()`](#createapp): [Create app](/api-reference/create-app), with the first prompt as `initial_message`.
  * - [`openLiveSession()`](#openlivesession): [Create socket session](/api-reference/create-socket-session) with `{ app_ids: [appId] }`.
- *   Return the response body unchanged. It holds a session token, never the workspace API key.
+ *   Return its `session_token`, `socket_url`, and `socket_path`, and keep `session_id` on your server.
+ *   None of them is the workspace API key.
  * - [`sendMessage()`](#sendmessage): [Send chat message](/api-reference/send-chat-message).
  * - [`submitToolCallInput()`](#submittoolcallinput): [Submit tool-call input](/api-reference/submit-tool-call-input). Send an
  *   `X-Request-ID` built from the tool call ID, so a retry resumes the turn only once.
@@ -69,7 +70,7 @@ export interface ChatBackend {
    * whenever the session expires. Sessions last one hour.
    *
    * @param appId - ID of the app to follow.
-   * @returns Promise resolving to the Create socket session response body, unchanged.
+   * @returns Promise resolving to the session's `session_token`, `socket_url`, and `socket_path`.
    */
   openLiveSession(appId: string): Promise<SocketSession>;
   /**
