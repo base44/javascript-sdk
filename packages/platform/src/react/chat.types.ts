@@ -364,19 +364,22 @@ export interface UseChatResult {
    */
   error: ChatError | null;
   /**
-   * Sends a prompt to the current app. Base44 queues it while the AI is working. The prompt shows
-   * at once as a pending item, and the reply arrives through `items`. Without an app, it sets
-   * `error`. Use {@link UseChatResult.create} for the first prompt.
+   * Sends a prompt to the app the chat follows. The prompt appears in [`items`](#items) right away
+   * as a pending item, and the reply arrives there too. Base44 queues the prompt while the AI is
+   * working. If the chat doesn't follow an app yet, it sets [`error`](#error) instead. Use
+   * [`create()`](#create) for the first prompt.
    *
    * @param prompt - The prompt to send.
-   * @returns Promise resolving once Base44 accepts the prompt. It never rejects.
+   * @returns Promise resolving once Base44 accepts the prompt, or once the send fails and sets [`error`](#error). It never rejects.
    */
   send(prompt: string): Promise<void>;
   /**
-   * Creates an app from its first prompt and reports it through `onAppCreated`.
+   * Creates an app from its first prompt. The prompt appears in [`items`](#items) right away as a
+   * pending item. Once the app exists, the hook passes it to [`onAppCreated`](#onappcreated). If
+   * `appId` is `null`, the chat then follows the new app. Otherwise it stays on the app it follows.
    *
    * @param prompt - The first prompt, which describes the app.
-   * @returns Promise resolving once the app exists. It never rejects.
+   * @returns Promise resolving once the app exists, or once creating it fails and sets [`error`](#error). It never rejects.
    */
   create(prompt: string): Promise<void>;
   /** Clears {@link UseChatResult.error}. A failed build's error stays while Base44 reports it. */
