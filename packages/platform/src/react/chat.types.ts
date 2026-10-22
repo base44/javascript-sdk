@@ -63,6 +63,22 @@ export interface ChatBackend {
    *
    * @param prompt - The first prompt, which describes the app.
    * @returns Promise resolving to the new app.
+   *
+   * @example
+   * ```typescript
+   * // Your server route for createApp(), with a personal access token
+   * export async function POST(request: Request) {
+   *   const { prompt } = await request.json();
+   *   const response = await fetch("https://app.base44.com/api/apps", {
+   *     method: "POST",
+   *     headers: { Authorization: `Bearer ${process.env.BASE44_ACCESS_TOKEN}`, "Content-Type": "application/json" },
+   *     body: JSON.stringify({ initial_message: { content: prompt } }),
+   *   });
+   *   if (!response.ok) return new Response("Create app failed", { status: response.status });
+   *   const app = await response.json();
+   *   return Response.json({ id: app.id, name: app.name });
+   * }
+   * ```
    */
   createApp(prompt: string): Promise<ChatApp>;
   /**
@@ -71,6 +87,23 @@ export interface ChatBackend {
    *
    * @param appId - ID of the app to follow.
    * @returns Promise resolving to the session.
+   *
+   * @example
+   * ```typescript
+   * // Your server route for openLiveSession(), with a workspace API key
+   * export async function POST(request: Request) {
+   *   const { appId } = await request.json();
+   *   const response = await fetch("https://app.base44.com/api/v1/socket-sessions", {
+   *     method: "POST",
+   *     headers: { Authorization: `Bearer ${process.env.BASE44_API_KEY}`, "Content-Type": "application/json" },
+   *     body: JSON.stringify({ app_ids: [appId] }),
+   *   });
+   *   if (!response.ok) return new Response("Create socket session failed", { status: response.status });
+   *   const { session_token, socket_url, socket_path, session_id } = await response.json();
+   *   await saveSession(appId, session_id); // Keep it on your server to change or end the session
+   *   return Response.json({ session_token, socket_url, socket_path });
+   * }
+   * ```
    */
   openLiveSession(appId: string): Promise<SocketSession>;
   /**
@@ -200,12 +233,35 @@ export interface ChoiceQuestion {
    * @param picked - One list of picked labels per question, in the order of `questions`.
    * @param texts - One free-text answer per question, in the same order. Use it for a `text_input` question, or as a note beside a pick. A question with no pick and no text is skipped.
    * @returns Promise resolving once Base44 accepts the answer, or once sending it fails and sets [`error`](#error). It never rejects.
+   *
+   * @example
+   * ```tsx
+   * // Answer a one-question choice with a button per option
+   * function ChoiceButtons({ question }: { question: ChoiceQuestion }) {
+   *   const [entry] = question.questions;
+   *   return (
+   *     <div>
+   *       <p>{entry.text}</p>
+   *       {entry.options.map((label) => (
+   *         <button key={label} onClick={() => question.answer([[label]])}>{label}</button>
+   *       ))}
+   *       <button onClick={question.decline}>Skip</button>
+   *     </div>
+   *   );
+   * }
+   * ```
    */
   answer(picked: string[][], texts?: string[]): Promise<void>;
   /**
    * Declines the question. The AI continues without the answer.
    *
    * @returns Promise resolving once Base44 accepts the decline, or once sending it fails and sets [`error`](#error). It never rejects.
+   *
+   * @example
+   * ```tsx
+   * // Skip the question
+   * <button onClick={question.decline}>Skip</button>
+   * ```
    */
   decline(): Promise<void>;
 }
@@ -229,12 +285,43 @@ export interface SecretsQuestion {
    *
    * @param values - The values, keyed by each field's `name`.
    * @returns Promise resolving once Base44 accepts the values, or once sending it fails and sets [`error`](#error). It never rejects.
+   *
+   * @example
+   * ```tsx
+   * // Ask for each secret, then submit the values by name
+   * function SecretsForm({ question }: { question: SecretsQuestion }) {
+   *   return (
+   *     <form
+   *       onSubmit={(event) => {
+   *         event.preventDefault();
+   *         const form = new FormData(event.currentTarget);
+   *         question.submit(Object.fromEntries(question.fields.map((field) => [field.name, String(form.get(field.name) ?? "")])));
+   *       }}
+   *     >
+   *       {question.fields.map((field) => (
+   *         <label key={field.name}>
+   *           {field.name}
+   *           <input name={field.name} type="password" placeholder={field.description} />
+   *         </label>
+   *       ))}
+   *       <button type="submit">Save</button>
+   *       <button type="button" onClick={question.decline}>Skip</button>
+   *     </form>
+   *   );
+   * }
+   * ```
    */
   submit(values: Record<string, string>): Promise<void>;
   /**
    * Declines the question. The AI continues without the values.
    *
    * @returns Promise resolving once Base44 accepts the decline, or once sending it fails and sets [`error`](#error). It never rejects.
+   *
+   * @example
+   * ```tsx
+   * // Skip without entering the secrets
+   * <button onClick={question.decline}>Skip</button>
+   * ```
    */
   decline(): Promise<void>;
 }
@@ -255,12 +342,33 @@ export interface ApprovalQuestion {
    * Lets the action run.
    *
    * @returns Promise resolving once Base44 accepts the approval, or once sending it fails and sets [`error`](#error). It never rejects.
+   *
+   * @example
+   * ```tsx
+   * // Show what the action would do, then allow or decline it
+   * function ApprovalPrompt({ question }: { question: ApprovalQuestion }) {
+   *   return (
+   *     <div>
+   *       <p>The AI wants to run {question.action}.</p>
+   *       {question.reason && <p>{question.reason}</p>}
+   *       <button onClick={question.approve}>Allow</button>
+   *       <button onClick={question.decline}>Decline</button>
+   *     </div>
+   *   );
+   * }
+   * ```
    */
   approve(): Promise<void>;
   /**
    * Declines the action. It never runs, and the AI continues.
    *
    * @returns Promise resolving once Base44 accepts the decline, or once sending it fails and sets [`error`](#error). It never rejects.
+   *
+   * @example
+   * ```tsx
+   * // Decline the action
+   * <button onClick={question.decline}>Decline</button>
+   * ```
    */
   decline(): Promise<void>;
 }
@@ -381,6 +489,27 @@ export interface UseChatResult {
    *
    * @param prompt - The prompt to send.
    * @returns Promise resolving once Base44 accepts the prompt, or once the send fails and sets [`error`](#error). It never rejects.
+   *
+   * @example
+   * ```tsx
+   * // Send the prompt from a form
+   * function PromptForm({ chat }: { chat: UseChatResult }) {
+   *   const [prompt, setPrompt] = useState("");
+   *   return (
+   *     <form
+   *       onSubmit={(event) => {
+   *         event.preventDefault();
+   *         chat.send(prompt);
+   *         setPrompt("");
+   *       }}
+   *     >
+   *       <input value={prompt} onChange={(event) => setPrompt(event.target.value)} />
+   *       <button type="submit" disabled={!prompt.trim()}>Send</button>
+   *       {chat.status === "building" && <small>The AI is working. New prompts wait in the queue.</small>}
+   *     </form>
+   *   );
+   * }
+   * ```
    */
   send(prompt: string): Promise<void>;
   /**
@@ -390,8 +519,30 @@ export interface UseChatResult {
    *
    * @param prompt - The first prompt, which describes the app.
    * @returns Promise resolving once the app exists, or once creating it fails and sets [`error`](#error). It never rejects.
+   *
+   * @example
+   * ```tsx
+   * // Create the app from the first prompt, and send the next prompts to it
+   * const [appId, setAppId] = useState<string | null>(null);
+   * const chat = useChat({ appId, backend, onAppCreated: (app) => setAppId(app.id) });
+   *
+   * const submit = (prompt: string) => (appId ? chat.send(prompt) : chat.create(prompt));
+   * ```
    */
   create(prompt: string): Promise<void>;
-  /** Clears a failed call's or the connection's [`error`](#error). A failed build's error stays while Base44 reports it. */
+  /**
+   * Clears a failed call's or the connection's [`error`](#error). A failed build's error stays while Base44 reports it.
+   *
+   * @example
+   * ```tsx
+   * // Show the error, with a dismiss button unless the build failed
+   * {chat.error && (
+   *   <div role="alert">
+   *     {chat.error.message}
+   *     {chat.error.code !== "build_failed" && <button onClick={chat.clearError}>Dismiss</button>}
+   *   </div>
+   * )}
+   * ```
+   */
   clearError(): void;
 }
