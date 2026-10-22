@@ -301,14 +301,16 @@ export type ChatConnection = "connecting" | "connected" | "disconnected";
 
 /** A failure of a call, of the live connection, or of the build. */
 export interface ChatError {
-  /** What went wrong, for people. */
+  /** A readable description of what went wrong, such as `The build failed`. */
   message: string;
   /**
-   * What went wrong, for code. A connection error carries a `PlatformSocketErrorCode`, and a failed
-   * build carries `build_failed`. A failed call to your backend carries none.
+   * A value your code can check to handle the error, such as `build_failed` for a failed build. A
+   * connection error has one of the session or app error codes listed under the chat module's
+   * [Errors](/developers/references/platform-sdk/docs/interfaces/chat#errors). A failed call to
+   * your backend has no code.
    */
   code?: string;
-  /** The original error, for logging. */
+  /** The error the failure came from, such as the one your backend threw. Log it to debug the failure. It's absent when the hook found the failure itself, such as a failed build or a send with no app. */
   cause?: unknown;
 }
 
@@ -344,9 +346,11 @@ export interface UseChatResult {
   /** Whether the chat follows the app live. */
   connection: ChatConnection;
   /**
-   * The last failure. It's set whenever `status` is `error`, and on any failed call or connection
-   * error. A failed call's error clears on the next action. A connection error stays until
-   * {@link UseChatResult.clearError}. A failed build stays while Base44 reports it.
+   * The failure to show, or `null`. It's set when a call fails, when the live connection fails, and
+   * whenever `status` is `error`. When more than one of these conditions is true, `error` holds the
+   * failed call first, then the connection error, then the failed build. A failed call's error
+   * clears on the next action, and a connection error stays until [`clearError()`](#clearerror). A
+   * failed build's error stays while Base44 reports it. Switching to another app clears it.
    */
   error: ChatError | null;
   /**
