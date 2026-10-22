@@ -14,13 +14,11 @@ const NEW_APP = "new-app";
  * Runs an app's AI chat in your own React UI. Requires a browser environment and can't be used in
  * the backend.
  *
- * The hook is headless. It gives you the conversation and the actions, and your components render them:
+ * The hook is headless. It gives you the conversation and the [actions](#returned-actions), and your components render them:
  * - Follows the app live, and renews its socket session when it expires.
  * - Turns Base44's messages into [items](#items), and shows each open question with the step that asked it.
- * - Reports what the AI is doing in {@linkcode UseChatResult.status}, and the live connection in {@linkcode UseChatResult.connection}.
+ * - Reports what the AI is doing in [`status`](#status), and the live connection in [`connection`](#connection).
  * - Sends prompts, creates apps, and answers questions through the {@link ChatBackend | backend} you pass, so no credential reaches the browser.
- *
- * The actions never throw. A failure sets {@linkcode UseChatResult.error}.
  *
  * @param options - The app to follow, your backend's calls, and what to do with a created app.
  * @returns The conversation, its `status`, `connection`, and `error`, and the [actions](#actions) `send()`, `create()`, and `clearError()`.
