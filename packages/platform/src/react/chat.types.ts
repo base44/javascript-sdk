@@ -74,8 +74,10 @@ export interface ChatBackend {
    */
   openLiveSession(appId: string): Promise<SocketSession>;
   /**
-   * Sends a prompt to an existing app. Base44 queues a prompt sent while the AI is working. When the
-   * app has no queue, Base44 refuses it with a 409, so reject the promise.
+   * Sends a prompt to an existing app. Base44 queues a prompt sent while the AI is working. If Base44
+   * refuses the prompt, for example because the app is busy with an operation that blocks new
+   * messages, reject the promise. The hook then sets [`error`](#error), so your UI can show the
+   * failure.
    *
    * @param appId - ID of the app.
    * @param content - The prompt.
