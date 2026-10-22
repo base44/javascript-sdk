@@ -64,6 +64,38 @@ export interface CheckoutBuyer {
 }
 
 /**
+ * A shipping address. Returned on a purchase whether your app or the provider collected it.
+ */
+export interface ShippingAddress {
+  /** Recipient's full name, 1 to 300 characters. */
+  name: string;
+  /** Street address, 1 to 300 characters. */
+  line1: string;
+  /** Apartment, suite or building, up to 300 characters. */
+  line2?: string | null;
+  /** City, up to 120 characters. Some countries address by region and postal code alone. */
+  city?: string | null;
+  /** State, province or region, up to 300 characters. */
+  region?: string | null;
+  /** Postal or ZIP code, up to 60 characters. */
+  postal_code?: string | null;
+  /** Two-letter ISO 3166-1 country code, such as `'US'`. */
+  country: string;
+}
+
+/**
+ * Shipping for a checkout with at least one `shippable` item. Supported for PayPal one-time checkouts only.
+ *
+ * Compute the fee on your server, never in the browser. When the fee depends on the address, such as by distance or zone, collect the address in your app and pass it in `address`: PayPal shows it to the buyer locked, so the order ships where the fee was computed for. When the fee doesn't depend on the address, pass only `amount` and PayPal asks the buyer for the address.
+ */
+export interface CheckoutShipping {
+  /** Address your app collected. Omit it to let the provider ask the buyer. */
+  address?: ShippingAddress;
+  /** Shipping fee in minor units, shown to the buyer as its own shipping line. Omit it for free shipping. */
+  amount?: number;
+}
+
+/**
  * How the buyer pays.
  *
  * - `'redirect'`: The buyer leaves the app for the provider's hosted checkout page at `redirect_url`.
@@ -91,6 +123,8 @@ export interface CreateCheckoutParams {
   idempotency_key?: string;
   /** How the buyer pays. Defaults to `'redirect'`. PayPal apps must pass `'embedded'`, and Wix Payments supports only `'redirect'`. */
   presentation?: CheckoutPresentation;
+  /** Shipping address and fee. Allowed only when at least one item is `shippable`. Supported for PayPal one-time checkouts only; other providers and subscriptions reject it with `invalid_request`. */
+  shipping?: CheckoutShipping;
 }
 
 /**
@@ -204,6 +238,10 @@ export interface Purchase {
   metadata?: Record<string, string> | null;
   /** ID of the subscription, for recurring purchases. */
   subscription_id?: string | null;
+  /** Where the order ships, whether your app or the provider collected the address. Always `null` unless you call with the service role. Save it on your order record. */
+  shipping_address?: ShippingAddress | null;
+  /** Shipping fee in minor units, when the checkout charged one. */
+  shipping_amount?: number | null;
   /** ID of the payment to pass to [`refund()`](/developers/references/sdk/docs/interfaces/service-role-payments#refund). For a PayPal subscription it's the latest charge, returned only with the service role: read it when you start a refund and reuse it on retries. It's `null` where the provider doesn't name a payment, such as a PayPal subscription whose latest charge is already refunded. */
   payment_id?: string | null;
 }
