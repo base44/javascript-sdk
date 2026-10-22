@@ -24,14 +24,15 @@ export interface ToolCallAnswer {
  * The functions you write for the `backend` option. The hook calls them when it needs Base44, and
  * each one usually forwards to a route on your own server, which adds your credentials.
  *
- * Each call wraps one Base44 API request with your credentials, so the browser never holds a
- * workspace API key or an access token. Your backend can be written in any language.
+ * Keeping the Base44 requests on your server means the browser never holds a workspace API key or
+ * an access token. Your server can be written in any language.
  *
- * - `createApp`: [Create app](/api-reference/create-app), with the first prompt as `initial_message`.
- * - `openLiveSession`: [Create socket session](/api-reference/create-socket-session) with `{ app_ids: [appId] }`.
+ * Each function's route calls one Base44 endpoint:
+ * - [`createApp()`](#createapp): [Create app](/api-reference/create-app), with the first prompt as `initial_message`.
+ * - [`openLiveSession()`](#openlivesession): [Create socket session](/api-reference/create-socket-session) with `{ app_ids: [appId] }`.
  *   Return the response body unchanged. It holds a session token, never the workspace API key.
- * - `sendMessage`: [Send chat message](/api-reference/send-chat-message).
- * - `submitToolCallInput`: [Submit tool-call input](/api-reference/submit-tool-call-input). Send an
+ * - [`sendMessage()`](#sendmessage): [Send chat message](/api-reference/send-chat-message).
+ * - [`submitToolCallInput()`](#submittoolcallinput): [Submit tool-call input](/api-reference/submit-tool-call-input). Send an
  *   `X-Request-ID` built from the tool call ID, so a retry resumes the turn only once.
  *
  * Base44 keeps the Send chat message and Submit tool-call input requests open until the AI
