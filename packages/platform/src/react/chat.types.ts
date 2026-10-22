@@ -42,7 +42,7 @@ export interface ToolCallAnswer {
  *
  * @example
  * ```typescript
- * // Your four calls, behind your own API routes
+ * // Your four functions, behind your own API routes
  * async function post<T>(path: string, body: unknown): Promise<T> {
  *   const response = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
  *   if (!response.ok) throw new Error(`${path} failed: ${response.status}`);
