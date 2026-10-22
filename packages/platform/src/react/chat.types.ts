@@ -106,9 +106,10 @@ export interface ChatItem {
   /** One step per tool call, in order. */
   steps: ChatStep[];
   /**
-   * Whether this is a prompt sent from this chat that Base44 hasn't confirmed yet. It shows at once,
-   * and Base44's own message replaces it. A failed send removes it. A prompt sent while the AI is
-   * working waits in Base44's queue and stays pending until it runs.
+   * Whether this is a stand-in for a prompt you just sent. When you call [`send()`](#send) or
+   * [`create()`](#create), the prompt appears in `items` right away as a pending item, and Base44's
+   * copy of the message replaces it once it arrives. A failed send removes it. A prompt sent while the
+   * AI is working waits in Base44's queue, so it stays pending until it runs.
    */
   pending: boolean;
 }
@@ -121,20 +122,24 @@ export interface ChatStep {
   tool: string;
   /** The file paths the tool call touched. */
   files: string[];
-  /** A line ready to show. It's Base44's description of the step when there is one, then the entity it touched, then the tool name and its files. */
+  /**
+   * A line to show for the step. It's Base44's description of the step when there is one. Otherwise
+   * it's the tool name followed by the entity the step touched and its record count, such as
+   * `create_records Task (3)`, or by the step's files.
+   */
   label: string;
   /**
-   * Where the tool call is. A `waiting` step waits on the user. A `stopped` step was declined, or the
-   * turn was stopped.
+   * The step's progress. A `waiting` step needs the user to answer its question. A `stopped` step was
+   * declined, or its turn was stopped. A status this release doesn't know counts as `done`.
    */
   status: "running" | "waiting" | "done" | "stopped" | "error";
   /**
-   * The question this step waits on, with the actions that answer it. Present only while the step is
-   * `waiting` in the last assistant message, which is the one that makes the chat wait. It goes away
-   * once answered, and is absent for a question kind this release doesn't know.
+   * The question the step needs answered, with the actions that answer it. It's present only on a
+   * `waiting` step in the latest assistant reply, and goes away once answered. A `waiting` step in an
+   * older message has no question. It's also absent for a question kind this release doesn't know.
    */
   question?: ChatQuestion;
-  /** What the user answered on a choice question, once answered. It stays after the question closes, so the chat's history shows it. */
+  /** The user's answers to a choice question, one for each question the step asked. It stays after the question closes, so you can show the answers in the chat's history. */
   answered?: ChatAnswer[];
 }
 
