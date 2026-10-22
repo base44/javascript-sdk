@@ -305,7 +305,9 @@ export interface ChatError {
 export interface ChatOptions {
   /**
    * ID of the app to follow, or `null` until an app exists. While it's `null`, the chat follows the
-   * app {@link UseChatResult.create} made. Any change to `appId` forgets that app.
+   * app that [`create()`](#create) made, so you don't have to pass the new ID back.
+   * Changing `appId` stops following that app, so setting it back to `null` starts a new chat.
+   * Switching to another app closes the old session and starts over.
    */
   appId: string | null;
   /** The four calls your backend makes to Base44. The chat reads the latest on every action, so an inline object works. */
