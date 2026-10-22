@@ -37,7 +37,7 @@ export interface ToolCallAnswer {
  *
  * Base44 keeps the Send chat message and Submit tool-call input requests open until the AI
  * finishes the turn. Resolve your call once Base44 accepts the request, not when it returns. The
- * chat follows the rest live. A rejected promise from any call sets `error` on the {@link useChat | chat}.
+ * chat follows the rest live. A rejected promise from any call sets [`error`](#error).
  *
  * @example
  * ```typescript
@@ -159,7 +159,7 @@ export interface ChatAnswer {
  * An open question, with the actions that answer this question and no other.
  *
  * Each kind carries only the actions that make sense for it, and every kind can be declined. The
- * actions never throw. A failure sets `error` on the {@link useChat | chat}, and the question opens again.
+ * actions never throw. A failure sets [`error`](#error), and the question opens again.
  *
  * The chat declines a question kind this release doesn't know, once per tool call, when Base44
  * names that kind on the last assistant message. If the decline fails, the chat's `error` says
