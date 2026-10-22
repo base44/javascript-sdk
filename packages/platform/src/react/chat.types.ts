@@ -159,14 +159,17 @@ export interface ChatAnswer {
 }
 
 /**
- * An open question, with the actions that answer this question and no other.
+ * An open question the AI waits on. A `waiting` step carries it as its `question`, and
+ * [`status`](#status) becomes `waiting`. Check `kind` to see which of the three kinds it is.
  *
- * Each kind carries only the actions that make sense for it, and every kind can be declined. The
- * actions never throw. A failure sets [`error`](#error), and the question opens again.
+ * Each kind has only the actions that fit it, and every kind can be declined. Calling an action
+ * closes the question right away and sends the answer through your
+ * [`submitToolCallInput()`](#submittoolcallinput). The actions never throw. A failure sets
+ * [`error`](#error), and the question opens again.
  *
- * The chat declines a question kind this release doesn't know, once per tool call, when Base44
- * names that kind on the last assistant message. If the decline fails, the chat's `error` says
- * so, and the chat tries again after it reconnects.
+ * The hook declines a question kind this release doesn't know, once per tool call, when Base44
+ * names that kind on the last assistant message. If the decline fails, [`error`](#error) says
+ * so, and the hook tries again after it reconnects.
  */
 export type ChatQuestion = ChoiceQuestion | SecretsQuestion | ApprovalQuestion;
 
@@ -191,30 +194,31 @@ export interface ChoiceQuestion {
   /** The questions, in order. */
   questions: ChoiceEntry[];
   /**
-   * Answers with the picked labels, and free text where the user wrote some.
+   * Answers with the picked labels, and free text where the user wrote some. For a question whose
+   * `multi` is `false`, only the first picked label counts.
    *
    * @param picked - One list of picked labels per question, in the order of `questions`.
    * @param texts - One free-text answer per question, in the same order. Use it for a `text_input` question, or as a note beside a pick. A question with no pick and no text is skipped.
-   * @returns Promise resolving once the answer is sent.
+   * @returns Promise resolving once Base44 accepts the answer, or once sending it fails and sets [`error`](#error). It never rejects.
    */
   answer(picked: string[][], texts?: string[]): Promise<void>;
   /**
    * Declines the question. The AI continues without the answer.
    *
-   * @returns Promise resolving once the decline is sent.
+   * @returns Promise resolving once Base44 accepts the decline, or once sending it fails and sets [`error`](#error). It never rejects.
    */
   decline(): Promise<void>;
 }
 
 /** A value the AI needs, such as an API key. */
 export interface SecretField {
-  /** Name of the field, used as its key in `submit`. */
+  /** Name of the field, which keys its value in [`submit()`](#submit). */
   name: string;
   /** Where to get the value. */
   description?: string;
 }
 
-/** The AI needs secrets, such as API keys. The values go to Base44 and the chat keeps none of them. */
+/** The AI needs secrets, such as API keys. The values go to Base44, and the hook keeps none of them. */
 export interface SecretsQuestion {
   /** Kind of question. */
   kind: "secrets";
@@ -223,14 +227,14 @@ export interface SecretsQuestion {
   /**
    * Submits the values.
    *
-   * @param values - The values, keyed by field name.
-   * @returns Promise resolving once the values are sent.
+   * @param values - The values, keyed by each field's `name`.
+   * @returns Promise resolving once Base44 accepts the values, or once sending it fails and sets [`error`](#error). It never rejects.
    */
   submit(values: Record<string, string>): Promise<void>;
   /**
    * Declines the question. The AI continues without the values.
    *
-   * @returns Promise resolving once the decline is sent.
+   * @returns Promise resolving once Base44 accepts the decline, or once sending it fails and sets [`error`](#error). It never rejects.
    */
   decline(): Promise<void>;
 }
@@ -241,7 +245,7 @@ export interface ApprovalQuestion {
   kind: "approval";
   /** Name of the tool that wants to run. */
   action: string;
-  /** Why the action needs approval, when Base44 gives a reason. Empty otherwise. */
+  /** Why the action needs approval. It's Base44's reason when there is one, otherwise the `summary` in `details`, and empty when neither is given. */
   reason: string;
   /** The check that paused the action, such as `exec_tool_send_email` or `entity_rls_guard`. */
   guard: string;
@@ -250,13 +254,13 @@ export interface ApprovalQuestion {
   /**
    * Lets the action run.
    *
-   * @returns Promise resolving once the approval is sent.
+   * @returns Promise resolving once Base44 accepts the approval, or once sending it fails and sets [`error`](#error). It never rejects.
    */
   approve(): Promise<void>;
   /**
    * Declines the action. It never runs, and the AI continues.
    *
-   * @returns Promise resolving once the decline is sent.
+   * @returns Promise resolving once Base44 accepts the decline, or once sending it fails and sets [`error`](#error). It never rejects.
    */
   decline(): Promise<void>;
 }
