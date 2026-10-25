@@ -37,8 +37,10 @@ export interface ToolCallAnswer {
  *   `X-Request-ID` built from the tool call ID, so a retry resumes the turn only once.
  *
  * Base44 keeps the Send chat message and Submit tool-call input requests open until the AI
- * finishes the turn. Resolve your call once Base44 accepts the request, not when it returns. The
- * chat follows the rest live. A rejected promise from any call sets [`error`](#error).
+ * finishes the turn, which can take minutes. Forward the request and return its result: the hook
+ * learns from the live updates as soon as Base44 has the prompt or the answer, and a failure after
+ * that, such as a timeout on your server, doesn't set an error. A rejected promise from any call
+ * before then sets [`error`](#error).
  *
  * @example
  * ```typescript
@@ -114,15 +116,16 @@ export interface ChatBackend {
    *
    * @param appId - ID of the app.
    * @param content - The prompt.
-   * @returns Promise resolving once Base44 accepts the prompt.
+   * @returns Promise resolving when Base44 answers the request, which can be when the turn ends.
    */
   sendMessage(appId: string, content: string): Promise<void>;
   /**
-   * Answers or declines a question the AI waits on.
+   * Answers or declines a question the AI waits on. If Base44 refuses the answer, reject the
+   * promise. The hook then sets [`error`](#error) and shows the question again.
    *
    * @param appId - ID of the app.
    * @param answer - The tool call and the answer to it.
-   * @returns Promise resolving once Base44 accepts the answer.
+   * @returns Promise resolving when Base44 answers the request, which can be when the turn ends.
    */
   submitToolCallInput(appId: string, answer: ToolCallAnswer): Promise<void>;
 }
@@ -136,9 +139,8 @@ export interface ChatItem {
   /** The message text, as raw markdown. Show it before the message's steps. It's empty when the message only holds tool calls. */
   text: string;
   /**
-   * When the message was created, as an ISO 8601 timestamp in UTC. A timestamp from Base44 has no `Z`
-   * or offset, so add a `Z` before parsing it with `new Date()`. A pending prompt has the browser's
-   * time, which already ends in `Z`.
+   * When the message was created, as an ISO 8601 timestamp in UTC that ends in `Z`, such as
+   * `2026-10-25T11:00:00.000Z`. `new Date(createdAt)` reads it correctly in any time zone.
    */
   createdAt: string;
   /** One step per tool call, in order. */

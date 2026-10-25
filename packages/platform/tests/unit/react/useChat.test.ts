@@ -492,6 +492,57 @@ describe("pending prompts", () => {
     expect(latest.error).toMatchObject({ message: "Send message failed: 409" });
   });
 
+  test("send resolves once Base44's copy arrives, and a failure after that is no refusal", async () => {
+    const backend = makeBackend();
+    const call = pending();
+    backend.sendMessage.mockReturnValueOnce(call.promise);
+    await mount({ appId: app, backend });
+    await snapshot([]);
+    let resolved = false;
+    let done!: Promise<void>;
+    await act(async () => { done = latest.send("make it blue").then(() => { resolved = true; }); });
+    expect(resolved).toBe(false);
+    await updated(message("u1", "1", { role: "user", content: "make it blue" }));
+    await settle();
+    expect(resolved).toBe(true);
+    // The turn outlives the backend's own timeout.
+    await act(async () => { call.reject(new Error("Send message failed: 502")); await done; });
+    await settle();
+    expect(latest.error).toBeNull();
+    expect(shown()).toEqual([["make it blue", false]]);
+    expect(latest.status).toBe("submitted");
+  });
+
+  test("a prompt Base44 queued stays pending when its send fails afterwards", async () => {
+    const backend = makeBackend();
+    const call = pending();
+    backend.sendMessage.mockReturnValueOnce(call.promise);
+    await mount({ appId: app, backend });
+    await snapshot([], "processing");
+    let done!: Promise<void>;
+    await act(async () => { done = latest.send("and a footer"); });
+    await queueUpdated([{ id: "q1", content: "and a footer" }]);
+    await act(async () => { await done; });
+    await act(async () => { call.reject(new Error("Send message failed: 502")); });
+    await settle();
+    expect(latest.error).toBeNull();
+    expect(shown()).toEqual([["and a footer", true]]);
+  });
+
+  test("a reconnect's snapshot that holds the prompt in its queue counts as Base44 having it", async () => {
+    const backend = makeBackend();
+    const call = pending();
+    backend.sendMessage.mockReturnValueOnce(call.promise);
+    await mount({ appId: app, backend });
+    await snapshot([], "processing");
+    await act(async () => { void latest.send("and a footer"); });
+    await snapshot([], "processing", { queue: { items: [{ id: "q1", content: "and a footer" }] } });
+    await act(async () => { call.reject(new Error("Send message failed: 502")); });
+    await settle();
+    expect(latest.error).toBeNull();
+    expect(shown()).toEqual([["and a footer", true]]);
+  });
+
   test("the first prompt shows while the app is created, and the new app's snapshot settles it", async () => {
     const backend = makeBackend();
     const call = pending<{ id: string; name: string }>();
@@ -583,6 +634,40 @@ describe("questions", () => {
     expect(latest.items[0].steps[0].question?.kind).toBe("approval");
     expect(latest.error).toMatchObject({ message: "Submit answer failed: 409" });
     expect(latest.status).toBe("waiting");
+  });
+
+  test("an answer resolves once its call stops waiting, and a failure after that is no refusal", async () => {
+    const backend = makeBackend();
+    const call = pending();
+    backend.submitToolCallInput.mockReturnValueOnce(call.promise);
+    await mount({ appId: app, backend });
+    await snapshot([message("m1", "1", { tool_calls: [waiting("t1")] })]);
+    const question = latest.items[0].steps[0].question!;
+    if (question.kind !== "approval") throw new Error("expected an approval");
+    let resolved = false;
+    await act(async () => { void question.approve().then(() => { resolved = true; }); });
+    expect(resolved).toBe(false);
+    await updated(message("m1", "1", { tool_calls: [{ ...waiting("t1"), status: "running" }] }));
+    await settle();
+    expect(resolved).toBe(true);
+    await act(async () => { call.reject(new Error("Submit answer failed: 502")); });
+    await settle();
+    expect(latest.error).toBeNull();
+    expect(latest.items[0].steps[0]).toMatchObject({ status: "running" });
+    expect(latest.items[0].steps[0].question).toBeUndefined();
+  });
+
+  test("a decline that fails after Base44 stopped the call is no refusal", async () => {
+    const backend = makeBackend();
+    const call = pending();
+    backend.submitToolCallInput.mockReturnValueOnce(call.promise);
+    await mount({ appId: app, backend });
+    await snapshot([message("m1", "1", { tool_calls: [waiting("t1", "plan_review")] })]);
+    await updated(message("m1", "1", { tool_calls: [{ ...waiting("t1", "plan_review"), status: "stopped" }] }));
+    await act(async () => { call.reject(new Error("Submit answer failed: 502")); });
+    await settle();
+    expect(latest.error).toBeNull();
+    expect(latest.items[0].steps[0].status).toBe("stopped");
   });
 
   test("a kind this release doesn't know is declined once, then shows stopped when Base44 says so", async () => {

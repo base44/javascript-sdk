@@ -1,8 +1,8 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPlatformClient } from "../client/client.js";
-import type { Message, StatusObject } from "../client/modules/chat.events.generated.js";
-import { isWaitingForUser, mergeMessage, mergeSnapshot, pendingPromptItems, settlePendingPrompts, sortMessages, toItems, unknownKindToolCalls, waitingToolCallIds, type PendingPrompt } from "./chat-items.js";
+import type { Message, QueueItem, StatusObject } from "../client/modules/chat.events.generated.js";
+import { isWaitingForUser, markQueuedPrompts, mergeMessage, mergeSnapshot, pendingPromptItems, settlePendingPrompts, sortMessages, toItems, unknownKindToolCalls, waitingToolCallIds, type PendingPrompt } from "./chat-items.js";
 import type { UseChatResult, ChatOptions, ChatConnection, ChatError, ChatStatus } from "./chat.types.js";
 
 // Base44's public status carries no reason, so a failed build has one error.
@@ -70,8 +70,15 @@ export function useChat({ appId, backend, onAppCreated }: ChatOptions): UseChatR
   // Tool calls declined for the user, and those whose decline failed and may try again.
   const declinedToolCalls = useRef(new Set<string>());
   const failedDeclines = useRef(new Set<string>());
-  // Tool calls answered from here whose submission ends when Base44 stops reporting them waiting.
-  const answersAwaitingBase44 = useRef(new Set<string>());
+  // Base44 keeps a send or an answer open until the turn ends, so the live updates say when Base44
+  // has it: that ends the action, and a failure after it, such as a timeout on the way, is no
+  // refusal. Each entry holds what resolves the action.
+  // Tool calls answered from here, whose submission ends when Base44 stops reporting them waiting.
+  const answersAwaitingBase44 = useRef(new Map<string, () => void>());
+  // Prompts sent from here, by pending id, until Base44's copy settles them or its queue holds them.
+  const promptsAwaitingBase44 = useRef(new Map<string, { resolve: () => void; shown: boolean }>());
+  // The tool calls Base44 reports waiting, as of the last render.
+  const waitingToolCalls = useRef(new Set<string>());
 
   // The app `create` made, shown while `appId` is null. Any change to `appId` forgets it.
   const [createdAppId, setCreatedAppId] = useState<string | null>(null);
@@ -146,6 +153,10 @@ export function useChat({ appId, backend, onAppCreated }: ChatOptions): UseChatR
         setPendingPrompts(prompts => settlePendingPrompts(prompts, followedAppId, arrivedPrompts));
       }
     };
+    const handleQueue = (queueItems: QueueItem[] | null | undefined) => {
+      const queuedPrompts = (queueItems ?? []).map(queueItem => queueItem.content ?? "");
+      if (queuedPrompts.length) setPendingPrompts(prompts => markQueuedPrompts(prompts, followedAppId, queuedPrompts));
+    };
     // A snapshot replaces the conversation when it is the first, or follows a rewrite of main
     // (undo, restore, sync); after a plain rejoin the messages before its window stay.
     let nextSnapshotReplaces = true;
@@ -189,6 +200,7 @@ export function useChat({ appId, backend, onAppCreated }: ChatOptions): UseChatR
       onSnapshot: snapshot => {
         // A snapshot holds old prompts too, so only an exact match settles one.
         handleIncomingMessages(snapshot.messages);
+        handleQueue(snapshot.queue?.items);
         const replaceMessages = nextSnapshotReplaces;
         nextSnapshotReplaces = false;
         setMessages(heldMessages => (replaceMessages ? snapshot.messages : mergeSnapshot(heldMessages, snapshot.messages)));
@@ -210,7 +222,10 @@ export function useChat({ appId, backend, onAppCreated }: ChatOptions): UseChatR
         if (event.type === "conversation.changed" && event.data.branch_id == null) nextSnapshotReplaces = true;
         // A prompt sent while the AI is working waits in Base44's queue: Base44 has it, and it
         // stays pending until it runs.
-        if (event.type === "queue.updated" && event.data.branch_id == null) setSubmittedTo(null);
+        if (event.type === "queue.updated" && event.data.branch_id == null) {
+          setSubmittedTo(null);
+          handleQueue(event.data.items);
+        }
       },
       // Only snapshot_unavailable leaves the subscription running.
       onError: error => ((error as { code?: string }).code === "snapshot_unavailable" ? reportConnectionError(error) : endLiveUpdates(error)),
@@ -224,8 +239,8 @@ export function useChat({ appId, backend, onAppCreated }: ChatOptions): UseChatR
     };
   }, [currentAppId]);
 
-  // Answers one tool call. Its id leaves the answered list again if the submit fails, so the
-  // question comes back.
+  // Answers one tool call. Its id leaves the answered list again if Base44 refuses the answer, so
+  // the question comes back.
   const submitAnswer = useCallback(
     (toolCallId: string, messageId: string, approve: boolean, extraUserInput?: Record<string, unknown>) => {
       if (!currentAppId) return Promise.resolve();
@@ -233,14 +248,17 @@ export function useChat({ appId, backend, onAppCreated }: ChatOptions): UseChatR
       setActionError(null);
       setSubmittedTo(targetAppId);
       setAnsweredToolCallIds(ids => [...ids, toolCallId]);
-      answersAwaitingBase44.current.add(toolCallId);
       const answer = { toolCallId, messageId, approve, extraUserInput };
-      return backendRef.current.submitToolCallInput(targetAppId, answer).catch((error: unknown) => {
-        answersAwaitingBase44.current.delete(toolCallId);
-        if (!stillFollowing(targetAppId)) return;
-        setAnsweredToolCallIds(ids => ids.filter(answeredId => answeredId !== toolCallId));
-        setSubmittedTo(null);
-        reportActionError(error);
+      return new Promise<void>(resolve => {
+        answersAwaitingBase44.current.set(toolCallId, resolve);
+        backendRef.current.submitToolCallInput(targetAppId, answer).then(resolve, (error: unknown) => {
+          resolve();
+          if (!answersAwaitingBase44.current.delete(toolCallId)) return;
+          if (!stillFollowing(targetAppId)) return;
+          setAnsweredToolCallIds(ids => ids.filter(answeredId => answeredId !== toolCallId));
+          setSubmittedTo(null);
+          reportActionError(error);
+        });
       });
     },
     [currentAppId, reportActionError],
@@ -268,6 +286,8 @@ export function useChat({ appId, backend, onAppCreated }: ChatOptions): UseChatR
       declinedToolCalls.current.add(declineKey);
       setAnsweredToolCallIds(ids => [...ids, toolCallId]);
       backendRef.current.submitToolCallInput(followedAppId, { toolCallId, messageId, approve: false }).catch((error: unknown) => {
+        // A call that no longer waits has the decline: the failure came after it.
+        if (!waitingToolCalls.current.has(toolCallId)) return;
         failedDeclines.current.add(declineKey);
         setAnsweredToolCallIds(ids => ids.filter(answeredId => answeredId !== toolCallId));
         reportActionError(error);
@@ -280,15 +300,29 @@ export function useChat({ appId, backend, onAppCreated }: ChatOptions): UseChatR
   // An answer's submission ends there too: Base44 has taken it once the call no longer waits.
   useEffect(() => {
     const stillWaiting = waitingToolCallIds(sortedMessages);
+    waitingToolCalls.current = stillWaiting;
     setAnsweredToolCallIds(ids => (ids.every(answeredId => stillWaiting.has(answeredId)) ? ids : ids.filter(answeredId => stillWaiting.has(answeredId))));
     let answerTaken = false;
-    for (const toolCallId of answersAwaitingBase44.current) {
+    for (const [toolCallId, resolveAnswer] of answersAwaitingBase44.current) {
       if (stillWaiting.has(toolCallId)) continue;
       answersAwaitingBase44.current.delete(toolCallId);
+      resolveAnswer();
       answerTaken = true;
     }
     if (answerTaken) setSubmittedTo(target => (target === followedAppIdRef.current ? null : target));
   }, [sortedMessages]);
+
+  // A prompt's send ends once Base44 has it: its copy settled the pending prompt, or its queue holds
+  // it. A prompt not shown yet is still on its way to the list, not settled.
+  useEffect(() => {
+    for (const [promptId, sentPrompt] of promptsAwaitingBase44.current) {
+      const pendingPrompt = pendingPrompts.find(prompt => prompt.id === promptId);
+      if (pendingPrompt) sentPrompt.shown = true;
+      if (pendingPrompt ? !pendingPrompt.queued : !sentPrompt.shown) continue;
+      promptsAwaitingBase44.current.delete(promptId);
+      sentPrompt.resolve();
+    }
+  }, [pendingPrompts]);
 
   const submissionInFlight = (submittedTo === NEW_APP && !currentAppId) || (submittedTo !== null && submittedTo === currentAppId);
   let status: ChatStatus = "ready";
@@ -298,7 +332,7 @@ export function useChat({ appId, backend, onAppCreated }: ChatOptions): UseChatR
   else if (submissionInFlight) status = "submitted";
 
   const addPendingPrompt = useCallback((content: string, targetAppId: string) => {
-    const pendingPrompt = { id: `pending-${++pendingPromptCount.current}`, content, createdAt: new Date().toISOString(), appId: targetAppId };
+    const pendingPrompt = { id: `pending-${++pendingPromptCount.current}`, content, createdAt: new Date().toISOString(), appId: targetAppId, queued: false };
     setPendingPrompts(prompts => [...prompts, pendingPrompt]);
     return pendingPrompt;
   }, []);
@@ -313,11 +347,22 @@ export function useChat({ appId, backend, onAppCreated }: ChatOptions): UseChatR
       setActionError(null);
       setSubmittedTo(targetAppId);
       const pendingPrompt = addPendingPrompt(prompt, targetAppId);
-      return backendRef.current.sendMessage(targetAppId, prompt).catch((error: unknown) => {
-        setPendingPrompts(prompts => prompts.filter(other => other !== pendingPrompt));
-        if (!stillFollowing(targetAppId)) return;
-        setSubmittedTo(null);
-        reportActionError(error);
+      return new Promise<void>(resolve => {
+        promptsAwaitingBase44.current.set(pendingPrompt.id, { resolve, shown: false });
+        backendRef.current.sendMessage(targetAppId, prompt).then(
+          () => {
+            promptsAwaitingBase44.current.delete(pendingPrompt.id);
+            resolve();
+          },
+          (error: unknown) => {
+            resolve();
+            if (!promptsAwaitingBase44.current.delete(pendingPrompt.id)) return;
+            setPendingPrompts(prompts => prompts.filter(other => other.id !== pendingPrompt.id));
+            if (!stillFollowing(targetAppId)) return;
+            setSubmittedTo(null);
+            reportActionError(error);
+          },
+        );
       });
     },
     [currentAppId, reportActionError, addPendingPrompt],

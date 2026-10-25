@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- **Breaking:** `ChatItem.createdAt` always ends in `Z` now. Base44's own timestamps used to come
+  through with no zone, so `new Date()` read them as local time. If you added a `Z` yourself,
+  remove it, or the date won't parse.
+- `useChat` learns from the live updates when Base44 has a prompt or an answer: Base44's copy of
+  the prompt arrives, its queue holds the prompt, or the question stops waiting. `send()` and the
+  answer actions resolve then, and a failure after that, such as a timeout on your server while
+  the turn runs, no longer sets `error` or removes the prompt. Your `ChatBackend` can forward
+  Send chat message and Submit tool-call input and return their result, however long the turn
+  takes.
+
 ## 0.5.0
 
 The first release to build on. Versions 0.1.0 to 0.4.0 were previews and are deprecated on npm.

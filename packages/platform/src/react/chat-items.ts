@@ -54,7 +54,7 @@ export function toItems(sortedMessages: Message[], answeredToolCallIds: string[]
     id: message.id!,
     role: message.role === "user" ? "user" : "assistant",
     text: message.content ?? "",
-    createdAt: message.metadata?.created_date ?? "",
+    createdAt: toUtcTimestamp(message.metadata?.created_date),
     pending: false,
     steps: (message.tool_calls ?? []).map(toolCall => {
       const isAnswerable = message === lastReply && !answeredToolCallIds.includes(toolCall.id!);
@@ -64,6 +64,17 @@ export function toItems(sortedMessages: Message[], answeredToolCallIds: string[]
       return toStep(toolCall, answerToolCall);
     }),
   }));
+}
+
+/** @internal Base44 writes UTC with no zone, which `new Date()` would read as local time. The
+ * timestamp comes out with its `Z`, in the shape a pending prompt has. Anything but an ISO date and
+ * time is left as it is: `new Date()` guesses at other shapes. */
+export function toUtcTimestamp(date: string | null | undefined): string {
+  if (!date) return "";
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(date)) return date;
+  const hasZone = /(Z|[+-]\d{2}:?\d{2})$/i.test(date);
+  const parsed = new Date(hasZone ? date : `${date}Z`);
+  return Number.isNaN(parsed.getTime()) ? date : parsed.toISOString();
 }
 
 // What a tool's display projection may carry; each tool declares only some of it.
@@ -153,12 +164,14 @@ export function waitingToolCallIds(sortedMessages: Message[]): Set<string> {
   );
 }
 
-/** @internal A prompt sent from this chat that Base44 has not confirmed, for the app it went to. */
+/** @internal A prompt sent from this chat that Base44 has not confirmed, for the app it went to.
+ * `queued` once Base44's queue holds it: Base44 has it, and it waits to run. */
 export interface PendingPrompt {
   id: string;
   content: string;
   createdAt: string;
   appId: string;
+  queued: boolean;
 }
 
 /** @internal Prompts that arrived from Base44 as messages settle the pending ones with the same
@@ -171,6 +184,18 @@ export function settlePendingPrompts(pendingPrompts: PendingPrompt[], appId: str
     if (settled) stillPending = stillPending.filter(prompt => prompt !== settled);
   }
   return stillPending;
+}
+
+/** @internal Base44's queue for the app marks the pending prompts it holds, one queued prompt per
+ * pending one with the same text. Text is the only link here too. */
+export function markQueuedPrompts(pendingPrompts: PendingPrompt[], appId: string, queuedPrompts: string[]): PendingPrompt[] {
+  const matched = new Set<PendingPrompt>();
+  for (const queuedPrompt of queuedPrompts) {
+    const match = pendingPrompts.find(prompt => !matched.has(prompt) && prompt.appId === appId && prompt.content.trim() === queuedPrompt.trim());
+    if (match) matched.add(match);
+  }
+  if ([...matched].every(prompt => prompt.queued)) return pendingPrompts;
+  return pendingPrompts.map(prompt => (matched.has(prompt) && !prompt.queued ? { ...prompt, queued: true } : prompt));
 }
 
 /** @internal Pending prompts as items, drawn after the messages Base44 has. */

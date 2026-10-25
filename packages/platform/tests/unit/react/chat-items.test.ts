@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import type { Message } from "../../../src/client/modules/chat.events.generated.js";
 import type { ToolCall } from "../../../src/client/modules/chat.events.types.js";
-import { toQuestion, isWaitingForUser, mergeMessage, mergeSnapshot, pendingPromptItems, settlePendingPrompts, SNAPSHOT_SIZE, sortMessages, stepStatus, toItems, unknownKindToolCalls, waitingToolCallIds } from "../../../src/react/chat-items.js";
+import { toQuestion, isWaitingForUser, markQueuedPrompts, mergeMessage, mergeSnapshot, pendingPromptItems, settlePendingPrompts, SNAPSHOT_SIZE, sortMessages, stepStatus, toItems, toUtcTimestamp, unknownKindToolCalls, waitingToolCallIds } from "../../../src/react/chat-items.js";
 
 const message = (id: string, created: string, extra: Partial<Message> = {}): Message => ({ id, role: "assistant", metadata: { created_date: created }, ...extra });
 const waiting = (id: string, extra: Partial<ToolCall> = {}): ToolCall => ({ id, name: "tool", status: "waiting_for_user_input", ...extra });
@@ -47,8 +47,8 @@ describe("items", () => {
       { id: "t3", name: "run", status: "error" },
       { id: "t4", name: "run", status: "stopped" },
     ];
-    const [item] = toItems([message("m", "2026-10-14T10:00:00Z", { role: "user", content: "hi", tool_calls: tools })], [], vi.fn());
-    expect(item).toMatchObject({ id: "m", role: "user", text: "hi", createdAt: "2026-10-14T10:00:00Z" });
+    const [item] = toItems([message("m", "2026-10-14T10:00:00.123456", { role: "user", content: "hi", tool_calls: tools })], [], vi.fn());
+    expect(item).toMatchObject({ id: "m", role: "user", text: "hi", createdAt: "2026-10-14T10:00:00.123Z" });
     expect(item.steps[0]).toEqual({ id: "t1", tool: "write_file", files: ["src/App.jsx", "src/index.css"], label: "write_file src/App.jsx src/index.css", status: "done" });
     expect(item.steps.map(s => [s.label, s.status])).toEqual([["write_file src/App.jsx src/index.css", "done"], ["run", "running"], ["run", "error"], ["run", "stopped"]]);
     expect(item.steps.every(s => !("question" in s))).toBe(true);
@@ -162,8 +162,24 @@ describe("steps", () => {
   });
 });
 
+describe("timestamps", () => {
+  test("Base44's zoneless UTC gets its Z, in the shape a pending prompt has", () => {
+    expect(toUtcTimestamp("2026-10-25T11:00:00")).toBe("2026-10-25T11:00:00.000Z");
+    expect(toUtcTimestamp("2026-10-25T11:00:00.123456")).toBe("2026-10-25T11:00:00.123Z");
+    expect(toUtcTimestamp(new Date(Date.UTC(2026, 9, 25, 11)).toISOString())).toBe("2026-10-25T11:00:00.000Z");
+  });
+
+  test("a zone already there is kept, and what doesn't parse is left as it is", () => {
+    expect(toUtcTimestamp("2026-10-25T11:00:00Z")).toBe("2026-10-25T11:00:00.000Z");
+    expect(toUtcTimestamp("2026-10-25T14:00:00+03:00")).toBe("2026-10-25T11:00:00.000Z");
+    expect(toUtcTimestamp("1")).toBe("1");
+    expect(toUtcTimestamp(undefined)).toBe("");
+    expect(toUtcTimestamp(null)).toBe("");
+  });
+});
+
 describe("pending prompts", () => {
-  const pending = (id: string, content: string, appId = "a") => ({ id, content, createdAt: "", appId });
+  const pending = (id: string, content: string, appId = "a") => ({ id, content, createdAt: "", appId, queued: false });
 
   test("an arrival settles the pending prompt with its text, of its own app, ignoring outer spaces", () => {
     const all = [pending("p1", "one"), pending("p2", "two"), pending("p3", "two", "b")];
@@ -175,8 +191,20 @@ describe("pending prompts", () => {
     expect(settlePendingPrompts([pending("p1", "one"), pending("p2", "two")], "a", ["someone else's"]).map(p => p.id)).toEqual(["p1", "p2"]);
   });
 
+  test("the queue marks one pending prompt per queued prompt with its text, of its own app", () => {
+    const all = [pending("p1", "two"), pending("p2", "two"), pending("p3", "two", "b"), pending("p4", "one")];
+    const marked = markQueuedPrompts(all, "a", [" two "]);
+    expect(marked.map(p => [p.id, p.queued])).toEqual([["p1", true], ["p2", false], ["p3", false], ["p4", false]]);
+    expect(markQueuedPrompts(marked, "a", ["two", "two"]).map(p => p.queued)).toEqual([true, true, false, false]);
+  });
+
+  test("a queue that marks nothing new leaves the same list", () => {
+    const marked = markQueuedPrompts([pending("p1", "one")], "a", ["one"]);
+    expect(markQueuedPrompts(marked, "a", ["one", "someone else's"])).toBe(marked);
+  });
+
   test("a pending prompt is a user item with no steps", () => {
-    expect(pendingPromptItems([{ id: "p1", content: "hi", createdAt: "t", appId: "a" }])).toEqual([
+    expect(pendingPromptItems([{ id: "p1", content: "hi", createdAt: "t", appId: "a", queued: false }])).toEqual([
       { id: "p1", role: "user", text: "hi", createdAt: "t", steps: [], pending: true },
     ]);
   });
