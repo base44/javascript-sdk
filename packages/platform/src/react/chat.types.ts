@@ -40,7 +40,9 @@ export interface ToolCallAnswer {
  * finishes the turn, which can take minutes. Forward the request and return its result: the hook
  * learns from the live updates as soon as Base44 has the prompt or the answer, and a failure after
  * that, such as a timeout on your server, doesn't set an error. A rejected promise from any call
- * before then sets [`error`](#error).
+ * before then sets [`error`](#error). Next.js server actions run one at a time, so one that waits
+ * out the turn holds up every later call: resolve it once Base44 hasn't refused the request
+ * within a few seconds. Base44 refuses at once.
  *
  * @example
  * ```typescript

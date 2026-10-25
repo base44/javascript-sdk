@@ -1,8 +1,8 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPlatformClient } from "../client/client.js";
-import type { Message, QueueItem, StatusObject } from "../client/modules/chat.events.generated.js";
-import { isWaitingForUser, markQueuedPrompts, mergeMessage, mergeSnapshot, pendingPromptItems, settlePendingPrompts, sortMessages, toItems, unknownKindToolCalls, waitingToolCallIds, type PendingPrompt } from "./chat-items.js";
+import type { Message, StatusObject } from "../client/modules/chat.events.generated.js";
+import { isWaitingForUser, mergeMessage, mergeSnapshot, pendingPromptItems, settlePendingPrompts, sortMessages, toItems, unknownKindToolCalls, waitingToolCallIds, type PendingPrompt } from "./chat-items.js";
 import type { UseChatResult, ChatOptions, ChatConnection, ChatError, ChatStatus } from "./chat.types.js";
 
 // Base44's public status carries no reason, so a failed build has one error.
@@ -75,7 +75,8 @@ export function useChat({ appId, backend, onAppCreated }: ChatOptions): UseChatR
   // refusal. Each entry holds what resolves the action.
   // Tool calls answered from here, whose submission ends when Base44 stops reporting them waiting.
   const answersAwaitingBase44 = useRef(new Map<string, () => void>());
-  // Prompts sent from here, by pending id, until Base44's copy settles them or its queue holds them.
+  // Prompts sent from here, by pending id, until Base44's copy settles them. A prompt Base44 queues
+  // needs none: Base44 answers that send at once.
   const promptsAwaitingBase44 = useRef(new Map<string, { resolve: () => void; shown: boolean }>());
   // The tool calls Base44 reports waiting, as of the last render.
   const waitingToolCalls = useRef(new Set<string>());
@@ -153,10 +154,6 @@ export function useChat({ appId, backend, onAppCreated }: ChatOptions): UseChatR
         setPendingPrompts(prompts => settlePendingPrompts(prompts, followedAppId, arrivedPrompts));
       }
     };
-    const handleQueue = (queueItems: QueueItem[] | null | undefined) => {
-      const queuedPrompts = (queueItems ?? []).map(queueItem => queueItem.content ?? "");
-      if (queuedPrompts.length) setPendingPrompts(prompts => markQueuedPrompts(prompts, followedAppId, queuedPrompts));
-    };
     // A snapshot replaces the conversation when it is the first, or follows a rewrite of main
     // (undo, restore, sync); after a plain rejoin the messages before its window stay.
     let nextSnapshotReplaces = true;
@@ -200,7 +197,6 @@ export function useChat({ appId, backend, onAppCreated }: ChatOptions): UseChatR
       onSnapshot: snapshot => {
         // A snapshot holds old prompts too, so only an exact match settles one.
         handleIncomingMessages(snapshot.messages);
-        handleQueue(snapshot.queue?.items);
         const replaceMessages = nextSnapshotReplaces;
         nextSnapshotReplaces = false;
         setMessages(heldMessages => (replaceMessages ? snapshot.messages : mergeSnapshot(heldMessages, snapshot.messages)));
@@ -222,10 +218,7 @@ export function useChat({ appId, backend, onAppCreated }: ChatOptions): UseChatR
         if (event.type === "conversation.changed" && event.data.branch_id == null) nextSnapshotReplaces = true;
         // A prompt sent while the AI is working waits in Base44's queue: Base44 has it, and it
         // stays pending until it runs.
-        if (event.type === "queue.updated" && event.data.branch_id == null) {
-          setSubmittedTo(null);
-          handleQueue(event.data.items);
-        }
+        if (event.type === "queue.updated" && event.data.branch_id == null) setSubmittedTo(null);
       },
       // Only snapshot_unavailable leaves the subscription running.
       onError: error => ((error as { code?: string }).code === "snapshot_unavailable" ? reportConnectionError(error) : endLiveUpdates(error)),
@@ -312,13 +305,15 @@ export function useChat({ appId, backend, onAppCreated }: ChatOptions): UseChatR
     if (answerTaken) setSubmittedTo(target => (target === followedAppIdRef.current ? null : target));
   }, [sortedMessages]);
 
-  // A prompt's send ends once Base44 has it: its copy settled the pending prompt, or its queue holds
-  // it. A prompt not shown yet is still on its way to the list, not settled.
+  // A prompt's send ends once Base44's copy settled the pending prompt. A prompt not shown yet is
+  // still on its way to the list, not settled.
   useEffect(() => {
     for (const [promptId, sentPrompt] of promptsAwaitingBase44.current) {
-      const pendingPrompt = pendingPrompts.find(prompt => prompt.id === promptId);
-      if (pendingPrompt) sentPrompt.shown = true;
-      if (pendingPrompt ? !pendingPrompt.queued : !sentPrompt.shown) continue;
+      if (pendingPrompts.some(prompt => prompt.id === promptId)) {
+        sentPrompt.shown = true;
+        continue;
+      }
+      if (!sentPrompt.shown) continue;
       promptsAwaitingBase44.current.delete(promptId);
       sentPrompt.resolve();
     }
@@ -332,7 +327,7 @@ export function useChat({ appId, backend, onAppCreated }: ChatOptions): UseChatR
   else if (submissionInFlight) status = "submitted";
 
   const addPendingPrompt = useCallback((content: string, targetAppId: string) => {
-    const pendingPrompt = { id: `pending-${++pendingPromptCount.current}`, content, createdAt: new Date().toISOString(), appId: targetAppId, queued: false };
+    const pendingPrompt = { id: `pending-${++pendingPromptCount.current}`, content, createdAt: new Date().toISOString(), appId: targetAppId };
     setPendingPrompts(prompts => [...prompts, pendingPrompt]);
     return pendingPrompt;
   }, []);

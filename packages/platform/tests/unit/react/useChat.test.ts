@@ -513,35 +513,6 @@ describe("pending prompts", () => {
     expect(latest.status).toBe("submitted");
   });
 
-  test("a prompt Base44 queued stays pending when its send fails afterwards", async () => {
-    const backend = makeBackend();
-    const call = pending();
-    backend.sendMessage.mockReturnValueOnce(call.promise);
-    await mount({ appId: app, backend });
-    await snapshot([], "processing");
-    let done!: Promise<void>;
-    await act(async () => { done = latest.send("and a footer"); });
-    await queueUpdated([{ id: "q1", content: "and a footer" }]);
-    await act(async () => { await done; });
-    await act(async () => { call.reject(new Error("Send message failed: 502")); });
-    await settle();
-    expect(latest.error).toBeNull();
-    expect(shown()).toEqual([["and a footer", true]]);
-  });
-
-  test("a reconnect's snapshot that holds the prompt in its queue counts as Base44 having it", async () => {
-    const backend = makeBackend();
-    const call = pending();
-    backend.sendMessage.mockReturnValueOnce(call.promise);
-    await mount({ appId: app, backend });
-    await snapshot([], "processing");
-    await act(async () => { void latest.send("and a footer"); });
-    await snapshot([], "processing", { queue: { items: [{ id: "q1", content: "and a footer" }] } });
-    await act(async () => { call.reject(new Error("Send message failed: 502")); });
-    await settle();
-    expect(latest.error).toBeNull();
-    expect(shown()).toEqual([["and a footer", true]]);
-  });
 
   test("the first prompt shows while the app is created, and the new app's snapshot settles it", async () => {
     const backend = makeBackend();
