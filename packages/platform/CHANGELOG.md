@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.0
 
 - **Breaking:** `ChatItem.createdAt` always ends in `Z`. If you added one yourself, remove it.
 - `send()` and the answer actions resolve once Base44 has the prompt or answer. A backend failure
