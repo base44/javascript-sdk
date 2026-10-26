@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Breaking:** `ChatItem.createdAt` always ends in `Z`. If you added one yourself, remove it.
+- `send()` and the answer actions resolve once Base44 has the prompt or answer. A backend failure
+  after that, such as a server timeout mid-turn, no longer sets `error`, so your `ChatBackend`
+  can simply forward the request.
+
 ## 0.5.0
 
 The first release to build on. Versions 0.1.0 to 0.4.0 were previews and are deprecated on npm.
