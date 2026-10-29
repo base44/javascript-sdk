@@ -93,7 +93,7 @@ export interface MountCheckoutDeps {
 
 async function scriptUrlFor(
   provider: "paypal" | "stripe",
-  deps: MountCheckoutDeps
+  deps: Pick<MountCheckoutDeps, "getConfig">
 ): Promise<string> {
   const value = (await deps.getConfig())?.[provider]?.script_url;
   let url: URL | undefined;
@@ -335,6 +335,25 @@ async function mountPayPal(
       session.destroy?.();
     },
   };
+}
+
+/**
+ * Fetches the payments config and loads the provider's script ahead of mountCheckout().
+ * @internal
+ */
+export async function preloadCheckout(
+  provider: "paypal" | "stripe",
+  deps: Pick<MountCheckoutDeps, "getConfig" | "loadScript">
+): Promise<void> {
+  if (typeof window === "undefined" || typeof document === "undefined") return;
+  const read = () => (provider === "paypal" ? browserGlobals().paypal : browserGlobals().Stripe);
+  try {
+    if (!read()) {
+      await deps.loadScript(await scriptUrlFor(provider, deps));
+    }
+  } catch {
+    // A hint only: mountCheckout() fetches and loads again and reports the failure.
+  }
 }
 
 /**
