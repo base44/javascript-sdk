@@ -27,6 +27,11 @@ base44.payments.refund;
 // @ts-expect-error The service role runs in backend code, where there is nothing to mount.
 base44.asServiceRole.payments.mountCheckout;
 
+base44.payments.preloadCheckout("paypal");
+
+// @ts-expect-error Only connected checkout providers have a script to preload.
+base44.payments.preloadCheckout("wix");
+
 base44.asServiceRole.payments.listPurchases({ buyer_email: "buyer@example.com" });
 
 // @ts-expect-error Only the service role can filter by another buyer's email.
