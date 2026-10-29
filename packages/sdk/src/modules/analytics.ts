@@ -452,3 +452,27 @@ export function getAnalyticsSessionId(): string {
     return getFallbackSessionId();
   }
 }
+
+/**
+ * Gets the anonymous visitor id the SDK already sends as `X-Base44-Anonymous-Id` on requests made
+ * without a signed-in user.
+ *
+ * Use it to send the same id on requests the SDK doesn't make itself, such as calls to an app's own
+ * server functions. Outside a browser it returns `null`.
+ *
+ * @returns The visitor id, or `null` outside a browser.
+ *
+ * @example
+ * ```typescript
+ * const visitorId = getAnonymousVisitorId();
+ * const headers = visitorId ? { "X-Base44-Anonymous-Id": visitorId } : {};
+ * ```
+ */
+export function getAnonymousVisitorId(): string | null {
+  try {
+    if (typeof window === "undefined") return null;
+    return getAnalyticsSessionId();
+  } catch {
+    return null;
+  }
+}

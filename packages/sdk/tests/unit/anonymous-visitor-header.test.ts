@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createAxiosClient } from "../../src/utils/axios-client.ts";
 import { getAnalyticsSessionId } from "../../src/modules/analytics.ts";
+import { getAnonymousVisitorId } from "../../src/index.ts";
 
 const ANALYTICS_SESSION_ID_KEY = "base44_analytics_session_id";
 
@@ -111,5 +112,46 @@ describe("anonymous visitor header", () => {
       expect(first).toBeTruthy();
       expect(getId()).toBe(first);
     });
+  });
+});
+
+// The TanStack template sends this id itself on server-function calls, which use TanStack's fetch
+// rather than the SDK's client.
+describe("getAnonymousVisitorId", () => {
+  test("is the id an unauthenticated client sends as X-Base44-Anonymous-Id", async () => {
+    const headers = await captureRequestHeaders(undefined);
+    expect(getAnonymousVisitorId()).toBe(headers.get("X-Base44-Anonymous-Id"));
+  });
+
+  test("is null outside a browser", () => {
+    vi.stubGlobal("window", undefined);
+    expect(getAnonymousVisitorId()).toBeNull();
+  });
+
+  test("is the analytics session id, and persists it", () => {
+    const id = getAnonymousVisitorId();
+    expect(id).toBeTruthy();
+    expect(id).toBe(getAnalyticsSessionId());
+    expect(
+      (globalThis as any).localStorage.getItem(ANALYTICS_SESSION_ID_KEY)
+    ).toBe(id);
+    expect(getAnonymousVisitorId()).toBe(id);
+  });
+
+  test("reuses an id already stored", () => {
+    (globalThis as any).localStorage.setItem(
+      ANALYTICS_SESSION_ID_KEY,
+      "existing-id"
+    );
+    expect(getAnonymousVisitorId()).toBe("existing-id");
+  });
+
+  test("never throws when localStorage throws", () => {
+    vi.stubGlobal("localStorage", {
+      getItem() {
+        throw new Error("blocked");
+      },
+    });
+    expect(() => getAnonymousVisitorId()).not.toThrow();
   });
 });
