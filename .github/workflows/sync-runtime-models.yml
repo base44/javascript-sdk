@@ -1,0 +1,143 @@
+name: Sync Runtime Models
+
+# Keeps the `InvokeLLMParams.model` union in sync with apper's `RuntimeModel`
+# enum. Runs daily; opens one PR on `bot/sync-runtime-models` when they differ.
+#
+# Needs the GitHub App installed on base44-dev (apper: contents read) and on
+# base44 (javascript-sdk: contents + pull requests write).
+
+on:
+  pull_request: # TEMP: verification run on PR #284, revert before merge
+  schedule:
+    - cron: "0 6 * * *" # daily, 06:00 UTC
+  workflow_dispatch:
+    inputs:
+      apper_ref:
+        description: "apper branch, tag, or SHA to read RuntimeModel from"
+        required: false
+        default: "main"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-runtime-models
+  cancel-in-progress: false
+
+env:
+  APPER_REPO: base44-dev/apper
+  APPER_PATH: backend/app/integrations/core/runtime_model_config.py
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Wix gateway proxy (mandatory)
+        uses: ./.github/actions/wix-gateway-proxy
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20.x"
+
+      - name: Generate apper read token
+        id: apper-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ vars.BASE44_GITHUB_ACTIONS_APP_ID }}
+          private-key: ${{ secrets.BASE44_GITHUB_ACTIONS_APP_PRIVATE_KEY }}
+          owner: base44-dev
+          repositories: apper
+          permission-contents: read
+
+      - name: Fetch RuntimeModel source from apper
+        id: fetch
+        env:
+          GH_TOKEN: ${{ steps.apper-token.outputs.token }}
+          APPER_REF: ${{ inputs.apper_ref || 'main' }}
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/runtime_model_config.py"
+          gh api -H "Accept: application/vnd.github.raw+json" \
+            "/repos/${APPER_REPO}/contents/${APPER_PATH}?ref=${APPER_REF}" > "$out"
+          test -s "$out" || { echo "::error::Fetched an empty file from ${APPER_REPO}:${APPER_PATH}@${APPER_REF}"; exit 1; }
+          sha="$(gh api "/repos/${APPER_REPO}/commits?path=${APPER_PATH}&sha=${APPER_REF}&per_page=1" --jq '.[0].sha')"
+          test -n "$sha" || { echo "::error::Could not resolve the last commit touching ${APPER_PATH}"; exit 1; }
+          echo "Read ${APPER_PATH} at ${APPER_REF} (last changed in ${sha})"
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+          echo "ref=${APPER_REF}" >> "$GITHUB_OUTPUT"
+
+      - name: Sync the InvokeLLM model union
+        id: sync
+        run: |
+          set -euo pipefail
+          node scripts/sync-runtime-models.mjs \
+            --source "$RUNNER_TEMP/runtime_model_config.py" \
+            --write \
+            --summary "$RUNNER_TEMP/summary.md"
+
+      - name: Compose PR body
+        env:
+          SHA: ${{ steps.fetch.outputs.sha }}
+          REF: ${{ steps.fetch.outputs.ref }}
+        run: |
+          set -euo pipefail
+          {
+            echo "Source: [\`${APPER_REPO}@${SHA:0:7}\`](https://github.com/${APPER_REPO}/blob/${SHA}/${APPER_PATH}) (ref \`${REF}\`)"
+            echo
+            cat "$RUNNER_TEMP/summary.md"
+            echo
+            echo "_Opened by the \`sync-runtime-models\` workflow. It runs daily, updates this PR in place while drift persists, and closes it automatically if apper reverts._"
+          } > "$RUNNER_TEMP/pr-body.md"
+          cat "$RUNNER_TEMP/pr-body.md"
+
+      # App token (not GITHUB_TOKEN) so CI runs on the PR and commits are signed.
+      - name: Generate javascript-sdk write token
+        id: sdk-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ vars.BASE44_GITHUB_ACTIONS_APP_ID }}
+          private-key: ${{ secrets.BASE44_GITHUB_ACTIONS_APP_PRIVATE_KEY }}
+          owner: base44
+          repositories: javascript-sdk
+          permission-contents: write
+          permission-pull-requests: write
+
+      # No diff: no-op. Open PR but no diff any more: closes it.
+      - name: Open or update pull request
+        id: pr
+        uses: ./.github/actions/open-or-update-pr
+        with:
+          token: ${{ steps.sdk-token.outputs.token }}
+          bot-slug: ${{ steps.sdk-token.outputs.app-slug }}
+          add-paths: src/modules/integrations.types.ts
+          branch: bot/sync-runtime-models
+          base: main
+          title: "fix(types): sync InvokeLLM model union with apper RuntimeModel"
+          body-path: ${{ runner.temp }}/pr-body.md
+          commit-message: |
+            fix(types): sync InvokeLLM model union with apper RuntimeModel
+
+            Source: ${{ env.APPER_REPO }}@${{ steps.fetch.outputs.sha }}
+            Added: ${{ steps.sync.outputs.added || '(none)' }}
+            Removed: ${{ steps.sync.outputs.removed || '(none)' }}
+
+      - name: Report
+        env:
+          CHANGED: ${{ steps.sync.outputs.changed }}
+          OPERATION: ${{ steps.pr.outputs.operation }}
+          URL: ${{ steps.pr.outputs.url }}
+        run: |
+          {
+            echo "## Sync Runtime Models"
+            echo
+            echo "- Drift in working tree: \`${CHANGED}\`"
+            echo "- Pull request: \`${OPERATION:-none}\` ${URL}"
+            echo
+            cat "$RUNNER_TEMP/summary.md"
+          } >> "$GITHUB_STEP_SUMMARY"
