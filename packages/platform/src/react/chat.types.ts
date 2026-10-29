@@ -37,12 +37,14 @@ export interface ToolCallAnswer {
  *   `X-Request-ID` built from the tool call ID, so a retry resumes the turn only once.
  *
  * Base44 keeps the Send chat message and Submit tool-call input requests open until the AI
- * finishes the turn, which can take minutes. Forward the request and return its result: the hook
- * learns from the live updates as soon as Base44 has the prompt or the answer, and a failure after
- * that, such as a timeout on your server, doesn't set an error. A rejected promise from any call
- * before then sets [`error`](#error). Next.js server actions run one at a time, so one that waits
- * out the turn holds up every later call: resolve it once Base44 hasn't refused the request
- * within a few seconds. Base44 refuses at once.
+ * finishes the turn, which can take minutes. Forward each request and return its result. The hook
+ * learns from the live updates as soon as Base44 has the prompt or the answer, so a failure after
+ * that, such as a timeout on your server, doesn't set an error. A rejected promise before then sets
+ * [`error`](#error).
+ *
+ * Next.js server actions run one at a time, so one that waits out the turn holds up every later
+ * call. In a server action, wait a few seconds for a refusal instead, and resolve if none comes.
+ * Base44 refuses a request right away.
  *
  * @example
  * ```typescript
@@ -119,6 +121,54 @@ export interface ChatBackend {
    * @param appId - ID of the app.
    * @param content - The prompt.
    * @returns Promise resolving when Base44 answers the request, which can be when the turn ends.
+   *
+   * @example
+   * ```typescript
+   * // Your route handler for sendMessage(), forwarding the request
+   * export async function POST(request: Request) {
+   *   const { appId, content } = await request.json();
+   *   // Check that the signed-in user may use this app before you forward anything
+   *   const response = await fetch(`https://app.base44.com/api/apps/${appId}/chat/message`, {
+   *     method: "POST",
+   *     headers: {
+   *       Authorization: `Bearer ${process.env.BASE44_ACCESS_TOKEN}`,
+   *       "Content-Type": "application/json",
+   *       "X-Request-ID": crypto.randomUUID(),
+   *     },
+   *     body: JSON.stringify({ content }),
+   *   });
+   *   return new Response(response.body, { status: response.status });
+   * }
+   * ```
+   * ```typescript
+   * // Your server action for sendMessage(), waiting a few seconds for a refusal
+   * "use server";
+   *
+   * export async function sendMessage(appId: string, content: string) {
+   *   const sent = fetch(`https://app.base44.com/api/apps/${appId}/chat/message`, {
+   *     method: "POST",
+   *     headers: {
+   *       Authorization: `Bearer ${process.env.BASE44_ACCESS_TOKEN}`,
+   *       "Content-Type": "application/json",
+   *       "X-Request-ID": crypto.randomUUID(),
+   *     },
+   *     body: JSON.stringify({ content }),
+   *   });
+   *   const timeout = new Promise<null>((resolve) => setTimeout(resolve, 3000, null));
+   *   const response = await Promise.race([sent, timeout]);
+   *   if (response === null) {
+   *     // The caller has moved on, so a later failure can only be logged
+   *     sent.then(
+   *       (late) => {
+   *         if (!late.ok) console.error(`Send chat message failed: ${late.status}`);
+   *       },
+   *       (error) => console.error("Send chat message failed", error),
+   *     );
+   *     return;
+   *   }
+   *   if (!response.ok) throw new Error(`Send chat message failed: ${response.status}`);
+   * }
+   * ```
    */
   sendMessage(appId: string, content: string): Promise<void>;
   /**
@@ -128,6 +178,30 @@ export interface ChatBackend {
    * @param appId - ID of the app.
    * @param answer - The tool call and the answer to it.
    * @returns Promise resolving when Base44 answers the request, which can be when the turn ends.
+   *
+   * @example
+   * ```typescript
+   * // Your route handler for submitToolCallInput(), forwarding the answer
+   * export async function POST(request: Request) {
+   *   const { appId, answer } = await request.json();
+   *   // Check that the signed-in user may use this app before you forward anything
+   *   const response = await fetch(`https://app.base44.com/api/apps/${appId}/chat/submit-tool-call-input`, {
+   *     method: "POST",
+   *     headers: {
+   *       Authorization: `Bearer ${process.env.BASE44_ACCESS_TOKEN}`,
+   *       "Content-Type": "application/json",
+   *       "X-Request-ID": `submit-${answer.toolCallId}`,
+   *     },
+   *     body: JSON.stringify({
+   *       tool_call_id: answer.toolCallId,
+   *       action: answer.approve ? "approved" : "rejected",
+   *       // A choice's answers or a secrets request's values, and nothing for an approval or a decline
+   *       extra_user_input: answer.extraUserInput,
+   *     }),
+   *   });
+   *   return new Response(response.body, { status: response.status });
+   * }
+   * ```
    */
   submitToolCallInput(appId: string, answer: ToolCallAnswer): Promise<void>;
 }
@@ -201,8 +275,9 @@ export interface ChatAnswer {
  *
  * Each kind has only the actions that fit it, and every kind can be declined. Calling an action
  * closes the question right away and sends the answer through your
- * [`submitToolCallInput()`](#submittoolcallinput). The actions never throw. A failure sets
- * [`error`](#error), and the question opens again.
+ * [`submitToolCallInput()`](#submittoolcallinput). The actions never throw. If Base44 refuses an
+ * answer, or your backend fails before Base44 has it, [`error`](#error) is set and the question
+ * opens again.
  *
  * The hook declines a question kind this release doesn't know, once per tool call, when Base44
  * names that kind on the last assistant message. If the decline fails, [`error`](#error) says
@@ -468,7 +543,8 @@ export interface ChatOptions {
  *
  * @groupDescription Methods
  * Functions on the same object, which you call to act on the chat, as in `chat.send(prompt)`. They
- * never throw. A failure sets [`error`](#error).
+ * never throw. If Base44 refuses the request, or your backend fails before Base44 has the prompt or
+ * answer, [`error`](#error) is set.
  */
 export interface UseChatResult {
   /** The conversation, oldest first. Each open question appears with the step that asked it. */
