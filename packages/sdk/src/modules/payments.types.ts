@@ -568,6 +568,26 @@ export interface PaymentsModule {
     checkout: MountableCheckout,
     options?: MountCheckoutOptions
   ): Promise<CheckoutMount>;
+
+  /**
+   * Loads the provider's checkout script before you mount a checkout.
+   *
+   * Call it when the checkout page or form opens, while the buyer is still filling it in. A later {@linkcode mountCheckout | mountCheckout()} then skips loading the script and renders sooner.
+   *
+   * It never rejects, so you don't need to await it or catch errors. If the script can't load, `mountCheckout()` tries again and rejects with the error. In the backend it does nothing.
+   *
+   * @param provider - The provider the app is connected to.
+   * @returns Promise resolving once the script has loaded or failed to load.
+   *
+   * @example
+   * ```tsx
+   * // Start loading PayPal when the checkout form opens
+   * useEffect(() => {
+   *   base44.payments.preloadCheckout('paypal');
+   * }, []);
+   * ```
+   */
+  preloadCheckout(provider: "paypal" | "stripe"): Promise<void>;
 }
 
 /**

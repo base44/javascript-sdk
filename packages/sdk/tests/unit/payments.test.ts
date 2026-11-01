@@ -773,3 +773,60 @@ describe("payments config", () => {
     expect(scope.isDone()).toBe(true);
   });
 });
+
+describe("preloadCheckout", () => {
+  const appId = "test-app-id";
+  const serverUrl = "https://base44.app";
+  const configPath = `/api/apps/${appId}/payments/config`;
+  const scriptUrl = "https://www.sandbox.paypal.com/web-sdk/v6/core";
+
+  afterEach(() => {
+    nock.cleanAll();
+    vi.unstubAllGlobals();
+  });
+
+  async function setup() {
+    vi.resetModules();
+    const { createClient: create } = await import("../../src/index.ts");
+    const scripts: any[] = [];
+    vi.stubGlobal("window", {});
+    vi.stubGlobal("document", {
+      createElement: () => ({ remove: vi.fn() }),
+      head: { appendChild: (script: any) => scripts.push(script) },
+    });
+    const base44 = create({ serverUrl, appId, token: "user-token", analytics: { enabled: false } });
+    return { base44, scripts };
+  }
+
+  test("fetches the config and loads the script once across calls", async () => {
+    const { base44, scripts } = await setup();
+    const scope = nock(serverUrl).get(configPath).once().reply(200, { paypal: { script_url: scriptUrl } });
+
+    const preload = base44.payments.preloadCheckout("paypal");
+    await vi.waitFor(() => expect(scripts).toHaveLength(1));
+    scripts[0].onload();
+    await expect(preload).resolves.toBeUndefined();
+    base44.payments.preloadCheckout("paypal");
+
+    expect(scripts[0].src).toBe(scriptUrl);
+    expect(scripts).toHaveLength(1);
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test("resolves without loading anything when the config has no valid script URL", async () => {
+    const { base44, scripts } = await setup();
+    nock(serverUrl).get(configPath).reply(200, { paypal: { script_url: "https://evil.example.com/sdk.js" } });
+
+    await expect(base44.payments.preloadCheckout("paypal")).resolves.toBeUndefined();
+    expect(scripts).toHaveLength(0);
+  });
+
+  test("resolves when the config fetch fails", async () => {
+    const { base44 } = await setup();
+    nock(serverUrl)
+      .get(configPath)
+      .reply(503, { error: { code: "provider_unavailable", message: "Down", details: {} } });
+
+    await expect(base44.payments.preloadCheckout("paypal")).resolves.toBeUndefined();
+  });
+});
