@@ -21,6 +21,27 @@ export const ANALYTICS_CONFIG_ENABLE_URL_PARAM_KEY = "analytics-enable";
 export const ANALYTICS_SESSION_ID_LOCAL_STORAGE_KEY =
   "base44_analytics_session_id";
 
+// Set by the Base44 server from the app owner's choice: "off" never tracks,
+// "consent" waits for the page's Google Consent Mode `analytics_storage` grant,
+// "on" tracks until that consent is denied. Absent: track as before.
+export const ANALYTICS_MODE_META_NAME = "base44-analytics";
+
+type AnalyticsMode = "off" | "consent" | "on";
+
+function readAnalyticsMode(): AnalyticsMode | null {
+  if (typeof document === "undefined") return null;
+  try {
+    const content = document
+      .querySelector(`meta[name="${ANALYTICS_MODE_META_NAME}"]`)
+      ?.getAttribute("content");
+    return content === "off" || content === "consent" || content === "on"
+      ? content
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 const defaultConfiguration: AnalyticsModuleOptions = {
   // default to enabled //
   enabled: true,
@@ -56,6 +77,73 @@ const analyticsSharedState = getSharedInstance(
 );
 
 ///////////////////////////////////////////////
+//// visitor consent                       ////
+///////////////////////////////////////////////
+
+// Its own shared instance: an older SDK copy on the page may own "analytics".
+const consentSharedState = getSharedInstance("analytics-consent", () => {
+  const analyticsMode = readAnalyticsMode();
+  return {
+    analyticsMode,
+    // Whether the visitor may be tracked and the session id stored.
+    consentGranted: analyticsMode !== "consent",
+    isWatchingConsent: false,
+    listeners: [] as Array<(granted: boolean) => void>,
+  };
+});
+
+/** Whether analytics may run and store the session id on this page. */
+export function isAnalyticsAllowed(): boolean {
+  const { analyticsMode, consentGranted } = consentSharedState;
+  return analyticsMode !== "off" && consentGranted;
+}
+
+function setConsentGranted(granted: boolean) {
+  if (consentSharedState.consentGranted === granted) return;
+  consentSharedState.consentGranted = granted;
+  if (!granted) {
+    try {
+      const sessionId = localStorage.getItem(
+        ANALYTICS_SESSION_ID_LOCAL_STORAGE_KEY
+      );
+      // Same id for the rest of the tab, so an anonymous agent chat keeps its owner.
+      if (sessionId) analyticsSharedState.fallbackSessionId ??= sessionId;
+      localStorage.removeItem(ANALYTICS_SESSION_ID_LOCAL_STORAGE_KEY);
+    } catch {
+      // storage unavailable: nothing was stored
+    }
+  }
+  for (const listener of [...consentSharedState.listeners]) {
+    listener(granted);
+  }
+}
+
+// Subscribes once to the consent listener Base44 injects next to the meta tag.
+// Without it (e.g. a CSP blocked the inline script) "consent" never grants.
+function watchAnalyticsConsent() {
+  const state = consentSharedState;
+  if (state.isWatchingConsent) return;
+  state.isWatchingConsent = true;
+  if (state.analyticsMode !== "consent" && state.analyticsMode !== "on") return;
+  const b44Consent =
+    typeof window !== "undefined" ? (window as any).__b44Consent : undefined;
+  b44Consent?.on(
+    "analytics_storage",
+    () => setConsentGranted(true),
+    () => setConsentGranted(false)
+  );
+}
+
+function onConsentChange(listener: (granted: boolean) => void) {
+  consentSharedState.listeners.push(listener);
+  return () => {
+    const listeners = consentSharedState.listeners;
+    const index = listeners.indexOf(listener);
+    if (index >= 0) listeners.splice(index, 1);
+  };
+}
+
+///////////////////////////////////////////////
 
 export interface AnalyticsModuleArgs {
   axiosClient: AxiosInstance;
@@ -74,12 +162,18 @@ export const createAnalyticsModule = ({
 }: AnalyticsModuleArgs) => {
   // prevent overflow of events //
   const { maxQueueSize, throttleTime, batchSize } = analyticsSharedState.config;
+  watchAnalyticsConsent();
 
   // Disable analytics on React Native. It defines `window` but not `document`,
   // so the per-callsite `typeof window` guards below aren't enough to keep it
   // from touching `document` (e.g. `document.referrer` on init). Node/SSR is
   // still handled by those `window` guards, so this doesn't affect it.
-  if (!enabled || !analyticsSharedState.config?.enabled || isReactNative) {
+  if (
+    !enabled ||
+    !analyticsSharedState.config?.enabled ||
+    isReactNative ||
+    consentSharedState.analyticsMode === "off"
+  ) {
     return {
       track: () => {},
       cleanup: () => {},
@@ -116,7 +210,8 @@ export const createAnalyticsModule = ({
     eventsData: TrackEventData[],
     options: { isBeacon?: boolean } = {}
   ) => {
-    if (eventsData.length === 0) return;
+    // Consent may have been withdrawn while these events waited.
+    if (eventsData.length === 0 || !isAnalyticsAllowed()) return;
 
     const sessionContext_ = await getSessionContext(userAuthModule);
     const events = eventsData.map(
@@ -140,7 +235,10 @@ export const createAnalyticsModule = ({
   };
 
   const track = (params: TrackEventParams) => {
-    if (analyticsSharedState.requestsQueue.length >= maxQueueSize) {
+    if (
+      !isAnalyticsAllowed() ||
+      analyticsSharedState.requestsQueue.length >= maxQueueSize
+    ) {
       return;
     }
     const intrinsicData = getEventIntrinsicData();
@@ -179,7 +277,25 @@ export const createAnalyticsModule = ({
     }
   };
 
-  const cleanup = () => {
+  let isStarted = false;
+
+  const start = () => {
+    if (isStarted) return;
+    isStarted = true;
+    // start the flusing process ///
+    startProcessing();
+    // start the heart beat processor //
+    clearHeartBeatProcessor = startHeartBeatProcessor(track);
+    // track the referrer event //
+    trackInitializationEvent(track);
+    // start the visibility change listener //
+    if (typeof window !== "undefined") {
+      window.addEventListener("visibilitychange", onVisibilityChange);
+    }
+  };
+
+  const stop = () => {
+    isStarted = false;
     stopAnalyticsProcessor();
     clearHeartBeatProcessor?.();
     if (typeof window !== "undefined") {
@@ -187,16 +303,21 @@ export const createAnalyticsModule = ({
     }
   };
 
-  // start the flusing process ///
-  startProcessing();
-  // start the heart beat processor //
-  clearHeartBeatProcessor = startHeartBeatProcessor(track);
-  // track the referrer event //
-  trackInitializationEvent(track);
-  // start the visibility change listener //
-  if (typeof window !== "undefined") {
-    window.addEventListener("visibilitychange", onVisibilityChange);
-  }
+  const stopWatchingConsent = onConsentChange((granted) => {
+    if (granted) {
+      start();
+    } else {
+      stop();
+      analyticsSharedState.requestsQueue.splice(0);
+    }
+  });
+
+  const cleanup = () => {
+    stopWatchingConsent();
+    stop();
+  };
+
+  if (isAnalyticsAllowed()) start();
 
   return {
     track,
@@ -432,7 +553,7 @@ function getFallbackSessionId(): string {
 }
 
 export function getAnalyticsSessionId(): string {
-  if (typeof window === "undefined") {
+  if (typeof window === "undefined" || !isAnalyticsAllowed()) {
     return getFallbackSessionId();
   }
   try {
@@ -440,7 +561,8 @@ export function getAnalyticsSessionId(): string {
       ANALYTICS_SESSION_ID_LOCAL_STORAGE_KEY
     );
     if (!sessionId) {
-      const newSessionId = generateUuid();
+      // An id used before consent was granted carries on, so it is stored now.
+      const newSessionId = analyticsSharedState.fallbackSessionId ?? generateUuid();
       localStorage.setItem(
         ANALYTICS_SESSION_ID_LOCAL_STORAGE_KEY,
         newSessionId
