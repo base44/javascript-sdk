@@ -21,25 +21,34 @@ export interface ToolCallAnswer {
 }
 
 /**
- * The four calls your backend makes to Base44 for the chat.
+ * The functions you write for the `backend` option. The hook calls them when it needs Base44, and
+ * each one usually forwards to a route on your own server, which adds your credentials.
  *
- * Each call wraps one Base44 API request with your credentials, so the browser never holds a
- * workspace API key or an access token. Your backend can be written in any language.
+ * Keeping the Base44 requests on your server means the browser never holds a workspace API key or
+ * an access token. Your server can be written in any language.
  *
- * - `createApp`: [Create app](/api-reference/create-app), with the first prompt as `initial_message`.
- * - `openLiveSession`: [Create socket session](/api-reference/create-socket-session) with `{ app_ids: [appId] }`.
- *   Return the response body unchanged. It holds a session token, never the workspace API key.
- * - `sendMessage`: [Send chat message](/api-reference/send-chat-message).
- * - `submitToolCallInput`: [Submit tool-call input](/api-reference/submit-tool-call-input). Send an
+ * Each function's route calls one Base44 endpoint:
+ * - [`createApp()`](#createapp): [Create app](/api-reference/create-app), with the first prompt as `initial_message`.
+ * - [`openLiveSession()`](#openlivesession): [Create socket session](/api-reference/create-socket-session) with `{ app_ids: [appId] }`.
+ *   Return its `session_token`, `socket_url`, and `socket_path`, and keep `session_id` on your server.
+ *   None of them is the workspace API key.
+ * - [`sendMessage()`](#sendmessage): [Send chat message](/api-reference/send-chat-message).
+ * - [`submitToolCallInput()`](#submittoolcallinput): [Submit tool-call input](/api-reference/submit-tool-call-input). Send an
  *   `X-Request-ID` built from the tool call ID, so a retry resumes the turn only once.
  *
  * Base44 keeps the Send chat message and Submit tool-call input requests open until the AI
- * finishes the turn. Resolve your call once Base44 accepts the request, not when it returns. The
- * chat follows the rest live. A rejected promise from any call sets `error` on the {@link useChat | chat}.
+ * finishes the turn, which can take minutes. Forward each request and return its result. The hook
+ * learns from the live updates as soon as Base44 has the prompt or the answer, so a failure after
+ * that, such as a timeout on your server, doesn't set an error. A rejected promise before then sets
+ * [`error`](#error).
+ *
+ * Next.js server actions run one at a time, so one that waits out the turn holds up every later
+ * call. In a server action, wait a few seconds for a refusal instead, and resolve if none comes.
+ * Base44 refuses a request right away.
  *
  * @example
  * ```typescript
- * // Your four calls, behind your own API routes
+ * // Your four functions, behind your own API routes
  * async function post<T>(path: string, body: unknown): Promise<T> {
  *   const response = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
  *   if (!response.ok) throw new Error(`${path} failed: ${response.status}`);
@@ -60,6 +69,22 @@ export interface ChatBackend {
    *
    * @param prompt - The first prompt, which describes the app.
    * @returns Promise resolving to the new app.
+   *
+   * @example
+   * ```typescript
+   * // Your server route for createApp(), with a personal access token
+   * export async function POST(request: Request) {
+   *   const { prompt } = await request.json();
+   *   const response = await fetch("https://app.base44.com/api/apps", {
+   *     method: "POST",
+   *     headers: { Authorization: `Bearer ${process.env.BASE44_ACCESS_TOKEN}`, "Content-Type": "application/json" },
+   *     body: JSON.stringify({ initial_message: { content: prompt } }),
+   *   });
+   *   if (!response.ok) return new Response("Create app failed", { status: response.status });
+   *   const app = await response.json();
+   *   return Response.json({ id: app.id, name: app.name });
+   * }
+   * ```
    */
   createApp(prompt: string): Promise<ChatApp>;
   /**
@@ -67,24 +92,116 @@ export interface ChatBackend {
    * whenever the session expires. Sessions last one hour.
    *
    * @param appId - ID of the app to follow.
-   * @returns Promise resolving to the Create socket session response body, unchanged.
+   * @returns Promise resolving to the session.
+   *
+   * @example
+   * ```typescript
+   * // Your server route for openLiveSession(), with a workspace API key
+   * export async function POST(request: Request) {
+   *   const { appId } = await request.json();
+   *   const response = await fetch("https://app.base44.com/api/v1/socket-sessions", {
+   *     method: "POST",
+   *     headers: { Authorization: `Bearer ${process.env.BASE44_API_KEY}`, "Content-Type": "application/json" },
+   *     body: JSON.stringify({ app_ids: [appId] }),
+   *   });
+   *   if (!response.ok) return new Response("Create socket session failed", { status: response.status });
+   *   const { session_token, socket_url, socket_path, session_id } = await response.json();
+   *   await saveSession(appId, session_id); // Keep it on your server to change or end the session
+   *   return Response.json({ session_token, socket_url, socket_path });
+   * }
+   * ```
    */
   openLiveSession(appId: string): Promise<SocketSession>;
   /**
-   * Sends a prompt to an existing app. Base44 queues a prompt sent while the AI is working. When the
-   * app has no queue, Base44 refuses it with a 409, so reject the promise.
+   * Sends a prompt to an existing app. Base44 queues a prompt sent while the AI is working. If Base44
+   * refuses the prompt, for example because the app is busy with an operation that blocks new
+   * messages, reject the promise. The hook then sets [`error`](#error), so your UI can show the
+   * failure.
    *
    * @param appId - ID of the app.
    * @param content - The prompt.
-   * @returns Promise resolving once Base44 accepts the prompt.
+   * @returns Promise resolving when Base44 answers the request, which can be when the turn ends.
+   *
+   * @example
+   * ```typescript
+   * // Your route handler for sendMessage(), forwarding the request
+   * export async function POST(request: Request) {
+   *   const { appId, content } = await request.json();
+   *   // Check that the signed-in user may use this app before you forward anything
+   *   const response = await fetch(`https://app.base44.com/api/apps/${appId}/chat/message`, {
+   *     method: "POST",
+   *     headers: {
+   *       Authorization: `Bearer ${process.env.BASE44_ACCESS_TOKEN}`,
+   *       "Content-Type": "application/json",
+   *       "X-Request-ID": crypto.randomUUID(),
+   *     },
+   *     body: JSON.stringify({ content }),
+   *   });
+   *   return new Response(response.body, { status: response.status });
+   * }
+   * ```
+   * ```typescript
+   * // Your server action for sendMessage(), waiting a few seconds for a refusal
+   * "use server";
+   *
+   * export async function sendMessage(appId: string, content: string) {
+   *   const sent = fetch(`https://app.base44.com/api/apps/${appId}/chat/message`, {
+   *     method: "POST",
+   *     headers: {
+   *       Authorization: `Bearer ${process.env.BASE44_ACCESS_TOKEN}`,
+   *       "Content-Type": "application/json",
+   *       "X-Request-ID": crypto.randomUUID(),
+   *     },
+   *     body: JSON.stringify({ content }),
+   *   });
+   *   const timeout = new Promise<null>((resolve) => setTimeout(resolve, 3000, null));
+   *   const response = await Promise.race([sent, timeout]);
+   *   if (response === null) {
+   *     // The caller has moved on, so a later failure can only be logged
+   *     sent.then(
+   *       (late) => {
+   *         if (!late.ok) console.error(`Send chat message failed: ${late.status}`);
+   *       },
+   *       (error) => console.error("Send chat message failed", error),
+   *     );
+   *     return;
+   *   }
+   *   if (!response.ok) throw new Error(`Send chat message failed: ${response.status}`);
+   * }
+   * ```
    */
   sendMessage(appId: string, content: string): Promise<void>;
   /**
-   * Answers or declines a question the AI waits on.
+   * Answers or declines a question the AI waits on. If Base44 refuses the answer, reject the
+   * promise. The hook then sets [`error`](#error) and shows the question again.
    *
    * @param appId - ID of the app.
    * @param answer - The tool call and the answer to it.
-   * @returns Promise resolving once Base44 accepts the answer.
+   * @returns Promise resolving when Base44 answers the request, which can be when the turn ends.
+   *
+   * @example
+   * ```typescript
+   * // Your route handler for submitToolCallInput(), forwarding the answer
+   * export async function POST(request: Request) {
+   *   const { appId, answer } = await request.json();
+   *   // Check that the signed-in user may use this app before you forward anything
+   *   const response = await fetch(`https://app.base44.com/api/apps/${appId}/chat/submit-tool-call-input`, {
+   *     method: "POST",
+   *     headers: {
+   *       Authorization: `Bearer ${process.env.BASE44_ACCESS_TOKEN}`,
+   *       "Content-Type": "application/json",
+   *       "X-Request-ID": `submit-${answer.toolCallId}`,
+   *     },
+   *     body: JSON.stringify({
+   *       tool_call_id: answer.toolCallId,
+   *       action: answer.approve ? "approved" : "rejected",
+   *       // A choice's answers or a secrets request's values, and nothing for an approval or a decline
+   *       extra_user_input: answer.extraUserInput,
+   *     }),
+   *   });
+   *   return new Response(response.body, { status: response.status });
+   * }
+   * ```
    */
   submitToolCallInput(appId: string, answer: ToolCallAnswer): Promise<void>;
 }
@@ -95,16 +212,20 @@ export interface ChatItem {
   id: string;
   /** Who wrote the message. */
   role: "user" | "assistant";
-  /** The message text, as raw markdown. It comes before the steps, and is empty when the message only holds tool calls. */
+  /** The message text, as raw markdown. Show it before the message's steps. It's empty when the message only holds tool calls. */
   text: string;
-  /** When the message was created, as an ISO timestamp. Base44's timestamps are UTC with no time zone. A pending prompt carries the browser's time. */
+  /**
+   * When the message was created, as an ISO 8601 timestamp in UTC that ends in `Z`, such as
+   * `2026-10-25T11:00:00.000Z`. `new Date(createdAt)` reads it correctly in any time zone.
+   */
   createdAt: string;
   /** One step per tool call, in order. */
   steps: ChatStep[];
   /**
-   * Whether this is a prompt sent from this chat that Base44 hasn't confirmed yet. It shows at once,
-   * and Base44's own message replaces it. A failed send removes it. A prompt sent while the AI is
-   * working waits in Base44's queue and stays pending until it runs.
+   * Whether this is a stand-in for a prompt you just sent. When you call [`send()`](#send) or
+   * [`create()`](#create), the prompt appears in `items` right away as a pending item, and Base44's
+   * copy of the message replaces it once it arrives. A failed send removes it. A prompt sent while the
+   * AI is working waits in Base44's queue, so it stays pending until it runs.
    */
   pending: boolean;
 }
@@ -117,20 +238,24 @@ export interface ChatStep {
   tool: string;
   /** The file paths the tool call touched. */
   files: string[];
-  /** A line ready to show. It's Base44's description of the step when there is one, then the entity it touched, then the tool name and its files. */
+  /**
+   * A line to show for the step. It's Base44's description of the step when there is one. Otherwise
+   * it's the tool name followed by the entity the step touched and its record count, such as
+   * `create_records Task (3)`, or by the step's files.
+   */
   label: string;
   /**
-   * Where the tool call is. A `waiting` step waits on the user. A `stopped` step was declined, or the
-   * turn was stopped.
+   * The step's progress. A `waiting` step needs the user to answer its question. A `stopped` step was
+   * declined, or its turn was stopped. A status this release doesn't know counts as `done`.
    */
   status: "running" | "waiting" | "done" | "stopped" | "error";
   /**
-   * The question this step waits on, with the actions that answer it. Present only while the step is
-   * `waiting` in the last assistant message, which is the one that makes the chat wait. It goes away
-   * once answered, and is absent for a question kind this release doesn't know.
+   * The {@link ChatQuestion | question} the step needs answered, with the actions that answer it. It's present only on a
+   * `waiting` step in the latest assistant reply, and goes away once answered. A `waiting` step in an
+   * older message has no question. It's also absent for a question kind this release doesn't know.
    */
   question?: ChatQuestion;
-  /** What the user answered on a choice question, once answered. It stays after the question closes, so the chat's history shows it. */
+  /** The user's answers to a choice question, one for each question the step asked. It stays after the question closes, so you can show the answers in the chat's history. */
   answered?: ChatAnswer[];
 }
 
@@ -145,14 +270,18 @@ export interface ChatAnswer {
 }
 
 /**
- * An open question, with the actions that answer this question and no other.
+ * An open question the AI waits on. A `waiting` step carries it as its `question`, and
+ * [`status`](#status) becomes `waiting`. Check `kind` to see which of the three kinds it is.
  *
- * Each kind carries only the actions that make sense for it, and every kind can be declined. The
- * actions never throw. A failure sets `error` on the {@link useChat | chat}, and the question opens again.
+ * Each kind has only the actions that fit it, and every kind can be declined. Calling an action
+ * closes the question right away and sends the answer through your
+ * [`submitToolCallInput()`](#submittoolcallinput). The actions never throw. If Base44 refuses an
+ * answer, or your backend fails before Base44 has it, [`error`](#error) is set and the question
+ * opens again.
  *
- * The chat declines a question kind this release doesn't know, once per tool call, when Base44
- * names that kind on the last assistant message. If the decline fails, the chat's `error` says
- * so, and the chat tries again after it reconnects.
+ * The hook declines a question kind this release doesn't know, once per tool call, when Base44
+ * names that kind on the last assistant message. If the decline fails, [`error`](#error) says
+ * so, and the hook tries again after it reconnects.
  */
 export type ChatQuestion = ChoiceQuestion | SecretsQuestion | ApprovalQuestion;
 
@@ -177,30 +306,54 @@ export interface ChoiceQuestion {
   /** The questions, in order. */
   questions: ChoiceEntry[];
   /**
-   * Answers with the picked labels, and free text where the user wrote some.
+   * Answers with the picked labels, and free text where the user wrote some. For a question whose
+   * `multi` is `false`, only the first picked label counts.
    *
    * @param picked - One list of picked labels per question, in the order of `questions`.
    * @param texts - One free-text answer per question, in the same order. Use it for a `text_input` question, or as a note beside a pick. A question with no pick and no text is skipped.
-   * @returns Promise resolving once the answer is sent.
+   * @returns Promise resolving once Base44 accepts the answer, or once sending it fails and sets [`error`](#error). It never rejects.
+   *
+   * @example
+   * ```tsx
+   * // Answer a one-question choice with a button per option
+   * function ChoiceButtons({ question }: { question: ChoiceQuestion }) {
+   *   const [entry] = question.questions;
+   *   return (
+   *     <div>
+   *       <p>{entry.text}</p>
+   *       {entry.options.map((label) => (
+   *         <button key={label} onClick={() => question.answer([[label]])}>{label}</button>
+   *       ))}
+   *       <button onClick={question.decline}>Skip</button>
+   *     </div>
+   *   );
+   * }
+   * ```
    */
   answer(picked: string[][], texts?: string[]): Promise<void>;
   /**
    * Declines the question. The AI continues without the answer.
    *
-   * @returns Promise resolving once the decline is sent.
+   * @returns Promise resolving once Base44 accepts the decline, or once sending it fails and sets [`error`](#error). It never rejects.
+   *
+   * @example
+   * ```tsx
+   * // Skip the question
+   * <button onClick={question.decline}>Skip</button>
+   * ```
    */
   decline(): Promise<void>;
 }
 
 /** A value the AI needs, such as an API key. */
 export interface SecretField {
-  /** Name of the field, used as its key in `submit`. */
+  /** Name of the field, which keys its value in [`submit()`](#submit). */
   name: string;
   /** Where to get the value. */
   description?: string;
 }
 
-/** The AI needs secrets, such as API keys. The values go to Base44 and the chat keeps none of them. */
+/** The AI needs secrets, such as API keys. The values go to Base44, and the hook keeps none of them. */
 export interface SecretsQuestion {
   /** Kind of question. */
   kind: "secrets";
@@ -209,14 +362,45 @@ export interface SecretsQuestion {
   /**
    * Submits the values.
    *
-   * @param values - The values, keyed by field name.
-   * @returns Promise resolving once the values are sent.
+   * @param values - The values, keyed by each field's `name`.
+   * @returns Promise resolving once Base44 accepts the values, or once sending it fails and sets [`error`](#error). It never rejects.
+   *
+   * @example
+   * ```tsx
+   * // Ask for each secret, then submit the values by name
+   * function SecretsForm({ question }: { question: SecretsQuestion }) {
+   *   return (
+   *     <form
+   *       onSubmit={(event) => {
+   *         event.preventDefault();
+   *         const form = new FormData(event.currentTarget);
+   *         question.submit(Object.fromEntries(question.fields.map((field) => [field.name, String(form.get(field.name) ?? "")])));
+   *       }}
+   *     >
+   *       {question.fields.map((field) => (
+   *         <label key={field.name}>
+   *           {field.name}
+   *           <input name={field.name} type="password" placeholder={field.description} />
+   *         </label>
+   *       ))}
+   *       <button type="submit">Save</button>
+   *       <button type="button" onClick={question.decline}>Skip</button>
+   *     </form>
+   *   );
+   * }
+   * ```
    */
   submit(values: Record<string, string>): Promise<void>;
   /**
    * Declines the question. The AI continues without the values.
    *
-   * @returns Promise resolving once the decline is sent.
+   * @returns Promise resolving once Base44 accepts the decline, or once sending it fails and sets [`error`](#error). It never rejects.
+   *
+   * @example
+   * ```tsx
+   * // Skip without entering the secrets
+   * <button onClick={question.decline}>Skip</button>
+   * ```
    */
   decline(): Promise<void>;
 }
@@ -227,7 +411,7 @@ export interface ApprovalQuestion {
   kind: "approval";
   /** Name of the tool that wants to run. */
   action: string;
-  /** Why the action needs approval, when Base44 gives a reason. Empty otherwise. */
+  /** Why the action needs approval. It's Base44's reason when there is one, otherwise the `summary` in `details`, and empty when neither is given. */
   reason: string;
   /** The check that paused the action, such as `exec_tool_send_email` or `entity_rls_guard`. */
   guard: string;
@@ -236,13 +420,34 @@ export interface ApprovalQuestion {
   /**
    * Lets the action run.
    *
-   * @returns Promise resolving once the approval is sent.
+   * @returns Promise resolving once Base44 accepts the approval, or once sending it fails and sets [`error`](#error). It never rejects.
+   *
+   * @example
+   * ```tsx
+   * // Show what the action would do, then allow or decline it
+   * function ApprovalPrompt({ question }: { question: ApprovalQuestion }) {
+   *   return (
+   *     <div>
+   *       <p>The AI wants to run {question.action}.</p>
+   *       {question.reason && <p>{question.reason}</p>}
+   *       <button onClick={question.approve}>Allow</button>
+   *       <button onClick={question.decline}>Decline</button>
+   *     </div>
+   *   );
+   * }
+   * ```
    */
   approve(): Promise<void>;
   /**
    * Declines the action. It never runs, and the AI continues.
    *
-   * @returns Promise resolving once the decline is sent.
+   * @returns Promise resolving once Base44 accepts the decline, or once sending it fails and sets [`error`](#error). It never rejects.
+   *
+   * @example
+   * ```tsx
+   * // Decline the action
+   * <button onClick={question.decline}>Decline</button>
+   * ```
    */
   decline(): Promise<void>;
 }
@@ -266,23 +471,25 @@ export interface ApprovalDetails {
 }
 
 /**
- * What the AI is doing. When several hold at once, the first in this list wins.
+ * What the AI is doing.
+ *
+ * When several hold at once, the first in this list wins.
  *
  * - `error`: Base44 reports that the last build failed.
- * - `waiting`: a question waits on the user.
- * - `building`: the AI is working.
- * - `submitted`: a prompt, a new app or an answer is on its way. It lasts until Base44 reports work, a reply or a queue change, or the call fails.
- * - `ready`: none of the above.
+ * - `waiting`: A question waits for the user's answer.
+ * - `building`: The AI is working.
+ * - `submitted`: A prompt, a new app, or an answer is on its way. It lasts until Base44 reports work, a reply, or a queue change, or until the call fails.
+ * - `ready`: None of the above.
  */
 export type ChatStatus = "ready" | "submitted" | "building" | "waiting" | "error";
 
 /**
  * Whether the chat follows the app live.
  *
- * - `connecting`: until the first snapshot arrives.
- * - `connected`: after the first snapshot.
- * - `disconnected`: live updates stopped for good. The session couldn't open, the retries ran out,
- *   or Base44 ended the session or the app's subscription. {@link UseChatResult.error} says why.
+ * - `connecting`: The chat waits for the app's first snapshot.
+ * - `connected`: The first snapshot arrived, and updates follow live.
+ * - `disconnected`: Live updates stopped for good. The session couldn't open, the retries ran out,
+ *   or Base44 ended the session or the app's subscription. Check [`error`](#error) to see why.
  *
  * Watching another app, or mounting the chat again, starts over.
  */
@@ -290,14 +497,16 @@ export type ChatConnection = "connecting" | "connected" | "disconnected";
 
 /** A failure of a call, of the live connection, or of the build. */
 export interface ChatError {
-  /** What went wrong, for people. */
+  /** A readable description of what went wrong, such as `The build failed`. */
   message: string;
   /**
-   * What went wrong, for code. A connection error carries a `PlatformSocketErrorCode`, and a failed
-   * build carries `build_failed`. A failed call to your backend carries none.
+   * A value your code can check to handle the error, such as `build_failed` for a failed build. A
+   * connection error has one of the session or app error codes listed under the chat module's
+   * [Errors](/developers/references/platform-sdk/docs/interfaces/chat#errors). A failed call to
+   * your backend has no code.
    */
   code?: string;
-  /** The original error, for logging. */
+  /** The error the failure came from, such as the one your backend threw. Log it to debug the failure. It's absent when the hook found the failure itself, such as a failed build or a send with no app. */
   cause?: unknown;
 }
 
@@ -305,50 +514,115 @@ export interface ChatError {
 export interface ChatOptions {
   /**
    * ID of the app to follow, or `null` until an app exists. While it's `null`, the chat follows the
-   * app {@link UseChatResult.create} made. Any change to `appId` forgets that app.
+   * app that [`create()`](#create) made, so you don't have to pass the new ID back.
+   * Changing `appId` stops following that app, so setting it back to `null` starts a new chat.
+   * Switching to another app closes the old session and starts over.
    */
   appId: string | null;
-  /** The four calls your backend makes to Base44. The chat reads the latest on every action, so an inline object works. */
+  /**
+   * The functions the hook calls to reach Base44 through your backend, described in
+   * [Backend calls](#backend-calls). The hook uses the `backend` from the latest render, so you can
+   * pass an inline object without memoizing it.
+   */
   backend: ChatBackend;
   /**
-   * Called with the new app after {@link UseChatResult.create} succeeds. The chat already follows it.
-   * Pass its ID back as `appId` to keep it in your own state.
+   * Called with the new app after [`create()`](#create) succeeds. The chat already follows the new
+   * app. To keep its ID in your own state, pass it back as `appId`.
    *
    * @param app - The app that was created.
    */
   onAppCreated?: (app: ChatApp) => void;
 }
 
-/** The chat that {@link useChat} returns. */
+/**
+ * The chat state and actions that `useChat()` returns.
+ *
+ * @groupDescription Properties
+ * The hook returns one object, of type `UseChatResult`. Its state is below, and its functions are
+ * under [Returned actions](#returned-actions).
+ *
+ * @groupDescription Methods
+ * Functions on the same object, which you call to act on the chat, as in `chat.send(prompt)`. They
+ * never throw. If Base44 refuses the request, or your backend fails before Base44 has the prompt or
+ * answer, [`error`](#error) is set.
+ */
 export interface UseChatResult {
-  /** The conversation, oldest first, with open questions bound to their steps. */
+  /** The conversation, oldest first. Each open question appears with the step that asked it. */
   items: ChatItem[];
   /** What the AI is doing. */
   status: ChatStatus;
   /** Whether the chat follows the app live. */
   connection: ChatConnection;
   /**
-   * The last failure. It's set whenever `status` is `error`, and on any failed call or connection
-   * error. A failed call's error clears on the next action. A connection error stays until
-   * {@link UseChatResult.clearError}. A failed build stays while Base44 reports it.
+   * The failure to show, or `null`. It's set when a call fails, when the live connection fails, and
+   * whenever `status` is `error`. When more than one of these conditions is true, `error` holds the
+   * failed call first, then the connection error, then the failed build. A failed call's error
+   * clears on the next action, and a connection error stays until [`clearError()`](#clearerror). A
+   * failed build's error stays while Base44 reports it. Switching to another app clears it.
    */
   error: ChatError | null;
   /**
-   * Sends a prompt to the current app. Base44 queues it while the AI is working. The prompt shows
-   * at once as a pending item, and the reply arrives through `items`. Without an app, it sets
-   * `error`. Use {@link UseChatResult.create} for the first prompt.
+   * Sends a prompt to the app the chat follows. The prompt appears in [`items`](#items) right away
+   * as a pending item, and the reply arrives there too. Base44 queues the prompt while the AI is
+   * working. If the chat doesn't follow an app yet, it sets [`error`](#error) instead. Use
+   * [`create()`](#create) for the first prompt.
    *
    * @param prompt - The prompt to send.
-   * @returns Promise resolving once Base44 accepts the prompt. It never rejects.
+   * @returns Promise resolving once Base44 accepts the prompt, or once the send fails and sets [`error`](#error). It never rejects.
+   *
+   * @example
+   * ```tsx
+   * // Send the prompt from a form
+   * function PromptForm({ chat }: { chat: UseChatResult }) {
+   *   const [prompt, setPrompt] = useState("");
+   *   return (
+   *     <form
+   *       onSubmit={(event) => {
+   *         event.preventDefault();
+   *         chat.send(prompt);
+   *         setPrompt("");
+   *       }}
+   *     >
+   *       <input value={prompt} onChange={(event) => setPrompt(event.target.value)} />
+   *       <button type="submit" disabled={!prompt.trim()}>Send</button>
+   *       {chat.status === "building" && <small>The AI is working. New prompts wait in the queue.</small>}
+   *     </form>
+   *   );
+   * }
+   * ```
    */
   send(prompt: string): Promise<void>;
   /**
-   * Creates an app from its first prompt and reports it through `onAppCreated`.
+   * Creates an app from its first prompt. The prompt appears in [`items`](#items) right away as a
+   * pending item. Once the app exists, the hook passes it to [`onAppCreated`](#onappcreated). If
+   * `appId` is `null`, the chat then follows the new app. Otherwise it stays on the app it follows.
    *
    * @param prompt - The first prompt, which describes the app.
-   * @returns Promise resolving once the app exists. It never rejects.
+   * @returns Promise resolving once the app exists, or once creating it fails and sets [`error`](#error). It never rejects.
+   *
+   * @example
+   * ```tsx
+   * // Create the app from the first prompt, and send the next prompts to it
+   * const [appId, setAppId] = useState<string | null>(null);
+   * const chat = useChat({ appId, backend, onAppCreated: (app) => setAppId(app.id) });
+   *
+   * const submit = (prompt: string) => (appId ? chat.send(prompt) : chat.create(prompt));
+   * ```
    */
   create(prompt: string): Promise<void>;
-  /** Clears {@link UseChatResult.error}. A failed build's error stays while Base44 reports it. */
+  /**
+   * Clears a failed call's or the connection's [`error`](#error). A failed build's error stays while Base44 reports it.
+   *
+   * @example
+   * ```tsx
+   * // Show the error, with a dismiss button unless the build failed
+   * {chat.error && (
+   *   <div role="alert">
+   *     {chat.error.message}
+   *     {chat.error.code !== "build_failed" && <button onClick={chat.clearError}>Dismiss</button>}
+   *   </div>
+   * )}
+   * ```
+   */
   clearError(): void;
 }

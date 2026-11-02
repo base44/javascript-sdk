@@ -3,6 +3,7 @@ import {
   loadScript,
   mountCheckout,
   PaymentsCheckoutConfig,
+  preloadCheckout,
 } from "./payments-checkout.js";
 import {
   CancelSubscriptionOptions,
@@ -100,6 +101,9 @@ export function createPaymentsModule(
         getConfig,
         loadScript,
       });
+    },
+    preloadCheckout(provider) {
+      return preloadCheckout(provider, { getConfig, loadScript });
     },
   };
 }

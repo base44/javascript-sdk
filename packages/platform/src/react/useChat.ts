@@ -11,36 +11,33 @@ const BUILD_FAILED_ERROR: ChatError = { message: "The build failed", code: "buil
 const NEW_APP = "new-app";
 
 /**
- * Runs the AI chat for one app in your own UI.
+ * Runs an app's AI chat in your own React UI. Requires a browser environment and can't be used in
+ * the backend.
  *
- * The hook renders nothing. It gives you the conversation and the actions, and you draw them:
+ * The hook is headless. It gives you the conversation and the [actions](#returned-actions), and your components render them:
  * - Follows the app live, and renews its socket session when it expires.
- * - Turns Base44's messages into {@link ChatItem | items}, with each open question bound to the step it belongs to.
- * - Reports what the AI is doing in {@link UseChatResult.status}, and the live connection in {@link UseChatResult.connection}.
- * - Sends prompts, creates apps and answers questions through the {@link ChatBackend | backend} you pass, so no credential reaches the browser.
- *
- * The actions never throw. A failure sets {@link UseChatResult.error}, and a question whose answer
- * failed opens again. The chat declines a question kind this release doesn't know.
- *
- * Requires a browser environment and can't be used in the backend.
- *
- * The chat follows `appId` when it's set. While `appId` is `null`, it follows the app
- * {@link UseChatResult.create} made, so passing the new ID back is optional. Any change to `appId`
- * forgets that app, so setting it back to `null` starts a new chat. Switching apps closes the old
- * session and starts over.
+ * - Turns Base44's messages into [items](#items), and shows each open [question](#questions) with the step that asked it.
+ * - Reports what the AI is doing in [`status`](#status), and the live connection in [`connection`](#connection).
+ * - Sends prompts, creates apps, and answers questions through the {@link ChatBackend | backend} you pass, so no credential reaches the browser.
  *
  * @param options - The app to follow, your backend's calls, and what to do with a created app.
- * @returns The conversation, its status, connection and error, and the actions `send`, `create` and `clearError`.
+ * @returns The chat's state, `items`, `status`, `connection`, and `error`, and its actions `send()`, `create()`, and `clearError()`.
  *
  * @example
- * ```typescript
- * // Draw the chat and answer an approval
+ * ```tsx
+ * // Render the chat and answer an approval
+ * import { useChat } from "@base44/platform/react";
+ * import Markdown from "react-markdown";
+ *
+ * // ...
+ *
+ * // Inside your component
  * const chat = useChat({ appId, backend, onAppCreated: selectApp });
  * return (
  *   <>
  *     {chat.items.map((item) => (
  *       <div key={item.id} className={item.role}>
- *         {item.text && <p>{item.text}</p>}
+ *         {item.text && <Markdown>{item.text}</Markdown>}
  *         {item.steps.map((step) =>
  *           step.question?.kind === "approval" ? (
  *             <button key={step.id} onClick={step.question.approve}>Allow {step.question.action}</button>
@@ -73,8 +70,16 @@ export function useChat({ appId, backend, onAppCreated }: ChatOptions): UseChatR
   // Tool calls declined for the user, and those whose decline failed and may try again.
   const declinedToolCalls = useRef(new Set<string>());
   const failedDeclines = useRef(new Set<string>());
-  // Tool calls answered from here whose submission ends when Base44 stops reporting them waiting.
-  const answersAwaitingBase44 = useRef(new Set<string>());
+  // Base44 keeps a send or an answer open until the turn ends, so the live updates say when Base44
+  // has it: that ends the action, and a failure after it, such as a timeout on the way, is no
+  // refusal. Each entry holds what resolves the action.
+  // Tool calls answered from here, whose submission ends when Base44 stops reporting them waiting.
+  const answersAwaitingBase44 = useRef(new Map<string, () => void>());
+  // Prompts sent from here, by pending id, until Base44's copy settles them. A prompt Base44 queues
+  // needs none: Base44 answers that send at once.
+  const promptsAwaitingBase44 = useRef(new Map<string, { resolve: () => void; shown: boolean }>());
+  // The tool calls Base44 reports waiting, as of the last render.
+  const waitingToolCalls = useRef(new Set<string>());
 
   // The app `create` made, shown while `appId` is null. Any change to `appId` forgets it.
   const [createdAppId, setCreatedAppId] = useState<string | null>(null);
@@ -227,8 +232,8 @@ export function useChat({ appId, backend, onAppCreated }: ChatOptions): UseChatR
     };
   }, [currentAppId]);
 
-  // Answers one tool call. Its id leaves the answered list again if the submit fails, so the
-  // question comes back.
+  // Answers one tool call. Its id leaves the answered list again if Base44 refuses the answer, so
+  // the question comes back.
   const submitAnswer = useCallback(
     (toolCallId: string, messageId: string, approve: boolean, extraUserInput?: Record<string, unknown>) => {
       if (!currentAppId) return Promise.resolve();
@@ -236,14 +241,17 @@ export function useChat({ appId, backend, onAppCreated }: ChatOptions): UseChatR
       setActionError(null);
       setSubmittedTo(targetAppId);
       setAnsweredToolCallIds(ids => [...ids, toolCallId]);
-      answersAwaitingBase44.current.add(toolCallId);
       const answer = { toolCallId, messageId, approve, extraUserInput };
-      return backendRef.current.submitToolCallInput(targetAppId, answer).catch((error: unknown) => {
-        answersAwaitingBase44.current.delete(toolCallId);
-        if (!stillFollowing(targetAppId)) return;
-        setAnsweredToolCallIds(ids => ids.filter(answeredId => answeredId !== toolCallId));
-        setSubmittedTo(null);
-        reportActionError(error);
+      return new Promise<void>(resolve => {
+        answersAwaitingBase44.current.set(toolCallId, resolve);
+        backendRef.current.submitToolCallInput(targetAppId, answer).then(resolve, (error: unknown) => {
+          resolve();
+          if (!answersAwaitingBase44.current.delete(toolCallId)) return;
+          if (!stillFollowing(targetAppId)) return;
+          setAnsweredToolCallIds(ids => ids.filter(answeredId => answeredId !== toolCallId));
+          setSubmittedTo(null);
+          reportActionError(error);
+        });
       });
     },
     [currentAppId, reportActionError],
@@ -271,6 +279,8 @@ export function useChat({ appId, backend, onAppCreated }: ChatOptions): UseChatR
       declinedToolCalls.current.add(declineKey);
       setAnsweredToolCallIds(ids => [...ids, toolCallId]);
       backendRef.current.submitToolCallInput(followedAppId, { toolCallId, messageId, approve: false }).catch((error: unknown) => {
+        // A call that no longer waits has the decline: the failure came after it.
+        if (!waitingToolCalls.current.has(toolCallId)) return;
         failedDeclines.current.add(declineKey);
         setAnsweredToolCallIds(ids => ids.filter(answeredId => answeredId !== toolCallId));
         reportActionError(error);
@@ -283,15 +293,31 @@ export function useChat({ appId, backend, onAppCreated }: ChatOptions): UseChatR
   // An answer's submission ends there too: Base44 has taken it once the call no longer waits.
   useEffect(() => {
     const stillWaiting = waitingToolCallIds(sortedMessages);
+    waitingToolCalls.current = stillWaiting;
     setAnsweredToolCallIds(ids => (ids.every(answeredId => stillWaiting.has(answeredId)) ? ids : ids.filter(answeredId => stillWaiting.has(answeredId))));
     let answerTaken = false;
-    for (const toolCallId of answersAwaitingBase44.current) {
+    for (const [toolCallId, resolveAnswer] of answersAwaitingBase44.current) {
       if (stillWaiting.has(toolCallId)) continue;
       answersAwaitingBase44.current.delete(toolCallId);
+      resolveAnswer();
       answerTaken = true;
     }
     if (answerTaken) setSubmittedTo(target => (target === followedAppIdRef.current ? null : target));
   }, [sortedMessages]);
+
+  // A prompt's send ends once Base44's copy settled the pending prompt. A prompt not shown yet is
+  // still on its way to the list, not settled.
+  useEffect(() => {
+    for (const [promptId, sentPrompt] of promptsAwaitingBase44.current) {
+      if (pendingPrompts.some(prompt => prompt.id === promptId)) {
+        sentPrompt.shown = true;
+        continue;
+      }
+      if (!sentPrompt.shown) continue;
+      promptsAwaitingBase44.current.delete(promptId);
+      sentPrompt.resolve();
+    }
+  }, [pendingPrompts]);
 
   const submissionInFlight = (submittedTo === NEW_APP && !currentAppId) || (submittedTo !== null && submittedTo === currentAppId);
   let status: ChatStatus = "ready";
@@ -316,11 +342,22 @@ export function useChat({ appId, backend, onAppCreated }: ChatOptions): UseChatR
       setActionError(null);
       setSubmittedTo(targetAppId);
       const pendingPrompt = addPendingPrompt(prompt, targetAppId);
-      return backendRef.current.sendMessage(targetAppId, prompt).catch((error: unknown) => {
-        setPendingPrompts(prompts => prompts.filter(other => other !== pendingPrompt));
-        if (!stillFollowing(targetAppId)) return;
-        setSubmittedTo(null);
-        reportActionError(error);
+      return new Promise<void>(resolve => {
+        promptsAwaitingBase44.current.set(pendingPrompt.id, { resolve, shown: false });
+        backendRef.current.sendMessage(targetAppId, prompt).then(
+          () => {
+            promptsAwaitingBase44.current.delete(pendingPrompt.id);
+            resolve();
+          },
+          (error: unknown) => {
+            resolve();
+            if (!promptsAwaitingBase44.current.delete(pendingPrompt.id)) return;
+            setPendingPrompts(prompts => prompts.filter(other => other.id !== pendingPrompt.id));
+            if (!stillFollowing(targetAppId)) return;
+            setSubmittedTo(null);
+            reportActionError(error);
+          },
+        );
       });
     },
     [currentAppId, reportActionError, addPendingPrompt],
