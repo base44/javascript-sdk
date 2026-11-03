@@ -1,9 +1,12 @@
 [
-  "AiGatewayConnection",
   "ActorConnectOptions",
+  "AiGatewayConnection",
+  "AiGatewayConnectionOptions",
   "AppPublicSettingsResponse",
   "BrowserSession",
   "BrowserSessionOptions",
+  "ConnectorApiRequest",
+  "ConnectorApiResponse",
   "DeleteManyResult",
   "DeleteResult",
   "EntityAggregateResult",

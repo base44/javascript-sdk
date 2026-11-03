@@ -3,7 +3,8 @@
     "EntityHandler": "Entity Handler Methods",
     "ActorRef": "Actor methods",
     "Connection": "Connection methods",
-    "ActorSubscription": "Subscription methods"
+    "ActorSubscription": "Subscription methods",
+    "ServiceRolePaymentsModule": "Service role methods"
   },
   "typeDefinitionGroups": [
     [
@@ -31,6 +32,12 @@
     ],
     [
       "AppPublicSettings"
-    ]
+    ],
+    {
+      "title": "Errors",
+      "types": [
+        "PaymentsErrorCode"
+      ]
+    }
   ]
 }

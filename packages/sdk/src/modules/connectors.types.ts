@@ -447,8 +447,8 @@ export interface ConnectorsModule {
    * Use this for a shared platform connector identified by an integration type. Base44 adds the OAuth credential to the outgoing request, forwards it, and bills the workspace for the call, so you never handle the token yourself.
    *
    * @param integrationType - The type of integration, such as `'x'`. See [Available connectors](#available-connectors).
-   * @param request - The upstream request to forward. See {@link ConnectorApiRequest}.
-   * @returns Promise resolving to a {@link ConnectorApiResponse}. Note that an upstream error is reported in `success` and `status`, not thrown — only Base44-side failures reject.
+   * @param request - The upstream request to forward.
+   * @returns Promise resolving to the upstream response. An upstream error is reported in `success` and `status` instead of thrown. Only Base44-side failures reject.
    *
    * @example
    * ```typescript
