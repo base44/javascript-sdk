@@ -50,7 +50,7 @@ export interface DeleteManyResult {
 export interface UpdateManyResult {
   /** Whether the operation was successful. */
   success: boolean;
-  /** Number of entities that were updated. */
+  /** Number of entities that were updated. This includes records that already held the new values, because every update refreshes `updated_date`. */
   updated: number;
   /** Whether there are more entities matching the query that were not updated in this batch. When `true`, call `updateMany` again with the same query to update the next batch. */
   has_more: boolean;
@@ -1104,8 +1104,11 @@ export interface EntityHandler<T = any> {
    *
    * This method isn't available for the built-in `User` entity, and calling it fails with a 405 error.
    *
-   * This isn't a transaction. Each record is written on its own, so if the call
-   * fails partway, the records already written stay written. Learn more about
+   * This isn't a transaction. Before writing, the call checks every record. If an `id`
+   * doesn't match a record you can update, or a change isn't allowed or doesn't match the
+   * entity's schema, the call fails and no records change. After the checks pass, each
+   * record is written on its own, so if a write fails partway, the records already written
+   * stay written. Learn more about
    * [concurrent updates](/developers/backend/resources/entities/entity-schemas#concurrent-updates).
    *
    * To apply the same update to all records matching a query, use
