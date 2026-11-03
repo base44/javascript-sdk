@@ -165,8 +165,16 @@ describe("analytics follows the owner's choice and the visitor's consent", () =>
     consentListener!.revoke();
     client.cleanup();
 
-    // Next page: the SDK starts before the banner replays the saved Decline.
+    // Next page: fresh in-memory state; the SDK starts before the banner
+    // replays the saved Decline.
     requests.length = 0;
+    Object.assign(analyticsState, {
+      requestsQueue: [],
+      isProcessing: false,
+      wasInitializationTracked: false,
+      fallbackSessionId: null,
+      sessionContext: null,
+    });
     loadPage("on");
     client.analytics.track({ eventName: "click" });
     await client.appLogs.logUserInApp("home");
