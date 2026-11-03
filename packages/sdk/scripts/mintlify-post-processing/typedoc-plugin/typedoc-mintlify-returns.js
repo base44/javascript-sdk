@@ -505,15 +505,17 @@ function rewriteReturnSections(content, options) {
             result.push(`\`${typeNameForDisplay}\``);
           }
           const descriptionParts = [];
-          if (typeDescription) {
-            descriptionParts.push(typeDescription);
-          }
           if (leadingText) {
             descriptionParts.push(leadingText);
           }
           const returnsDescription = extractReturnsDescription(page);
           if (returnsDescription && !isShown(returnsDescription, descriptionParts)) {
             descriptionParts.push(returnsDescription);
+          }
+          // The method's own @returns text says what this call returns, so the return type's
+          // general description only fills in when there's none.
+          if (typeDescription && descriptionParts.length === 0) {
+            descriptionParts.push(typeDescription);
           }
           if (descriptionParts.length > 0) {
             result.push("");
@@ -610,13 +612,8 @@ function rewriteReturnSections(content, options) {
           result.push("");
           result.push(`\`${typeNameForDisplay}\``);
         }
-        const descriptionParts = [];
-        if (typeDescription) {
-          descriptionParts.push(typeDescription);
-        }
-        if (leadingText) {
-          descriptionParts.push(leadingText);
-        }
+        // As above, the type's description only fills in when the section has no text of its own.
+        const descriptionParts = [leadingText || typeDescription].filter(Boolean);
         if (descriptionParts.length > 0) {
           result.push("");
           result.push(descriptionParts.join("\n\n"));

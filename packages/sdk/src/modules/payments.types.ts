@@ -7,7 +7,7 @@ export type PaymentsRecurringFrequency = "day" | "week" | "month" | "year";
  * Free trial before the first charge of a recurring item.
  */
 export interface CheckoutFreeTrial {
-  /** Unit of the trial length. Stripe supports only `'day'` and `'week'`. */
+  /** Unit of the trial length, which is `'day'`, `'week'`, `'month'`, or `'year'`. Stripe supports only `'day'` and `'week'`. */
   frequency: PaymentsRecurringFrequency;
   /** Number of `frequency` units the trial lasts, from 1 to 999. */
   interval: number;
@@ -39,13 +39,13 @@ export interface CheckoutItemRecurring {
 export interface CheckoutItem {
   /** Item name shown to the buyer, 1 to 255 characters. */
   name: string;
-  /** Unit price in the currency's minor units, such as cents. Must be greater than `0`. Providers may also reject a total below their minimum charge. */
+  /** Unit price as an integer in the currency's minor units, such as cents. Must be greater than `0`. Providers may also reject a total below their minimum charge. */
   amount: number;
   /** Number of units, from 1 to 1,000,000. Defaults to `1`. */
   quantity?: number;
-  /** Whether the item ships. The provider then collects a shipping address, unless you pass one in `shipping.address`. */
+  /** Whether the item ships. For a shippable item, the provider collects a shipping address unless you pass one in `shipping.address`. */
   shippable?: boolean;
-  /** Billing terms. Set this to sell the item as a subscription. PayPal and Wix Payments allow one recurring item per checkout, and PayPal allows no other items with it. */
+  /** Billing terms. Set this to sell the item as a subscription. PayPal and Base44 Payments allow one recurring item per checkout, and PayPal allows no other items with it. */
   recurring?: CheckoutItemRecurring;
 }
 
@@ -71,11 +71,11 @@ export interface ShippingAddress {
   name: string;
   /** Street address, 1 to 300 characters. */
   line1: string;
-  /** Apartment, suite or building, up to 300 characters. */
+  /** Apartment, suite, or building, up to 300 characters. */
   line2?: string | null;
   /** City, up to 120 characters. Some countries address by region and postal code alone. */
   city?: string | null;
-  /** State, province or region, up to 300 characters. */
+  /** State, province, or region, up to 300 characters. */
   region?: string | null;
   /** Postal or ZIP code, up to 60 characters. */
   postal_code?: string | null;
@@ -84,14 +84,12 @@ export interface ShippingAddress {
 }
 
 /**
- * Shipping for a checkout with at least one `shippable` item. Supported for PayPal one-time checkouts only.
- *
- * Compute the fee on your server, never in the browser. When the fee depends on the address, such as by distance or zone, collect the address in your app and pass it in `address`: PayPal shows it to the buyer locked, so the order ships where the fee was computed for. When the fee doesn't depend on the address, pass only `amount` and PayPal asks the buyer for the address.
+ * Shipping address and fee for a checkout.
  */
 export interface CheckoutShipping {
   /** Address your app collected. Omit it to let the provider ask the buyer. */
   address?: ShippingAddress;
-  /** Shipping fee in minor units, shown to the buyer as its own shipping line. Omit it for free shipping. */
+  /** Shipping fee as an integer in minor units, shown to the buyer as its own shipping line. Omit it for free shipping. */
   amount?: number;
 }
 
@@ -99,12 +97,12 @@ export interface CheckoutShipping {
  * How the buyer pays.
  *
  * - `'redirect'`: The buyer leaves the app for the provider's hosted checkout page at `redirect_url`.
- * - `'embedded'`: The checkout renders inside the app with [`mountCheckout()`](/developers/references/sdk/docs/interfaces/payments#mountcheckout).
+ * - `'embedded'`: The checkout renders inside the app with [`mountCheckout()`](#mountcheckout).
  */
 export type CheckoutPresentation = "redirect" | "embedded";
 
 /**
- * Parameters for [`createCheckout()`](/developers/references/sdk/docs/interfaces/service-role-payments#createcheckout).
+ * Parameters for [`createCheckout()`](#createcheckout).
  */
 export interface CreateCheckoutParams {
   /** Items to sell, 1 to 100 entries. */
@@ -113,17 +111,21 @@ export interface CreateCheckoutParams {
   currency?: string;
   /** App-relative path the buyer returns to after paying, such as `'/thank-you'`. Must start with `/`. */
   success_path: string;
-  /** App-relative path the buyer returns to after cancelling. Must start with `/`. Not supported for Stripe embedded checkout. */
+  /** App-relative path the buyer returns to after canceling. Must start with `/`. Not supported for Stripe embedded checkout. */
   cancel_path?: string;
   /** Details about the buyer, used to prefill the checkout. */
   buyer?: CheckoutBuyer;
   /** Your own key-value pairs, up to 50 keys. Returned in each purchase's `metadata` to service role callers only. Not supported for PayPal. */
   metadata?: Record<string, string>;
-  /** Key that makes retries return the same checkout instead of creating another, 1 to 200 characters. Not supported for Wix Payments or PayPal subscriptions. */
+  /** Key that makes retries return the same checkout instead of creating another, 1 to 200 characters. Not supported for Base44 Payments or PayPal subscriptions. */
   idempotency_key?: string;
-  /** How the buyer pays. Defaults to `'redirect'`. PayPal apps must pass `'embedded'`, and Wix Payments supports only `'redirect'`. */
+  /** How the buyer pays. Defaults to `'redirect'`. PayPal apps must pass `'embedded'`, and Base44 Payments supports only `'redirect'`. */
   presentation?: CheckoutPresentation;
-  /** Shipping address and fee. Allowed only when at least one item is `shippable`. Supported for PayPal one-time checkouts only; other providers and subscriptions reject it with `invalid_request`. */
+  /**
+   * Shipping address and fee. Allowed only when at least one item is `shippable`. Supported for PayPal one-time checkouts only. Other providers and subscriptions reject it with [`invalid_request`](#paymentserrorcode).
+   *
+   * Compute the fee in a backend function, never in the browser. When the fee depends on the address, such as by distance or zone, collect the address in your app and pass it in `address`. PayPal shows the address to the buyer locked, so the order ships to the address you computed the fee for. When the fee doesn't depend on the address, pass only `amount` and PayPal asks the buyer for the address.
+   */
   shipping?: CheckoutShipping;
 }
 
@@ -161,7 +163,7 @@ export interface PayPalEmbeddedCheckout {
 export type EmbeddedCheckout = StripeEmbeddedCheckout | PayPalEmbeddedCheckout;
 
 /**
- * Result of [`createCheckout()`](/developers/references/sdk/docs/interfaces/service-role-payments#createcheckout).
+ * Result of [`createCheckout()`](#createcheckout).
  *
  * Exactly one of `redirect_url` and `embedded` is set, depending on the checkout's `presentation`.
  */
@@ -174,12 +176,12 @@ export interface CreateCheckoutResult {
   amount_total: number;
   /** Absolute URL of the provider's hosted checkout page, for redirect checkouts. */
   redirect_url: string | null;
-  /** Data for [`mountCheckout()`](/developers/references/sdk/docs/interfaces/payments#mountcheckout), for embedded checkouts. */
+  /** Data for [`mountCheckout()`](#mountcheckout), for embedded checkouts. */
   embedded: EmbeddedCheckout | null;
 }
 
 /**
- * Result of [`completeCheckout()`](/developers/references/sdk/docs/interfaces/payments#completecheckout).
+ * Result of [`completeCheckout()`](#completecheckout).
  */
 export interface CompleteCheckoutResult {
   /** ID of the checkout. */
@@ -234,7 +236,7 @@ export interface Purchase {
   currency?: string | null;
   /** Buyer's email address. */
   buyer_email?: string | null;
-  /** The metadata passed to [`createCheckout()`](/developers/references/sdk/docs/interfaces/service-role-payments#createcheckout). Always `null` unless you call with the service role. */
+  /** The metadata passed to [`createCheckout()`](#createcheckout). Always `null` unless you call with the service role. */
   metadata?: Record<string, string> | null;
   /** ID of the subscription, for recurring purchases. */
   subscription_id?: string | null;
@@ -242,12 +244,12 @@ export interface Purchase {
   shipping_address?: ShippingAddress | null;
   /** Shipping fee in minor units, when the checkout charged one. */
   shipping_amount?: number | null;
-  /** ID of the payment to pass to [`refund()`](/developers/references/sdk/docs/interfaces/service-role-payments#refund). For a PayPal subscription it's the latest charge, returned only with the service role: read it when you start a refund and reuse it on retries. It's `null` where the provider doesn't name a payment, such as a PayPal subscription whose latest charge is already refunded. */
+  /** ID of the payment to pass to [`refund()`](#refund). For a PayPal subscription it's the latest charge, returned only with the service role. Read it when you start a refund and reuse it on retries. It's `null` when the provider doesn't name a payment, such as a PayPal subscription whose latest charge is already refunded. */
   payment_id?: string | null;
 }
 
 /**
- * Parameters for [`listPurchases()`](/developers/references/sdk/docs/interfaces/payments#listpurchases).
+ * Parameters for [`listPurchases()`](#listpurchases).
  */
 export interface ListPurchasesParams {
   /** Only return the purchase from this checkout. */
@@ -261,7 +263,7 @@ export interface ListPurchasesParams {
 }
 
 /**
- * Parameters for [`listPurchases()`](/developers/references/sdk/docs/interfaces/service-role-payments#listpurchases) with the service role.
+ * Parameters for [`listPurchases()`](#service-role-methods) with the service role.
  */
 export interface ServiceRoleListPurchasesParams extends ListPurchasesParams {
   /** Only return purchases made with this email address. */
@@ -279,19 +281,19 @@ export interface ListPurchasesResult {
 }
 
 /**
- * Parameters for [`refund()`](/developers/references/sdk/docs/interfaces/service-role-payments#refund).
+ * Parameters for [`refund()`](#refund).
  */
 export interface RefundParams {
   /** The `payment_id` of the purchase to refund. */
   payment_id: string;
-  /** Amount to refund in minor units. Must be greater than `0`. */
+  /** Amount to refund as an integer in minor units. Must be greater than `0`. */
   amount: number;
   /** Key that makes retries return the original refund instead of refunding twice, 1 to 100 characters. */
   idempotency_key: string;
 }
 
 /**
- * Result of [`refund()`](/developers/references/sdk/docs/interfaces/service-role-payments#refund).
+ * Result of [`refund()`](#refund).
  */
 export interface RefundResult {
   /** Provider's ID of the refund. */
@@ -307,7 +309,7 @@ export interface RefundResult {
 }
 
 /**
- * Options for [`cancelSubscription()`](/developers/references/sdk/docs/interfaces/service-role-payments#cancelsubscription).
+ * Options for [`cancelSubscription()`](#cancelsubscription).
  */
 export interface CancelSubscriptionOptions {
   /** Cancel at the end of the current billing period instead of now. Defaults to `false`. Not supported for PayPal. */
@@ -327,9 +329,9 @@ export interface SubscriptionResult {
 }
 
 /**
- * Error codes that payments methods reject with, in the `code` of a `Base44Error`.
+ * Error codes that payments methods set in the `code` of a [`Base44Error`](/developers/references/sdk/getting-started/work-with-sdk#error-handling) when they reject. Invalid arguments and [`mountCheckout()`](#mountcheckout) failures reject with a plain `Error` instead.
  *
- * Some notable ones:
+ * Notable codes include:
  *
  * - `payment_declined`: The buyer's payment method was declined when completing the checkout. The buyer can try again with another method.
  * - `refund_failed`: The refund's outcome is unknown. Retry with the same `idempotency_key` and `amount`, which returns the original refund if one was made.
@@ -376,21 +378,19 @@ export type PaymentsErrorCode =
   | "subscription_action_not_supported";
 
 /**
- * Callbacks for [`mountCheckout()`](/developers/references/sdk/docs/interfaces/payments#mountcheckout).
+ * Callbacks for [`mountCheckout()`](#mountcheckout).
  */
 export interface MountCheckoutOptions {
   /**
-   * Called after the buyer approves a PayPal payment and the SDK completes the checkout.
+   * Called after the buyer approves a PayPal payment and the SDK completes the checkout. Use it to update the page, not to grant access.
    *
-   * Use it to update the page, not to grant access. Browser callbacks can be faked, so unlock paid content only after your backend confirms the purchase, for example with [`listPurchases()`](/developers/references/sdk/docs/interfaces/service-role-payments#listpurchases) in a backend function.
-   *
-   * Stripe doesn't call this. After a Stripe payment, the buyer returns to the checkout's `success_path` with a `session_id` query parameter. That parameter is the `checkout_id`. Show the result there with [`listPurchases()`](/developers/references/sdk/docs/interfaces/payments#listpurchases), and grant access only after your backend confirms it.
+   * Stripe doesn't call this. After a Stripe payment, the buyer returns to the checkout's `success_path` with a `session_id` query parameter. That parameter is the `checkout_id`. Show the result there with [`listPurchases()`](#listpurchases).
    */
   onComplete?: (result: CompleteCheckoutResult) => void;
   /** Called when the buyer closes the PayPal window without paying. The button stays mounted so the buyer can try again. */
   onCancel?: () => void;
   /**
-   * Called when a PayPal checkout fails after it's mounted, including a declined payment with the `payment_declined` code. The button stays mounted so the buyer can try again. If it keeps failing with `payment_declined`, create a new checkout and mount it. Stripe shows its own errors inside the checkout.
+   * Called when a PayPal checkout fails after it's mounted, including a declined payment with the [`payment_declined`](#paymentserrorcode) code. The button stays mounted so the buyer can try again. If it keeps failing with `payment_declined`, create a new checkout and mount it. Stripe shows its own errors inside the checkout.
    *
    * The error is a `Base44Error` when completing the checkout fails, or PayPal's own error object when the PayPal window fails.
    */
@@ -408,7 +408,7 @@ export interface CheckoutElement {
 }
 
 /**
- * The fields of a {@linkcode CreateCheckoutResult} that [`mountCheckout()`](/developers/references/sdk/docs/interfaces/payments#mountcheckout) reads.
+ * The fields of a {@linkcode CreateCheckoutResult} that [`mountCheckout()`](#mountcheckout) reads.
  */
 export interface MountableCheckout {
   /** ID of the checkout. */
@@ -428,103 +428,78 @@ export interface CheckoutMount {
 }
 
 /**
- * Payments module for selling from the app through its connected payment provider.
+ * Payments module for accepting one-time payments and subscriptions in your app through its connected payment provider.
  *
  * This module provides:
- * - An embedded checkout that renders in any framework, with a PayPal button or Stripe Embedded Checkout
- * - Completing PayPal checkouts
- * - Lookup of the signed-in user's purchases
+ * - Checkouts for one-time payments and subscriptions, on the provider's hosted page or embedded in your app
+ * - Purchase lookup
+ * - Refunds
+ * - Subscription management, including canceling, pausing, and resuming
  *
- * Creating checkouts, refunds, and subscription changes are in {@linkcode ServiceRolePaymentsModule}.
  *
- * Each app connects one provider, which is Stripe, PayPal, or Wix Payments. Amounts are always integers in the currency's minor units, such as cents.
+ * ## Providers
  *
- * | | Stripe | PayPal | Wix Payments |
+ * Each app connects one provider, which is Stripe, PayPal, or Base44 Payments powered by Wix.
+ *
+ * | | Stripe | PayPal | Base44 Payments |
  * | :- | :- | :- | :- |
  * | Redirect checkout | Yes | No | Yes |
- * | Embedded checkout | Yes | Yes, the only mode | No |
+ * | Embedded checkout | Yes | Yes, required | No |
  * | Refunds | Yes | Yes | No |
- * | Cancel a subscription | Yes, now or at period end | Yes, now only | No |
- * | Pause and resume a subscription | Yes | Yes | No |
+ * | Subscription cancellation | Yes, now or at period end | Yes, now only | No |
+ * | Subscription pause and resume | Yes | Yes | No |
  *
  * ## Authentication modes
  *
- * - **Anonymous or user authentication** (`base44.payments`): Completes checkouts, mounts embedded checkouts, and lists the signed-in user's own purchases.
- * - **Service role authentication** (`base44.asServiceRole.payments`): Creates checkouts, lists any purchase, refunds payments, and changes subscriptions. Use it in backend functions.
+ * - **Anonymous or user authentication** (`base44.payments`): Preloads and mounts embedded checkouts, completes PayPal checkouts, and lists the current user's own purchases.
+ * - **Service role authentication** (`base44.asServiceRole.payments`): Creates checkouts, lists any purchase, refunds payments, and changes subscriptions. Use the [service role methods](#service-role-methods) in backend functions.
  *
- * Failed requests reject with a `Base44Error` whose `code` is one of the {@linkcode PaymentsErrorCode} values. Invalid arguments and [`mountCheckout()`](#mountcheckout) failures reject with a plain `Error`.
+ * @groupDescription Methods
+ * These methods use anonymous or user authentication, through `base44.payments`.
  */
 export interface PaymentsModule {
   /**
-   * Completes a PayPal checkout after the buyer approves it.
+   * Starts downloading the provider's JavaScript library, Stripe.js or the PayPal JavaScript SDK, before you mount a checkout, so the checkout appears faster.
    *
-   * When you use {@linkcode mountCheckout | mountCheckout()}, it calls this for you. Call it yourself only if you render the PayPal button yourself. Calling it again for the same checkout returns the same result.
+   * Call it when the checkout page or form opens, while the buyer is still filling it in. {@linkcode mountCheckout | mountCheckout()} needs the library to render the checkout, and downloads it itself if you didn't preload it.
    *
-   * Only PayPal checkouts need completing. Other providers reject with `complete_not_supported`.
+   * It never rejects, so you don't need to await it or catch errors. If the library can't load, `mountCheckout()` tries again and rejects with the error. Loading the library requires a browser environment and is skipped in the backend.
    *
-   * @param checkoutId - The `checkout_id` from [`createCheckout()`](/developers/references/sdk/docs/interfaces/service-role-payments#createcheckout).
-   * @returns Promise resolving to the checkout's payment status.
+   * @param provider - The provider the app is connected to.
+   * @returns Promise resolving once the library has loaded or failed to load.
    *
    * @example
    * ```typescript
-   * // Complete a PayPal checkout in your own onApprove handler
-   * const { status } = await base44.payments.completeCheckout(checkoutId);
-   * if (status === 'paid') {
-   *   showThankYou();
-   * }
+   * // Preload PayPal
+   * base44.payments.preloadCheckout('paypal');
    * ```
    */
-  completeCheckout(checkoutId: string): Promise<CompleteCheckoutResult>;
-
-  /**
-   * Lists the signed-in user's purchases.
-   *
-   * Only purchases made with the user's own email address are returned. Rejects with `forbidden` when no user is signed in. PayPal apps must pass `checkout_id` or `subscription_id`, and get at most one purchase.
-   *
-   * @param params - Optional filters and pagination.
-   * @returns Promise resolving to a page of purchases.
-   *
-   * @example
-   * ```typescript
-   * // Check a purchase on the success page
-   * const { items } = await base44.payments.listPurchases({ checkout_id: checkoutId });
-   * const paid = items[0]?.status === 'paid';
-   * ```
-   *
-   * @example
-   * ```typescript
-   * // Page through the user's purchases
-   * let cursor: string | undefined;
-   * do {
-   *   const page = await base44.payments.listPurchases({ limit: 50, cursor });
-   *   page.items.forEach((purchase) => console.log(purchase.checkout_id, purchase.status));
-   *   cursor = page.next_cursor ?? undefined;
-   * } while (cursor);
-   * ```
-   */
-  listPurchases(params?: ListPurchasesParams): Promise<ListPurchasesResult>;
+  preloadCheckout(provider: "paypal" | "stripe"): Promise<void>;
 
   /**
    * Renders an embedded checkout inside an element on the page.
    *
-   * Pass the result of a [`createCheckout()`](/developers/references/sdk/docs/interfaces/service-role-payments#createcheckout) call made with `presentation: 'embedded'`. Because only the service role can create checkouts, create it in a backend function and return the result to the page.
+   * Pass the result of a {@linkcode ServiceRolePaymentsModule.createCheckout | createCheckout()} call made with `presentation: 'embedded'`. Because only the service role can create checkouts, create it in a backend function and return the result to the page.
    *
-   * The SDK loads the provider's script and renders the checkout for you:
+   * The SDK loads the provider's library and renders the checkout for you:
    * - PayPal: Renders a PayPal button. When the buyer approves the payment, the SDK calls {@linkcode completeCheckout | completeCheckout()} and then `onComplete`.
    * - Stripe: Mounts Stripe Embedded Checkout. After paying, the buyer returns to the checkout's `success_path`. Stripe allows one embedded checkout per page, so mounting another Stripe checkout destroys the previous one.
    *
-   * Requires a browser environment and can't be used in the backend. Rejects when the checkout isn't embedded, when the payments config can't be fetched or has no valid script URL for the provider, when the provider's script fails to load, or when PayPal isn't available for the checkout's currency.
+   * To make the checkout appear faster, load the library ahead of time with [`preloadCheckout()`](#preloadcheckout) when the page opens.
    *
-   * The checkout's callbacks run in the buyer's browser, where they can be faked. Grant access to what the buyer paid for only after your backend confirms the purchase, for example with [`listPurchases()`](/developers/references/sdk/docs/interfaces/service-role-payments#listpurchases) in a backend function.
+   * Requires a browser environment and can't be used in the backend. Rejects when the checkout isn't embedded, when the payments config can't be fetched or has no valid script URL for the provider, when the provider's library fails to load, or when PayPal isn't available for the checkout's currency.
+   *
+   * The checkout's callbacks run in the buyer's browser, where they can be faked. Grant access to what the buyer paid for only after your backend confirms the purchase, for example with [`listPurchases()`](#service-role-methods) in a backend function.
    *
    * @param element - Element to render the checkout in. It should be empty.
-   * @param checkout - The result of [`createCheckout()`](/developers/references/sdk/docs/interfaces/service-role-payments#createcheckout).
+   * @param checkout - The result of {@linkcode ServiceRolePaymentsModule.createCheckout | createCheckout()}.
    * @param options - Callbacks for the checkout's outcome.
    * @returns Promise resolving to the mounted checkout once it renders.
    *
    * @example
    * ```typescript
-   * // Create the checkout in a backend function, then mount it
+   * // Mount a checkout
+   * // Create the checkout in a backend function
    * const { data: checkout } = await base44.functions.invoke('createCheckout', { planId });
    *
    * const mount = await base44.payments.mountCheckout(
@@ -570,30 +545,80 @@ export interface PaymentsModule {
   ): Promise<CheckoutMount>;
 
   /**
-   * Loads the provider's checkout script before you mount a checkout.
+   * Completes a PayPal checkout after the buyer approves it.
    *
-   * Call it when the checkout page or form opens, while the buyer is still filling it in. A later {@linkcode mountCheckout | mountCheckout()} then skips loading the script and renders sooner.
+   * When you use {@linkcode mountCheckout | mountCheckout()}, it calls this for you. Call it directly only if you render your own PayPal button. Calling it again for the same checkout returns the same result.
    *
-   * It never rejects, so you don't need to await it or catch errors. If the script can't load, `mountCheckout()` tries again and rejects with the error. In the backend it does nothing.
+   * Only PayPal checkouts need completing. Other providers reject with [`complete_not_supported`](#paymentserrorcode).
    *
-   * @param provider - The provider the app is connected to.
-   * @returns Promise resolving once the script has loaded or failed to load.
+   * To complete the checkout from a backend function instead, use [`completeCheckout()`](#service-role-methods) with the service role.
+   *
+   * @param checkoutId - The `checkout_id` from {@linkcode ServiceRolePaymentsModule.createCheckout | createCheckout()}.
+   * @returns Promise resolving to the checkout's payment status.
    *
    * @example
-   * ```tsx
-   * // Start loading PayPal when the checkout form opens
-   * useEffect(() => {
-   *   base44.payments.preloadCheckout('paypal');
-   * }, []);
+   * ```typescript
+   * // Complete a PayPal checkout
+   * // In your own PayPal onApprove handler
+   * const { status } = await base44.payments.completeCheckout(checkoutId);
+   * if (status === 'paid') {
+   *   showThankYou();
+   * }
    * ```
    */
-  preloadCheckout(provider: "paypal" | "stripe"): Promise<void>;
+  completeCheckout(checkoutId: string): Promise<CompleteCheckoutResult>;
+
+  /**
+   * Lists the current user's purchases. A purchase belongs to the user when it was made with the user's email address.
+   *
+   * To confirm a purchase in a backend function before you grant access, or to look up any buyer's purchases, use [`listPurchases()`](#service-role-methods) with the service role.
+   *
+   * PayPal can't list purchases, so for PayPal apps, pass `checkout_id` or `subscription_id`. The call looks up that one purchase and rejects with [`invalid_request`](#paymentserrorcode) without either.
+   *
+   * Rejects with [`forbidden`](#paymentserrorcode) when the client uses anonymous authentication.
+   *
+   * @param params - Optional filters and pagination.
+   * @returns Promise resolving to a page of purchases.
+   *
+   * @example
+   * ```typescript
+   * // Check a purchase by checkout ID
+   * const { items } = await base44.payments.listPurchases({ checkout_id: checkoutId });
+   * const paid = items[0]?.status === 'paid';
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Stripe success page
+   * // On a Stripe success page, the session_id query parameter is the checkout ID
+   * const checkoutId = new URLSearchParams(window.location.search).get('session_id');
+   *
+   * // Filtering by checkout returns at most one purchase
+   * const { items: [purchase] } = await base44.payments.listPurchases({ checkout_id: checkoutId });
+   *
+   * if (purchase?.status === 'paid') {
+   *   showThankYou();
+   * }
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Page through purchases
+   * let cursor: string | undefined;
+   * do {
+   *   const page = await base44.payments.listPurchases({ limit: 50, cursor });
+   *   page.items.forEach((purchase) => console.log(purchase.checkout_id, purchase.status));
+   *   cursor = page.next_cursor ?? undefined;
+   * } while (cursor);
+   * ```
+   */
+  listPurchases(params?: ListPurchasesParams): Promise<ListPurchasesResult>;
 }
 
 /**
- * Payments module with service role authentication, for backend functions.
+ * These methods use service role authentication, through `base44.asServiceRole.payments`. Call them from backend functions.
  *
- * Creates checkouts, lists any purchase, refunds payments, and changes subscriptions. See {@linkcode PaymentsModule} for which providers support which operations.
+ * Not every provider supports every operation. See [Providers](#providers) for which ones do.
  *
  * Refunds take a required `idempotency_key` and checkouts take an optional one, so retrying them doesn't charge or refund twice. Repeating a subscription change returns the subscription's current state.
  */
@@ -601,16 +626,20 @@ export interface ServiceRolePaymentsModule {
   /**
    * Creates a checkout.
    *
-   * For a redirect checkout, send the buyer to the returned `redirect_url`. For an embedded checkout, return the result to the page and pass it to [`mountCheckout()`](/developers/references/sdk/docs/interfaces/payments#mountcheckout).
+   * A checkout is either a redirect checkout, where the buyer leaves your app for the provider's hosted checkout page, or an embedded checkout, which renders inside your app. Choose one with `presentation`. It defaults to `'redirect'`.
+   *
+   * After you create the checkout, use the result:
+   * - Redirect checkout: Send the buyer to the returned `redirect_url`.
+   * - Embedded checkout: Return the result to the page and pass it to {@linkcode PaymentsModule.mountCheckout | mountCheckout()}.
    *
    * A checkout with a `recurring` item creates a subscription.
    *
    * @param params - Items, return paths, and options for the checkout.
-   * @returns Promise resolving to the checkout.
+   * @returns Promise resolving to the checkout. Exactly one of `redirect_url` and `embedded` is set, depending on the checkout's `presentation`.
    *
    * @example
    * ```typescript
-   * // Create a redirect checkout in a backend function
+   * // Redirect checkout
    * import { createClientFromRequest } from 'npm:@base44/sdk';
    *
    * Deno.serve(async (req) => {
@@ -628,7 +657,7 @@ export interface ServiceRolePaymentsModule {
    *
    * @example
    * ```typescript
-   * // Create an embedded subscription checkout for the signed-in user
+   * // Embedded subscription checkout
    * import { createClientFromRequest } from 'npm:@base44/sdk';
    *
    * Deno.serve(async (req) => {
@@ -654,16 +683,18 @@ export interface ServiceRolePaymentsModule {
   createCheckout(params: CreateCheckoutParams): Promise<CreateCheckoutResult>;
 
   /**
-   * Completes a PayPal checkout after the buyer approves it.
+   * Completes a PayPal checkout from a backend function, after the buyer approves it.
    *
-   * See [`base44.payments.completeCheckout()`](/developers/references/sdk/docs/interfaces/payments#completecheckout).
+   * Use it when you render your own PayPal button and its `onApprove` handler sends the checkout ID to your backend. Calling it again for the same checkout returns the same result.
+   *
+   * Only PayPal checkouts need completing. Other providers reject with [`complete_not_supported`](#paymentserrorcode).
    *
    * @param checkoutId - The `checkout_id` from {@linkcode createCheckout | createCheckout()}.
    * @returns Promise resolving to the checkout's payment status.
    *
    * @example
    * ```typescript
-   * // Complete a PayPal checkout from a backend function
+   * // Complete a PayPal checkout
    * const { status } = await base44.asServiceRole.payments.completeCheckout(checkoutId);
    * ```
    */
@@ -672,14 +703,39 @@ export interface ServiceRolePaymentsModule {
   /**
    * Lists the app's purchases.
    *
-   * Unlike [`base44.payments.listPurchases()`](/developers/references/sdk/docs/interfaces/payments#listpurchases), it returns any buyer's purchases and includes their `metadata`. PayPal apps must pass `checkout_id` or `subscription_id`, and get at most one purchase.
+   * Unlike {@linkcode PaymentsModule.listPurchases | base44.payments.listPurchases()}, it returns any buyer's purchases and includes their `metadata`.
+   *
+   * PayPal can't list purchases, so for PayPal apps, pass `checkout_id` or `subscription_id`. The call looks up that one purchase and rejects with [`invalid_request`](#paymentserrorcode) without either.
    *
    * @param params - Optional filters and pagination.
    * @returns Promise resolving to a page of purchases.
    *
    * @example
    * ```typescript
+   * // Confirm a purchase before granting access
+   * import { createClientFromRequest } from 'npm:@base44/sdk';
+   *
+   * Deno.serve(async (req) => {
+   *   const base44 = createClientFromRequest(req);
+   *   const { checkoutId } = await req.json();
+   *
+   *   const { items: [purchase] } = await base44.asServiceRole.payments.listPurchases({
+   *     checkout_id: checkoutId,
+   *   });
+   *
+   *   if (purchase?.status !== 'paid') {
+   *     return Response.json({ error: 'Payment not confirmed' }, { status: 402 });
+   *   }
+   *
+   *   // Grant access to what the buyer paid for here
+   *   return Response.json({ ok: true });
+   * });
+   * ```
+   *
+   * @example
+   * ```typescript
    * // Find a buyer's purchases
+   * // Not available for PayPal apps, which need checkout_id or subscription_id
    * const { items } = await base44.asServiceRole.payments.listPurchases({
    *   buyer_email: 'buyer@example.com',
    * });
@@ -692,16 +748,16 @@ export interface ServiceRolePaymentsModule {
   /**
    * Refunds all or part of a payment.
    *
-   * Retrying with the same `idempotency_key` and `amount` returns the original refund instead of refunding twice. When the call rejects with `refund_failed`, the outcome is unknown, so retry it with the same values.
+   * Retrying with the same `idempotency_key` and `amount` returns the original refund instead of refunding twice. When the call rejects with [`refund_failed`](#paymentserrorcode), the outcome is unknown, so retry it with the same values.
    *
-   * Not supported for Wix Payments.
+   * Not supported for Base44 Payments.
    *
    * @param params - The payment, amount, and idempotency key.
    * @returns Promise resolving to the refund.
    *
    * @example
    * ```typescript
-   * // Refund a purchase in full
+   * // Full refund
    * const { items } = await base44.asServiceRole.payments.listPurchases({ checkout_id: checkoutId });
    * const purchase = items[0];
    *
@@ -717,7 +773,7 @@ export interface ServiceRolePaymentsModule {
   /**
    * Cancels a subscription, now or at the end of the current billing period.
    *
-   * Not supported for Wix Payments. PayPal supports cancelling now only.
+   * Not supported for Base44 Payments. PayPal supports canceling now only.
    *
    * @param subscriptionId - The `subscription_id` of the purchase.
    * @param options - When to cancel.
@@ -725,7 +781,7 @@ export interface ServiceRolePaymentsModule {
    *
    * @example
    * ```typescript
-   * // Cancel at the end of the billing period
+   * // Cancel at period end
    * await base44.asServiceRole.payments.cancelSubscription(subscriptionId, {
    *   at_period_end: true,
    * });
@@ -739,7 +795,7 @@ export interface ServiceRolePaymentsModule {
   /**
    * Pauses a subscription's billing.
    *
-   * Not supported for Wix Payments.
+   * Not supported for Base44 Payments.
    *
    * @param subscriptionId - The `subscription_id` of the purchase.
    * @returns Promise resolving to the subscription's state.
@@ -755,14 +811,14 @@ export interface ServiceRolePaymentsModule {
   /**
    * Resumes a paused subscription's billing.
    *
-   * Not supported for Wix Payments.
+   * Not supported for Base44 Payments.
    *
    * @param subscriptionId - The `subscription_id` of the purchase.
    * @returns Promise resolving to the subscription's state.
    *
    * @example
    * ```typescript
-   * // Resume a paused subscription
+   * // Resume a subscription
    * await base44.asServiceRole.payments.resumeSubscription(subscriptionId);
    * ```
    */

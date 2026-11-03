@@ -92,7 +92,8 @@ export interface ChatBackend {
    * whenever the session expires. Sessions last one hour.
    *
    * @param appId - ID of the app to follow.
-   * @returns Promise resolving to the session.
+   * @returns Promise resolving to the three fields of a [Create socket session](/api-reference/create-socket-session)
+   * response that the browser needs. Keep the response's `session_id` on your server.
    *
    * @example
    * ```typescript

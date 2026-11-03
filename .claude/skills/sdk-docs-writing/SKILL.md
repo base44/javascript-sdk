@@ -79,11 +79,14 @@ Every public method needs: description, `@param` tags, `@returns`, and at least 
 - **Sentence case** for free-text headings in JSDoc.
 - **State environment constraints** when a method is browser-only: "Requires a browser environment and can't be used in the backend."
 - **Document side effects** explicitly (e.g., "automatically sets the token for subsequent requests").
-- **Link method references.** When mentioning another SDK method or module by name in JSDoc prose, always use `{@link}` or `{@linkcode}` to create a cross-reference.
+- **Link method references.** When mentioning another SDK method or module by name in JSDoc prose, always use `{@link}` or `{@linkcode}` to create a cross-reference. There are two exceptions, where `{@link}` produces a broken or missing link, so write a markdown link instead:
+  - A method on another module's page. Link to the page's route, as in ``[`InvokeLLM()`](/developers/references/sdk/docs/type-aliases/integrations#invokellm)``.
+  - A method mentioned in the comment of a type or property that renders inside a field, such as `Purchase` or `CreateCheckoutParams`. The pipeline drops the link and its code formatting there, so link to the method's anchor on the page, as in ``[`refund()`](#refund)``.
 - **Never use a colon as a sentence break.** Write "Use this when you sync data from another system. Name the field..." not "...another system: name the field...". Reserve colons for `label: description` bullet-list items, not prose sentences.
 - **Name the two SDKs.** Call `@base44/sdk` the "App SDK" and `@base44/platform` the "Platform SDK" wherever a page mentions both. Docs for only one package can say "the SDK".
 - **Use a serial comma.** Put a comma before the final "and" or "or" in every series of three or more, as in "snapshots, events, and errors".
 - **Never start a sentence with a lowercase inline-code term.** If the natural phrasing would open with one (e.g., "`week` is only supported on..."), restructure so a capitalized word leads instead (e.g., "Every date field supports `day`, `month` and `year`. The `created_date` and `updated_date` fields also support `week`.").
+- **Call the app user the client acts for "the current user".** Don't write "signed-in user" or "logged-in user". When the difference matters, say which authentication mode applies, as in "Rejects with `forbidden` when the client uses anonymous authentication."
 - **Name the place and the AI correctly.** Write "app editor" (lowercase) for the place where you build, and "the AI" or "the AI chat" for the assistant doing the work ("The AI inserts this ID", "ask the AI chat to fix it"). Never use "builder" for either. It stays only for the Builder plan, the Base44 Builder GitHub App, people who build apps ("builders", "app builders"), and exact UI labels or code names.
 
 ## References
