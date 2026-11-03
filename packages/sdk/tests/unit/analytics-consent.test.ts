@@ -1,9 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createClient } from "../../src/index.ts";
 import { getSharedInstance } from "../../src/utils/sharedInstance.ts";
-import { getAnalyticsSessionId } from "../../src/modules/analytics.ts";
+import {
+  getAnalyticsSessionId,
+  initialConsentGranted,
+} from "../../src/modules/analytics.ts";
 
 const SESSION_ID_KEY = "base44_analytics_session_id";
+const DENIED_KEY = "base44_analytics_denied";
 
 const requests: string[] = [];
 
@@ -47,7 +51,7 @@ let client: ReturnType<typeof createClient>;
 // What the page looks like: the server's meta tag and Base44's consent listener.
 function loadPage(mode: string | null) {
   consentState.analyticsMode = mode;
-  consentState.consentGranted = mode !== "consent";
+  consentState.consentGranted = initialConsentGranted(mode);
   consentState.isWatchingConsent = false;
   consentState.listeners = [];
   client = createClient({ serverUrl: "https://api", appId: "app-1" });
@@ -153,6 +157,31 @@ describe("analytics follows the owner's choice and the visitor's consent", () =>
 
     expect(storage.has(SESSION_ID_KEY)).toBe(false);
     expect(requests).toEqual([]);
+  });
+
+  test("on: after a Decline, the next page sends nothing before the banner replays it", async () => {
+    loadPage("on");
+    await vi.advanceTimersByTimeAsync(0);
+    consentListener!.revoke();
+    client.cleanup();
+
+    // Next page: the SDK starts before the banner replays the saved Decline.
+    requests.length = 0;
+    loadPage("on");
+    client.analytics.track({ eventName: "click" });
+    await client.appLogs.logUserInApp("home");
+    getAnalyticsSessionId();
+    await vi.advanceTimersByTimeAsync(5000);
+
+    expect(storage.has(SESSION_ID_KEY)).toBe(false);
+    expect(requests).toEqual([]);
+
+    // A later Accept clears the Decline and starts tracking.
+    consentListener!.grant();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(storage.has(DENIED_KEY)).toBe(false);
+    expect(analyticsRequests().length).toBeGreaterThan(0);
+    expect(storage.has(SESSION_ID_KEY)).toBe(true);
   });
 
   test("no meta tag: tracks as before and ignores consent updates", async () => {
