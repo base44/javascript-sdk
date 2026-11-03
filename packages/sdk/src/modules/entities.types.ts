@@ -850,6 +850,8 @@ export interface EntityHandler<T = any> {
    * records first and then updates them. Learn more about
    * [concurrent updates](/developers/backend/resources/entities/entity-schemas#concurrent-updates).
    *
+   * This method isn't available for the built-in `User` entity, and calling it fails with a 405 error.
+   *
    * To update a single record by ID, use {@linkcode update | update()} instead. To update
    * multiple specific records with different data each, use {@linkcode bulkUpdate | bulkUpdate()}.
    *
@@ -1099,6 +1101,8 @@ export interface EntityHandler<T = any> {
    * on three separate invoices in one call.
    *
    * You can update up to 500 records per request.
+   *
+   * This method isn't available for the built-in `User` entity, and calling it fails with a 405 error.
    *
    * This isn't a transaction. Each record is written on its own, so if the call
    * fails partway, the records already written stay written. Learn more about
