@@ -1,22 +1,22 @@
 {
   "asyncapi": "3.0.0",
   "info": {
-    "title": "Base44 Live Builder Updates",
+    "title": "Base44 Live AI Chat Updates",
     "version": "1.0.0",
-    "description": "Live updates of the builder chat for the apps a white-label session may watch. The connection is Socket.IO, not a raw WebSocket: connect with `io(socket_url, { path: socket_path, transports: [\"websocket\"], auth: { session_token } })`, using the values your server received from `POST /api/service/socket-sessions`. Then send `join` for each app, and receive its snapshot followed by live events.\n\nAvailable to white-label workspaces with live builder updates turned on. Your onboarding contact turns them on for your workspace."
+    "description": "This connection delivers live updates of the AI chat for the apps a white-label session can watch. It uses Socket.IO, not a raw WebSocket. Connect with `io(socket_url, { path: socket_path, transports: [\"websocket\"], auth: { session_token } })`, using the values your server received from `POST /api/v1/socket-sessions`. Then send `join` for each app to receive the app's snapshot, followed by live events.\n\nAvailable only to white-label workspaces on the Builder plan or higher, with live AI chat updates turned on. Ask your onboarding contact to turn them on for your workspace."
   },
   "servers": {
     "platform": {
       "host": "ws.base44.com",
       "protocol": "wss",
       "pathname": "/ws/socket.io/",
-      "description": "Send the session token in the Socket.IO CONNECT `auth` as `session_token`. A refused connect is a `connect_error` with `message: \"connection_denied\"` and `data: { retryable }`: retry with backoff when `retryable`, otherwise ask your server for a new session."
+      "description": "Send the session token in the Socket.IO CONNECT `auth` as `session_token`. A refused connection is a `connect_error` with `message: \"connection_denied\"` and `data: { retryable }`. If `retryable` is true, retry with backoff. Otherwise, ask your server for a new session."
     }
   },
   "channels": {
     "platform": {
       "title": "Platform socket",
-      "description": "One connection per session carries the events of every app it joins. In an event's `data`, a missing key is unchanged and an explicit `null` clears it. `app.snapshot` is the exception, since it replaces the app's state.",
+      "description": "One connection per session carries the events of every app it joins. In an event's `data`, a missing field is unchanged and an explicit `null` clears it. The `app.snapshot` event is the exception, since it replaces the app's state.",
       "messages": {
         "MessageUpdatedEvent": {
           "$ref": "#/components/messages/MessageUpdatedEvent"
@@ -116,7 +116,7 @@
           "$ref": "#/channels/platform/messages/AppStatusChangedEvent"
         }
       ],
-      "summary": "The builder started, finished or failed a turn. Null status clears it."
+      "summary": "The AI started, finished, or failed a turn. Null status clears it."
     },
     "sendPreviewReloadRequestedEvent": {
       "action": "send",
@@ -188,7 +188,7 @@
           "$ref": "#/channels/platform/messages/ConversationChangedEvent"
         }
       ],
-      "summary": "The conversation was rewritten (undo, restore, sync). Rejoin the room for a fresh snapshot."
+      "summary": "The conversation was rewritten by an undo, restore, or sync. Rejoin the room for a fresh snapshot."
     },
     "sendFilesChangedEvent": {
       "action": "send",
@@ -248,7 +248,7 @@
           "$ref": "#/channels/platform/messages/SessionEndedEvent"
         }
       ],
-      "summary": "The session ended (expired, revoked, or taken by a newer socket). The socket disconnects next."
+      "summary": "The session ended because it expired, was revoked, or was taken by a newer socket. The socket disconnects next."
     },
     "sendRoomAccessDeniedEvent": {
       "action": "send",
@@ -395,8 +395,8 @@
       "AppStatusChangedEvent": {
         "name": "app.status_changed",
         "title": "app.status_changed",
-        "summary": "The builder started, finished or failed a turn. Null status clears it.",
-        "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nThe builder started, finished or failed a turn. Null status clears it.",
+        "summary": "The AI started, finished, or failed a turn. Null status clears it.",
+        "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nThe AI started, finished, or failed a turn. Null status clears it.",
         "payload": {
           "$ref": "#/components/schemas/AppStatusChangedEvent"
         },
@@ -541,8 +541,8 @@
       "ConversationChangedEvent": {
         "name": "conversation.changed",
         "title": "conversation.changed",
-        "summary": "The conversation was rewritten (undo, restore, sync). Rejoin the room for a fresh snapshot.",
-        "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nThe conversation was rewritten (undo, restore, sync). Rejoin the room for a fresh snapshot.",
+        "summary": "The conversation was rewritten by an undo, restore, or sync. Rejoin the room for a fresh snapshot.",
+        "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nThe conversation was rewritten by an undo, restore, or sync. Rejoin the room for a fresh snapshot.",
         "payload": {
           "$ref": "#/components/schemas/ConversationChangedEvent"
         },
@@ -641,8 +641,8 @@
       "SessionEndedEvent": {
         "name": "session.ended",
         "title": "session.ended",
-        "summary": "The session ended (expired, revoked, or taken by a newer socket). The socket disconnects next.",
-        "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nThe session ended (expired, revoked, or taken by a newer socket). The socket disconnects next.",
+        "summary": "The session ended because it expired, was revoked, or was taken by a newer socket. The socket disconnects next.",
+        "description": "<Info>This API is in beta. Endpoints, fields, and behavior may still change, so avoid depending on it in production.</Info>\n\nThe session ended because it expired, was revoked, or was taken by a newer socket. The socket disconnects next.",
         "payload": {
           "$ref": "#/components/schemas/SessionEndedEvent"
         },
@@ -884,7 +884,7 @@
         "type": "object"
       },
       "AppStatusChangedEvent": {
-        "description": "The builder started, finished or failed a turn. Null status clears it.",
+        "description": "The AI started, finished, or failed a turn. Null status clears it.",
         "properties": {
           "room": {
             "type": [
@@ -930,7 +930,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
+            "description": "Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -939,7 +939,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
+            "description": "Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -959,7 +959,7 @@
               }
             ],
             "default": null,
-            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
+            "description": "State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -1080,7 +1080,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
+            "description": "Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -1089,7 +1089,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
+            "description": "Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -1109,7 +1109,7 @@
               }
             ],
             "default": null,
-            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
+            "description": "State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -1207,7 +1207,7 @@
         "type": "object"
       },
       "BackendFunctionEntityDeleteApproval": {
-        "description": "Waiting for approval: testing a backend function would delete records from an entity.",
+        "description": "Waiting for approval because testing a backend function would delete records from an entity.",
         "properties": {
           "guard": {
             "const": "backend_function_entity_delete",
@@ -1244,7 +1244,7 @@
         "type": "object"
       },
       "BashApproval": {
-        "description": "Waiting for approval: the AI wants to run a shell command that needs a review first. The command itself is not published.",
+        "description": "Waiting for approval because the AI wants to run a shell command that needs a review first. The command itself is not published.",
         "properties": {
           "guard": {
             "const": "bash_approval",
@@ -1283,7 +1283,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
+            "description": "Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -1292,7 +1292,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
+            "description": "Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -1312,7 +1312,7 @@
               }
             ],
             "default": null,
-            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
+            "description": "State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -1437,7 +1437,7 @@
         "type": "object"
       },
       "ConversationChangedEvent": {
-        "description": "The conversation was rewritten (undo, restore, sync). Rejoin the room for a fresh snapshot.",
+        "description": "The conversation was rewritten by an undo, restore, or sync. Rejoin the room for a fresh snapshot.",
         "properties": {
           "room": {
             "type": [
@@ -1483,7 +1483,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
+            "description": "Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -1492,7 +1492,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
+            "description": "Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -1512,7 +1512,7 @@
               }
             ],
             "default": null,
-            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
+            "description": "State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -1621,7 +1621,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
+            "description": "Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -1630,7 +1630,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
+            "description": "Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -1650,7 +1650,7 @@
               }
             ],
             "default": null,
-            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
+            "description": "State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -1771,7 +1771,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
+            "description": "Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -1780,7 +1780,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
+            "description": "Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -1800,7 +1800,7 @@
               }
             ],
             "default": null,
-            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
+            "description": "State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -1909,7 +1909,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
+            "description": "Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -1918,7 +1918,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
+            "description": "Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -1938,7 +1938,7 @@
               }
             ],
             "default": null,
-            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
+            "description": "State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -2082,7 +2082,7 @@
         "type": "object"
       },
       "EntityRlsGuardApproval": {
-        "description": "Waiting for approval: the AI wants to change who can read or write an entity's records.",
+        "description": "Waiting for approval because the AI wants to change who can read or write an entity's records.",
         "properties": {
           "guard": {
             "const": "entity_rls_guard",
@@ -2159,7 +2159,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
+            "description": "Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -2168,7 +2168,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
+            "description": "Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -2188,7 +2188,7 @@
               }
             ],
             "default": null,
-            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
+            "description": "State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -2274,7 +2274,7 @@
         "type": "object"
       },
       "ExecToolEntityMutationApproval": {
-        "description": "Waiting for approval: the AI's code would update or delete records in an entity.",
+        "description": "Waiting for approval because the AI's code would update or delete records in an entity.",
         "properties": {
           "guard": {
             "const": "exec_tool_entity_mutation",
@@ -2311,7 +2311,7 @@
         "type": "object"
       },
       "ExecToolGithubRepoWriteApproval": {
-        "description": "Waiting for approval: the AI's code would write to a GitHub repository.",
+        "description": "Waiting for approval because the AI's code would write to a GitHub repository.",
         "properties": {
           "guard": {
             "const": "exec_tool_github_repo_write",
@@ -2348,7 +2348,7 @@
         "type": "object"
       },
       "ExecToolInviteUserApproval": {
-        "description": "Waiting for approval: the AI's code would invite someone to the app by email.",
+        "description": "Waiting for approval because the AI's code would invite someone to the app by email.",
         "properties": {
           "guard": {
             "const": "exec_tool_invite_user",
@@ -2385,7 +2385,7 @@
         "type": "object"
       },
       "ExecToolSendEmailApproval": {
-        "description": "Waiting for approval: the AI's code would send an email.",
+        "description": "Waiting for approval because the AI's code would send an email.",
         "properties": {
           "guard": {
             "const": "exec_tool_send_email",
@@ -2422,7 +2422,7 @@
         "type": "object"
       },
       "ExecToolSendSmsApproval": {
-        "description": "Waiting for approval: the AI's code would send a text message.",
+        "description": "Waiting for approval because the AI's code would send a text message.",
         "properties": {
           "guard": {
             "const": "exec_tool_send_sms",
@@ -2525,7 +2525,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
+            "description": "Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -2534,7 +2534,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
+            "description": "Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -2554,7 +2554,7 @@
               }
             ],
             "default": null,
-            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
+            "description": "State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -2697,7 +2697,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
+            "description": "Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -2706,7 +2706,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
+            "description": "Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -2726,7 +2726,7 @@
               }
             ],
             "default": null,
-            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
+            "description": "State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -2832,7 +2832,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
+            "description": "Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -2841,7 +2841,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
+            "description": "Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -2861,7 +2861,7 @@
               }
             ],
             "default": null,
-            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
+            "description": "State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -2979,7 +2979,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
+            "description": "Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -2988,7 +2988,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
+            "description": "Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -3008,7 +3008,7 @@
               }
             ],
             "default": null,
-            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
+            "description": "State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -3129,7 +3129,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
+            "description": "Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -3138,7 +3138,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
+            "description": "Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -3158,7 +3158,7 @@
               }
             ],
             "default": null,
-            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
+            "description": "State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -3267,7 +3267,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
+            "description": "Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -3276,7 +3276,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
+            "description": "Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -3296,7 +3296,7 @@
               }
             ],
             "default": null,
-            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
+            "description": "State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -3408,7 +3408,7 @@
               }
             ],
             "default": null,
-            "description": "`pending` while the image generates, `completed` once `image_url` is ready, `failed` when generation failed.",
+            "description": "State of the image. The value is `pending` while the image generates, `completed` once `image_url` is ready, or `failed` when generation failed.",
             "title": "Status"
           },
           "placeholder_url": {
@@ -3510,7 +3510,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
+            "description": "Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -3519,7 +3519,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
+            "description": "Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -3539,7 +3539,7 @@
               }
             ],
             "default": null,
-            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
+            "description": "State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -3625,7 +3625,7 @@
         "type": "object"
       },
       "InstallPackageArguments": {
-        "description": "The package operations the builder runs.",
+        "description": "The package operations the AI runs.",
         "properties": {
           "packages": {
             "description": "Requested package operations.",
@@ -3641,12 +3641,18 @@
       },
       "JoinMessage": {
         "description": "Join an app's room, once per app after every connect. An `app.snapshot` follows, then its live events. Refused with `room.access_denied` when the app is not on the session's allowlist, or past 30 joins a minute.",
+        "examples": [
+          "/apps/6820f3a4e7b91d003c45a1f2"
+        ],
         "pattern": "^/apps/[0-9a-f]{24}$",
         "title": "JoinMessage",
         "type": "string"
       },
       "LeaveMessage": {
         "description": "Leave an app's room. Its events stop.",
+        "examples": [
+          "/apps/6820f3a4e7b91d003c45a1f2"
+        ],
         "pattern": "^/apps/[0-9a-f]{24}$",
         "title": "LeaveMessage",
         "type": "string"
@@ -3695,7 +3701,7 @@
               }
             ],
             "default": null,
-            "description": "`user` for a message a person sent, `assistant` for the AI's reply. `system` messages are never sent.",
+            "description": "Who sent the message. The value is `user` for a message a person sent and `assistant` for the AI's reply. Messages with the `system` role are never sent.",
             "title": "Role"
           },
           "content": {
@@ -4075,7 +4081,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
+            "description": "Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -4084,7 +4090,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
+            "description": "Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -4104,7 +4110,7 @@
               }
             ],
             "default": null,
-            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
+            "description": "State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -4258,7 +4264,7 @@
             "type": "string"
           },
           "prd_type": {
-            "description": "Build or plan declaration, when the builder asks for one.",
+            "description": "Build or plan declaration, when the AI asks for one.",
             "title": "Prd Type",
             "type": "string"
           },
@@ -4300,7 +4306,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
+            "description": "Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -4309,7 +4315,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
+            "description": "Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -4329,7 +4335,7 @@
               }
             ],
             "default": null,
-            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
+            "description": "State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -4530,7 +4536,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
+            "description": "Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -4539,7 +4545,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
+            "description": "Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -4559,7 +4565,7 @@
               }
             ],
             "default": null,
-            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
+            "description": "State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -4745,7 +4751,7 @@
         "type": "object"
       },
       "QuestionArguments": {
-        "description": "The questions the builder asks.",
+        "description": "The questions the AI asks.",
         "properties": {
           "questions": {
             "description": "Questions presented to the user.",
@@ -4830,7 +4836,7 @@
         "type": "object"
       },
       "QueueState": {
-        "description": "The prompts the builder runs next, in order.",
+        "description": "The prompts the AI runs next, in order.",
         "properties": {
           "items": {
             "items": {
@@ -4850,7 +4856,7 @@
               "null"
             ],
             "default": null,
-            "description": "Whether the queue is paused, so queued prompts wait. A person can pause it, and the builder pauses it while the AI waits for an answer.",
+            "description": "Whether the queue is paused, so queued prompts wait. A person can pause it, and Base44 pauses it while the AI waits for an answer.",
             "title": "Is Paused"
           }
         },
@@ -4878,7 +4884,7 @@
               "null"
             ],
             "default": null,
-            "description": "Whether the queue is paused, so queued prompts wait. A person can pause it, and the builder pauses it while the AI waits for an answer.",
+            "description": "Whether the queue is paused, so queued prompts wait. A person can pause it, and Base44 pauses it while the AI waits for an answer.",
             "title": "Is Paused"
           },
           "processed_item_id": {
@@ -4887,7 +4893,7 @@
               "null"
             ],
             "default": null,
-            "description": "ID of the queued prompt the builder just picked up to run. Absent when a prompt was added, removed or cleared.",
+            "description": "ID of the queued prompt the AI just picked up to run. Absent when a prompt was added, removed, or cleared.",
             "title": "Processed Item Id"
           },
           "branch_id": {
@@ -4950,7 +4956,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
+            "description": "Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -4959,7 +4965,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
+            "description": "Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -4979,7 +4985,7 @@
               }
             ],
             "default": null,
-            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
+            "description": "State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -5088,7 +5094,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
+            "description": "Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -5097,7 +5103,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
+            "description": "Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -5117,7 +5123,7 @@
               }
             ],
             "default": null,
-            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
+            "description": "State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -5324,7 +5330,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
+            "description": "Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -5333,7 +5339,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
+            "description": "Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -5353,7 +5359,7 @@
               }
             ],
             "default": null,
-            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
+            "description": "State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -5459,7 +5465,7 @@
         "description": "The session is over. The socket disconnects right after this event.",
         "properties": {
           "reason": {
-            "description": "`expired`: ask the partner backend for a new session. `revoked`: the partner or an admin ended it, so do not reconnect. `replaced`: a newer socket took the session, so stop.",
+            "description": "Why the session ended. When it's `expired`, ask your server for a new session. When it's `revoked`, your server or an admin ended it, so don't reconnect. When it's `replaced`, a newer socket took the session, so stop.",
             "enum": [
               "expired",
               "revoked",
@@ -5476,7 +5482,7 @@
         "type": "object"
       },
       "SessionEndedEvent": {
-        "description": "The session ended (expired, revoked, or taken by a newer socket). The socket disconnects next.",
+        "description": "The session ended because it expired, was revoked, or was taken by a newer socket. The socket disconnects next.",
         "properties": {
           "room": {
             "type": [
@@ -5499,7 +5505,7 @@
         "type": "object"
       },
       "SetSecretsArguments": {
-        "description": "The secrets the builder asks for.",
+        "description": "The secrets the AI asks for.",
         "properties": {
           "secrets_schema": {
             "description": "Requested secrets.",
@@ -5537,7 +5543,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
+            "description": "Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -5546,7 +5552,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
+            "description": "Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -5566,7 +5572,7 @@
               }
             ],
             "default": null,
-            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
+            "description": "State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -5666,7 +5672,7 @@
             "description": "The app's build status, or `null` when none is recorded."
           },
           "messages": {
-            "description": "The last 50 messages visible to partners, oldest first.",
+            "description": "The last 50 messages, oldest first.",
             "items": {
               "$ref": "#/components/schemas/Message"
             },
@@ -5826,7 +5832,7 @@
               }
             ],
             "default": null,
-            "description": "`task_started`, `task_progress`, `task_completed`, `task_failed` or `task_cancelled`.",
+            "description": "Kind of progress update. The value is `task_started`, `task_progress`, `task_completed`, `task_failed`, or `task_cancelled`.",
             "title": "Event Type"
           },
           "progress": {
@@ -5901,7 +5907,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
+            "description": "Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -5910,7 +5916,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
+            "description": "Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -5930,7 +5936,7 @@
               }
             ],
             "default": null,
-            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
+            "description": "State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -6039,7 +6045,7 @@
             "type": "array"
           },
           "sections_with_enough": {
-            "description": "Base plan sections the builder considers sufficiently specified.",
+            "description": "Base plan sections the AI considers sufficiently specified.",
             "items": {
               "type": "string"
             },
@@ -6074,7 +6080,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
+            "description": "Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -6083,7 +6089,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
+            "description": "Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -6103,7 +6109,7 @@
               }
             ],
             "default": null,
-            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
+            "description": "State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -6192,7 +6198,7 @@
         "description": "What the call waits for. Render the widget by kind, not by tool name.",
         "properties": {
           "kind": {
-            "description": "`choice`: pick among options. `input`: supply values. `approval`: approve or reject.",
+            "description": "What the call needs from the user. The value is `choice` to pick among options, `input` to supply values, or `approval` to approve or reject.",
             "enum": [
               "choice",
               "input",
@@ -6229,7 +6235,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
+            "description": "Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -6238,7 +6244,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
+            "description": "Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -6258,7 +6264,7 @@
               }
             ],
             "default": null,
-            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
+            "description": "State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
@@ -6367,7 +6373,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.",
+            "description": "Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.",
             "title": "Requires User Input"
           },
           "auto_approved": {
@@ -6376,7 +6382,7 @@
               "null"
             ],
             "default": null,
-            "description": "`true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.",
+            "description": "Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.",
             "title": "Auto Approved"
           },
           "status": {
@@ -6396,7 +6402,7 @@
               }
             ],
             "default": null,
-            "description": "`running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.",
+            "description": "State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.",
             "title": "Status"
           },
           "mutation_applied": {
