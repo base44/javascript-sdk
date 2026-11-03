@@ -241,6 +241,8 @@ export interface AgentsModule {
    *
    * This function returns the complete stored conversation including full tool call results, even for large responses.
    *
+   * A user can access only their own conversations. Other users' conversations aren't available through this method.
+   *
    * @param conversationId - The unique identifier of the conversation.
    * @returns Promise resolving to the conversation, or undefined if not found.
    *
@@ -327,6 +329,8 @@ export interface AgentsModule {
    * Sends a message to the agent and updates the conversation. This method
    * also updates the realtime socket to notify any subscribers.
    *
+   * A user can add messages only to their own conversations. Other users' conversations aren't available through this method.
+   *
    * @param conversation - The conversation to add the message to.
    * @param message - The message to add.
    * @returns Promise resolving to the created message.
@@ -352,7 +356,9 @@ export interface AgentsModule {
    * Establishes a WebSocket connection to receive instant updates when new
    * messages are added to the conversation. Returns an unsubscribe function
    * to clean up the connection.
-   * 
+   *
+   * A user can subscribe only to their own conversations. Other users' conversations aren't available through this method.
+   *
    * <Note>
    * When receiving messages through this function, tool call data is truncated for efficiency. The `arguments_string` is limited to 500 characters and `results` to 50 characters. The complete tool call data is always saved in storage and can be retrieved by calling {@linkcode getConversation | getConversation()} after the message completes.
    * </Note>
