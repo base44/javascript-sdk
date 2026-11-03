@@ -672,9 +672,12 @@ function updatePanelWithHeadings(hostContent, headings) {
   return ensurePanelSpacing(updatedContent);
 }
 
-function prepareAppendedSection(appendPath) {
+// A renamed module's page is titled with its slug, so pass `heading` to title its section with
+// the interface name instead, which page-sections.json `typesWithOwnMethods` can then rename.
+function prepareAppendedSection(appendPath, heading = null) {
   const rawContent = fs.readFileSync(appendPath, "utf-8");
-  const { title, content: withoutFrontMatter } = stripFrontMatter(rawContent);
+  const { title: frontMatterTitle, content: withoutFrontMatter } = stripFrontMatter(rawContent);
+  const title = heading ?? frontMatterTitle;
   const withoutPanel = removeFirstPanelBlock(withoutFrontMatter);
   const { content: normalizedContent, headings } =
     normalizeHeadings(withoutPanel);
@@ -766,7 +769,10 @@ function applyAppendedArticles(appendedArticles, inlinedTypeNames = new Set()) {
         }
       }
 
-      const { section, headings } = prepareAppendedSection(appendPath);
+      const { section, headings } = prepareAppendedSection(
+        appendPath,
+        appendModuleRename ? appendName : null
+      );
       combinedSections += `\n\n${section}`;
       if (PANELS_ENABLED && collectedHeadings) {
         collectedHeadings.push(...headings);
@@ -791,7 +797,10 @@ function applyAppendedArticles(appendedArticles, inlinedTypeNames = new Set()) {
     hostContent = hostContent.trimEnd() + combinedSections + "\n";
     hostContent = updatePanelWithHeadings(hostContent, collectedHeadings);
 
-    hostContent = linkMergedTypesInPage(hostContent, mergedTypeNames);
+    // An appended module links back to the host's methods by the host's type name, which is
+    // this page too.
+    const linkedTypeNames = hostModuleRename ? [hostName, ...mergedTypeNames] : mergedTypeNames;
+    hostContent = linkMergedTypesInPage(hostContent, linkedTypeNames);
     fs.writeFileSync(hostPath, hostContent, "utf-8");
   }
 }
@@ -806,8 +815,10 @@ function applyAppendedArticles(appendedArticles, inlinedTypeNames = new Set()) {
  */
 function linkMergedTypesInPage(content, typeNames) {
   for (const typeName of typeNames) {
+    // A renamed module's links already use its slug, such as `service-role-payments`.
+    const rename = getModuleRename(typeName);
     const linkRegex = new RegExp(
-      `\\]\\((?:\\.\\./(?:interfaces|type-aliases|classes|functions)/)?${typeName}(?:\\.mdx|\\.md)?(#[\\w-]*)?\\)`,
+      `\\]\\((?:\\.\\./(?:interfaces|type-aliases|classes|functions)/)?(?:${typeName}${rename ? `|${rename}` : ""})(?:\\.mdx|\\.md)?(#[\\w-]*)?\\)`,
       "g"
     );
     content = content.replace(
@@ -1662,7 +1673,7 @@ function nestUnderGroupTypes(section, typeNames) {
  * Rename and merge method sections for better TOC organization
  * - EntityHandler → Entity Handler Methods
  * - First ## Methods in integrations → Core Integrations Methods
- * - custom-integrations → Custom Integrations Methods
+ * - CustomIntegrationsModule → Custom Integrations Methods
  * - Create Type Definitions section with Core, custom, and Indexable
  */
 function mergeSectionWithMethods(content, filePath) {
@@ -1678,14 +1689,14 @@ function mergeSectionWithMethods(content, filePath) {
   let indexableContent = [];
   let customIntegrationsModuleDescription = [];
 
-  // For connectors.mdx: remove the appended user-connectors intro section and
+  // For connectors.mdx: remove the appended UserConnectorsModule intro section and
   // fold connectAppUser/disconnectAppUser into the existing ## Methods section.
   if (isConnectors) {
     let userConnectorsStart = -1;
     let appendedMethodsStart = -1;
 
     for (let i = 0; i < lines.length; i++) {
-      if (lines[i].trim() === "## user-connectors") {
+      if (lines[i].trim() === "## UserConnectorsModule") {
         userConnectorsStart = i;
       } else if (userConnectorsStart !== -1 && lines[i].trim() === "## Methods") {
         appendedMethodsStart = i;
@@ -1696,7 +1707,7 @@ function mergeSectionWithMethods(content, filePath) {
     if (userConnectorsStart !== -1 && appendedMethodsStart !== -1) {
       // Extract the method lines (everything after the appended ## Methods heading)
       const methodLines = lines.splice(appendedMethodsStart + 1);
-      // Remove the appended ## user-connectors section (intro + ## Methods heading)
+      // Remove the appended ## UserConnectorsModule section (intro + ## Methods heading)
       lines.splice(userConnectorsStart, lines.length - userConnectorsStart);
 
       // ## Type Definitions doesn't exist yet at this stage — groupTypeDefinitions
@@ -1944,8 +1955,8 @@ function mergeSectionWithMethods(content, filePath) {
         i--;
         continue;
       }
-      // custom-integrations section
-      else if (line === "## custom-integrations") {
+      // CustomIntegrationsModule section
+      else if (line === "## CustomIntegrationsModule") {
         // Replace with Custom Integrations Methods
         lines[i] = "## Custom Integrations Methods";
         modified = true;

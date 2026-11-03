@@ -13,7 +13,7 @@ import { createChat } from "./modules/chat.js";
  * [`createPlatformServer()`](/developers/references/platform-sdk/docs/functions/createPlatformServer)
  * from `@base44/platform/server`.
  *
- * @returns A new platform client.
+ * @returns A new platform client, with one property for each module.
  *
  * @example
  * ```typescript

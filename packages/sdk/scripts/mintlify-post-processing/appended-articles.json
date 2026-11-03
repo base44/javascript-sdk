@@ -35,6 +35,7 @@
     "interfaces/ActorNameRegistry"
   ],
   "interfaces/PaymentsModule": [
+    "interfaces/ServiceRolePaymentsModule",
     "type-aliases/PaymentsErrorCode",
     "type-aliases/PurchaseStatus",
     "type-aliases/PaymentsRecurringFrequency"
