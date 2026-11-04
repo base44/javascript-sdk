@@ -4,6 +4,7 @@ import type {
   CompleteCheckoutResult,
   MountableCheckout,
   MountCheckoutOptions,
+  PayPalCheckoutOnClick,
   PayPalEmbeddedCheckout,
   StripeEmbeddedCheckout,
 } from "./payments.types.js";
@@ -80,9 +81,15 @@ export type LoadScript = (src: string) => Promise<void>;
  * @internal
  */
 export interface PaymentsCheckoutConfig {
-  paypal?: { script_url?: string };
+  paypal?: {
+    script_url?: string;
+    // Set once the app's PayPal can take payments, so the button mounts before the order exists.
+    button?: PayPalButtonConfig | null;
+  };
   stripe?: { script_url?: string };
 }
+
+type PayPalButtonConfig = Pick<PayPalEmbeddedCheckout, "client_id" | "merchant_id" | "partner_attribution_id">;
 
 /** @internal */
 export interface MountCheckoutDeps {
@@ -211,6 +218,8 @@ function mountStripe(
         if (activeStripeCheckout === handle) activeStripeCheckout = null;
         checkout.destroy();
       },
+      // Stripe's own form has no single button to disable.
+      setDisabled: () => undefined,
     };
     activeStripeCheckout = handle;
     return handle;
@@ -222,9 +231,10 @@ function mountStripe(
 async function mountPayPal(
   element: CheckoutElement,
   scriptUrl: string,
-  checkoutId: string,
   currency: string,
   embedded: PayPalEmbeddedCheckout,
+  // A created checkout's id, or what an on-click checkout calls inside the click to create one.
+  checkout: string | (() => Promise<string>),
   options: MountCheckoutOptions,
   deps: MountCheckoutDeps
 ): Promise<CheckoutMount> {
@@ -269,6 +279,10 @@ async function mountPayPal(
 
   let destroyed = false;
   let completing = false;
+  // Set once a payment goes through: another click would create and charge a second order.
+  let paid = false;
+  let starting = false;
+  let checkoutId = typeof checkout === "string" ? checkout : undefined;
   // App callbacks run only while mounted, and their own errors never reach PayPal or onError.
   const notify = (callback: () => void) => {
     if (destroyed) return;
@@ -289,6 +303,7 @@ async function mountPayPal(
       button.disabled = true;
       let result: CompleteCheckoutResult;
       try {
+        if (!checkoutId) throw new Error("PayPal approved a checkout that wasn't created");
         // Runs even after destroy(), so an approved payment is still captured.
         result = await deps.completeCheckout(checkoutId);
       } catch (error) {
@@ -299,6 +314,7 @@ async function mountPayPal(
         return;
       }
       completing = false;
+      paid = true;
       notify(() => options.onComplete?.(result));
     },
     onCancel() {
@@ -311,15 +327,24 @@ async function mountPayPal(
 
   button.setAttribute("type", subscription ? "subscribe" : "pay");
   const onClick = () => {
-    if (completing) return;
+    if (paid || completing || starting || button.disabled) return;
+    starting = true;
     // Not awaited before start(), which must run inside the click to open PayPal's popup.
-    const id = Promise.resolve(
-      subscription ? { subscriptionId: checkoutId } : { orderId: checkoutId }
-    );
+    const id = Promise.resolve()
+      .then(typeof checkout === "string" ? () => checkout : checkout)
+      .then((resolved) => {
+        checkoutId = resolved;
+        return subscription ? { subscriptionId: resolved } : { orderId: resolved };
+      });
     const report = (error: unknown) => notify(() => options.onError?.(error));
     try {
-      Promise.resolve(session.start({ presentationMode: "auto" }, id)).catch(report);
+      Promise.resolve(session.start({ presentationMode: "auto" }, id))
+        .catch(report)
+        .finally(() => {
+          starting = false;
+        });
     } catch (error) {
+      starting = false;
       report(error);
     }
   };
@@ -334,6 +359,32 @@ async function mountPayPal(
       button.remove();
       session.destroy?.();
     },
+    setDisabled(disabled) {
+      // A payment being completed, or already made, keeps the button off whatever the app asks.
+      if (!completing && !paid) button.disabled = disabled;
+    },
+  };
+}
+
+/** The new checkout's id, refused unless it is the checkout the button was drawn for. */
+function onClickCheckoutId(
+  spec: PayPalCheckoutOnClick,
+  button: PayPalButtonConfig
+): () => Promise<string> {
+  return async () => {
+    const checkout = await spec.createCheckout();
+    const embedded = checkout?.embedded;
+    if (
+      embedded?.provider !== "paypal" ||
+      embedded.intent !== spec.intent ||
+      embedded.merchant_id !== button.merchant_id ||
+      checkout.currency?.toLowerCase() !== spec.currency.toLowerCase()
+    ) {
+      throw new Error(
+        "createCheckout() returned a checkout that doesn't match the PayPal button. Check its provider, intent and currency."
+      );
+    }
+    return checkout.checkout_id;
   };
 }
 
@@ -362,7 +413,7 @@ export async function preloadCheckout(
  */
 export async function mountCheckout(
   element: CheckoutElement,
-  checkout: MountableCheckout,
+  checkout: MountableCheckout | PayPalCheckoutOnClick,
   options: MountCheckoutOptions,
   deps: MountCheckoutDeps
 ): Promise<CheckoutMount> {
@@ -371,6 +422,9 @@ export async function mountCheckout(
   }
   if (!element) {
     throw new Error("mountCheckout() requires an element to render in");
+  }
+  if ("createCheckout" in checkout) {
+    return mountPayPalOnClick(element, checkout, options, deps);
   }
   const embedded = checkout?.embedded;
   if (!embedded) {
@@ -385,9 +439,9 @@ export async function mountCheckout(
       return mountPayPal(
         element,
         await scriptUrlFor("paypal", deps),
-        checkout.checkout_id,
         checkout.currency,
         embedded,
+        checkout.checkout_id,
         options,
         deps
       );
@@ -396,4 +450,24 @@ export async function mountCheckout(
         `Embedded checkout isn't supported for provider ${(embedded as { provider: string }).provider}`
       );
   }
+}
+
+async function mountPayPalOnClick(
+  element: CheckoutElement,
+  spec: PayPalCheckoutOnClick,
+  options: MountCheckoutOptions,
+  deps: MountCheckoutDeps
+): Promise<CheckoutMount> {
+  if (spec.provider !== "paypal" || typeof spec.createCheckout !== "function") {
+    throw new Error("Only PayPal can create its checkout on click");
+  }
+  const scriptUrl = await scriptUrlFor("paypal", deps);
+  const button = (await deps.getConfig())?.paypal?.button;
+  if (!button?.client_id || !button.merchant_id) {
+    throw new Error("PayPal isn't ready to take payments in this app yet");
+  }
+  const embedded: PayPalEmbeddedCheckout = { provider: "paypal", ...button, intent: spec.intent };
+  return mountPayPal(
+    element, scriptUrl, spec.currency, embedded, onClickCheckoutId(spec, button), options, deps
+  );
 }

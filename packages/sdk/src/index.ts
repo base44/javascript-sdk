@@ -154,6 +154,7 @@ export type {
   CreateCheckoutResult,
   CompleteCheckoutResult,
   EmbeddedCheckout,
+  PayPalCheckoutOnClick,
   PayPalEmbeddedCheckout,
   StripeEmbeddedCheckout,
   MountCheckoutOptions,

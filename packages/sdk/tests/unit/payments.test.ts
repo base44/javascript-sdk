@@ -315,6 +315,104 @@ describe("mountCheckout", () => {
     expect(session.destroy).toHaveBeenCalledTimes(1);
   });
 
+  describe("PayPal checkout created on click", () => {
+    const onClickConfig = {
+      ...config,
+      paypal: {
+        ...config.paypal,
+        button: { client_id: "client-1", merchant_id: "MERCHANT1", partner_attribution_id: null },
+      },
+    };
+    const spec = (createCheckout: () => Promise<MountableCheckout>) => ({
+      provider: "paypal" as const,
+      currency: "usd",
+      intent: "capture" as const,
+      createCheckout,
+    });
+
+    test("shows the button before any order exists and creates it on the click", async () => {
+      const { paypal, session, callbacks } = installPayPal();
+      getConfig.mockResolvedValue(onClickConfig);
+      const createCheckout = vi.fn().mockResolvedValue({
+        checkout_id: "ORDER1", currency: "usd", embedded: paypalEmbedded(),
+      });
+      completeCheckout.mockResolvedValue({ checkout_id: "ORDER1", status: "paid" });
+      const onComplete = vi.fn();
+
+      await mountCheckout(container as any, spec(createCheckout), { onComplete }, deps());
+
+      expect(paypal.createInstance).toHaveBeenCalledWith(
+        expect.objectContaining({ clientId: "client-1", merchantId: "MERCHANT1" })
+      );
+      expect(createCheckout).not.toHaveBeenCalled();
+
+      container.children[0].click();
+      await expect(session.start.mock.calls[0][1]).resolves.toEqual({ orderId: "ORDER1" });
+      expect(createCheckout).toHaveBeenCalledTimes(1);
+
+      await callbacks().onApprove({});
+      expect(completeCheckout).toHaveBeenCalledWith("ORDER1");
+      expect(onComplete).toHaveBeenCalledWith({ checkout_id: "ORDER1", status: "paid" });
+    });
+
+    test("refuses a created checkout that isn't the one the button was drawn for", async () => {
+      const { session } = installPayPal();
+      getConfig.mockResolvedValue(onClickConfig);
+      const onError = vi.fn();
+      const createCheckout = vi.fn().mockResolvedValue({
+        checkout_id: "SUB1", currency: "usd", embedded: paypalEmbedded({ intent: "subscription" }),
+      });
+      session.start.mockImplementation((_options: unknown, id: Promise<unknown>) => id);
+
+      await mountCheckout(container as any, spec(createCheckout), { onError }, deps());
+      container.children[0].click();
+
+      await vi.waitFor(() => expect(onError).toHaveBeenCalled());
+      expect(onError.mock.calls[0][0].message).toContain("doesn't match the PayPal button");
+    });
+
+    test("rejects until the app's PayPal can take payments", async () => {
+      installPayPal();
+
+      await expect(
+        mountCheckout(container as any, spec(vi.fn()), {}, deps())
+      ).rejects.toThrow("PayPal isn't ready");
+    });
+
+    test("after a payment, re-enabling the button can't create a second order", async () => {
+      const { session, callbacks } = installPayPal();
+      getConfig.mockResolvedValue(onClickConfig);
+      const createCheckout = vi.fn().mockResolvedValue({
+        checkout_id: "ORDER1", currency: "usd", embedded: paypalEmbedded(),
+      });
+      completeCheckout.mockResolvedValue({ checkout_id: "ORDER1", status: "paid" });
+
+      const mount = await mountCheckout(container as any, spec(createCheckout), {}, deps());
+      container.children[0].click();
+      await session.start.mock.calls[0][1];
+      await callbacks().onApprove({});
+
+      mount.setDisabled(false);
+      container.children[0].click();
+
+      expect(createCheckout).toHaveBeenCalledTimes(1);
+      expect(session.start).toHaveBeenCalledTimes(1);
+    });
+
+    test("a disabled button ignores clicks", async () => {
+      const { session } = installPayPal();
+      getConfig.mockResolvedValue(onClickConfig);
+      const createCheckout = vi.fn();
+
+      const mount = await mountCheckout(container as any, spec(createCheckout), {}, deps());
+      mount.setDisabled(true);
+      container.children[0].click();
+
+      expect(session.start).not.toHaveBeenCalled();
+      expect(createCheckout).not.toHaveBeenCalled();
+    });
+  });
+
   test("uses the subscriptions component and passes the partner attribution id", async () => {
     const { paypal, sdk, session } = installPayPal();
     const checkout = {

@@ -27,6 +27,14 @@ base44.payments.refund;
 // @ts-expect-error The service role runs in backend code, where there is nothing to mount.
 base44.asServiceRole.payments.mountCheckout;
 
+// PayPal can create its checkout on click; the mount can grey the button out until a form is valid.
+base44.payments
+  .mountCheckout(div, { provider: "paypal", currency: "usd", intent: "capture", createCheckout: async () => checkout })
+  .then((mount) => mount.setDisabled(true));
+
+// @ts-expect-error Only PayPal creates its checkout on click: Stripe needs its session to render.
+base44.payments.mountCheckout(div, { provider: "stripe", currency: "usd", intent: "capture", createCheckout: async () => checkout });
+
 base44.payments.preloadCheckout("paypal");
 
 // @ts-expect-error Only connected checkout providers have a script to preload.

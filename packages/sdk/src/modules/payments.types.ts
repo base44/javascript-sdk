@@ -420,11 +420,29 @@ export interface MountableCheckout {
 }
 
 /**
+ * A PayPal checkout that [`mountCheckout()`](#mountcheckout) creates when the buyer clicks PayPal's button. The button shows as soon as the page loads, the buyer clicks once, and no order is created until they do.
+ */
+export interface PayPalCheckoutOnClick {
+  /** Payment provider. Only PayPal can create its checkout on click. */
+  provider: "paypal";
+  /** Three-letter ISO currency code the checkout uses, such as `'usd'`. */
+  currency: string;
+  /** Whether the checkout is a one-time payment or a subscription. */
+  intent: "capture" | "subscription";
+  /**
+   * Creates the checkout when the buyer clicks, usually by calling the backend function that calls {@linkcode ServiceRolePaymentsModule.createCheckout | createCheckout()}. Resolve with its result. Reject to stop, for example when a required form field is empty: PayPal's window closes and `onError` receives the error.
+   */
+  createCheckout: () => Promise<MountableCheckout>;
+}
+
+/**
  * A mounted embedded checkout.
  */
 export interface CheckoutMount {
   /** Removes the checkout from the page. Call it when the component that holds it unmounts. For Stripe, mounting another checkout destroys this one for you. */
   destroy: () => void;
+  /** PayPal: greys out the button and ignores clicks, for example until a required form is filled in. After a payment completes the button stays off, so `setDisabled(false)` can't start a second payment. Stripe ignores it. */
+  setDisabled: (disabled: boolean) => void;
 }
 
 /**
@@ -487,12 +505,14 @@ export interface PaymentsModule {
    *
    * To make the checkout appear faster, load the library ahead of time with [`preloadCheckout()`](#preloadcheckout) when the page opens.
    *
-   * Requires a browser environment and can't be used in the backend. Rejects when the checkout isn't embedded, when the payments config can't be fetched or has no valid script URL for the provider, when the provider's library fails to load, or when PayPal isn't available for the checkout's currency.
+   * For PayPal, pass a {@linkcode PayPalCheckoutOnClick} instead of a created checkout to show PayPal's button right away and create the checkout only when the buyer clicks it. The buyer clicks once, and page views create no orders.
+   *
+   * Requires a browser environment and can't be used in the backend. Rejects when the checkout isn't embedded, when an on-click PayPal checkout is mounted before the app's PayPal can take payments, when the payments config can't be fetched or has no valid script URL for the provider, when the provider's library fails to load, or when PayPal isn't available for the checkout's currency.
    *
    * The checkout's callbacks run in the buyer's browser, where they can be faked. Grant access to what the buyer paid for only after your backend confirms the purchase, for example with [`listPurchases()`](#service-role-methods) in a backend function.
    *
    * @param element - Element to render the checkout in. It should be empty.
-   * @param checkout - The result of {@linkcode ServiceRolePaymentsModule.createCheckout | createCheckout()}.
+   * @param checkout - The result of {@linkcode ServiceRolePaymentsModule.createCheckout | createCheckout()}, or for PayPal a {@linkcode PayPalCheckoutOnClick} that creates it when the buyer clicks.
    * @param options - Callbacks for the checkout's outcome.
    * @returns Promise resolving to the mounted checkout once it renders.
    *
@@ -513,6 +533,25 @@ export interface PaymentsModule {
    *
    * // Later, when the page unmounts
    * mount.destroy();
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // PayPal: show the button on page load and create the checkout on click
+   * const mount = await base44.payments.mountCheckout(
+   *   document.getElementById('paypal')!,
+   *   {
+   *     provider: 'paypal',
+   *     currency: 'usd',
+   *     intent: 'capture',
+   *     createCheckout: async () =>
+   *       (await base44.functions.invoke('createCheckout', { productId })).data,
+   *   },
+   *   { onComplete: ({ checkout_id }) => confirmPurchase(checkout_id) }
+   * );
+   *
+   * // Grey out the button until the shipping form is valid
+   * mount.setDisabled(!formIsValid);
    * ```
    *
    * @example
@@ -540,7 +579,7 @@ export interface PaymentsModule {
    */
   mountCheckout(
     element: CheckoutElement,
-    checkout: MountableCheckout,
+    checkout: MountableCheckout | PayPalCheckoutOnClick,
     options?: MountCheckoutOptions
   ): Promise<CheckoutMount>;
 
