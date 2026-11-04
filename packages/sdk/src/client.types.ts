@@ -144,7 +144,7 @@ export interface Base44Client {
   actors: ActorsModule;
   /** {@link AuthModule | Auth module} for user authentication and management. */
   auth: AuthModule;
-  /** {@link UserConnectorsModule | Connectors module} for app-user OAuth flows. */
+  /** [Connectors module](/developers/references/sdk/docs/interfaces/connectors#app-user-connectors) for app-user OAuth flows. */
   connectors: UserConnectorsModule;
   /** {@link EntitiesModule | Entities module} for CRUD operations on your data models. */
   entities: EntitiesModule;
@@ -252,7 +252,7 @@ export interface Base44Client {
     functions: FunctionsModule;
     /** {@link IntegrationsModule | Integrations module} with elevated permissions. */
     integrations: IntegrationsModule;
-    /** {@link ServiceRolePaymentsModule | Payments module} for creating checkouts, refunds, and subscription changes. */
+    /** [Payments module](/developers/references/sdk/docs/interfaces/payments#service-role-methods) for creating checkouts, refunds, and subscription changes. */
     payments: ServiceRolePaymentsModule;
     /** {@link SsoModule | SSO module} for generating SSO tokens. */
     sso: SsoModule;
