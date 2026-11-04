@@ -3,15 +3,15 @@
  */
 export interface BrowserSessionOptions {
   /**
-   * Whether to capture browser recordings and diagnostic logs for the session.
+   * Whether Base44's browser provider records the session and keeps its diagnostic logs.
    *
-   * Captured artifacts stay with the remote browser provider and can't be retrieved through the SDK. Defaults to `true`.
+   * You can't retrieve the recordings or logs through the SDK. Set this to `false` when the session shows sensitive data that shouldn't be recorded. Defaults to `true`.
    */
   captureDebugArtifacts?: boolean;
   /**
    * Maximum lifetime of the session, in whole seconds.
    *
-   * The session ends when the timeout expires, even if it's still in use. Base44 sets minimum and maximum allowed values and clamps the timeout to that range. When omitted, Base44 applies a default timeout.
+   * The session ends when the timeout expires, even if it's still in use. Base44 clamps the value to between `60` and `900` seconds. Defaults to `300`.
    */
   sessionTimeoutSeconds?: number;
 }
@@ -23,7 +23,7 @@ export interface BrowserSession {
   /**
    * Opaque session identifier issued to your app.
    *
-   * Pass it unchanged to {@linkcode BrowserModule.endSession | endSession()} to end the session from a different request.
+   * Pass it unchanged to [`endSession()`](#endsession) to end the session from a different request.
    */
   sessionId: string;
   /**
@@ -44,7 +44,7 @@ export interface BrowserSession {
   /** ISO 8601 timestamp when the browser session expires. Omitted when the provider doesn't expose it. */
   sessionExpiresAt?: string;
   /**
-   * Ends the session. Equivalent to calling {@linkcode BrowserModule.endSession | endSession()} with this session's ID.
+   * Ends the session. Equivalent to calling [`endSession()`](#endsession) with this session's ID.
    */
   end: () => Promise<void>;
 }
@@ -52,18 +52,23 @@ export interface BrowserSession {
 /**
  * Browser module for running browser automation from your backend.
  *
- * This module creates remote browser sessions that you can control with a CDP client library such as Playwright or Puppeteer. Base44 doesn't store browser state, so each session is independent. End each session when you're done with it. Otherwise it keeps running until its timeout expires. To change the timeout, pass the `sessionTimeoutSeconds` option to {@linkcode BrowserModule.getSession | getSession()}.
+ * This module creates remote browser sessions that you can control with a [Chrome DevTools Protocol (CDP)](https://chromedevtools.github.io/devtools-protocol/) client library such as [Playwright](https://playwright.dev/docs/api/class-browsertype#browser-type-connect-over-cdp) or [Puppeteer](https://pptr.dev/api/puppeteer.puppeteer.connect). Base44 doesn't store browser state, so each session is independent.
  *
- * This module is only available to use with a client in service role authentication mode, which means it can only be used in backend environments.
+ * ## Authentication modes
+ *
+ * This module is only available to use with a client in [service role authentication mode](/developers/references/sdk/getting-started/client#service-role) (`base44.asServiceRole.browser`), which means it can only be used in backend environments.
  */
 export interface BrowserModule {
   /**
    * Creates a new remote browser session and returns its connection details.
    *
-   * Each call creates a fresh session. Calls aren't retried automatically, and repeating a failed call doesn't resume a previous session. Session creation is rate limited per app.
+   * Each call creates a fresh session, which uses credits from the workspace that owns the app. Each session is billed by the minute until it ends. An open session keeps running until its timeout expires. When you're done, call `end()` on the session. To end it from a different request, use {@linkcode endSession | endSession()}.
    *
    * @param options - Optional session settings.
-   * @returns Promise resolving to the new browser session.
+   * @returns Promise resolving to the new browser session. Rejects with a [`Base44Error`](/developers/references/sdk/getting-started/work-with-sdk#error-handling) whose `code` is one of the values under [Throws](#throws).
+   * @throws `insufficient_credits`: The workspace is out of credits.
+   * @throws `rate_limited`: You created more than 100 sessions in the last minute.
+   * @throws `browser_capacity_exceeded`: Browser capacity is temporarily unavailable.
    *
    * @example
    * ```typescript
@@ -95,14 +100,12 @@ export interface BrowserModule {
    * const session = await base44.asServiceRole.browser.getSession({
    *   captureDebugArtifacts: false,
    * });
-   * ```
    *
-   * @example
-   * ```typescript
-   * // Request a custom session timeout
-   * const session = await base44.asServiceRole.browser.getSession({
-   *   sessionTimeoutSeconds: 600,
-   * });
+   * try {
+   *   // Connect to session.connectionUrl and run your automation
+   * } finally {
+   *   await session.end();
+   * }
    * ```
    */
   getSession(options?: BrowserSessionOptions): Promise<BrowserSession>;
@@ -110,14 +113,15 @@ export interface BrowserModule {
   /**
    * Ends a browser session created by your app.
    *
-   * Use this when the session was created in a different request. Otherwise call `end()` on the session returned by {@linkcode getSession | getSession()}. Ending a session that has already ended succeeds, so it's safe to call more than once. The call fails with the `browser_session_not_found` error code if the ID wasn't issued to your app.
+   * Use this when the session was created in a different request. Otherwise call `end()` on the session returned by {@linkcode getSession | getSession()}. Ending a session that has already ended succeeds, so it's safe to call more than once.
    *
-   * @param sessionId - The `sessionId` returned by {@linkcode getSession | getSession()}, unchanged.
-   * @returns Promise that resolves when the session has ended.
+   * @param sessionId - The `sessionId` returned by {@linkcode getSession | getSession()}.
+   * @returns Promise that resolves when the session has ended. Rejects with a [`Base44Error`](/developers/references/sdk/getting-started/work-with-sdk#error-handling) whose `code` is one of the values under [Throws](#throws-2).
+   * @throws `browser_session_not_found`: The session ID wasn't issued to your app.
    *
    * @example
    * ```typescript
-   * // End a session whose ID was saved by an earlier request
+   * // End a session from a later request, using the ID sent in the request body
    * import { createClientFromRequest } from 'npm:@base44/sdk';
    *
    * Deno.serve(async (req) => {

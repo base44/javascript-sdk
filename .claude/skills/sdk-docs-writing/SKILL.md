@@ -39,6 +39,8 @@ Module interfaces like `EntitiesModule`, `AuthModule`, and `IntegrationsModule` 
  * - Token management
  * - User profile access and updates
  *
+ * ## Authentication modes
+ *
  * The auth module is only available in user authentication mode (`base44.auth`).
  */
 export interface AuthModule {
@@ -47,7 +49,7 @@ export interface AuthModule {
 Rules for module descriptions:
 - First sentence: one-line summary of what the module does.
 - Follow with a list of key capabilities using markdown bullet points.
-- State which authentication modes the module supports (anonymous, user, service role).
+- State which authentication modes the module supports (anonymous, user, service role) under a `## Authentication modes` heading at the end of the description. It renders as `### Authentication modes` on the page. Give the access path in parentheses, such as (`base44.asServiceRole.browser`). For a service-role-only module, link the mode to `/developers/references/sdk/getting-started/client#service-role`.
 - Use `{@link ModuleName | display text}` to cross-reference other modules.
 
 ### Method documentation
@@ -79,6 +81,9 @@ Every public method needs: description, `@param` tags, `@returns`, and at least 
 - **Sentence case** for free-text headings in JSDoc.
 - **State environment constraints** when a method is browser-only: "Requires a browser environment and can't be used in the backend."
 - **Document side effects** explicitly (e.g., "automatically sets the token for subsequent requests").
+- **Put errors under `@throws`, not in the description.** Keep "Rejects with..." sentences out of a method's description and list each error code with its own `@throws` tag. See [Documenting errors](references/jsdoc-tags.md#documenting-errors).
+- **Give the real values.** When a method has a limit, a range, or a default, state the number, as in "Base44 clamps the value to between `60` and `900` seconds. Defaults to `300`." Don't write "Base44 sets minimum and maximum values" or "Session creation is rate limited". Confirm each value in the backend source rather than guessing. Don't describe how a limit is keyed when it's more complex than the reader needs.
+- **Link third-party tools at first mention.** The first time a page names a protocol or library, such as CDP or Playwright, link it to its official docs. Point at the API the reader needs from it, such as Playwright's `connectOverCDP()`, rather than the home page.
 - **Link method references.** When mentioning another SDK method or module by name in JSDoc prose, always use `{@link}` or `{@linkcode}` to create a cross-reference. There are two exceptions, where `{@link}` produces a broken or missing link, so write a markdown link instead:
   - A method on another module's page. Link to the page's route, as in ``[`InvokeLLM()`](/developers/references/sdk/docs/type-aliases/integrations#invokellm)``.
   - A method mentioned in the comment of a type or property that renders inside a field, such as `Purchase` or `CreateCheckoutParams`. The pipeline drops the link and its code formatting there, so link to the method's anchor on the page, as in ``[`refund()`](#refund)``.
@@ -86,7 +91,7 @@ Every public method needs: description, `@param` tags, `@returns`, and at least 
 - **Name the two SDKs.** Call `@base44/sdk` the "App SDK" and `@base44/platform` the "Platform SDK" wherever a page mentions both. Docs for only one package can say "the SDK".
 - **Use a serial comma.** Put a comma before the final "and" or "or" in every series of three or more, as in "snapshots, events, and errors".
 - **Never start a sentence with a lowercase inline-code term.** If the natural phrasing would open with one (e.g., "`week` is only supported on..."), restructure so a capitalized word leads instead (e.g., "Every date field supports `day`, `month` and `year`. The `created_date` and `updated_date` fields also support `week`.").
-- **Call the app user the client acts for "the current user".** Don't write "signed-in user" or "logged-in user". When the difference matters, say which authentication mode applies, as in "Rejects with `forbidden` when the client uses anonymous authentication."
+- **Call the app user the client acts for "the current user".** Don't write "signed-in user" or "logged-in user". When the difference matters, say which authentication mode applies, as in "Requires user authentication, because a client in anonymous authentication mode has no current user."
 - **Name the place and the AI correctly.** Write "app editor" (lowercase) for the place where you build, and "the AI" or "the AI chat" for the assistant doing the work ("The AI inserts this ID", "ask the AI chat to fix it"). Never use "builder" for either. It stays only for the Builder plan, the Base44 Builder GitHub App, people who build apps ("builders", "app builders"), and exact UI labels or code names.
 
 ## References
@@ -97,7 +102,7 @@ Every public method needs: description, `@param` tags, `@returns`, and at least 
 
 ## Checklist before submitting a PR
 
-1. **JSDoc completeness:** Every public method has description, `@param`, `@returns`, and `@example`.
+1. **JSDoc completeness:** Every public method has description, `@param`, `@returns`, and `@example`. Known error codes are in `@throws` tags, not the description.
 2. **`@internal` on implementation:** Factory functions, config interfaces, and helpers are marked `@internal`.
 3. **Examples work:** Code examples are syntactically valid TypeScript and use the `base44.` call path.
 4. **Pipeline config:** New public types are in `types-to-expose.json`. Helper types that belong on another page are in `appended-articles.json`.

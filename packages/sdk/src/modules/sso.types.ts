@@ -12,7 +12,9 @@ export interface SsoAccessTokenResponse {
  * tokens allow you to authenticate Base44 users with external systems or
  * services.
  *
- * This module is only available to use with a client in service role authentication mode, which means it can only be used in backend environments.
+ * ## Authentication modes
+ *
+ * This module is only available to use with a client in [service role authentication mode](/developers/references/sdk/getting-started/client#service-role) (`base44.asServiceRole.sso`), which means it can only be used in backend environments.
  */
 export interface SsoModule {
   /**

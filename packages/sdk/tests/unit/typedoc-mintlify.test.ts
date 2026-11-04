@@ -370,6 +370,14 @@ describe("fixInPageAnchors", () => {
     expect(fixInPageAnchors(content)).toContain("[EntityHandler](#entity-handler-methods)");
   });
 
+  test("keeps links to a repeated heading's numbered anchors", () => {
+    const content = ["#### Throws", "#### Throws", "See [first](#throws), [second](#throws-2), and [third](#throws-3)."].join("\n");
+
+    expect(fixInPageAnchors(content)).toBe(
+      ["#### Throws", "#### Throws", "See [first](#throws), [second](#throws-2), and third."].join("\n")
+    );
+  });
+
   test("unlinks an anchor the page doesn't have, and leaves other links alone", () => {
     const content = "The [status](#status) and the [guide](/guide#status).";
 
