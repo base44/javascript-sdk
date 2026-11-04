@@ -21,6 +21,35 @@ export const ANALYTICS_CONFIG_ENABLE_URL_PARAM_KEY = "analytics-enable";
 export const ANALYTICS_SESSION_ID_LOCAL_STORAGE_KEY =
   "base44_analytics_session_id";
 
+// Remembers a visitor's Decline across pages. On "on" pages the SDK starts
+// before the app's banner replays the saved choice, so without it each new
+// page would store the id and send one batch before the denial arrives.
+export const ANALYTICS_DENIED_LOCAL_STORAGE_KEY = "base44_analytics_denied";
+
+function readAnalyticsDenied(): boolean {
+  try {
+    return localStorage.getItem(ANALYTICS_DENIED_LOCAL_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeAnalyticsDenied(denied: boolean) {
+  try {
+    if (denied) localStorage.setItem(ANALYTICS_DENIED_LOCAL_STORAGE_KEY, "1");
+    else localStorage.removeItem(ANALYTICS_DENIED_LOCAL_STORAGE_KEY);
+  } catch {
+    // storage unavailable: the banner's replay still stops tracking
+  }
+}
+
+/** Whether a page in this mode may track before any consent signal. */
+export function initialConsentGranted(mode: string | null): boolean {
+  if (mode === "consent") return false;
+  if (mode === "on") return !readAnalyticsDenied();
+  return true;
+}
+
 // Set by the Base44 server from the app owner's choice: "off" never tracks,
 // "consent" waits for the page's Google Consent Mode `analytics_storage` grant,
 // "on" tracks until that consent is denied. Absent: track as before.
@@ -86,7 +115,7 @@ const consentSharedState = getSharedInstance("analytics-consent", () => {
   return {
     analyticsMode,
     // Whether the visitor may be tracked and the session id stored.
-    consentGranted: analyticsMode !== "consent",
+    consentGranted: initialConsentGranted(analyticsMode),
     isWatchingConsent: false,
     listeners: [] as Array<(granted: boolean) => void>,
   };
@@ -99,6 +128,7 @@ export function isAnalyticsAllowed(): boolean {
 }
 
 function setConsentGranted(granted: boolean) {
+  writeAnalyticsDenied(!granted);
   if (consentSharedState.consentGranted === granted) return;
   consentSharedState.consentGranted = granted;
   if (!granted) {
