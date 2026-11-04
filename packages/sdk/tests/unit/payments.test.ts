@@ -379,6 +379,26 @@ describe("mountCheckout", () => {
       ).rejects.toThrow("PayPal isn't ready");
     });
 
+    test("after a payment, re-enabling the button can't create a second order", async () => {
+      const { session, callbacks } = installPayPal();
+      getConfig.mockResolvedValue(onClickConfig);
+      const createCheckout = vi.fn().mockResolvedValue({
+        checkout_id: "ORDER1", currency: "usd", embedded: paypalEmbedded(),
+      });
+      completeCheckout.mockResolvedValue({ checkout_id: "ORDER1", status: "paid" });
+
+      const mount = await mountCheckout(container as any, spec(createCheckout), {}, deps());
+      container.children[0].click();
+      await session.start.mock.calls[0][1];
+      await callbacks().onApprove({});
+
+      mount.setDisabled(false);
+      container.children[0].click();
+
+      expect(createCheckout).toHaveBeenCalledTimes(1);
+      expect(session.start).toHaveBeenCalledTimes(1);
+    });
+
     test("a disabled button ignores clicks", async () => {
       const { session } = installPayPal();
       getConfig.mockResolvedValue(onClickConfig);

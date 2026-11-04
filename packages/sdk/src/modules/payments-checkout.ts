@@ -279,6 +279,8 @@ async function mountPayPal(
 
   let destroyed = false;
   let completing = false;
+  // Set once a payment goes through: another click would create and charge a second order.
+  let paid = false;
   let starting = false;
   let checkoutId = typeof checkout === "string" ? checkout : undefined;
   // App callbacks run only while mounted, and their own errors never reach PayPal or onError.
@@ -312,6 +314,7 @@ async function mountPayPal(
         return;
       }
       completing = false;
+      paid = true;
       notify(() => options.onComplete?.(result));
     },
     onCancel() {
@@ -324,7 +327,7 @@ async function mountPayPal(
 
   button.setAttribute("type", subscription ? "subscribe" : "pay");
   const onClick = () => {
-    if (completing || starting || button.disabled) return;
+    if (paid || completing || starting || button.disabled) return;
     starting = true;
     // Not awaited before start(), which must run inside the click to open PayPal's popup.
     const id = Promise.resolve()
@@ -357,8 +360,8 @@ async function mountPayPal(
       session.destroy?.();
     },
     setDisabled(disabled) {
-      // A payment being completed keeps the button off whatever the app asks.
-      if (!completing) button.disabled = disabled;
+      // A payment being completed, or already made, keeps the button off whatever the app asks.
+      if (!completing && !paid) button.disabled = disabled;
     },
   };
 }
