@@ -223,7 +223,7 @@ function updateDocsJson(repoDir, sdkFiles) {
       }));
 
       existing.icon = existing.icon ?? "brackets-curly";
-      existing.expanded = false;
+      existing.expanded = true;
       existing.pages = localizedPages;
       updatedCount++;
     }

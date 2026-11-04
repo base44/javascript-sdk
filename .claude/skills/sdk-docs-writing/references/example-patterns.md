@@ -33,7 +33,7 @@ const records = await base44.entities.MyEntity.list();
   }
   ```
   ```
-- **Show cleanup** for subscriptions and resources:
+- **Show cleanup** for subscriptions and resources. Every example that creates something billed or long-lived, such as a browser session, releases it, including short examples that only show an option. Use `try`/`finally` when the cleanup must run even if the work fails:
   ```typescript
   @example
   ```typescript

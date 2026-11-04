@@ -3062,12 +3062,19 @@ function headingAnchor(text) {
  */
 function fixInPageAnchors(content) {
   const anchors = new Set();
+  // Mintlify numbers a repeated heading's anchor in page order: `throws`, then `throws-2`.
+  const headingCounts = new Map();
   let inFence = false;
   for (const line of content.split("\n")) {
     if (line.trim().startsWith("```")) inFence = !inFence;
     if (inFence) continue;
     const heading = line.match(/^#{1,6} (.+)$/);
-    if (heading) anchors.add(headingAnchor(heading[1]));
+    if (heading) {
+      const anchor = headingAnchor(heading[1]);
+      const count = (headingCounts.get(anchor) ?? 0) + 1;
+      headingCounts.set(anchor, count);
+      anchors.add(count === 1 ? anchor : `${anchor}-${count}`);
+    }
     // An explicit anchor, such as an overload's <a id="..." /> label
     for (const [, id] of line.matchAll(/\bid="([^"]+)"/g)) anchors.add(id);
   }
