@@ -455,8 +455,34 @@ function parseParametersWithExpansion(
       i++;
     }
 
+    // TypeDoc-Markdown writes a union type after the description instead of
+    // before it, so the type line check above found nothing. Pull the union
+    // off the end of the description and expand each member separately.
+    let unionGroups = null;
+    if (type === "any") {
+      const lastIdx = descriptionLines.findLastIndex((l) => l.trim() !== "");
+      const members =
+        lastIdx >= 0 ? parseUnionTypeLine(descriptionLines[lastIdx]) : null;
+      if (members) {
+        descriptionLines.splice(lastIdx);
+        type = members.map((m) => m.type).join(" | ");
+        unionGroups = members
+          .map((m) => {
+            const info = getLinkedTypeInfo(m.type, m.link, context);
+            const props =
+              info && context
+                ? extractPropertiesFromLinkedType(info, context)
+                : [];
+            return { type: m.type, fields: normalizePropertiesForParams(props) };
+          })
+          .filter((g) => g.fields.length > 0);
+      }
+    }
+
     // Check if we should expand this type inline
-    let linkedTypeInfo = getLinkedTypeInfo(type, typeLink, context);
+    let linkedTypeInfo = unionGroups
+      ? null
+      : getLinkedTypeInfo(type, typeLink, context);
     let nested = [];
 
     // Track linked types for suppression (for types with explicit links)
@@ -570,10 +596,30 @@ function parseParametersWithExpansion(
       description: descriptionLines.join("\n").trim(),
       optional,
       nested,
+      unionGroups,
     });
   }
 
   return params;
+}
+
+/**
+ * Parse a union type line such as [`A`](A.mdx) | [`B`](B.mdx) | `null` into
+ * its members. Returns null unless the whole line is a union of two or more
+ * linked or backticked types.
+ */
+function parseUnionTypeLine(line) {
+  const parts = line.trim().split(" | ");
+  if (parts.length < 2) return null;
+  const members = [];
+  for (const part of parts) {
+    const match = part.match(/^(?:\[`([^`]+)`\]\(([^)]+)\)|`([^`]+)`)$/);
+    if (!match) return null;
+    members.push(
+      match[1] ? { type: match[1], link: match[2] } : { type: match[3], link: null }
+    );
+  }
+  return members;
 }
 
 /**
@@ -896,7 +942,7 @@ function buildParamFieldsSection(
     const requiredAttr = param.optional ? "" : " required";
 
     // Clean up the type string by removing markdown backticks
-    let typeAttr = param.type.replace(/`/g, '');
+    let typeAttr = escapeAttribute(param.type.replace(/`/g, ''));
     fieldsOutput += `<ParamField body="${param.name}" type="${typeAttr}"${requiredAttr}>\n`;
 
     // Always show description in ParamField if it exists
@@ -914,6 +960,16 @@ function buildParamFieldsSection(
       fieldsOutput += renderNestedParamFields(param.nested);
 
       fieldsOutput += "</Accordion>\n\n";
+    } else if (param.unionGroups?.length > 0) {
+      // One accordion per union member, titled with its type so readers can
+      // tell which properties go with which shape.
+      for (const group of param.unionGroups) {
+        fieldsOutput += `\n<Accordion title="${escapeAttribute(
+          group.type
+        )} properties">\n\n`;
+        fieldsOutput += renderNestedParamFields(group.fields);
+        fieldsOutput += "</Accordion>\n\n";
+      }
     } else {
       fieldsOutput += "\n";
     }
