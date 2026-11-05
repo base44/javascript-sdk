@@ -177,6 +177,13 @@ export type {
   BrowserSessionOptions,
 } from "./modules/browser.types.js";
 
+export type {
+  VoiceModule,
+  VoiceSession,
+  VoiceSessionMessage,
+  VoiceSessionOptions,
+} from "./modules/voice.types.js";
+
 export { Actor, type Conn } from "./actor.js";
 
 export type {

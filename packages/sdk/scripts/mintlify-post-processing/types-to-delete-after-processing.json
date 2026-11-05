@@ -20,5 +20,8 @@
   "ImportResult",
   "SortField",
   "UpdateManyResult",
+  "VoiceSession",
+  "VoiceSessionMessage",
+  "VoiceSessionOptions",
   "user-connectors"
 ]
