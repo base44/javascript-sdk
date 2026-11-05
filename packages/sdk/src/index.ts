@@ -80,6 +80,7 @@ export type {
   GenerateImageResult,
   UploadFileParams,
   UploadFileResult,
+  EmailAttachment,
   SendEmailParams,
   SendEmailResult,
   ExtractDataFromUploadedFileParams,

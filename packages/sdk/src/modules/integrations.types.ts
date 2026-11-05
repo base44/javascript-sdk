@@ -97,6 +97,22 @@ export interface UploadFileResult {
 }
 
 /**
+ * A file to attach to an email.
+ */
+export interface EmailAttachment {
+  /**
+   * File name the recipient sees, including the extension. Supported extensions: `csv`, `docx`, `gif`, `ics`, `jpeg`, `jpg`, `md`, `pdf`, `png`, `txt`, `webp`, and `xlsx`.
+   */
+  filename: string;
+  /**
+   * A file your app already uploaded, such as the `file_url` returned by `UploadFile()` or the `file_uri` returned by `UploadPrivateFile()`. Files uploaded by other apps are rejected.
+   */
+  file_url?: string;
+  /** Base64-encoded file contents, for a file your code generated. */
+  content?: string;
+}
+
+/**
  * Parameters for the SendEmail function.
  */
 export interface SendEmailParams {
@@ -104,10 +120,18 @@ export interface SendEmailParams {
   to: string;
   /** Email subject line. */
   subject: string;
-  /** Plain text email body content. */
-  body: string;
-  /** The name of the sender. If omitted, the app's name will be used. */
+  /** HTML email body. The same as `html`, so set one or the other, not both. */
+  body?: string;
+  /** HTML email body. The same as `body`, so set one or the other, not both. */
+  html?: string;
+  /**
+   * Plain-text email body. On its own, it sends a plain-text email. Set it together with `body` or `html` to send both versions in one email, and the recipient's mail client shows whichever it prefers. Make sure both versions say the same thing.
+   */
+  text?: string;
+  /** The name of the sender. If omitted, the app's name is used. */
   from_name?: string;
+  /** Files to attach. You can attach up to 5 files, up to 5 MB each and 10 MB in total. Set `filename` and exactly one of `file_url` or `content` on each file. */
+  attachments?: EmailAttachment[];
 }
 
 export type SendEmailResult = any;
@@ -257,10 +281,35 @@ export interface CoreIntegrations {
   UploadFile(params: UploadFileParams): Promise<UploadFileResult>;
 
   /**
-   * Send emails to registered users of your app.
+   * Send an email from your app.
    *
-   * @param params - Parameters for sending email
+   * You can always email registered users of your app. To email anyone else, the app needs a paid plan and a connected custom domain.
+   *
+   * @param params - Parameters for sending email. Set at least one of `body`, `html`, or `text`.
    * @returns Promise resolving when the email is sent.
+   *
+   * @example
+   * ```typescript
+   * // Send an HTML email with a plain-text version
+   * await base44.integrations.Core.SendEmail({
+   *   to: "user@example.com",
+   *   subject: "Your order has shipped",
+   *   html: "<p>Your order <strong>#1234</strong> is on its way.</p>",
+   *   text: "Your order #1234 is on its way.",
+   * });
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Attach a file your app uploaded
+   * const { file_url } = await base44.integrations.Core.UploadFile({ file });
+   * await base44.integrations.Core.SendEmail({
+   *   to: "user@example.com",
+   *   subject: "Your invoice",
+   *   html: "<p>Your invoice is attached.</p>",
+   *   attachments: [{ filename: "invoice.pdf", file_url }],
+   * });
+   * ```
    */
   SendEmail(params: SendEmailParams): Promise<SendEmailResult>;
 
