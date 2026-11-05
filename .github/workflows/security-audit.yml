@@ -45,15 +45,19 @@ jobs:
       # gateway proxies the advisory endpoints.
       - name: Unpin the registry for the advisory API
         run: |
+          echo "GATEWAY_IP=$(awk '/registry\.npmjs\.org/ {print $1; exit}' /etc/hosts)" >> "$GITHUB_ENV"
           sudo sed -i "/registry\.npmjs\.org/d" /etc/hosts
           getent hosts registry.npmjs.org
 
       # Gating check: fail the build on high/critical vulnerabilities in
       # the production dependencies declared in package.json. These are the
       # ones that ship to consumers of the SDK (and show up in their Wiz
-      # scans), so they get the strictest treatment.
+      # scans), so they get the strictest treatment. A fix the gateway still
+      # blocks is reported as a warning, since no lockfile change could pass.
       - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
+        run: |
+          npm audit --omit=dev --json > audit.json || true
+          node .github/scripts/audit-gate.mjs audit.json "$GATEWAY_IP"
 
       # Informational: report the full picture (including dev/transitive
       # dependencies) without failing the build.
