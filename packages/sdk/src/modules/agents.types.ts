@@ -215,15 +215,15 @@ export interface AgentsModuleConfig {
  */
 export interface AgentsModule {
   /**
-   * Gets all conversations from all agents in the app.
+   * Gets the current user's conversations with all agents in the app.
    *
-   * Retrieves all conversations. Use {@linkcode listConversations | listConversations()} to filter which conversations are returned, apply sorting, or paginate results. Use {@linkcode getConversation | getConversation()} to retrieve a specific conversation by ID.
+   * Retrieves every conversation the current user started, across all agents. Conversations that other users started aren't included. Use {@linkcode listConversations | listConversations()} to filter which conversations are returned, apply sorting, or paginate results. Use {@linkcode getConversation | getConversation()} to retrieve a specific conversation by ID.
    *
    * @returns Promise resolving to an array of conversations.
    *
    * @example
    * ```typescript
-   * // Get all conversations
+   * // Get the current user's conversations
    * const conversations = await base44.agents.getConversations();
    * console.log(`Total conversations: ${conversations.length}`);
    * ```
@@ -237,9 +237,11 @@ export interface AgentsModule {
    * Gets a specific conversation by ID.
    *
    * Retrieves a single conversation using its unique identifier. To retrieve
-   * all conversations, use {@linkcode getConversations | getConversations()}. To filter, sort, or paginate conversations, use {@linkcode listConversations | listConversations()}.
+   * all of the current user's conversations, use {@linkcode getConversations | getConversations()}. To filter, sort, or paginate conversations, use {@linkcode listConversations | listConversations()}.
    *
    * This function returns the complete stored conversation including full tool call results, even for large responses.
+   *
+   * A user can access only their own conversations. Other users' conversations aren't available through this method.
    *
    * @param conversationId - The unique identifier of the conversation.
    * @returns Promise resolving to the conversation, or undefined if not found.
@@ -263,7 +265,7 @@ export interface AgentsModule {
   /**
    * Lists conversations with filtering, sorting, and pagination.
    *
-   * Provides querying capabilities including filtering by fields, sorting, pagination, and field selection. For cases where you need all conversations without filtering, use {@linkcode getConversations | getConversations()}. To retrieve a specific conversation by ID, use {@linkcode getConversation | getConversation()}.
+   * Provides querying capabilities including filtering by fields, sorting, pagination, and field selection. For cases where you need all of the current user's conversations without filtering, use {@linkcode getConversations | getConversations()}. To retrieve a specific conversation by ID, use {@linkcode getConversation | getConversation()}.
    *
    * @param filterParams - Filter parameters for querying conversations.
    * @returns Promise resolving to an array of filtered conversations.
@@ -327,6 +329,8 @@ export interface AgentsModule {
    * Sends a message to the agent and updates the conversation. This method
    * also updates the realtime socket to notify any subscribers.
    *
+   * A user can add messages only to their own conversations. Other users' conversations aren't available through this method.
+   *
    * @param conversation - The conversation to add the message to.
    * @param message - The message to add.
    * @returns Promise resolving to the created message.
@@ -352,7 +356,9 @@ export interface AgentsModule {
    * Establishes a WebSocket connection to receive instant updates when new
    * messages are added to the conversation. Returns an unsubscribe function
    * to clean up the connection.
-   * 
+   *
+   * A user can subscribe only to their own conversations. Other users' conversations aren't available through this method.
+   *
    * <Note>
    * When receiving messages through this function, tool call data is truncated for efficiency. The `arguments_string` is limited to 500 characters and `results` to 50 characters. The complete tool call data is always saved in storage and can be retrieved by calling {@linkcode getConversation | getConversation()} after the message completes.
    * </Note>
