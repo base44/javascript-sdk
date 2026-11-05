@@ -48,7 +48,7 @@ export interface Snapshot {
    */
   status: StatusObject | null;
   /**
-   * The last 50 messages visible to partners, oldest first.
+   * The last 50 messages, oldest first.
    */
   messages: Message[];
   /**
@@ -82,7 +82,7 @@ export interface Message {
    */
   id?: string | null;
   /**
-   * `user` for a message a person sent, `assistant` for the AI's reply. `system` messages are never sent.
+   * Who sent the message. The value is `user` for a message a person sent and `assistant` for the AI's reply. Messages with the `system` role are never sent.
    */
   role?: ("user" | "assistant" | "system") | null;
   /**
@@ -148,15 +148,15 @@ export interface AskClarifyingQuestionsCall {
    */
   id?: string | null;
   /**
-   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
+   * Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
+   * Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
+   * State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
@@ -197,12 +197,12 @@ export interface AskClarifyingQuestionsCall {
  */
 export interface WaitingOn {
   /**
-   * `choice`: pick among options. `input`: supply values. `approval`: approve or reject.
+   * What the call needs from the user. The value is `choice` to pick among options, `input` to supply values, or `approval` to approve or reject.
    */
   kind?: "choice" | "input" | "approval";
 }
 /**
- * Waiting for approval: testing a backend function would delete records from an entity.
+ * Waiting for approval because testing a backend function would delete records from an entity.
  */
 export interface BackendFunctionEntityDeleteApproval {
   /**
@@ -236,7 +236,7 @@ export interface FunctionEntityDeleteDetails {
   inspection_failed?: boolean;
 }
 /**
- * Waiting for approval: the AI wants to run a shell command that needs a review first. The command itself is not published.
+ * Waiting for approval because the AI wants to run a shell command that needs a review first. The command itself is not published.
  */
 export interface BashApproval {
   /**
@@ -245,7 +245,7 @@ export interface BashApproval {
   guard: "bash_approval";
 }
 /**
- * Waiting for approval: the AI wants to change who can read or write an entity's records.
+ * Waiting for approval because the AI wants to change who can read or write an entity's records.
  */
 export interface EntityRlsGuardApproval {
   /**
@@ -262,7 +262,7 @@ export interface EntityRlsGuardApproval {
   details?: AccessRuleChangeDetails | null;
 }
 /**
- * Waiting for approval: the AI's code would update or delete records in an entity.
+ * Waiting for approval because the AI's code would update or delete records in an entity.
  */
 export interface ExecToolEntityMutationApproval {
   /**
@@ -292,7 +292,7 @@ export interface EntityMutationDetails {
   summary?: string;
 }
 /**
- * Waiting for approval: the AI's code would write to a GitHub repository.
+ * Waiting for approval because the AI's code would write to a GitHub repository.
  */
 export interface ExecToolGithubRepoWriteApproval {
   /**
@@ -318,7 +318,7 @@ export interface SummaryDetails {
   summary?: string;
 }
 /**
- * Waiting for approval: the AI's code would invite someone to the app by email.
+ * Waiting for approval because the AI's code would invite someone to the app by email.
  */
 export interface ExecToolInviteUserApproval {
   /**
@@ -335,7 +335,7 @@ export interface ExecToolInviteUserApproval {
   details?: SummaryDetails | null;
 }
 /**
- * Waiting for approval: the AI's code would send an email.
+ * Waiting for approval because the AI's code would send an email.
  */
 export interface ExecToolSendEmailApproval {
   /**
@@ -352,7 +352,7 @@ export interface ExecToolSendEmailApproval {
   details?: SummaryDetails | null;
 }
 /**
- * Waiting for approval: the AI's code would send a text message.
+ * Waiting for approval because the AI's code would send a text message.
  */
 export interface ExecToolSendSmsApproval {
   /**
@@ -378,7 +378,7 @@ export interface OtherApproval {
   guard: string;
 }
 /**
- * The questions the builder asks.
+ * The questions the AI asks.
  */
 export interface QuestionArguments {
   /**
@@ -467,15 +467,15 @@ export interface AskPlanQuestionsCall {
    */
   id?: string | null;
   /**
-   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
+   * Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
+   * Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
+   * State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
@@ -524,15 +524,15 @@ export interface BashCall {
    */
   id?: string | null;
   /**
-   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
+   * Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
+   * Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
+   * State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
@@ -586,15 +586,15 @@ export interface CreateEntityRecordsCall {
    */
   id?: string | null;
   /**
-   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
+   * Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
+   * Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
+   * State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
@@ -652,15 +652,15 @@ export interface DeleteEntitiesCall {
    */
   id?: string | null;
   /**
-   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
+   * Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
+   * Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
+   * State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
@@ -727,15 +727,15 @@ export interface DeleteFileCall {
    */
   id?: string | null;
   /**
-   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
+   * Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
+   * Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
+   * State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
@@ -793,15 +793,15 @@ export interface EditRepoFileCall {
    */
   id?: string | null;
   /**
-   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
+   * Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
+   * Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
+   * State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
@@ -846,15 +846,15 @@ export interface ExecToolCall {
    */
   id?: string | null;
   /**
-   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
+   * Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
+   * Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
+   * State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
@@ -912,15 +912,15 @@ export interface FindReplaceCall {
    */
   id?: string | null;
   /**
-   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
+   * Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
+   * Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
+   * State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
@@ -965,15 +965,15 @@ export interface GenerateGameBackgroundCall {
    */
   id?: string | null;
   /**
-   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
+   * Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
+   * Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
+   * State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
@@ -1018,15 +1018,15 @@ export interface GenerateGameImageCall {
    */
   id?: string | null;
   /**
-   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
+   * Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
+   * Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
+   * State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
@@ -1084,15 +1084,15 @@ export interface GenerateImageCall {
    */
   id?: string | null;
   /**
-   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
+   * Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
+   * Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
+   * State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
@@ -1171,15 +1171,15 @@ export interface GeneratePrdCall {
    */
   id?: string | null;
   /**
-   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
+   * Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
+   * Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
+   * State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
@@ -1240,7 +1240,7 @@ export interface PrdArguments {
    */
   design_preferences?: string;
   /**
-   * Build or plan declaration, when the builder asks for one.
+   * Build or plan declaration, when the AI asks for one.
    */
   prd_type?: string;
   /**
@@ -1265,15 +1265,15 @@ export interface GenerateVideoCall {
    */
   id?: string | null;
   /**
-   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
+   * Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
+   * Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
+   * State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
@@ -1322,15 +1322,15 @@ export interface InstallNpmPackageCall {
    */
   id?: string | null;
   /**
-   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
+   * Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
+   * Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
+   * State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
@@ -1363,7 +1363,7 @@ export interface InstallNpmPackageCall {
   arguments?: InstallPackageArguments | null;
 }
 /**
- * The package operations the builder runs.
+ * The package operations the AI runs.
  */
 export interface InstallPackageArguments {
   /**
@@ -1397,15 +1397,15 @@ export interface PreviewExecuteCodeCall {
    */
   id?: string | null;
   /**
-   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
+   * Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
+   * Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
+   * State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
@@ -1450,15 +1450,15 @@ export interface PreviewScreenshotCall {
    */
   id?: string | null;
   /**
-   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
+   * Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
+   * Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
+   * State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
@@ -1503,15 +1503,15 @@ export interface ReadOnlyExecToolCall {
    */
   id?: string | null;
   /**
-   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
+   * Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
+   * Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
+   * State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
@@ -1556,15 +1556,15 @@ export interface ReadRepoFileCall {
    */
   id?: string | null;
   /**
-   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
+   * Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
+   * Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
+   * State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
@@ -1609,15 +1609,15 @@ export interface RunShellCommandCall {
    */
   id?: string | null;
   /**
-   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
+   * Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
+   * Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
+   * State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
@@ -1662,15 +1662,15 @@ export interface SetSecretsCall {
    */
   id?: string | null;
   /**
-   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
+   * Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
+   * Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
+   * State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
@@ -1703,7 +1703,7 @@ export interface SetSecretsCall {
   arguments?: SetSecretsArguments | null;
 }
 /**
- * The secrets the builder asks for.
+ * The secrets the AI asks for.
  */
 export interface SetSecretsArguments {
   /**
@@ -1737,15 +1737,15 @@ export interface UpdateEntitiesCall {
    */
   id?: string | null;
   /**
-   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
+   * Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
+   * Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
+   * State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
@@ -1794,15 +1794,15 @@ export interface UpdatePlanCall {
    */
   id?: string | null;
   /**
-   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
+   * Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
+   * Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
+   * State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
@@ -1843,7 +1843,7 @@ export interface UpdatePlanArguments {
    */
   updates?: PlanUpdate[];
   /**
-   * Base plan sections the builder considers sufficiently specified.
+   * Base plan sections the AI considers sufficiently specified.
    */
   sections_with_enough?: string[];
 }
@@ -1881,15 +1881,15 @@ export interface WriteFileCall {
    */
   id?: string | null;
   /**
-   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
+   * Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
+   * Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
+   * State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
@@ -1934,15 +1934,15 @@ export interface WriteRepoFileCall {
    */
   id?: string | null;
   /**
-   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
+   * Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
+   * Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
+   * State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
@@ -1987,15 +1987,15 @@ export interface OtherToolCall {
    */
   id?: string | null;
   /**
-   * `true` once the call has paused for the user's answer or approval. It stays `true` after the user answers, so read `status` to know whether the call is still waiting.
+   * Whether the call has paused for the user's answer or approval. The value becomes `true` once it pauses and stays `true` after the user answers, so read `status` to know whether it's still waiting.
    */
   requires_user_input?: boolean | null;
   /**
-   * `true` when the call needed approval but ran at once because the app has Auto approve on. It never paused, and its result is real.
+   * Whether the call skipped its approval because the app has Auto approve on. The value is `true` when the call needed approval but ran at once. It never paused, and its result is real.
    */
   auto_approved?: boolean | null;
   /**
-   * `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, and `waiting_for_user_input` while it waits for the user's answer or approval.
+   * State of the call. The value is `running` while the tool works, `success` or `error` once it finished, `stopped` when the user stopped the turn, or `waiting_for_user_input` while it waits for the user's answer or approval.
    */
   status?: ("running" | "success" | "error" | "stopped" | "waiting_for_user_input") | null;
   /**
@@ -2058,7 +2058,7 @@ export interface MessageParams {
   system_message_type?: string;
 }
 /**
- * The prompts the builder runs next, in order.
+ * The prompts the AI runs next, in order.
  */
 export interface QueueState {
   /**
@@ -2066,7 +2066,7 @@ export interface QueueState {
    */
   items?: QueueItem[] | null;
   /**
-   * Whether the queue is paused, so queued prompts wait. A person can pause it, and the builder pauses it while the AI waits for an answer.
+   * Whether the queue is paused, so queued prompts wait. A person can pause it, and Base44 pauses it while the AI waits for an answer.
    */
   is_paused?: boolean | null;
 }
@@ -2105,7 +2105,7 @@ export interface AppStatusChanged {
   branch_id?: string | null;
 }
 /**
- * The builder started, finished or failed a turn. Null status clears it.
+ * The AI started, finished, or failed a turn. Null status clears it.
  */
 export interface AppStatusChangedEvent {
   /**
@@ -2140,7 +2140,7 @@ export interface BranchDeletedEvent {
   data: BranchChange;
 }
 /**
- * The conversation was rewritten (undo, restore, sync). Rejoin the room for a fresh snapshot.
+ * The conversation was rewritten by an undo, restore, or sync. Rejoin the room for a fresh snapshot.
  */
 export interface ConversationChangedEvent {
   /**
@@ -2170,7 +2170,7 @@ export interface FilesChangedEvent {
  */
 export interface ImageResolved {
   /**
-   * `pending` while the image generates, `completed` once `image_url` is ready, `failed` when generation failed.
+   * State of the image. The value is `pending` while the image generates, `completed` once `image_url` is ready, or `failed` when generation failed.
    */
   status?: ("pending" | "completed" | "failed") | null;
   /**
@@ -2329,11 +2329,11 @@ export interface QueueUpdated {
    */
   items?: QueueItem[] | null;
   /**
-   * Whether the queue is paused, so queued prompts wait. A person can pause it, and the builder pauses it while the AI waits for an answer.
+   * Whether the queue is paused, so queued prompts wait. A person can pause it, and Base44 pauses it while the AI waits for an answer.
    */
   is_paused?: boolean | null;
   /**
-   * ID of the queued prompt the builder just picked up to run. Absent when a prompt was added, removed or cleared.
+   * ID of the queued prompt the AI just picked up to run. Absent when a prompt was added, removed, or cleared.
    */
   processed_item_id?: string | null;
   /**
@@ -2415,12 +2415,12 @@ export interface RoomSnapshotUnavailableEvent {
  */
 export interface SessionEnded {
   /**
-   * `expired`: ask the partner backend for a new session. `revoked`: the partner or an admin ended it, so do not reconnect. `replaced`: a newer socket took the session, so stop.
+   * Why the session ended. When it's `expired`, ask your server for a new session. When it's `revoked`, your server or an admin ended it, so don't reconnect. When it's `replaced`, a newer socket took the session, so stop.
    */
   reason: "expired" | "revoked" | "replaced";
 }
 /**
- * The session ended (expired, revoked, or taken by a newer socket). The socket disconnects next.
+ * The session ended because it expired, was revoked, or was taken by a newer socket. The socket disconnects next.
  */
 export interface SessionEndedEvent {
   /**
@@ -2462,7 +2462,7 @@ export interface TaskProgressed {
    */
   message_id?: string | null;
   /**
-   * `task_started`, `task_progress`, `task_completed`, `task_failed` or `task_cancelled`.
+   * Kind of progress update. The value is `task_started`, `task_progress`, `task_completed`, `task_failed`, or `task_cancelled`.
    */
   event_type?: ("task_started" | "task_progress" | "task_completed" | "task_failed" | "task_cancelled") | null;
   /**
@@ -2494,7 +2494,7 @@ export interface ServerEventMap {
   "message.updated": MessageUpdated;
   /** A chat message was removed or hidden. An `id` the viewer never saw is a no-op. */
   "message.removed": MessageRemoved;
-  /** The builder started, finished or failed a turn. Null status clears it. */
+  /** The AI started, finished, or failed a turn. Null status clears it. */
   "app.status_changed": AppStatusChanged;
   /** Reload the app preview. */
   "preview.reload_requested": PreviewReloadRequested;
@@ -2506,7 +2506,7 @@ export interface ServerEventMap {
   "task.progressed": TaskProgressed;
   /** A generated image finished or failed. Replace its `placeholder_url` wherever it appears. */
   "image.resolved": ImageResolved;
-  /** The conversation was rewritten (undo, restore, sync). Rejoin the room for a fresh snapshot. */
+  /** The conversation was rewritten by an undo, restore, or sync. Rejoin the room for a fresh snapshot. */
   "conversation.changed": BranchChange;
   /** The app's files changed outside a chat turn. */
   "files.changed": BranchChange;
@@ -2516,7 +2516,7 @@ export interface ServerEventMap {
   "repository.changed": BranchChange;
   /** The imported app's pull request changed. */
   "pull_request.changed": BranchChange;
-  /** The session ended (expired, revoked, or taken by a newer socket). The socket disconnects next. */
+  /** The session ended because it expired, was revoked, or was taken by a newer socket. The socket disconnects next. */
   "session.ended": SessionEnded;
   /** A join was refused because the app is not on the session's allowlist, or the socket joins too often. */
   "room.access_denied": RoomNotice;
