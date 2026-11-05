@@ -57,5 +57,9 @@
   "ServiceRolePaymentsModule",
   "SortField",
   "SsoModule",
-  "UpdateManyResult"
+  "UpdateManyResult",
+  "VoiceModule",
+  "VoiceSession",
+  "VoiceSessionMessage",
+  "VoiceSessionOptions"
 ]
