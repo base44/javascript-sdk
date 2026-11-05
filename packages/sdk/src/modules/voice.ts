@@ -30,7 +30,7 @@ export interface VoiceModuleConfig {
  *
  * @param axios - Axios instance (should be service role client)
  * @param config - Module configuration
- * @returns Voice module with methods to start and end live voice sessions
+ * @returns Voice module with methods to create and end live voice sessions
  * @internal
  */
 export function createVoiceModule(
@@ -46,7 +46,7 @@ export function createVoiceModule(
   };
 
   return {
-    async startSession(options: VoiceSessionOptions): Promise<VoiceSession> {
+    async createSession(options: VoiceSessionOptions): Promise<VoiceSession> {
       // The app is derived from the service token, so the route isn't app-scoped.
       const response = await axios.post<VoiceSessionResponse>(
         "/v1/voice-sessions",
@@ -82,7 +82,6 @@ export function createVoiceModule(
         sdp: data.sdp,
         expiresAt: data.expires_at,
         environment: data.environment,
-        end: () => endSession(data.session_id),
       };
     },
 

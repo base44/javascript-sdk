@@ -19,7 +19,7 @@ export interface VoiceSessionMessage {
 }
 
 /**
- * Options for {@linkcode VoiceModule.startSession | startSession()}.
+ * Options for {@linkcode VoiceModule.createSession | createSession()}.
  */
 export interface VoiceSessionOptions {
   /**
@@ -63,13 +63,13 @@ export interface VoiceSessionOptions {
 }
 
 /**
- * A live voice session returned by {@linkcode VoiceModule.startSession | startSession()}.
+ * A live voice session returned by {@linkcode VoiceModule.createSession | createSession()}.
  */
 export interface VoiceSession {
   /**
    * Opaque session identifier issued to your app.
    *
-   * Pass it unchanged to [`endSession()`](#endsession) to end the session from a different request.
+   * Pass it unchanged to [`endSession()`](#endsession) to end the session.
    */
   sessionId: string;
   /**
@@ -87,20 +87,16 @@ export interface VoiceSession {
    * - `'draft'`: The current draft of the MCP profile. Served when the app's owner or an editor starts the session from the app editor preview, so voice works before the app is published.
    */
   environment: "live" | "draft";
-  /**
-   * Ends the session. Equivalent to calling [`endSession()`](#endsession) with this session's ID.
-   */
-  end: () => Promise<void>;
 }
 
 /**
  * Voice module for live voice conversations between your app's users and an AI agent.
  *
- * This module starts and ends live voice sessions. The voice agent can use your app's tools through one of the app's MCP profiles, acting as the current user. Audio flows directly between the browser and the voice model over [WebRTC](https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API), so your backend only handles the start and the end of a session.
+ * This module creates and ends live voice sessions. The voice agent can use your app's tools through one of the app's MCP profiles, acting as the current user. Audio flows directly between the browser and the voice model over [WebRTC](https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API), so your backend only creates and ends the session.
  *
  * A session takes three steps:
  * - The browser creates a WebRTC SDP offer and sends it to one of your backend functions.
- * - The backend function calls {@linkcode startSession | startSession()} with the offer and your voice settings, and returns the SDP answer to the browser.
+ * - The backend function calls {@linkcode createSession | createSession()} with the offer and your voice settings, and returns the SDP answer to the browser.
  * - The browser applies the answer, and the conversation starts.
  *
  * Keep the instructions, models, and MCP profile ID in the backend function. Only the SDP offer should come from the browser.
@@ -113,9 +109,9 @@ export interface VoiceSession {
  */
 export interface VoiceModule {
   /**
-   * Starts a live voice session and returns the SDP answer for the browser.
+   * Creates a live voice session and returns the SDP answer for the browser.
    *
-   * Each call starts a new session, which uses credits from the workspace that owns the app. The session ends on its own when it's idle or reaches its maximum duration. When the current user hangs up, call `end()` on the session. To end it from a different request, use {@linkcode endSession | endSession()}.
+   * Each call creates a new session, which uses credits from the workspace that owns the app. The session ends on its own when it's idle or reaches its maximum duration. To end it sooner, such as when the current user hangs up, call {@linkcode endSession | endSession()} from a later request.
    *
    * @param options - The browser's SDP offer and the voice settings.
    * @returns Promise resolving to the new voice session. Rejects with a [`Base44Error`](/developers/references/sdk/getting-started/work-with-sdk#error-handling) whose `code` is one of the values under [Throws](#throws).
@@ -125,13 +121,13 @@ export interface VoiceModule {
    * @throws `unsupported_agent_model`: The agent model isn't supported.
    * @throws `voice_settings_rejected`: The voice provider rejected the settings, for example because the instructions are too long.
    * @throws `invalid_request`: A value in the options is invalid.
-   * @throws `rate_limited`: You started too many sessions in a short time.
+   * @throws `rate_limited`: You created too many sessions in a short time.
    * @throws `voice_capacity_exceeded`: Voice capacity is temporarily unavailable.
    * @throws `voice_connection_failed`: The voice provider couldn't be reached or rejected the request.
    *
    * @example
    * ```typescript
-   * // Backend function that starts a voice session for the current user
+   * // Backend function that creates a voice session for the current user
    * import { createClientFromRequest } from 'npm:@base44/sdk';
    *
    * const VOICE_PROFILE_ID = '6a1f0c2b9d8e7f6a5b4c3d2e';
@@ -141,7 +137,7 @@ export interface VoiceModule {
    *   // Only the SDP offer comes from the browser.
    *   const { sdp } = await req.json();
    *
-   *   const session = await base44.asServiceRole.voice.startSession({
+   *   const session = await base44.asServiceRole.voice.createSession({
    *     sdp,
    *     mcpProfileId: VOICE_PROFILE_ID,
    *     voiceInstructions: 'You are the shop assistant. Speak briefly and let the person interrupt.',
@@ -155,7 +151,7 @@ export interface VoiceModule {
    * @example
    * ```typescript
    * // Pick the models and voice, and give the agent context about the current page
-   * const session = await base44.asServiceRole.voice.startSession({
+   * const session = await base44.asServiceRole.voice.createSession({
    *   sdp,
    *   mcpProfileId: VOICE_PROFILE_ID,
    *   voiceModel: 'gpt_live_1',
@@ -169,14 +165,14 @@ export interface VoiceModule {
    * });
    * ```
    */
-  startSession(options: VoiceSessionOptions): Promise<VoiceSession>;
+  createSession(options: VoiceSessionOptions): Promise<VoiceSession>;
 
   /**
-   * Ends a voice session started by your app.
+   * Ends a voice session created by your app.
    *
-   * Use this when the session was started in a different request, such as when the browser reports that the current user hung up. Otherwise call `end()` on the session returned by {@linkcode startSession | startSession()}. Ending a session that has already ended succeeds, so it's safe to call more than once.
+   * Call it from a later request, such as when the browser reports that the current user hung up. Ending a session that has already ended succeeds, so it's safe to call more than once.
    *
-   * @param sessionId - The `sessionId` returned by {@linkcode startSession | startSession()}.
+   * @param sessionId - The `sessionId` returned by {@linkcode createSession | createSession()}.
    * @returns Promise that resolves when Base44 accepts the request. The session closes in the background. Rejects with a [`Base44Error`](/developers/references/sdk/getting-started/work-with-sdk#error-handling) whose `code` is one of the values under [Throws](#throws-2).
    * @throws `voice_session_not_found`: The session ID wasn't issued to your app.
    * @throws `voice_connection_failed`: Base44 couldn't reach its background processing. It closes the session directly where possible, and retrying is safe.

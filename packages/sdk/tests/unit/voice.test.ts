@@ -44,25 +44,24 @@ describe("Voice module", () => {
     nock.cleanAll();
   });
 
-  test("startSession posts with the service token and maps the response", async () => {
+  test("createSession posts with the service token and maps the response", async () => {
     scope
       .post("/api/v1/voice-sessions", requiredBody)
       .matchHeader("Authorization", `Bearer ${serviceToken}`)
       .reply(201, created);
 
-    const session = await base44.asServiceRole.voice.startSession(required);
+    const session = await base44.asServiceRole.voice.createSession(required);
 
     expect(session).toEqual({
       sessionId,
       sdp: answer,
       expiresAt: "2030-01-01T12:30:00Z",
       environment: "live",
-      end: expect.any(Function),
     });
     expect(scope.isDone()).toBe(true);
   });
 
-  test("startSession omits optional keys when not set", async () => {
+  test("createSession omits optional keys when not set", async () => {
     let body: Record<string, unknown> = {};
     scope
       .post("/api/v1/voice-sessions", (b) => {
@@ -71,13 +70,13 @@ describe("Voice module", () => {
       })
       .reply(201, created);
 
-    await base44.asServiceRole.voice.startSession(required);
+    await base44.asServiceRole.voice.createSession(required);
 
     expect(body).toEqual(requiredBody);
     expect(scope.isDone()).toBe(true);
   });
 
-  test("startSession forwards models, voice, and initialMessages", async () => {
+  test("createSession forwards models, voice, and initialMessages", async () => {
     const initialMessages = [
       { role: "developer", text: "The person is viewing order 1042." },
       { role: "user", text: "Where is my order?" },
@@ -92,7 +91,7 @@ describe("Voice module", () => {
       })
       .reply(201, created);
 
-    await base44.asServiceRole.voice.startSession({
+    await base44.asServiceRole.voice.createSession({
       ...required,
       voiceModel: "gpt_live_1",
       agentModel: "gpt_6_luna",
@@ -103,7 +102,7 @@ describe("Voice module", () => {
     expect(scope.isDone()).toBe(true);
   });
 
-  test("startSession passes values through without checking them", async () => {
+  test("createSession passes values through without checking them", async () => {
     // Base44 owns validation, so the SDK sends values it doesn't recognize.
     const unchecked = {
       ...required,
@@ -124,12 +123,12 @@ describe("Voice module", () => {
       })
       .reply(201, created);
 
-    await base44.asServiceRole.voice.startSession(unchecked);
+    await base44.asServiceRole.voice.createSession(unchecked);
 
     expect(scope.isDone()).toBe(true);
   });
 
-  test("startSession sends on-behalf-of and Base44-Functions-Version together", async () => {
+  test("createSession sends on-behalf-of and Base44-Functions-Version together", async () => {
     const client = createClient({
       serverUrl,
       appId,
@@ -144,20 +143,20 @@ describe("Voice module", () => {
       .matchHeader("Base44-Functions-Version", "preview")
       .reply(201, { ...created, environment: "draft" });
 
-    const session = await client.asServiceRole.voice.startSession(required);
+    const session = await client.asServiceRole.voice.createSession(required);
 
     expect(session.environment).toBe("draft");
     expect(scope.isDone()).toBe(true);
   });
 
-  test("startSession sends neither header when there is no user or version", async () => {
+  test("createSession sends neither header when there is no user or version", async () => {
     scope
       .post("/api/v1/voice-sessions")
       .matchHeader("on-behalf-of", (value) => value === undefined)
       .matchHeader("Base44-Functions-Version", (value) => value === undefined)
       .reply(201, created);
 
-    await base44.asServiceRole.voice.startSession(required);
+    await base44.asServiceRole.voice.createSession(required);
 
     expect(scope.isDone()).toBe(true);
   });
@@ -182,7 +181,7 @@ describe("Voice module", () => {
       .matchHeader("Base44-State", "signed-state")
       .reply(201, created);
 
-    await client.asServiceRole.voice.startSession(required);
+    await client.asServiceRole.voice.createSession(required);
 
     expect(scope.isDone()).toBe(true);
   });
@@ -208,7 +207,7 @@ describe("Voice module", () => {
     expect(scope.isDone()).toBe(true);
   });
 
-  test("startSession surfaces the error code and doesn't retry", async () => {
+  test("createSession surfaces the error code and doesn't retry", async () => {
     scope.post("/api/v1/voice-sessions").once().reply(422, {
       error: {
         code: "unsupported_agent_model",
@@ -217,7 +216,7 @@ describe("Voice module", () => {
     });
 
     const error = await base44.asServiceRole.voice
-      .startSession({ ...required, agentModel: "gpt_0" })
+      .createSession({ ...required, agentModel: "gpt_0" })
       .catch((e) => e);
 
     expect(error).toBeInstanceOf(Base44Error);
@@ -242,19 +241,6 @@ describe("Voice module", () => {
     scope.delete("/api/v1/voice-sessions/a%2Fb%3Fc").reply(204);
 
     await base44.asServiceRole.voice.endSession("a/b?c");
-    expect(scope.isDone()).toBe(true);
-  });
-
-  test("session.end() ends the session it was returned with", async () => {
-    scope
-      .post("/api/v1/voice-sessions")
-      .reply(201, created)
-      .delete(`/api/v1/voice-sessions/${sessionId}`)
-      .reply(204);
-
-    const session = await base44.asServiceRole.voice.startSession(required);
-    await session.end();
-
     expect(scope.isDone()).toBe(true);
   });
 
