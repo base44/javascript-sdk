@@ -101,11 +101,11 @@ export interface UploadFileResult {
  */
 export interface EmailAttachment {
   /**
-   * File name the recipient sees, including the extension. Supported extensions: `csv`, `docx`, `gif`, `ics`, `jpeg`, `jpg`, `md`, `pdf`, `png`, `txt`, `webp`, and `xlsx`.
+   * File name the recipient sees, including the extension. The supported extensions are `csv`, `docx`, `gif`, `ics`, `jpeg`, `jpg`, `md`, `pdf`, `png`, `txt`, `webp`, and `xlsx`.
    */
   filename: string;
   /**
-   * A file your app already uploaded, such as the `file_url` returned by `UploadFile()` or the `file_uri` returned by `UploadPrivateFile()`. Files uploaded by other apps are rejected.
+   * A file your app already uploaded, such as the `file_url` returned by [`UploadFile()`](#uploadfile) or the `file_uri` returned by [`UploadPrivateFile()`](#uploadprivatefile). Files uploaded by other apps are rejected.
    */
   file_url?: string;
   /** Base64-encoded file contents, for a file your code generated. */
