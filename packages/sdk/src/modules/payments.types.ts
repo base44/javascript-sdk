@@ -463,8 +463,8 @@ export interface CheckoutMount {
  * | :- | :- | :- | :- |
  * | Redirect checkout | Yes | No | Yes |
  * | Embedded checkout | Yes | Yes, required | No |
- * | Refunds | Yes | Yes | No |
- * | Subscription cancellation | Yes, now or at period end | Yes, now only | No |
+ * | Refunds | Yes | Yes | Yes |
+ * | Subscription cancellation | Yes, now or at period end | Yes, now only | Yes, now or at period end |
  * | Subscription pause and resume | Yes | Yes | No |
  *
  * ## Authentication modes
@@ -787,8 +787,6 @@ export interface ServiceRolePaymentsModule {
    *
    * Retrying with the same `idempotency_key` and `amount` returns the original refund instead of refunding twice. When the call rejects with [`refund_failed`](#paymentserrorcode), the outcome is unknown, so retry it with the same values.
    *
-   * Not supported for Base44 Payments.
-   *
    * @param params - The payment, amount, and idempotency key.
    * @returns Promise resolving to the refund.
    *
@@ -810,7 +808,7 @@ export interface ServiceRolePaymentsModule {
   /**
    * Cancels a subscription, now or at the end of the current billing period.
    *
-   * Not supported for Base44 Payments. PayPal supports canceling now only.
+   * PayPal supports canceling now only.
    *
    * @param subscriptionId - The `subscription_id` of the purchase.
    * @param options - When to cancel.
