@@ -808,7 +808,7 @@ export interface ServiceRolePaymentsModule {
   /**
    * Cancels a subscription, now or at the end of the current billing period.
    *
-   * PayPal supports canceling now only.
+   * Stripe and Base44 Payments can cancel now or at the end of the period. PayPal can only cancel immediately, so `at_period_end` isn't supported there.
    *
    * @param subscriptionId - The `subscription_id` of the purchase.
    * @param options - When to cancel.
