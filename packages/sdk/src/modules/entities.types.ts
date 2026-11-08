@@ -1104,11 +1104,17 @@ export interface EntityHandler<T = any> {
    *
    * This method isn't available for the built-in `User` entity, and calling it fails with a 405 error.
    *
-   * This isn't a transaction. Before writing, the call checks every record. If an `id`
-   * doesn't match a record you can update, or a change isn't allowed or doesn't match the
-   * entity's schema, the call fails and no records change. After the checks pass, each
-   * record is written on its own, so if a write fails partway, the records already written
-   * stay written. Learn more about
+   * This isn't a transaction. Before writing, the call validates each record and checks that:
+   *
+   * - The `id` matches an existing record that the entity's
+   *   [row-level security](/developers/backend/resources/entities/security#row-level-security-rls)
+   *   update rule lets you update.
+   * - Each change passes the entity's
+   *   [field-level security](/developers/backend/resources/entities/security#field-level-security-fls)
+   *   write rules.
+   * - The record matches the entity's schema.
+   *
+   * After validation, each record is updated independently. Learn more about
    * [concurrent updates](/developers/backend/resources/entities/entity-schemas#concurrent-updates).
    *
    * To apply the same update to all records matching a query, use
