@@ -263,7 +263,7 @@ export interface AgentsModule {
   /**
    * Lists the current user's conversations with filtering, sorting, and pagination.
    *
-   * Provides querying capabilities including filtering by fields, sorting, pagination, and field selection. Results only include conversations the current user created, even if `q` filters on a different `created_by_id`. For cases where you need all of the current user's conversations without filtering, use {@linkcode getConversations | getConversations()}. To retrieve a specific conversation by ID, use {@linkcode getConversation | getConversation()}.
+   * Provides querying capabilities including filtering by fields, sorting, pagination, and field selection. Results only include conversations the current user created, even with a filter on `created_by_id`. For cases where you need all of the current user's conversations without filtering, use {@linkcode getConversations | getConversations()}. To retrieve a specific conversation by ID, use {@linkcode getConversation | getConversation()}.
    *
    * @param filterParams - Filter parameters for querying conversations.
    * @returns Promise resolving to an array of filtered conversations.
