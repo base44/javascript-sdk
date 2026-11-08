@@ -207,7 +207,7 @@ export interface AgentsModuleConfig {
  * This module is available to use with a client in all authentication modes:
  *
  * - **Anonymous or User authentication** (`base44.agents`): Access is scoped to the current user's permissions. Users must be authenticated to create and access conversations. Each user can read and add messages only to conversations they created, even if they have the admin role.
- * - **Service role authentication** (`base44.asServiceRole.agents`): Operations are invoked with the service role for backend code that needs elevated permissions. This module only reaches conversations created through the service role, so it doesn't give your backend access to conversations that individual users created.
+ * - **Service role authentication** (`base44.asServiceRole.agents`): Operations are invoked with the service role for backend code that needs elevated permissions.
  *
  * ## Generated Types
  *
@@ -217,7 +217,7 @@ export interface AgentsModule {
   /**
    * Gets the current user's conversations with all agents in the app.
    *
-   * Retrieves every conversation the current user started, across all agents. Conversations that other users started aren't included, even if the current user has the admin role. When you call this method through `base44.asServiceRole.agents`, it returns only the conversations created through the service role, not the conversations that your users created. Use {@linkcode listConversations | listConversations()} to filter which conversations are returned, apply sorting, or paginate results. Use {@linkcode getConversation | getConversation()} to retrieve a specific conversation by ID.
+   * Retrieves every conversation the current user started, across all agents. Conversations that other users started aren't included, even if the current user has the admin role. Use {@linkcode listConversations | listConversations()} to filter which conversations are returned, apply sorting, or paginate results. Use {@linkcode getConversation | getConversation()} to retrieve a specific conversation by ID.
    *
    * @returns Promise resolving to an array of conversations.
    *
@@ -263,7 +263,7 @@ export interface AgentsModule {
   /**
    * Lists the current user's conversations with filtering, sorting, and pagination.
    *
-   * Provides querying capabilities including filtering by fields, sorting, pagination, and field selection. Results only include conversations the current user created, even if `q` filters on a different `created_by_id`. When you call this method through `base44.asServiceRole.agents`, results only include conversations created through the service role. For cases where you need all of the current user's conversations without filtering, use {@linkcode getConversations | getConversations()}. To retrieve a specific conversation by ID, use {@linkcode getConversation | getConversation()}.
+   * Provides querying capabilities including filtering by fields, sorting, pagination, and field selection. Results only include conversations the current user created, even if `q` filters on a different `created_by_id`. For cases where you need all of the current user's conversations without filtering, use {@linkcode getConversations | getConversations()}. To retrieve a specific conversation by ID, use {@linkcode getConversation | getConversation()}.
    *
    * @param filterParams - Filter parameters for querying conversations.
    * @returns Promise resolving to an array of filtered conversations.
