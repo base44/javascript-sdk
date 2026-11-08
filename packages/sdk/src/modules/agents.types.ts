@@ -206,7 +206,7 @@ export interface AgentsModuleConfig {
  *
  * This module is available to use with a client in all authentication modes:
  *
- * - **Anonymous or User authentication** (`base44.agents`): Access is scoped to the current user's permissions. Users must be authenticated to create and access conversations. Each user can read and add messages only to conversations they created, even if they have the admin role.
+ * - **Anonymous or User authentication** (`base44.agents`): Access is scoped to the current user's permissions. Users must be authenticated to create and access conversations. Each user can read and add messages only to conversations they created, even if the user is an admin.
  * - **Service role authentication** (`base44.asServiceRole.agents`): Operations are invoked with the service role for backend code that needs elevated permissions.
  *
  * ## Generated Types
@@ -217,7 +217,7 @@ export interface AgentsModule {
   /**
    * Gets the current user's conversations with all agents in the app.
    *
-   * Retrieves every conversation the current user started, across all agents. Conversations that other users started aren't included, even if the current user has the admin role. Use {@linkcode listConversations | listConversations()} to filter which conversations are returned, apply sorting, or paginate results. Use {@linkcode getConversation | getConversation()} to retrieve a specific conversation by ID.
+   * Retrieves every conversation the current user started, across all agents. Conversations that other users started aren't included, even if the user is an admin. Use {@linkcode listConversations | listConversations()} to filter which conversations are returned, apply sorting, or paginate results. Use {@linkcode getConversation | getConversation()} to retrieve a specific conversation by ID.
    *
    * @returns Promise resolving to an array of conversations.
    *
