@@ -3,6 +3,7 @@ import type { IntegrationsModule } from "./modules/integrations.types.js";
 import type { AuthModule } from "./modules/auth.types.js";
 import type { SsoModule } from "./modules/sso.types.js";
 import type { BrowserModule } from "./modules/browser.types.js";
+import type { VoiceModule } from "./modules/voice.types.js";
 import type {
   PaymentsModule,
   ServiceRolePaymentsModule,
@@ -256,6 +257,8 @@ export interface Base44Client {
     payments: ServiceRolePaymentsModule;
     /** {@link SsoModule | SSO module} for generating SSO tokens. */
     sso: SsoModule;
+    /** {@link VoiceModule | Voice module} for live voice sessions. */
+    voice: VoiceModule;
     /** Cleanup function to disconnect WebSocket connections. */
     cleanup: () => void;
   };
