@@ -9,7 +9,7 @@ import {
   createConnectorsModule,
   createUserConnectorsModule,
 } from "./modules/connectors.js";
-import { getAccessToken } from "./utils/auth-utils.js";
+import { getAccessToken, sanitizeAppBaseUrl } from "./utils/auth-utils.js";
 import { createFetchWithAuth } from "./utils/fetch-with-auth.js";
 import { createFunctionsModule } from "./modules/functions.js";
 import { createAgentsModule } from "./modules/agents.js";
@@ -94,8 +94,8 @@ export function createClient(config: CreateClientConfig): Base44Client {
     headers: optionalHeaders,
   } = config;
 
-  // Normalize appBaseUrl to always be a string (empty if not provided or invalid)
-  const normalizedAppBaseUrl = typeof appBaseUrl === "string" ? appBaseUrl : "";
+  // Always a string: empty if not provided or not http(s)
+  const normalizedAppBaseUrl = sanitizeAppBaseUrl(appBaseUrl);
 
   const socketConfig: RoomsSocketConfig = {
     serverUrl,
