@@ -31,8 +31,10 @@ import {
 } from "./modules/payments.js";
 import {
   createActorsModule,
+  createServiceRoleActorsModule,
   resolveActorsHost,
   type ActorConnectionCredentials,
+  type PostActorRequest,
 } from "./modules/actors.js";
 
 // Re-export client types
@@ -169,6 +171,27 @@ export function createClient(config: CreateClientConfig): Base44Client {
     interceptResponses: false,
   });
 
+  // The backend authenticates the caller from the axios client's token (or the
+  // anonymous id it adds in a browser) and relays the request to the room.
+  const actorRequestPoster =
+    (client: typeof axiosClient): PostActorRequest =>
+    async (actorName, room, body) => {
+      const reply = await client.post(
+        `/apps/${appId}/actors/${encodeURIComponent(actorName)}/rooms/${encodeURIComponent(room)}/requests`,
+        JSON.stringify(body ?? null),
+        {
+          headers: {
+            "Content-Type": "application/json",
+            // Draft vs published copy, as for a connection.
+            ...(functionsVersion
+              ? { "Base44-Functions-Version": functionsVersion }
+              : {}),
+          },
+        },
+      );
+      return reply === "" ? undefined : reply;
+    };
+
   // Dedicated client for actor connection-token mints: no onError (a legacy
   // actor answers every mint with an expected 409 before the proxy fallback,
   // which must not reach the app's error handler — the actors module forwards
@@ -230,6 +253,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     },
     transport: options?.actorsTransport,
     onMintError: options?.onError,
+    postRequest: actorRequestPoster(axiosClient),
   });
 
   const userModules = {
@@ -324,6 +348,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     }),
     appLogs: createAppLogsModule(serviceRoleAxiosClient, appId),
     payments: createServiceRolePaymentsModule(serviceRoleAxiosClient, appId),
+    actors: createServiceRoleActorsModule(actorRequestPoster(serviceRoleAxiosClient)),
     cleanup: () => {
       if (socket) {
         socket.disconnect();

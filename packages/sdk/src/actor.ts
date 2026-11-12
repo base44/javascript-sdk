@@ -11,6 +11,21 @@
 
 import type { Base44Client } from "./client";
 
+/** Who a client is, verified by the platform: a logged-in user or an anonymous visitor. */
+export type ActorConnectionIdentity =
+  | Readonly<{ type: "authenticated"; userId: string }>
+  | Readonly<{ type: "anonymous"; anonymousId: string }>;
+
+/** Who sent a request to {@link Actor.handleRequest}: a client, or the app's
+ *  server code posting with the service role (`service`). */
+export type ActorRequestIdentity =
+  | ActorConnectionIdentity
+  | Readonly<{ type: "service" }>;
+
+export interface ActorRequestContext {
+  identity: ActorRequestIdentity;
+}
+
 /**
  * A single client connection. `Send` is the message type this connection accepts
  * via {@link send} — the actor's *outgoing* (server→client) messages.
@@ -20,6 +35,8 @@ export interface Conn<Send = unknown> {
    *  receives from `subscribe()`. Identifies a distinct client, so multiple
    *  tabs are separate connections. */
   id: string;
+  /** The client's identity, verified by the platform before the connection reached the actor. */
+  identity?: ActorConnectionIdentity;
   send(data: Send): void;
   reject(code: number, reason: string): void;
 }
@@ -66,6 +83,29 @@ export abstract class Actor<Incoming = unknown, Outgoing = unknown> {
    * The schedule is one-shot: it fires once and is cleared before this runs.
    */
   protected handleWake(_key: string): void | Promise<void> {}
+
+  /**
+   * Optional handler for requests sent to this session with `post()`, by a
+   * client or by the app's server code. Runs even when no client is connected,
+   * and can {@link broadcast} to the ones that are. Check `identity` before
+   * acting: a client can post to any session it can name.
+   *
+   * Return a `Response` for the caller; returning nothing answers 204, and a
+   * throw answers 500. An actor without this method refuses requests with 404.
+   *
+   * @example
+   * ```ts
+   * async handleRequest(request, { identity }) {
+   *   if (identity.type !== "service") return new Response("Forbidden", { status: 403 });
+   *   const result = await request.json();
+   *   this.broadcast({ type: "result", result });
+   * }
+   * ```
+   */
+  protected handleRequest?(
+    request: Request,
+    context: ActorRequestContext,
+  ): Response | void | Promise<Response | void>;
 
   /**
    * Arm a one-shot wake at `at` (epoch ms or a `Date`), identified by `key`.

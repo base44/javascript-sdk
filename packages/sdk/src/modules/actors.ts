@@ -4,7 +4,15 @@ import type {
   ActorRef,
   Connection as ConnectionType,
   ActorSubscription,
+  ServiceRoleActorRef,
 } from "./actors.types.js";
+
+/** Sends one request to a session's `handleRequest`; resolves to its JSON reply. */
+export type PostActorRequest = (
+  actorName: string,
+  room: string,
+  body: unknown,
+) => Promise<unknown>;
 
 /** Credentials minted by the platform for one direct actor connection. */
 export interface ActorConnectionCredentials {
@@ -42,6 +50,7 @@ interface ActorsConfig {
    * direct→proxy fallback (which recovers by itself). Wired to the client's
    * `options.onError`. */
   onMintError?: (error: Error) => void;
+  postRequest: PostActorRequest;
 }
 
 // Heartbeat / half-open detection: the socket only reconnects on a close/error
@@ -238,6 +247,8 @@ function makeActorRef(
       connections.add(c);
       return c as unknown as ConnectionType;
     },
+    post: <T>(body?: unknown) =>
+      config.postRequest(actorName, instanceId, body) as Promise<T | undefined>,
   };
 }
 
@@ -308,4 +319,20 @@ export function createActorsModule(config: ActorsConfig) {
       for (const c of [...connections]) c.close();
     },
   };
+}
+
+/** `asServiceRole.actors`: server code can't hold a connection, so it only posts. */
+export function createServiceRoleActorsModule(postRequest: PostActorRequest) {
+  return new Proxy(
+    {} as Record<string, (instanceId: string) => ServiceRoleActorRef>,
+    {
+      get(_, key) {
+        if (typeof key !== "string" || key === "then") return undefined;
+        return (instanceId: string): ServiceRoleActorRef => ({
+          post: <T>(body?: unknown) =>
+            postRequest(key, instanceId, body) as Promise<T | undefined>,
+        });
+      },
+    },
+  );
 }

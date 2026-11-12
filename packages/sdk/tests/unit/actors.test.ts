@@ -61,6 +61,7 @@ const makeConfig = () => ({
   ),
   transport: undefined as "auto" | "proxy" | "direct" | undefined,
   onMintError: undefined as ((error: Error) => void) | undefined,
+  postRequest: vi.fn(async (_actor: string, _room: string, _body: unknown) => undefined as unknown),
 });
 
 describe("Actors Module — connection API", () => {
@@ -710,6 +711,58 @@ describe("Actors Module — client wiring", () => {
     await expect(sockets[0].urlProvider()).resolves.toBe(
       "wss://base44.app/parties/PongGame/r1?_pk=c1&app_id=app-1&handler=PongGame&token=tok",
     );
+    base44.cleanup();
+  });
+});
+
+describe("Actors Module — post()", () => {
+  const serverUrl = "https://base44.app";
+  const appId = "app-1";
+
+  afterEach(() => { nock.cleanAll(); });
+
+  test("a client posts the JSON body as its user, with the version header, and gets the reply", async () => {
+    const scope = nock(serverUrl, {
+      reqheaders: {
+        authorization: "Bearer tok",
+        "base44-functions-version": "draft",
+        "content-type": "application/json",
+      },
+    })
+      .post(`/api/apps/${appId}/actors/VideoRoom/rooms/room%20one/requests`, { type: "ping" })
+      .reply(200, { ok: true });
+
+    const base44 = createClient({ serverUrl, appId, token: "tok", functionsVersion: "draft" });
+    await expect(base44.actors.VideoRoom("room one").post({ type: "ping" })).resolves.toEqual({ ok: true });
+    expect(scope.isDone()).toBe(true);
+    base44.cleanup();
+  });
+
+  test("a reply with no body resolves to undefined", async () => {
+    nock(serverUrl).post(`/api/apps/${appId}/actors/VideoRoom/rooms/r1/requests`).reply(204);
+    const base44 = createClient({ serverUrl, appId, token: "tok" });
+    await expect(base44.actors.VideoRoom("r1").post()).resolves.toBeUndefined();
+    base44.cleanup();
+  });
+
+  test("server code posts with the service token", async () => {
+    const scope = nock(serverUrl, { reqheaders: { authorization: "Bearer svc" } })
+      .post(`/api/apps/${appId}/actors/VideoRoom/rooms/user-1/requests`, { type: "video_ready", id: "video_1" })
+      .reply(200, { taken: true });
+
+    const base44 = createClient({ serverUrl, appId, serviceToken: "svc" });
+    await expect(
+      base44.asServiceRole.actors.VideoRoom("user-1").post({ type: "video_ready", id: "video_1" }),
+    ).resolves.toEqual({ taken: true });
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test("a refusal rejects with the actor's status", async () => {
+    nock(serverUrl)
+      .post(`/api/apps/${appId}/actors/VideoRoom/rooms/r1/requests`)
+      .reply(404, { message: "This actor does not accept requests" });
+    const base44 = createClient({ serverUrl, appId, token: "tok" });
+    await expect(base44.actors.VideoRoom("r1").post({})).rejects.toMatchObject({ status: 404 });
     base44.cleanup();
   });
 });

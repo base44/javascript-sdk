@@ -169,7 +169,58 @@ export interface ActorRef<N extends string = string> {
    * ```
    */
   connect(options?: ActorConnectOptions): Connection<N>;
+
+  /**
+   * Sends a request to this session's `handleRequest` and returns its reply.
+   *
+   * The actor receives the request with the caller's identity: the logged-in
+   * user, or an anonymous visitor. Unlike {@linkcode ActorRef.connect | connect()},
+   * no connection is opened, so the request reaches the session even when no
+   * client is connected; the actor can still `broadcast()` from it.
+   *
+   * @param body - JSON-serializable request body, up to 64 KB.
+   * @returns The JSON body of the actor's response, or `undefined` when it has none.
+   * @throws {Base44Error} When the actor refuses the request or doesn't implement
+   * `handleRequest` (404), with the actor's status code.
+   *
+   * @example
+   * ```typescript
+   * // Send a request to a session
+   * const reply = await base44.actors.chatRoom("session-1").post({ type: "ping" });
+   * ```
+   */
+  post<T = unknown>(body?: unknown): Promise<T | undefined>;
 }
+
+/**
+ * Represents a reference to an actor session for server code running with the
+ * [service role](/developers/references/sdk/getting-started/client#service-role).
+ * Server code can't hold a connection, so it only sends requests.
+ */
+export interface ServiceRoleActorRef {
+  /**
+   * Sends a request to this session's `handleRequest` as the app's server code,
+   * which the actor sees as the `service` identity, and returns its reply.
+   *
+   * @param body - JSON-serializable request body, up to 64 KB.
+   * @returns The JSON body of the actor's response, or `undefined` when it has none.
+   * @throws {Base44Error} When the actor refuses the request or doesn't implement
+   * `handleRequest` (404), with the actor's status code.
+   *
+   * @example
+   * ```typescript
+   * // Tell a user's session that their video is ready
+   * await base44.asServiceRole.actors.VideoRoom(userId).post({ type: "video_ready", id });
+   * ```
+   */
+  post<T = unknown>(body?: unknown): Promise<T | undefined>;
+}
+
+/**
+ * Actors module available with the service role: selects a session to send
+ * requests to with {@linkcode ServiceRoleActorRef.post | post()}.
+ */
+export type ServiceRoleActorsModule = Record<string, (instanceId: string) => ServiceRoleActorRef>;
 
 /**
  * Selects a session for a named actor.
@@ -208,6 +259,7 @@ export interface ActorClient<N extends string = string> {
  * - Manage connections: {@link ActorRef.connect | Open} and {@link Connection.close | close} a WebSocket connection to a session.
  * - Exchange messages: {@link Connection.send | Send} and {@link Connection.subscribe | listen} for messages to and from an actor.
  * - Manage subscriptions: {@link Connection.subscribe | Subscribe} and {@link ActorSubscription.unsubscribe | unsubscribe} from actor messages without closing the connection.
+ * - Send requests: {@link ActorRef.post | Post} a request to a session's `handleRequest` without connecting.
  *
  * For a sample flow, see
  * [connect a client to a session](/developers/backend/resources/actors/sample-flows#connect-a-client-to-a-session).
@@ -215,12 +267,14 @@ export interface ActorClient<N extends string = string> {
  * ## Authentication modes
  *
  * This module is available to use with a client in anonymous or user authentication mode. Access it
- * through `base44.actors`. It isn't available in
- * [service role authentication mode](/developers/references/sdk/getting-started/client#service-role).
+ * through `base44.actors`. In
+ * [service role authentication mode](/developers/references/sdk/getting-started/client#service-role),
+ * `base44.asServiceRole.actors` only sends requests, with {@link ServiceRoleActorRef.post | post()}.
  *
  * The actor receives each client's [identity](/developers/backend/resources/actors/reference#connections)
- * when the client connects. A client that hasn't logged in connects as anonymous, and a client that
- * has [logged in](/developers/references/sdk/docs/interfaces/auth) connects as authenticated.
+ * when the client connects or posts. A client that hasn't logged in is anonymous, a client that
+ * has [logged in](/developers/references/sdk/docs/interfaces/auth) is authenticated, and server
+ * code posting with the service role is `service`.
  */
 export type ActorsModule = {
   [K in AllActorNames]: K extends keyof ActorRegistry
