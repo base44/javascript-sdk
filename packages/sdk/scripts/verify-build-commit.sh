@@ -2,7 +2,7 @@
 # Proves the X-Base44-Build value really reaches a bundled app, using the SDK as
 # it ships: packed and installed into node_modules, not linked.
 #
-#   scripts/verify-build-commit.sh          # Vite 6 and 7: build + dev server
+#   scripts/verify-build-commit.sh          # Vite 6, 7 and 8: build + dev server
 #   scripts/verify-build-commit.sh --expo   # also Expo 54: Android (Hermes) and web
 #
 # Checks that `vite build` bakes VITE_BASE44_BUILD_COMMIT into the bundle and
@@ -39,7 +39,9 @@ import { createClient } from "@base44/sdk";
 const base44 = createClient({ appId: import.meta.env.VITE_BASE44_APP_ID });
 base44.entities.Todo.list().catch(() => {});
 EOF
-  (cd "$1" && npm install --silent >/dev/null 2>&1)
+  # `set -e` doesn't reach inside a function called from a condition, so a
+  # failed install must fail the run itself, or its checks are silently skipped.
+  (cd "$1" && npm install --silent >/dev/null 2>&1) || fail "$1: npm install failed"
 }
 
 check_vite() { # dir label
@@ -71,8 +73,13 @@ check_vite() { # dir label
   echo "ok  $label dev server's prebundled SDK carries the commit"
 }
 
-make_vite_app "$WORK/vite6" "^6.1.0" "^4.3.4" && check_vite "$WORK/vite6" "vite 6"
-make_vite_app "$WORK/vite7" "^7.0.0" "^5.0.0" && check_vite "$WORK/vite7" "vite 7"
+make_vite_app "$WORK/vite6" "^6.1.0" "^4.3.4"
+check_vite "$WORK/vite6" "vite 6"
+make_vite_app "$WORK/vite7" "^7.0.0" "^5.0.0"
+check_vite "$WORK/vite7" "vite 7"
+# What Base44's web template ships: Rolldown-based Vite 8.
+make_vite_app "$WORK/vite8" "^8.2.4" "^6.0.5"
+check_vite "$WORK/vite8" "vite 8"
 
 if [ "${1:-}" = "--expo" ]; then
   cd "$WORK"
