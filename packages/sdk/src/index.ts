@@ -133,6 +133,8 @@ export type {
   ActorConnectOptions,
   ActorNameRegistry,
   ActorRegistry,
+  ActorConnectable,
+  ActorMethods,
   ServiceRoleActorRef,
   ServiceRoleActorsModule,
 } from "./modules/actors.types.js";
@@ -191,8 +193,9 @@ export {
   Actor,
   type Conn,
   type ActorConnectionIdentity,
-  type ActorRequestIdentity,
-  type ActorRequestContext,
+  ActorError,
+  type ActorCallIdentity,
+  type ActorCallContext,
 } from "./actor.js";
 
 export type {

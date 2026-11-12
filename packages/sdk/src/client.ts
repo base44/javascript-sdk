@@ -34,7 +34,7 @@ import {
   createServiceRoleActorsModule,
   resolveActorsHost,
   type ActorConnectionCredentials,
-  type PostActorRequest,
+  type CallActorMethod,
 } from "./modules/actors.js";
 
 // Re-export client types
@@ -172,13 +172,13 @@ export function createClient(config: CreateClientConfig): Base44Client {
   });
 
   // The backend authenticates the caller from the axios client's token (or the
-  // anonymous id it adds in a browser) and relays the request to the room.
-  const actorRequestPoster =
-    (client: typeof axiosClient): PostActorRequest =>
-    async (actorName, room, body) => {
+  // anonymous id it adds in a browser) and relays the call to the room.
+  const actorMethodCaller =
+    (client: typeof axiosClient): CallActorMethod =>
+    async (actorName, room, method, args) => {
       const response = await client.post<unknown, { reply?: unknown } | undefined>(
         `/apps/${appId}/actors/${encodeURIComponent(actorName)}/rooms/${encodeURIComponent(room)}/requests`,
-        JSON.stringify(body ?? null),
+        JSON.stringify({ method, args }),
         {
           headers: {
             "Content-Type": "application/json",
@@ -253,7 +253,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     },
     transport: options?.actorsTransport,
     onMintError: options?.onError,
-    postRequest: actorRequestPoster(axiosClient),
+    callMethod: actorMethodCaller(axiosClient),
   });
 
   const userModules = {
@@ -348,7 +348,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
     }),
     appLogs: createAppLogsModule(serviceRoleAxiosClient, appId),
     payments: createServiceRolePaymentsModule(serviceRoleAxiosClient, appId),
-    actors: createServiceRoleActorsModule(actorRequestPoster(serviceRoleAxiosClient)),
+    actors: createServiceRoleActorsModule(actorMethodCaller(serviceRoleAxiosClient)),
     cleanup: () => {
       if (socket) {
         socket.disconnect();

@@ -7,12 +7,40 @@ import type {
   ServiceRoleActorRef,
 } from "./actors.types.js";
 
-/** Sends one request to a session's `handleRequest`; resolves to its JSON reply. */
-export type PostActorRequest = (
+/** Calls one of a session's callable methods; resolves to its JSON reply. */
+export type CallActorMethod = (
   actorName: string,
   room: string,
-  body: unknown,
+  method: string,
+  args: unknown,
 ) => Promise<unknown>;
+
+// Never actor methods: the ref's own API, what `await`/JSON/frameworks probe for, and
+// Object.prototype (resolved through the `in` check below).
+const NOT_METHODS = new Set(["then", "catch", "finally", "toJSON", "asymmetricMatch", "nodeType", "constructor"]);
+
+function isMethodName(target: object, key: string | symbol): key is string {
+  return (
+    typeof key === "string" &&
+    !(key in target) &&
+    !NOT_METHODS.has(key) &&
+    !key.startsWith("$$") &&
+    !key.startsWith("@@")
+  );
+}
+
+function withMethods<T extends object>(
+  target: T,
+  call: (method: string, args: unknown) => Promise<unknown>,
+): T {
+  return new Proxy(target, {
+    get(obj, key) {
+      return isMethodName(obj, key)
+        ? (args?: unknown) => call(key, args)
+        : Reflect.get(obj, key);
+    },
+  });
+}
 
 /** Credentials minted by the platform for one direct actor connection. */
 export interface ActorConnectionCredentials {
@@ -50,7 +78,7 @@ interface ActorsConfig {
    * direct→proxy fallback (which recovers by itself). Wired to the client's
    * `options.onError`. */
   onMintError?: (error: Error) => void;
-  postRequest: PostActorRequest;
+  callMethod: CallActorMethod;
 }
 
 // Heartbeat / half-open detection: the socket only reconnects on a close/error
@@ -236,7 +264,7 @@ function makeActorRef(
   connections: Set<Connection>,
 ): ActorRef {
   let conn: Connection | null = null;
-  return {
+  const ref = {
     connect(options?: ActorConnectOptions) {
       if (conn) return conn as unknown as ConnectionType;
       const c = new Connection(actorName, instanceId, config, options, () => {
@@ -247,9 +275,10 @@ function makeActorRef(
       connections.add(c);
       return c as unknown as ConnectionType;
     },
-    post: <T>(body?: unknown) =>
-      config.postRequest(actorName, instanceId, body) as Promise<T | undefined>,
   };
+  return withMethods(ref, (method, args) =>
+    config.callMethod(actorName, instanceId, method, args),
+  ) as unknown as ActorRef;
 }
 
 /**
@@ -321,17 +350,15 @@ export function createActorsModule(config: ActorsConfig) {
   };
 }
 
-/** `asServiceRole.actors`: server code can't hold a connection, so it only posts. */
-export function createServiceRoleActorsModule(postRequest: PostActorRequest) {
+/** `asServiceRole.actors`: server code can't hold a connection, so it only calls methods. */
+export function createServiceRoleActorsModule(callMethod: CallActorMethod) {
   return new Proxy(
     {} as Record<string, (instanceId: string) => ServiceRoleActorRef>,
     {
       get(_, key) {
         if (typeof key !== "string" || key === "then") return undefined;
-        return (instanceId: string): ServiceRoleActorRef => ({
-          post: <T>(body?: unknown) =>
-            postRequest(key, instanceId, body) as Promise<T | undefined>,
-        });
+        return (instanceId: string) =>
+          withMethods({}, (method, args) => callMethod(key, instanceId, method, args)) as ServiceRoleActorRef;
       },
     },
   );
