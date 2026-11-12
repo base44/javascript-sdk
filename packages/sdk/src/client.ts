@@ -176,7 +176,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
   const actorRequestPoster =
     (client: typeof axiosClient): PostActorRequest =>
     async (actorName, room, body) => {
-      const reply = await client.post(
+      const reply = await client.post<unknown, unknown>(
         `/apps/${appId}/actors/${encodeURIComponent(actorName)}/rooms/${encodeURIComponent(room)}/requests`,
         JSON.stringify(body ?? null),
         {
