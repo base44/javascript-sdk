@@ -730,7 +730,7 @@ describe("Actors Module — post()", () => {
       },
     })
       .post(`/api/apps/${appId}/actors/VideoRoom/rooms/room%20one/requests`, { type: "ping" })
-      .reply(200, { ok: true });
+      .reply(200, { reply: { ok: true } });
 
     const base44 = createClient({ serverUrl, appId, token: "tok", functionsVersion: "draft" });
     await expect(base44.actors.VideoRoom("room one").post({ type: "ping" })).resolves.toEqual({ ok: true });
@@ -738,8 +738,8 @@ describe("Actors Module — post()", () => {
     base44.cleanup();
   });
 
-  test("a reply with no body resolves to undefined", async () => {
-    nock(serverUrl).post(`/api/apps/${appId}/actors/VideoRoom/rooms/r1/requests`).reply(204);
+  test("a room that returned nothing resolves to undefined", async () => {
+    nock(serverUrl).post(`/api/apps/${appId}/actors/VideoRoom/rooms/r1/requests`).reply(200, { reply: null });
     const base44 = createClient({ serverUrl, appId, token: "tok" });
     await expect(base44.actors.VideoRoom("r1").post()).resolves.toBeUndefined();
     base44.cleanup();
@@ -748,7 +748,7 @@ describe("Actors Module — post()", () => {
   test("server code posts with the service token", async () => {
     const scope = nock(serverUrl, { reqheaders: { authorization: "Bearer svc" } })
       .post(`/api/apps/${appId}/actors/VideoRoom/rooms/user-1/requests`, { type: "video_ready", id: "video_1" })
-      .reply(200, { taken: true });
+      .reply(200, { reply: { taken: true } });
 
     const base44 = createClient({ serverUrl, appId, serviceToken: "svc" });
     await expect(
@@ -760,7 +760,7 @@ describe("Actors Module — post()", () => {
   test("a refusal rejects with the actor's status", async () => {
     nock(serverUrl)
       .post(`/api/apps/${appId}/actors/VideoRoom/rooms/r1/requests`)
-      .reply(404, { message: "This actor does not accept requests" });
+      .reply(404, { error: { code: "actor_refused_request", message: "The actor refused the request", details: {} } });
     const base44 = createClient({ serverUrl, appId, token: "tok" });
     await expect(base44.actors.VideoRoom("r1").post({})).rejects.toMatchObject({ status: 404 });
     base44.cleanup();

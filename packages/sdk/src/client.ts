@@ -176,7 +176,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
   const actorRequestPoster =
     (client: typeof axiosClient): PostActorRequest =>
     async (actorName, room, body) => {
-      const reply = await client.post<unknown, unknown>(
+      const response = await client.post<unknown, { reply?: unknown } | undefined>(
         `/apps/${appId}/actors/${encodeURIComponent(actorName)}/rooms/${encodeURIComponent(room)}/requests`,
         JSON.stringify(body ?? null),
         {
@@ -189,7 +189,7 @@ export function createClient(config: CreateClientConfig): Base44Client {
           },
         },
       );
-      return reply === "" ? undefined : reply;
+      return response?.reply ?? undefined;
     };
 
   // Dedicated client for actor connection-token mints: no onError (a legacy
