@@ -105,6 +105,26 @@ describe('appBaseUrl Normalization', () => {
     global.window = originalWindow;
   });
 
+  test.each([
+    ['javascript:alert(origin)//', '/login?from_url='],
+    ['JaVaScRiPt:alert(1)', '/login?from_url='],
+    ['data:text/html,x', '/login?from_url='],
+    ['https://app.example.com', 'https://app.example.com/login'],
+  ])('redirectToLogin with appBaseUrl %s targets %s', (appBaseUrl, expectedPrefix) => {
+    const client = createClient({ appId: 'test-app-id', appBaseUrl });
+
+    const originalWindow = global.window;
+    const mockLocation = { href: '', origin: 'https://current-app.com' };
+    global.window = { location: mockLocation };
+
+    try {
+      client.auth.redirectToLogin('https://example.com/dashboard');
+      expect(mockLocation.href.startsWith(expectedPrefix)).toBe(true);
+    } finally {
+      global.window = originalWindow;
+    }
+  });
+
   test('should normalize appBaseUrl to empty string when not provided', () => {
     const client = createClient({
       appId: 'test-app-id',
