@@ -35,8 +35,10 @@ import {
 } from "./modules/payments.js";
 import {
   createActorsModule,
+  createServiceRoleActorsModule,
   resolveActorsHost,
   type ActorConnectionCredentials,
+  type CallActorMethod,
 } from "./modules/actors.js";
 
 // Re-export client types
@@ -194,6 +196,27 @@ function buildClient(
     interceptResponses: false,
   });
 
+  // The backend authenticates the caller from the axios client's token (or the
+  // anonymous id it adds in a browser) and relays the call to the room.
+  const actorMethodCaller =
+    (client: typeof axiosClient): CallActorMethod =>
+    async (actorName, room, method, args) => {
+      const response = await client.post<unknown, { reply?: unknown } | undefined>(
+        `/apps/${appId}/actors/${encodeURIComponent(actorName)}/rooms/${encodeURIComponent(room)}/requests`,
+        JSON.stringify({ method, args }),
+        {
+          headers: {
+            "Content-Type": "application/json",
+            // Draft vs published copy, as for a connection.
+            ...(functionsVersion
+              ? { "Base44-Functions-Version": functionsVersion }
+              : {}),
+          },
+        },
+      );
+      return response?.reply ?? undefined;
+    };
+
   // Dedicated client for actor connection-token mints: no onError (a legacy
   // actor answers every mint with an expected 409 before the proxy fallback,
   // which must not reach the app's error handler — the actors module forwards
@@ -255,6 +278,7 @@ function buildClient(
     },
     transport: options?.actorsTransport,
     onMintError: options?.onError,
+    callMethod: actorMethodCaller(axiosClient),
   });
 
   const userModules = {
@@ -349,6 +373,7 @@ function buildClient(
     }),
     appLogs: createAppLogsModule(serviceRoleAxiosClient, appId),
     payments: createServiceRolePaymentsModule(serviceRoleAxiosClient, appId),
+    actors: createServiceRoleActorsModule(actorMethodCaller(serviceRoleAxiosClient)),
     cleanup: () => {
       if (socket) {
         socket.disconnect();

@@ -61,6 +61,7 @@ const makeConfig = () => ({
   ),
   transport: undefined as "auto" | "proxy" | "direct" | undefined,
   onMintError: undefined as ((error: Error) => void) | undefined,
+  callMethod: vi.fn(async (_actor: string, _room: string, _method: string, _args: unknown) => undefined as unknown),
 });
 
 describe("Actors Module — connection API", () => {
@@ -711,5 +712,82 @@ describe("Actors Module — client wiring", () => {
       "wss://base44.app/parties/PongGame/r1?_pk=c1&app_id=app-1&handler=PongGame&token=tok",
     );
     base44.cleanup();
+  });
+});
+
+describe("Actors Module — method calls", () => {
+  const serverUrl = "https://base44.app";
+  const appId = "app-1";
+
+  afterEach(() => { nock.cleanAll(); });
+
+  test("a client calls a method as its user, with the version header, and gets the reply", async () => {
+    const scope = nock(serverUrl, {
+      reqheaders: {
+        authorization: "Bearer tok",
+        "base44-functions-version": "draft",
+        "content-type": "application/json",
+      },
+    })
+      .post(`/api/apps/${appId}/actors/VideoRoom/rooms/room%20one/requests`, {
+        method: "kick",
+        args: { userId: "u-2" },
+      })
+      .reply(200, { reply: { kicked: true } });
+
+    const base44 = createClient({ serverUrl, appId, token: "tok", functionsVersion: "draft" });
+    await expect(base44.actors.VideoRoom("room one").kick({ userId: "u-2" })).resolves.toEqual({ kicked: true });
+    expect(scope.isDone()).toBe(true);
+    base44.cleanup();
+  });
+
+  test("a method that returned nothing resolves to undefined", async () => {
+    nock(serverUrl)
+      .post(`/api/apps/${appId}/actors/VideoRoom/rooms/r1/requests`, { method: "ping" })
+      .reply(200, { reply: null });
+    const base44 = createClient({ serverUrl, appId, token: "tok" });
+    await expect(base44.actors.VideoRoom("r1").ping()).resolves.toBeUndefined();
+    base44.cleanup();
+  });
+
+  test("server code calls with the service token", async () => {
+    const scope = nock(serverUrl, { reqheaders: { authorization: "Bearer svc" } })
+      .post(`/api/apps/${appId}/actors/VideoRoom/rooms/user-1/requests`, {
+        method: "videoReady",
+        args: { id: "video_1" },
+      })
+      .reply(200, { reply: { taken: true } });
+
+    const base44 = createClient({ serverUrl, appId, serviceToken: "svc" });
+    await expect(
+      base44.asServiceRole.actors.VideoRoom("user-1").videoReady({ id: "video_1" }),
+    ).resolves.toEqual({ taken: true });
+    expect(scope.isDone()).toBe(true);
+  });
+
+  test("a refusal rejects with the actor's status", async () => {
+    nock(serverUrl)
+      .post(`/api/apps/${appId}/actors/VideoRoom/rooms/r1/requests`)
+      .reply(404, { error: { code: "actor_refused_request", message: "The actor refused the request", details: {} } });
+    const base44 = createClient({ serverUrl, appId, token: "tok" });
+    await expect(base44.actors.VideoRoom("r1").secret({})).rejects.toMatchObject({ status: 404 });
+    base44.cleanup();
+  });
+
+  test("a ref is not a thenable or JSON-able method, and connect stays the connection", async () => {
+    const config = makeConfig();
+    const ref = createActorsModule(config).module.GameRoom("room-1") as unknown as Record<string, unknown>;
+    expect(ref.then).toBeUndefined();
+    expect(ref.toJSON).toBeUndefined();
+    expect(ref.$$typeof).toBeUndefined();
+    expect(typeof ref.hasOwnProperty).toBe("function");
+    expect(String(ref)).toBe("[object Object]");
+    await expect(Promise.resolve(ref)).resolves.toBe(ref);
+    expect(config.callMethod).not.toHaveBeenCalled();
+    sockets.length = 0;
+    (ref.connect as (o: object) => unknown)({ id: "c1" });
+    expect(sockets).toHaveLength(1);
+    await (ref.ping as () => Promise<unknown>)();
+    expect(config.callMethod).toHaveBeenCalledWith("GameRoom", "room-1", "ping", undefined);
   });
 });

@@ -11,6 +11,33 @@
 
 import type { Base44Client } from "./client";
 
+/** Who a client is, verified by the platform: a logged-in user or an anonymous visitor. */
+export type ActorConnectionIdentity =
+  | Readonly<{ type: "authenticated"; userId: string }>
+  | Readonly<{ type: "anonymous"; anonymousId: string }>;
+
+/** Who called one of the actor's callable methods: a client, or the app's server
+ *  code calling with the service role (`service`). */
+export type ActorCallIdentity =
+  | ActorConnectionIdentity
+  | Readonly<{ type: "service" }>;
+
+/** What a callable method receives besides its args. */
+export interface ActorCallContext {
+  identity: ActorCallIdentity;
+  /** Carries the caller's own credential, so `createClientFromRequest(request)` acts
+   *  as the caller, as in a backend function. Don't store it. */
+  request: Request;
+}
+
+/** Throw from a callable method to refuse the call with a 4xx status. */
+export class ActorError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+    this.name = "ActorError";
+  }
+}
+
 /**
  * A single client connection. `Send` is the message type this connection accepts
  * via {@link send} — the actor's *outgoing* (server→client) messages.
@@ -20,6 +47,8 @@ export interface Conn<Send = unknown> {
    *  receives from `subscribe()`. Identifies a distinct client, so multiple
    *  tabs are separate connections. */
   id: string;
+  /** The client's identity, verified by the platform before the connection reached the actor. */
+  identity?: ActorConnectionIdentity;
   send(data: Send): void;
   reject(code: number, reason: string): void;
 }
@@ -66,6 +95,27 @@ export abstract class Actor<Incoming = unknown, Outgoing = unknown> {
    * The schedule is one-shot: it fires once and is cleared before this runs.
    */
   protected handleWake(_key: string): void | Promise<void> {}
+
+  /**
+   * The methods a caller may run on a session, as `base44.actors.<Name>(id).<method>(args)`
+   * from a client or `base44.asServiceRole.actors.<Name>(id).<method>(args)` from server code.
+   * Nothing else is callable, and a hook-shaped name (`handle*`, `on*`, `_*`) never is.
+   *
+   * Each runs as `method(args, { identity, request })` (see {@link ActorCallContext}), even
+   * when no client is connected, and can {@link broadcast} to the ones that are. Check
+   * `identity` before acting: a client can call a method on any session it can name. The
+   * return value is the caller's reply; throw an {@link ActorError} to refuse with a 4xx.
+   *
+   * @example
+   * ```ts
+   * static callable = ["videoReady"];
+   * async videoReady(args, { identity }) {
+   *   if (identity.type !== "service") throw new ActorError(403, "Forbidden");
+   *   this.broadcast({ type: "video", ...args });
+   * }
+   * ```
+   */
+  static callable?: readonly string[];
 
   /**
    * Arm a one-shot wake at `at` (epoch ms or a `Date`), identified by `key`.
