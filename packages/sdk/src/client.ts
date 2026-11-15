@@ -20,6 +20,7 @@ import { createAgentsModule } from "./modules/agents.js";
 import { createAiGatewayModule } from "./modules/ai-gateway.js";
 import { createAppLogsModule } from "./modules/app-logs.js";
 import { createAppModule } from "./modules/app.js";
+import { createMcpModule } from "./modules/mcp.js";
 import { createUsersModule } from "./modules/users.js";
 import { RoomsSocket, RoomsSocketConfig } from "./utils/socket-utils.js";
 import type {
@@ -317,6 +318,7 @@ function buildClient(
     }),
     appLogs: createAppLogsModule(axiosClient, appId),
     app: createAppModule(axiosClient, appId),
+    mcp: createMcpModule(axiosClient, appId),
     users: createUsersModule(axiosClient, appId),
     payments: createPaymentsModule(axiosClient, appId),
     analytics: createAnalyticsModule({
