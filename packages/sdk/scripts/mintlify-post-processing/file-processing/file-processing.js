@@ -2707,9 +2707,8 @@ function applyOverloadPresentation(dir) {
 }
 
 /**
- * Tidy the generated actors page. Points links to `ActorRef` at its renamed heading, Actor methods,
- * and drops a duplicate `unsubscribe()` block under `subscribe()` if the ActorSubscription return
- * type was inlined there.
+ * Tidy the generated actors page: drops a duplicate `unsubscribe()` block under `subscribe()` if
+ * the ActorSubscription return type was inlined there.
  */
 function restructureActorsPage() {
   const file = path.join(DOCS_DIR, "content", "type-aliases", "actors.mdx");
@@ -2718,8 +2717,7 @@ function restructureActorsPage() {
   const duplicateUnsubscribe = /\n## Methods\n\n### unsubscribe\(\)[\s\S]*?<\/CodeGroup>\n/;
   const content = fs.readFileSync(file, "utf-8");
   const tidied = content
-    .replace(duplicateUnsubscribe, "\n")
-    .replace("](#actorref)", "](#actor-methods)");
+    .replace(duplicateUnsubscribe, "\n");
   if (tidied !== content) fs.writeFileSync(file, tidied, "utf-8");
 }
 
