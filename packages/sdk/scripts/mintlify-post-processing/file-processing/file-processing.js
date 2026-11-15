@@ -2707,7 +2707,7 @@ function applyOverloadPresentation(dir) {
 }
 
 /**
- * Tidy the generated actors page. Points links to `ActorRef` at its renamed heading, Actor methods,
+ * Tidy the generated actors page. Points links to `ActorRef` and `ActorConnectable` at their renamed heading, Actor methods,
  * and drops a duplicate `unsubscribe()` block under `subscribe()` if the ActorSubscription return
  * type was inlined there.
  */
@@ -2719,7 +2719,9 @@ function restructureActorsPage() {
   const content = fs.readFileSync(file, "utf-8");
   const tidied = content
     .replace(duplicateUnsubscribe, "\n")
-    .replace("](#actorref)", "](#actor-methods)");
+    .replaceAll("](#actorref)", "](#actor-methods)")
+    .replaceAll("](#actorconnectable)", "](#actor-methods)")
+    .replaceAll("\n`ActorRef`\\<", "\n[`ActorRef`](#actor-methods)\\<");
   if (tidied !== content) fs.writeFileSync(file, tidied, "utf-8");
 }
 
@@ -3189,8 +3191,6 @@ function main() {
   applyOverloadPresentation(DOCS_DIR);
 
   // Restructure the actors page so its table of contents matches other module pages
-  restructureActorsPage();
-
   // Link type names in Type Declarations sections to their corresponding headings
   applyTypeDeclarationLinking(DOCS_DIR);
 
@@ -3210,6 +3210,9 @@ function main() {
     exposedTypeNames,
     new Set([...loadTypesToDelete(), ...inlinedUnions.keys()])
   );
+
+  // After the link removal, which would strip the link to ActorRef, a merged type.
+  restructureActorsPage();
 
   // Delete types that should not appear in navigation but were needed for inline rendering
   deleteTypesAfterProcessing(DOCS_DIR);

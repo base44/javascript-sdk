@@ -1,5 +1,6 @@
 [
   "ActorConnectOptions",
+  "ActorRef",
   "AiGatewayConnection",
   "AiGatewayConnectionOptions",
   "AppPublicSettingsResponse",
@@ -23,5 +24,6 @@
   "VoiceSession",
   "VoiceSessionMessage",
   "VoiceSessionOptions",
+  "service-role-actors",
   "user-connectors"
 ]

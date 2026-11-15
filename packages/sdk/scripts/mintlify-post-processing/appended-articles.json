@@ -27,12 +27,13 @@
     "type-aliases/AppPublicSettings"
   ],
   "type-aliases/ActorsModule": [
-    "interfaces/ActorRef",
+    "interfaces/ActorConnectable",
     "interfaces/Connection",
     "interfaces/ActorSubscription",
     "interfaces/ActorClient",
     "interfaces/ActorRegistry",
-    "interfaces/ActorNameRegistry"
+    "interfaces/ActorNameRegistry",
+    "type-aliases/ServiceRoleActorRef"
   ],
   "interfaces/PaymentsModule": [
     "interfaces/ServiceRolePaymentsModule",

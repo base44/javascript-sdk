@@ -71,7 +71,7 @@ export type ActorMethods<N extends string> = N extends keyof ActorRegistry
   : UntypedActorMethods;
 
 /**
- * Configures the connection that {@linkcode ActorRef.connect | connect()} opens.
+ * Configures the connection that {@linkcode ActorConnectable.connect | connect()} opens.
  */
 export interface ActorConnectOptions {
   /**
@@ -167,7 +167,7 @@ export interface Connection<N extends string = string> {
 /**
  * Represents a reference to an actor session, identified by actor name and session ID.
  *
- * Call {@linkcode ActorRef.connect | connect()} to open the WebSocket and get a [connection](/developers/backend/resources/actors/overview#connections),
+ * Call {@linkcode ActorConnectable.connect | connect()} to open the WebSocket and get a [connection](/developers/backend/resources/actors/overview#connections),
  * or call one of the actor's callable methods by name, such as `ref.kick({ userId })`: it runs
  * the actor's method with your identity, even when no client is connected, and resolves to
  * its return value. A refusal rejects with a `Base44Error` carrying the actor's status (404 for
@@ -259,7 +259,7 @@ export interface ActorClient<N extends string = string> {
  *
  * The actors module provides the functionality to:  
  *
- * - Manage connections: {@link ActorRef.connect | Open} and {@link Connection.close | close} a WebSocket connection to a session.
+ * - Manage connections: {@link ActorConnectable.connect | Open} and {@link Connection.close | close} a WebSocket connection to a session.
  * - Exchange messages: {@link Connection.send | Send} and {@link Connection.subscribe | listen} for messages to and from an actor.
  * - Manage subscriptions: {@link Connection.subscribe | Subscribe} and {@link ActorSubscription.unsubscribe | unsubscribe} from actor messages without closing the connection.
  * - Call methods: run one of an actor's callable methods on a session, without connecting.
