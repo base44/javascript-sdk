@@ -91,7 +91,9 @@ export async function POST(request: Request) {
 
 An event type added to Base44 after your SDK version arrives as `{ type: "unknown", name, data }`,
 with its real type in `name` and an unchecked `data`, the same shape the client uses. After you
-upgrade, it arrives under its own `type`.
+upgrade, it arrives under its own `type`. A known event type can also gain an optional field or an
+enum value without a new version, so its enum fields are typed as their known values or any other
+string, and your code should handle values it doesn't recognize.
 
 Delivery is at least once with no ordering guarantee: deduplicate on `event.id`, and answer
 2xx to event types you do not handle. Event types are generated from the schemas published at
