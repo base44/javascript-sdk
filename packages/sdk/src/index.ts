@@ -133,6 +133,10 @@ export type {
   ActorConnectOptions,
   ActorNameRegistry,
   ActorRegistry,
+  ActorConnectable,
+  ActorMethods,
+  ServiceRoleActorRef,
+  ServiceRoleActorsModule,
 } from "./modules/actors.types.js";
 
 export type { SsoModule, SsoAccessTokenResponse } from "./modules/sso.types.js";
@@ -185,7 +189,14 @@ export type {
   VoiceSessionOptions,
 } from "./modules/voice.types.js";
 
-export { Actor, type Conn } from "./actor.js";
+export {
+  Actor,
+  type Conn,
+  type ActorConnectionIdentity,
+  ActorError,
+  type ActorCallIdentity,
+  type ActorCallContext,
+} from "./actor.js";
 
 export type {
   ConnectorsModule,

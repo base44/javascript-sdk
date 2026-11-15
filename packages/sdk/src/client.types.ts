@@ -18,7 +18,7 @@ import type { AiGatewayModule } from "./modules/ai-gateway.types.js";
 import type { AppLogsModule } from "./modules/app-logs.types.js";
 import type { AppModule } from "./modules/app.types.js";
 import type { AnalyticsModule } from "./modules/analytics.types.js";
-import type { ActorsModule } from "./modules/actors.types.js";
+import type { ActorsModule, ServiceRoleActorsModule } from "./modules/actors.types.js";
 import type { FetchWithAuthInit } from "./utils/fetch-with-auth.js";
 
 /**
@@ -237,6 +237,8 @@ export interface Base44Client {
    * @throws {Error} When accessed without providing a serviceToken during client creation
    */
   readonly asServiceRole: {
+    /** {@link ServiceRoleActorsModule | Actors module} for sending requests to actor sessions as the app's server code. */
+    actors: ServiceRoleActorsModule;
     /** {@link AgentsModule | Agents module} with elevated permissions. */
     agents: AgentsModule;
     /** {@link AiGatewayModule | AI Gateway module} with the service-role token. */
