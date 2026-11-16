@@ -61,8 +61,8 @@ type UntypedActorMethods = Record<string, (args?: unknown) => Promise<unknown>>;
 
 /**
  * An actor's callable methods, as seen by a caller: each runs the actor's method of the same
- * name and resolves to its return value. Typed from the actor's `methods` in
- * {@linkcode ActorRegistry}; any name otherwise.
+ * name with one JSON argument and resolves to its return value. Typed from the actor's `methods`
+ * in {@linkcode ActorRegistry}; any name otherwise.
  */
 export type ActorMethods<N extends string> = N extends keyof ActorRegistry
   ? ActorRegistry[N] extends { methods: infer M }
@@ -172,6 +172,12 @@ export interface Connection<N extends string = string> {
  * the actor's method with your identity, even when no client is connected, and resolves to
  * its return value. A refusal rejects with a `Base44Error` carrying the actor's status (404 for
  * a method the actor doesn't list in `static callable`).
+ *
+ * A call takes one argument, any JSON value: pass several values as an object, such as
+ * `ref.videoReady({ id, url })`, or an array. Further arguments are dropped, so `ref.m(a, b)`
+ * sends only `a`. Arguments and the reply are JSON-encoded: a `Date` arrives as a string,
+ * `undefined` is dropped (`null` inside an array), and functions, `Map` and `Set` values don't
+ * survive. A request is at most 64 KB and calls are rate-limited per caller.
  *
  * @example
  * ```typescript
