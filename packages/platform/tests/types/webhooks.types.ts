@@ -10,8 +10,13 @@ async function handle(body: string, headers: Headers) {
   const event = await platform.webhooks.verifyEvent(body, headers, { publicKeys, toleranceSeconds: 60 });
   switch (event.type) {
     case "app.created.v1": {
-      const appType: "imported_app" | "user_agent" | "user_app" | "user_game" = event.data.app_type;
-      void appType;
+      // A later schema revision can add an app_type: the known ones autocomplete, and any other string is allowed.
+      const appType: string = event.data.app_type;
+      const isGame: boolean = event.data.app_type === "user_game";
+      void isGame;
+      // @ts-expect-error A new app_type can arrive without an SDK upgrade, so don't assume it's a known one.
+      const known: "imported_app" | "user_agent" | "user_app" | "user_game" = event.data.app_type;
+      void appType; void known;
       // @ts-expect-error Only app.created.v1 has app_type narrowed here, not published_version.
       void event.data.published_version;
       break;
