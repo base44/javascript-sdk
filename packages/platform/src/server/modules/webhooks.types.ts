@@ -131,9 +131,11 @@ export interface CreateHandlerOptions extends VerifyEventOptions {
 /**
  * Webhooks module for receiving and verifying Base44's webhooks.
  *
- * Base44 sends a signed event to your endpoint:
- * - When an app is created, published, unpublished, moved to trash, or restored.
- * - When you add the endpoint, to test it.
+ * Base44 sends your endpoint a signed event for each event type it selected, and a `webhook.test.v1`
+ * event when you add the endpoint, to test it. `WebhookEventMap` lists every event type this version
+ * knows, with the shape of its `data`. See the
+ * [event types](https://docs.base44.com/developers/references/outbound-webhooks/get-started/event-types)
+ * for what each one means.
  *
  * The module verifies each delivery's signature with your workspace's public keys and returns the
  * event with a typed payload. It runs on Node.js 20 and later and on edge runtimes, and makes

@@ -2,6 +2,10 @@
 //
 //   npm run generate:webhooks                        # fetch https://base44.com/webhooks/schemas
 //   npm run generate:webhooks -- --from <schemas dir> # local apper checkout
+//   npm run generate:webhooks -- --openapi <url or file>
+//
+// The outbound webhooks OpenAPI (WEBHOOKS_OPENAPI_URL, by default production's) says which events are
+// deprecated; their types get a `@deprecated` tag.
 //
 // The event list is scripts/webhook-event-types.json: add a type there and rerun to pick up a new event.
 //
@@ -13,6 +17,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { compile } from "json-schema-to-typescript";
+import { deprecations } from "./webhook-deprecations.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const out = path.join(here, "../src/server/modules/webhooks.events.generated.ts");
@@ -20,6 +25,21 @@ const fromIndex = process.argv.indexOf("--from");
 const source = fromIndex === -1 ? "https://base44.com/webhooks/schemas" : process.argv[fromIndex + 1];
 if (!source) throw new Error("--from needs a value");
 
+const openapiIndex = process.argv.indexOf("--openapi");
+const openapiSource =
+  openapiIndex === -1
+    ? (process.env.WEBHOOKS_OPENAPI_URL ?? "https://app.base44.com/api/v1/outbound-webhooks/openapi.json")
+    : process.argv[openapiIndex + 1];
+if (!openapiSource) throw new Error("--openapi needs a value");
+
+async function readOpenapi() {
+  if (!/^https?:/.test(openapiSource)) return JSON.parse(await readFile(openapiSource, "utf8"));
+  const response = await fetch(openapiSource);
+  if (!response.ok) throw new Error(`GET ${openapiSource} returned ${response.status}`);
+  return response.json();
+}
+
+const deprecated = deprecations(await readOpenapi());
 const types = JSON.parse(await readFile(path.join(here, "webhook-event-types.json"), "utf8"));
 
 // The schema at `file` under the source, or null when it isn't published.
@@ -73,6 +93,7 @@ const docs = {};
 for (const type of types) {
   const { $schema, $id, examples, ...schema } = await load(type);
   docs[type] = schema.description.replace(/^The `data` object of `[^`]+`\. /, "").replace(/\*\//g, "* /");
+  if (deprecated[type]) schema.description += `\n\n${deprecated[type]}`;
   // Later revisions drop `additionalProperties: false` so receivers ignore fields added after them.
   // A TypeScript interface accepts extra fields anyway, so leave out the index signature that an open
   // schema would get and keep property typos a compile error.
@@ -84,7 +105,11 @@ for (const type of types) {
   });
 }
 body += `/** Every event type Base44 sends, mapped to the shape of its \`data\` object. */\nexport interface WebhookEventMap {\n`;
-for (const type of types) body += `  /** ${docs[type].split("\n")[0]} */\n  "${type}": ${dataName(type)};\n`;
+for (const type of types) {
+  const summary = docs[type].split("\n")[0];
+  const doc = deprecated[type] ? `/**\n   * ${summary}\n   *\n   * ${deprecated[type]}\n   */` : `/** ${summary} */`;
+  body += `  ${doc}\n  "${type}": ${dataName(type)};\n`;
+}
 body += "}\n";
 body += `\n/** Every event type in {@link WebhookEventMap}, so events from a newer Base44 can be told apart at runtime. @internal */\nexport const WEBHOOK_EVENT_TYPES = ${JSON.stringify(types)} as const;\n`;
 
