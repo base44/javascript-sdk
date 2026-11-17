@@ -5,7 +5,9 @@
 //   npm run generate:webhooks -- --openapi <url or file>
 //
 // The outbound webhooks OpenAPI (WEBHOOKS_OPENAPI_URL, by default production's) says which events are
-// deprecated; their types get a `@deprecated` tag.
+// deprecated; their types get a `@deprecated` tag, and verifyEvent() warns once when one arrives.
+// `--from` changes only where the schemas come from: to try a local deprecation, pass `--openapi` too.
+// The notices are kept in scripts/webhook-deprecations.json, so an event that leaves the spec keeps its own.
 //
 // The event list is scripts/webhook-event-types.json: add a type there and rerun to pick up a new event.
 //
@@ -39,7 +41,8 @@ async function readOpenapi() {
   return response.json();
 }
 
-const deprecated = deprecations(await readOpenapi());
+const notesFile = path.join(here, "webhook-deprecations.json");
+const deprecated = deprecations(await readOpenapi(), JSON.parse(await readFile(notesFile, "utf8")));
 const types = JSON.parse(await readFile(path.join(here, "webhook-event-types.json"), "utf8"));
 
 // The schema at `file` under the source, or null when it isn't published.
@@ -93,7 +96,7 @@ const docs = {};
 for (const type of types) {
   const { $schema, $id, examples, ...schema } = await load(type);
   docs[type] = schema.description.replace(/^The `data` object of `[^`]+`\. /, "").replace(/\*\//g, "* /");
-  if (deprecated[type]) schema.description += `\n\n${deprecated[type]}`;
+  if (deprecated[type]) schema.description += `\n\n@deprecated ${deprecated[type]}`;
   // Later revisions drop `additionalProperties: false` so receivers ignore fields added after them.
   // A TypeScript interface accepts extra fields anyway, so leave out the index signature that an open
   // schema would get and keep property typos a compile error.
@@ -107,11 +110,13 @@ for (const type of types) {
 body += `/** Every event type Base44 sends, mapped to the shape of its \`data\` object. */\nexport interface WebhookEventMap {\n`;
 for (const type of types) {
   const summary = docs[type].split("\n")[0];
-  const doc = deprecated[type] ? `/**\n   * ${summary}\n   *\n   * ${deprecated[type]}\n   */` : `/** ${summary} */`;
+  const doc = deprecated[type] ? `/**\n   * ${summary}\n   *\n   * @deprecated ${deprecated[type]}\n   */` : `/** ${summary} */`;
   body += `  ${doc}\n  "${type}": ${dataName(type)};\n`;
 }
 body += "}\n";
 body += `\n/** Every event type in {@link WebhookEventMap}, so events from a newer Base44 can be told apart at runtime. @internal */\nexport const WEBHOOK_EVENT_TYPES = ${JSON.stringify(types)} as const;\n`;
+body += `\n/** The deprecation notice of each deprecated event type, for verifyEvent()'s warning. @internal */\nexport const WEBHOOK_DEPRECATIONS: Partial<Record<string, string>> = ${JSON.stringify(deprecated)};\n`;
 
 await writeFile(out, body);
+await writeFile(notesFile, JSON.stringify(deprecated, null, 2) + "\n");
 console.log(`Wrote ${types.length} event types to ${path.relative(process.cwd(), out)}`);

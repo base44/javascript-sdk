@@ -16,7 +16,7 @@ describe("deprecations", () => {
       },
     };
     expect(deprecations(openapi)).toEqual({
-      "app.created.v1": "@deprecated Since 2027-01-01; use `app.created.v2`. Base44 stops sending it on 2027-07-01.",
+      "app.created.v1": "Deprecated from 2027-01-01; use `app.created.v2`. Base44 stops sending it on 2027-07-01.",
     });
   });
 
@@ -26,7 +26,13 @@ describe("deprecations", () => {
         "app.created.v1": operation({ deprecated: true, "x-deprecation": { replaced_by: "app.created.v2", effective: "2027-01-01" } }),
       },
     };
-    expect(deprecations(openapi)["app.created.v1"]).toBe("@deprecated Since 2027-01-01; use `app.created.v2`.");
+    expect(deprecations(openapi)["app.created.v1"]).toBe("Deprecated from 2027-01-01; use `app.created.v2`.");
+  });
+
+  test("an event that left the spec keeps its last notice", () => {
+    // The SDK keeps a type after Base44 stops publishing it, so it keeps saying why.
+    const previous = { "app.created.v1": "Deprecated from 2027-01-01; use `app.created.v2`." };
+    expect(deprecations({ webhooks: { "app.created.v2": operation({}) } }, previous)).toEqual(previous);
   });
 
   test("nothing is deprecated when no operation says so", () => {

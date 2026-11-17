@@ -237,3 +237,6 @@ export interface WebhookEventMap {
 
 /** Every event type in {@link WebhookEventMap}, so events from a newer Base44 can be told apart at runtime. @internal */
 export const WEBHOOK_EVENT_TYPES = ["app.created.v1","app.published.v1","app.unpublished.v1","app.deleted.v1","app.restored.v1","webhook.test.v1","chat.turn_started.v1","chat.turn_ended.v1"] as const;
+
+/** The deprecation notice of each deprecated event type, for verifyEvent()'s warning. @internal */
+export const WEBHOOK_DEPRECATIONS: Partial<Record<string, string>> = {};

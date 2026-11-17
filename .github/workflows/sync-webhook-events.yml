@@ -24,6 +24,7 @@ env:
   WEBHOOKS_OPENAPI_URL: https://app.base44.com/api/v1/outbound-webhooks/openapi.json
   EVENT_LIST: packages/platform/scripts/webhook-event-types.json
   GENERATED: packages/platform/src/server/modules/webhooks.events.generated.ts
+  NOTICES: packages/platform/scripts/webhook-deprecations.json
 
 jobs:
   sync:
@@ -55,7 +56,7 @@ jobs:
       - name: Check for changes
         id: changes
         run: |
-          if git diff --quiet -- "$EVENT_LIST" "$GENERATED"; then
+          if git diff --quiet -- "$EVENT_LIST" "$GENERATED" "$NOTICES"; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "✅ The webhook event types are up to date"
           else
@@ -84,7 +85,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -B "$BRANCH"
-          git add "$EVENT_LIST" "$GENERATED"
+          git add "$EVENT_LIST" "$GENERATED" "$NOTICES"
           git commit -m "chore(platform): sync the webhook event types from production"
 
           pr=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')

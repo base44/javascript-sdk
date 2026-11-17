@@ -137,6 +137,10 @@ export interface CreateHandlerOptions extends VerifyEventOptions {
  * [event types](https://docs.base44.com/developers/references/outbound-webhooks/get-started/event-types)
  * for what each one means.
  *
+ * A deprecated event type's `data` interface and its `WebhookEventMap` entry are marked `@deprecated`.
+ * Editors don't flag a `case` label or a handler key, so `verifyEvent()` also logs a warning the
+ * first time each deprecated type arrives, saying what replaces it.
+ *
  * The module verifies each delivery's signature with your workspace's public keys and returns the
  * event with a typed payload. It runs on Node.js 20 and later and on edge runtimes, and makes
  * no network requests.
