@@ -89,6 +89,17 @@ export interface AiGatewayModuleConfig {
  * request options, the full model list, and limits, see
  * [Generate video with the AI Gateway](/developers/references/sdk/getting-started/ai-gateway-video).
  *
+ * ## Music
+ *
+ * The gateway also serves a music endpoint, `/audio/music`, so you can turn a
+ * prompt with a style, a mood, and optional lyrics into a song or an
+ * instrumental track. OpenAI has no music endpoint, so the request format is
+ * Base44's own. Music generation is synchronous. The request returns the
+ * stored MP3's `url` once the track is ready, which can take a minute or more.
+ * Pass `'automatic'` or pin `'lyria_3_5'`, which `automatic` always uses. For
+ * request options, the model list, and limits, see
+ * [Generate music with the AI Gateway](/developers/references/sdk/getting-started/ai-gateway-music).
+ *
  * ## Structured evaluations
  *
  * The `typesafe` provider runs the `jev` evaluation model through
