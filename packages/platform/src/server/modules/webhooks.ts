@@ -1,11 +1,20 @@
 import { WebhookConfigurationError, WebhookVerificationError } from "../errors.js";
 import { anySignatureVerifies, importPublicKey, parsePublicKeys, parseSignatures, readHeader, signedPayload } from "./webhooks-signature.js";
-import { WEBHOOK_EVENT_TYPES } from "./webhooks.events.generated.js";
+import { WEBHOOK_DEPRECATIONS, WEBHOOK_EVENT_TYPES } from "./webhooks.events.generated.js";
 import type { DeliveredWebhookEvent, WebhookEvent, WebhookPublicKeys, WebhooksModule } from "./webhooks.types.js";
 
 const knownTypes: ReadonlySet<string> = new Set(WEBHOOK_EVENT_TYPES);
 
 const DEFAULT_TOLERANCE_SECONDS = 300;
+
+// Types can't flag a deprecated event in a `switch` or a handler key, so the first delivery of each says so.
+const warnedDeprecated = new Set<string>();
+function warnIfDeprecated(type: string) {
+  const notice = WEBHOOK_DEPRECATIONS[type];
+  if (!notice || warnedDeprecated.has(type)) return;
+  warnedDeprecated.add(type);
+  console.warn(`Base44 webhook event ${type}: ${notice}`);
+}
 
 /** Webhook receiving utilities. Verification is local: no network calls, no timers. */
 export function createWebhooks(): WebhooksModule {
@@ -53,6 +62,7 @@ export function createWebhooks(): WebhooksModule {
     if (typeof type !== "string" || typeof eventId !== "string" || typeof data !== "object" || data === null) {
       throw new WebhookVerificationError("invalid_payload");
     }
+    warnIfDeprecated(type);
     // A type from a newer Base44 gets the client's unknown-event shape, so known types keep narrowing.
     return (knownTypes.has(type) ? event : { ...(event as object), type: "unknown", name: type }) as WebhookEvent;
   };
