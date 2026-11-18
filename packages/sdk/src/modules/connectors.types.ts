@@ -62,6 +62,15 @@ export type ConnectorApiResponsePhase =
   | "sent_unconfirmed";
 
 /**
+ * A query parameter value: a string, number, boolean, or an array of strings and numbers.
+ */
+export type ConnectorApiQueryValue =
+  | string
+  | number
+  | boolean
+  | Array<string | number>;
+
+/**
  * A request to forward to a metered connector's API through the Base44 proxy.
  */
 export interface ConnectorApiRequest {
@@ -81,7 +90,7 @@ export interface ConnectorApiRequest {
    */
   path: string;
   /** Query parameters. Merged into the request URL with any already in `path`. */
-  query?: Record<string, string | number | boolean | Array<string | number>>;
+  query?: Record<string, ConnectorApiQueryValue>;
   /** Extra request headers. Only headers the connector explicitly allows are forwarded, and the rest are dropped. */
   headers?: Record<string, string>;
   /** JSON request body. Ignored for `GET` and `HEAD`. */

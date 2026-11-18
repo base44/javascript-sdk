@@ -8,6 +8,10 @@
   },
   "typeDefinitionGroups": [
     [
+      "ConnectorApiRequest",
+      "ConnectorApiResponse",
+      "ConnectorApiResponsePhase",
+      "ConnectorApiQueryValue",
       "ConnectorIntegrationType",
       "ConnectorIntegrationTypeRegistry"
     ],
