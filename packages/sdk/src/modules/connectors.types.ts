@@ -176,15 +176,15 @@ export interface ConnectorProxyRawResponse {
  *
  * ## Metered connectors
  *
- * Some [platform connectors](#shared-connectors) are provided by paid third-party APIs that charge Base44 per call. These connectors don't support an OAuth connection. As a result, {@linkcode getConnection | getConnection()} rejects with a permission error. Instead, call them with {@linkcode callApi | callApi()}. Base44 attaches the credential server-side, forwards the request, and charges the call to your workspace's credits.
+ * Some [platform connectors](#shared-connectors) use paid third-party APIs that charge Base44 per call. These connectors don't support an OAuth connection. As a result, {@linkcode getConnection | getConnection()} rejects with a permission error. Instead, call them with {@linkcode callApi | callApi()}. Base44 attaches the credential server-side, forwards the request, and charges the call to your workspace's credits.
  *
  * This applies to platform connectors only. Workspace-registered and app user connectors aren't metered. They run on your own OAuth app, so the provider charges you directly.
  *
  * Keep these in mind when you call a metered connector:
  *
- * - **Cost varies by endpoint:** The same connector can charge differently depending on the endpoint you are calling. Avoid running expensive calls inside a loop, and batch requests when the provider supports it. Each response reports what it cost in the `creditsCharged` response field. 
- * - **Response handling.** Provider errors and connection failures are returned in the response instead of being thrown. Read the `success` and `phase` fields to assess what happened. Errors on the Base44 side, such as authorization failures, quota failures, and invalid requests, reject the promise.
- * - **Retries.** After a timeout or a failure partway through, the provider may have already run it. You can confirm that a provider did not run you request when `phase:` is returned as 'not_sent'`.
+ * - **Cost varies by endpoint:** The same connector can charge differently depending on the endpoint you are calling. Avoid running expensive calls inside a loop, and batch requests when the provider supports it. Each response reports what it cost in the `creditsCharged` response field.
+ * - **Response handling:** Provider errors and connection failures are returned in the response instead of being thrown. Read the `success` and `phase` fields to assess what happened. Errors on the Base44 side, such as authorization failures, quota failures, and invalid requests, reject the promise.
+ * - **Retries:** After a timeout or a failure partway through, the provider may have already run it. You can confirm that a provider didn't run your request when `phase` is `'not_sent'`.
  *
  * ## Available connectors
  *
@@ -457,11 +457,11 @@ export interface ConnectorsModule {
   /**
    * Calls a [metered connector's](#metered-connectors) API through the Base44 proxy.
    *
-   * Use this for a shared platform connector identified by an integration type. Base44 adds the OAuth credential to the outgoing request, forwards it, and charges the call to the workspace's credits. 
-   * 
+   * Use this for a shared platform connector identified by an integration type. Base44 adds the OAuth credential to the outgoing request, forwards it, and charges the call to the workspace's credits.
+   *
    * @param integrationType - The integration type of a metered connector, such as `'x'`.
    * @param request - The upstream request to forward.
-   * @returns Promise resolving to the upstream response. 
+   * @returns Promise resolving to the upstream response.
    *
    * @example
    * ```typescript
