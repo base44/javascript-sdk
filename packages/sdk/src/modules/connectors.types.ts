@@ -176,13 +176,13 @@ export interface ConnectorProxyRawResponse {
  *
  * ## Metered connectors
  *
- * A few [platform connectors](#shared-connectors) are backed by paid third-party APIs that charge Base44 per call. For those, the OAuth token isn't available to your code, and {@linkcode getConnection | getConnection()} rejects with a permission error. Call them with {@linkcode callApi | callApi()} instead. Base44 attaches the credential server-side, forwards the request, and charges the call to your workspace's credits.
+ * A few [platform connectors](#shared-connectors) are provided by paid third-party APIs that charge Base44 per call. These connectors don't support an OAuth connection. As a result,{@linkcode getConnection | getConnection()} rejects with a permission error. Instead, call them with {@linkcode callApi | callApi()}. Base44 attaches the credential server-side, forwards the request, and charges the call to your workspace's credits.
  *
- * This applies to platform connectors only. A workspace-registered or app user connector runs on your own OAuth app, so the provider invoices you directly and there's nothing for Base44 to meter. Those connectors keep normal token access through {@linkcode getWorkspaceConnection | getWorkspaceConnection()} and {@linkcode getCurrentAppUserConnection | getCurrentAppUserConnection()}.
+ * This applies to platform connectors only. Workspace-registered and app user connectors aren't metered. They run on your own OAuth app, so the provider charges you directly, and you keep token access through {@linkcode getWorkspaceConnection | getWorkspaceConnection()} and {@linkcode getCurrentAppUserConnection | getCurrentAppUserConnection()}.
  *
  * Keep these in mind when you call a metered connector:
  *
- * - **Cost varies by endpoint, sometimes sharply.** The same connector can charge a hundred times more for one endpoint than for another, so avoid putting an expensive call inside a loop, and batch wherever the provider supports it. Each response reports what it cost in `creditsCharged`.
+ * - **Cost varies by endpoint:** The same connector can charge a hundred times more for one endpoint than for another, so avoid putting an expensive call inside a loop, and batch wherever the provider supports it. Each response reports what it cost in `creditsCharged`.
  * - **Provider and transport outcomes are returned, not thrown.** A provider `4xx` or `5xx` response, or a connection failure, comes back as `success: false` with its `phase`. Authorization failures, quota failures, and invalid proxy requests reject the promise.
  * - **Only `phase: 'not_sent'` proves the provider didn't execute the request.** A timeout or in-flight failure may have executed upstream, so don't automatically retry a non-idempotent call unless the provider supports an idempotency key.
  *
