@@ -89,7 +89,11 @@ export interface ConnectorApiRequest {
    * separately in `query`. Either way, they're forwarded and priced the same.
    */
   path: string;
-  /** Query parameters. Merged into the request URL with any already in `path`. */
+  /**
+   * Query parameters. Merged into the request URL with any already in `path`.
+   *
+   * Each value can be a string, number, boolean, or an array of strings and numbers.
+   */
   query?: Record<string, ConnectorApiQueryValue>;
   /** Extra request headers. Only headers the connector explicitly allows are forwarded, and the rest are dropped. */
   headers?: Record<string, string>;

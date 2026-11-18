@@ -9,7 +9,6 @@
   "ConnectorApiQueryValue",
   "ConnectorApiRequest",
   "ConnectorApiResponse",
-  "ConnectorApiResponsePhase",
   "DeleteManyResult",
   "DeleteResult",
   "EntityAggregateResult",
