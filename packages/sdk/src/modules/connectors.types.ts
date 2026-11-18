@@ -183,8 +183,8 @@ export interface ConnectorProxyRawResponse {
  * Keep these in mind when you call a metered connector:
  *
  * - **Cost varies by endpoint:** The same connector can charge differently depending on the endpoint you are calling. Avoid running expensive calls inside a loop, and batch requests when the provider supports it. Each response reports what it cost in the `creditsCharged` response field. 
- * - **Response handling.** Provider errors and connection failures come back in the response instead of being thrown. Read `success` and `phase` to see what happened. Errors on the Base44 side, such as authorization failures, quota failures, and invalid requests, reject the promise.
- * - **Failures and retries.** Only `phase: 'not_sent'` proves the provider didn't run your request. After a timeout or a failure partway through, the provider may have already run it. Retry automatically only when `phase` is `'not_sent'`, or when the provider supports an idempotency key.
+ * - **Response handling.** Provider errors and connection failures are returned in the response instead of being thrown. Read the `success` and `phase` fields to assess what happened. Errors on the Base44 side, such as authorization failures, quota failures, and invalid requests, reject the promise.
+ * - **Retries.** After a timeout or a failure partway through, the provider may have already run it. You can confirm that a provider did not run you request when `phase:` is returned as 'not_sent'`.
  *
  * ## Available connectors
  *
@@ -457,11 +457,11 @@ export interface ConnectorsModule {
   /**
    * Calls a [metered connector's](#metered-connectors) API through the Base44 proxy.
    *
-   * Use this for a shared platform connector identified by an integration type. Base44 adds the OAuth credential to the outgoing request, forwards it, and charges the call to the workspace's credits, so you never handle the token yourself.
-   *
+   * Use this for a shared platform connector identified by an integration type. Base44 adds the OAuth credential to the outgoing request, forwards it, and charges the call to the workspace's credits. 
+   * 
    * @param integrationType - The integration type of a metered connector, such as `'x'`.
    * @param request - The upstream request to forward.
-   * @returns Promise resolving to the upstream response. An upstream error is reported in `success` and `status` instead of thrown. Only Base44-side failures reject.
+   * @returns Promise resolving to the upstream response. 
    *
    * @example
    * ```typescript
