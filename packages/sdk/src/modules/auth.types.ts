@@ -395,6 +395,14 @@ export interface AuthModule {
    * {@linkcode verifyOtp | verifyOtp()} to complete verification, then log the user
    * in with {@linkcode loginViaEmailPassword | loginViaEmailPassword()}.
    *
+   * The response is the same whether or not the email already has an account.
+   * If the email belongs to an account that's still waiting for verification, the user gets a fresh code.
+   * If the account is already verified, no code is sent. Because your app can't
+   * tell which case applies, offer a new code with
+   * {@linkcode resendOtp | resendOtp()}, and tell users who already have an
+   * account to log in or reset their password with
+   * {@linkcode resetPasswordRequest | resetPasswordRequest()}.
+   *
    * @param params - Registration details including email, password, and optional fields.
    * @returns Promise resolving to the registration response.
    *
@@ -432,10 +440,22 @@ export interface AuthModule {
    * has expired or the user didn't receive it, send a fresh one with
    * {@linkcode resendOtp | resendOtp()}.
    *
+   * Each code allows five tries. Verification fails with the same error, "Invalid or
+   * expired verification code", in each of these cases:
+   *
+   * - The code is wrong.
+   * - The code has expired.
+   * - The code has used up its five tries.
+   * - The email has no account waiting for verification.
+   *
+   * The error doesn't say how many tries are left. When verification fails, offer
+   * the user a new code with {@linkcode resendOtp | resendOtp()}, which also
+   * resets the tries.
+   *
    * @param params - The email being verified and the OTP code the user entered.
    * @returns Promise resolving to the verification response, which includes an
    * access token for the now-verified user.
-   * @throws Error if the OTP code is invalid or expired.
+   * @throws Error if verification fails for any reason.
    *
    * @example
    * ```typescript
@@ -447,7 +467,8 @@ export interface AuthModule {
    *   });
    *   console.log('Email verified successfully!');
    * } catch (error) {
-   *   console.error('Invalid or expired OTP code');
+   *   // The same error covers a wrong, expired, or used-up code
+   *   console.error('Invalid or expired code. Request a new one.');
    * }
    * ```
    *
@@ -479,13 +500,19 @@ export interface AuthModule {
    *
    * Call this when the user didn't receive the original code sent by
    * {@linkcode register | register()}, or when the previous code has expired.
-   * The new code replaces the previous one. Pass it to
+   * Sending a new code resets the five tries. Pass it to
    * {@linkcode verifyOtp | verifyOtp()} to complete verification.
    *
+   * A code is sent only when the email belongs to an account that's still
+   * waiting for verification. For an email that's already verified or has no
+   * account, nothing is sent, but the response is the same. Tell users who still
+   * don't get a code to log in or reset their password with
+   * {@linkcode resetPasswordRequest | resetPasswordRequest()}.
+   *
    * @param email - Email address to send the new OTP to.
-   * @returns Promise resolving once the new OTP has been sent, with a
-   * confirmation message and the new code's expiration window.
-   * @throws Error if the email is invalid or the request fails.
+   * @returns Promise resolving to a confirmation message and the code's
+   * expiration window. The same response is returned whether or not a code was sent.
+   * @throws Error if the request fails.
    *
    * @example
    * ```typescript
