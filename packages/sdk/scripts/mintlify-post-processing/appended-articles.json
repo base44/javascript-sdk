@@ -2,7 +2,8 @@
   "interfaces/ConnectorsModule": [
     "type-aliases/ConnectorIntegrationType",
     "interfaces/ConnectorIntegrationTypeRegistry",
-    "interfaces/UserConnectorsModule"
+    "interfaces/UserConnectorsModule",
+    "type-aliases/ConnectorApiQueryValue"
   ],
   "type-aliases/EntitiesModule": [
     "interfaces/EntityHandler",

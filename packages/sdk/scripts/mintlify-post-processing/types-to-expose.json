@@ -22,6 +22,7 @@
   "BrowserSession",
   "BrowserSessionOptions",
   "Connection",
+  "ConnectorApiQueryValue",
   "ConnectorApiRequest",
   "ConnectorApiResponse",
   "ConnectorApiResponsePhase",
