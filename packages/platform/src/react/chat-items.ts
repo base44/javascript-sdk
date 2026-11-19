@@ -92,7 +92,7 @@ function toStep(toolCall: ToolCall, answerToolCall: AnswerToolCall | undefined):
     id: toolCall.id!,
     tool: toolName,
     files,
-    label: stepLabel(toolName, files, summary, display),
+    label: stepLabel(toolName, files, summary, display, status),
     status,
     ...(question && { question }),
     ...(answered && { answered }),
@@ -100,14 +100,29 @@ function toStep(toolCall: ToolCall, answerToolCall: AnswerToolCall | undefined):
 }
 
 // Base44's own description of the step reads best; then the entity it touched; then the files.
-function stepLabel(toolName: string, files: string[], summary: string | undefined, display: ToolDisplay | null | undefined): string {
-  if (summary) return summary;
+function stepLabel(
+  toolName: string,
+  files: string[],
+  summary: string | undefined,
+  display: ToolDisplay | null | undefined,
+  status: ChatStep["status"],
+): string {
+  if (summary) return summaryForStatus(summary, status);
   const entityName = display?.entity_name;
   if (entityName) {
     const recordCount = display?.record_count;
     return recordCount === undefined ? `${toolName} ${entityName}` : `${toolName} ${entityName} (${recordCount})`;
   }
   return [toolName, ...files].join(" ");
+}
+
+// The AI often writes a summary as "present | past", such as "Looking at your app | Looked at your
+// app". Like Base44's builder, a step still going shows the first half and a finished one the last.
+function summaryForStatus(summary: string, status: ChatStep["status"]): string {
+  const halves = summary.split("|").map(half => half.trim()).filter(Boolean);
+  if (halves.length < 2) return summary.trim();
+  const isGoing = status === "running" || status === "waiting";
+  return isGoing ? halves[0] : halves[halves.length - 1];
 }
 
 // What the user answered on a choice, each answer next to the question it answers.
