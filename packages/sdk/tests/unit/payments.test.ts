@@ -769,16 +769,14 @@ describe("mountCheckout", () => {
   });
 
   describe("Wix Payment Element", () => {
-    const wixCheckout = (overrides: Partial<WixEmbeddedCheckout> = {}): MountableCheckout => ({
+    const wixCheckout = (): MountableCheckout => ({
       checkout_id: "ORDER1",
       currency: "usd",
       embedded: {
         provider: "wix",
         client_id: "client-1",
         order_id: "ORDER1",
-        country: "US",
-        ...overrides,
-      },
+      } satisfies WixEmbeddedCheckout,
     });
 
     function installWix(confirmPayment = vi.fn().mockResolvedValue("succeeded")) {
@@ -806,7 +804,7 @@ describe("mountCheckout", () => {
         "https://tpa.wixapps.net/payment-elements/payment-elements.js"
       );
       expect(wpe).toHaveBeenCalledWith("client-1", { locale: "de" });
-      expect(create).toHaveBeenCalledWith("checkout", { intentId: "ORDER1", country: "US" });
+      expect(create).toHaveBeenCalledWith("checkout", { intentId: "ORDER1" });
       const [box, button] = container.children;
       expect(element.mount).toHaveBeenCalledWith(box);
       expect(button).toMatchObject({ tagName: "button", type: "button", textContent: "Pay" });
@@ -826,14 +824,6 @@ describe("mountCheckout", () => {
       );
       expect(container.children).toHaveLength(0);
       expect(element.destroy).toHaveBeenCalledTimes(1);
-    });
-
-    test("leaves country out when the checkout has none", async () => {
-      const { create } = installWix();
-
-      await mountCheckout(container as any, wixCheckout({ country: null }), {}, deps());
-
-      expect(create).toHaveBeenCalledWith("checkout", { intentId: "ORDER1" });
     });
 
     test("confirms inside the click, completes the checkout, and stays disabled once paid", async () => {

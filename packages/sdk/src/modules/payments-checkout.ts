@@ -86,7 +86,7 @@ type WixPaymentElements = (
   clientId: string,
   options: { locale: string }
 ) => {
-  create(type: "checkout", options: { intentId: string; country?: string }): WixPaymentElement;
+  create(type: "checkout", options: { intentId: string }): WixPaymentElement;
 };
 
 /** @internal */
@@ -405,7 +405,6 @@ async function mountWix(
   const locale = (document.documentElement?.lang || navigator.language || "en").split("-")[0];
   const paymentElement = wpe(embedded.client_id, { locale }).create("checkout", {
     intentId: embedded.order_id,
-    ...(embedded.country ? { country: embedded.country } : {}),
   });
   const box = document.createElement("div");
   (element as unknown as HTMLElement).appendChild(box);

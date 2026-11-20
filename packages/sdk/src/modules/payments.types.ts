@@ -167,8 +167,6 @@ export interface WixEmbeddedCheckout {
   client_id: string;
   /** ID of the order the buyer pays. */
   order_id: string;
-  /** Two-letter ISO country code of the buyer, when known. */
-  country?: string | null;
 }
 
 /**
