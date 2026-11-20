@@ -407,7 +407,7 @@ export interface MountCheckoutOptions {
   /** Called when the buyer closes the PayPal window without paying, or when a Base44 Payments payment doesn't go through, a declined one included. The button stays mounted so the buyer can try again. */
   onCancel?: () => void;
   /**
-   * Called when a PayPal or Base44 Payments checkout fails after it's mounted, including a declined payment with the [`payment_declined`](#paymentserrorcode) code. The button stays mounted so the buyer can try again. If it keeps failing with `payment_declined`, create a new checkout and mount it. Stripe shows its own errors inside the checkout.
+   * Called when a PayPal or Base44 Payments checkout fails after it's mounted. The button stays mounted so the buyer can try again. For PayPal this includes a declined payment with the [`payment_declined`](#paymentserrorcode) code. If it keeps failing with `payment_declined`, create a new checkout and mount it. A declined Base44 Payments payment calls `onCancel` instead. Stripe shows its own errors inside the checkout.
    *
    * The error is a `Base44Error` when completing the checkout fails, or the provider's own error object when the PayPal window or the Wix Payment Element fails.
    */
@@ -486,7 +486,7 @@ export interface CheckoutMount {
  *
  * ## Authentication modes
  *
- * - **Anonymous or user authentication** (`base44.payments`): Preloads and mounts embedded checkouts, completes PayPal checkouts, and lists the current user's own purchases.
+ * - **Anonymous or user authentication** (`base44.payments`): Preloads and mounts embedded checkouts, completes PayPal and embedded Base44 Payments checkouts, and lists the current user's own purchases.
  * - **Service role authentication** (`base44.asServiceRole.payments`): Creates checkouts, lists any purchase, refunds payments, and changes subscriptions. Use the [service role methods](#service-role-methods) in backend functions.
  *
  * @groupDescription Methods

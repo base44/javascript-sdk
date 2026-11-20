@@ -76,7 +76,7 @@ interface StripeInstance {
 type StripeConstructor = (publishableKey: string) => StripeInstance;
 
 interface WixPaymentElement {
-  mount(element: CheckoutElement): void;
+  mount(element: CheckoutElement): Promise<void>;
   // Resolves to "canceled" for a declined payment too.
   confirmPayment(): Promise<string>;
   destroy(): void;
@@ -410,7 +410,7 @@ async function mountWix(
   const box = document.createElement("div");
   (element as unknown as HTMLElement).appendChild(box);
   try {
-    paymentElement.mount(box);
+    await paymentElement.mount(box);
   } catch (error) {
     box.remove();
     paymentElement.destroy();

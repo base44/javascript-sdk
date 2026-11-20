@@ -782,7 +782,7 @@ describe("mountCheckout", () => {
     });
 
     function installWix(confirmPayment = vi.fn().mockResolvedValue("succeeded")) {
-      const element = { mount: vi.fn(), confirmPayment, destroy: vi.fn() };
+      const element = { mount: vi.fn().mockResolvedValue(undefined), confirmPayment, destroy: vi.fn() };
       const create = vi.fn(() => element);
       const wpe = vi.fn(() => ({ create }));
       loadScript.mockImplementation(async () => {
@@ -813,6 +813,17 @@ describe("mountCheckout", () => {
 
       mount.destroy();
       mount.destroy();
+      expect(container.children).toHaveLength(0);
+      expect(element.destroy).toHaveBeenCalledTimes(1);
+    });
+
+    test("rejects and cleans up when the element fails to mount", async () => {
+      const { element } = installWix();
+      element.mount.mockRejectedValue(new Error("auth failed"));
+
+      await expect(mountCheckout(container as any, wixCheckout(), {}, deps())).rejects.toThrow(
+        "auth failed"
+      );
       expect(container.children).toHaveLength(0);
       expect(element.destroy).toHaveBeenCalledTimes(1);
     });
