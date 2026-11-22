@@ -1,10 +1,12 @@
 /**
- * Maps actor names to their incoming and outgoing message types.
+ * Maps actor names to their message types and method types.
  *
- * Extend this interface when you want typed actor
- * messages without generating types with the CLI: 
- * -  `toServer`: Defines incoming messages that a client sends to the actor. 
- * - `toClient`:  Defines outgoing messages that the actor sends to connected clients.
+ * Extend this interface when you want typed actor messages and method calls without generating
+ * types with the CLI:
+ * - `toServer`: Defines incoming messages that a client sends to the actor.
+ * - `toClient`: Defines outgoing messages that the actor sends to connected clients.
+ * - `methods`: Defines the actor's methods that you can call on a session. Each entry's argument
+ *   and return types become the types of the matching [method call](#session-methods).
  *
  * To generate types from deployed actors, use the
  * [`types generate`](/developers/references/cli/commands/types-generate) CLI command.
@@ -167,22 +169,38 @@ export interface Connection<N extends string = string> {
 /**
  * Represents a reference to an actor session, identified by actor name and session ID.
  *
- * Call {@linkcode ActorConnectable.connect | connect()} to open the WebSocket and get a [connection](/developers/backend/resources/actors/overview#connections),
- * or call one of the actor's callable methods by name, such as `ref.kick({ userId })`: it runs
- * the actor's method with your identity, even when no client is connected, and resolves to
- * its return value. A refusal rejects with a `Base44Error` carrying the actor's status (404 for
- * a method the actor doesn't list in `static callable`).
+ * Call {@linkcode ActorConnectable.connect | connect()} to open a WebSocket and get a
+ * [connection](/developers/backend/resources/actors/overview#connections) that sends and receives
+ * messages.
  *
- * A call takes one argument, any JSON value: pass several values as an object, such as
- * `ref.videoReady({ id, url })`, or an array. Further arguments are dropped, so `ref.m(a, b)`
- * sends only `a`. Arguments and the reply are JSON-encoded: a `Date` arrives as a string,
- * `undefined` is dropped (`null` inside an array), and functions, `Map` and `Set` values don't
- * survive. A request is at most 64 KB and calls are rate-limited per caller.
+ * You can also call a method you wrote in the actor by name, such as a `kick()` method that
+ * removes a user from a chat room. The method runs on the session even when no client is
+ * connected, and the call resolves to its return value.
+ *
+ * A method call takes one argument, which can be any JSON value. To pass several values, wrap
+ * them in an object. The actor receives the caller's identity, which is the current user, or an
+ * anonymous visitor when the client uses anonymous authentication. If the actor refuses the call,
+ * the promise rejects with a
+ * [`Base44Error`](/developers/references/sdk/getting-started/work-with-sdk#error-handling).
+ *
+ * To type a method's argument and return value, add the actor's `methods` to
+ * {@linkcode ActorRegistry}. To learn which methods an actor accepts, how arguments are
+ * encoded, and the size and rate limits, see
+ * [callable methods](/developers/backend/resources/actors/reference#callable-methods).
+ *
+ * @example
+ * ```typescript
+ * // Connect to a session and listen for messages
+ * const conn = base44.actors.chatRoom("session-1").connect();
+ * conn.subscribe((msg) => {
+ *   console.log(msg);
+ * });
+ * ```
  *
  * @example
  * ```typescript
  * // Call a method on a session
- * const { kicked } = await base44.actors.chatRoom("session-1").kick({ userId });
+ * const { kicked } = await base44.actors.chatRoom("session-1").kick({ userId: "user-123" });
  * ```
  */
 export interface ActorConnectable<N extends string = string> {
@@ -213,13 +231,13 @@ export type ActorRef<N extends string = string> = ActorConnectable<N> & ActorMet
 /**
  * Represents a reference to an actor session for server code running with the
  * [service role](/developers/references/sdk/getting-started/client#service-role).
- * Server code can't hold a connection, so it only calls methods; the actor sees the
- * `service` identity.
+ * Server code can't hold a connection, so it can only call the actor's methods. The actor
+ * receives the `service` identity.
  *
  * @example
  * ```typescript
- * // Tell a user's session that their video is ready
- * await base44.asServiceRole.actors.VideoRoom(userId).videoReady({ id });
+ * // Remove a user from a chat room from server code
+ * await base44.asServiceRole.actors.chatRoom("session-1").kick({ userId: "user-123" });
  * ```
  */
 export type ServiceRoleActorRef<N extends string = string> = ActorMethods<N>;
@@ -234,7 +252,7 @@ export type ServiceRoleActorsModule = {
 /**
  * Selects a session for a named actor.
  *
- * TypeScript infers message types when you register the actor in
+ * TypeScript infers message types and method types when you register the actor in
  * {@linkcode ActorRegistry}. {@linkcode ActorNameRegistry}
  * provides autocomplete for actor names only.
  */
@@ -245,7 +263,7 @@ export interface ActorClient<N extends string = string> {
    * Clients that specify the same actor name and session ID join the same session.
    *
    * @param instanceId - Session ID that identifies which session to connect to.
-   * @returns A reference to the actor session.
+   * @returns A [reference to the actor session](#session-methods).
    *
    * @example
    * ```typescript
@@ -268,17 +286,20 @@ export interface ActorClient<N extends string = string> {
  * - Manage connections: {@link ActorConnectable.connect | Open} and {@link Connection.close | close} a WebSocket connection to a session.
  * - Exchange messages: {@link Connection.send | Send} and {@link Connection.subscribe | listen} for messages to and from an actor.
  * - Manage subscriptions: {@link Connection.subscribe | Subscribe} and {@link ActorSubscription.unsubscribe | unsubscribe} from actor messages without closing the connection.
- * - Call methods: run one of an actor's callable methods on a session, without connecting.
+ * - Call methods: {@link ActorConnectable | Run} a method you wrote in the actor on a session, without connecting to it.
  *
  * For a sample flow, see
  * [connect a client to a session](/developers/backend/resources/actors/sample-flows#connect-a-client-to-a-session).
  *
  * ## Authentication modes
  *
- * This module is available to use with a client in anonymous or user authentication mode. Access it
- * through `base44.actors`. In
- * [service role authentication mode](/developers/references/sdk/getting-started/client#service-role),
- * `base44.asServiceRole.actors` only calls methods.
+ * This module is available to use with a client in all authentication modes:
+ *
+ * - **Anonymous or user authentication** (`base44.actors`): Opens connections to sessions,
+ *   exchanges messages, and calls an actor's methods.
+ * - **[Service role authentication](/developers/references/sdk/getting-started/client#service-role)**
+ *   (`base44.asServiceRole.actors`): Calls an actor's methods. Server code can't hold a
+ *   connection, so it can't connect to a session.
  *
  * The actor receives each client's [identity](/developers/backend/resources/actors/reference#connections)
  * when the client connects or calls a method. A client that hasn't logged in is anonymous, a client that

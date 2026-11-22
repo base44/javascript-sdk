@@ -1,7 +1,7 @@
 {
   "typesWithOwnMethods": {
     "EntityHandler": "Entity Handler Methods",
-    "ActorConnectable": "Actor methods",
+    "ActorConnectable": "Session methods",
     "Connection": "Connection methods",
     "ActorSubscription": "Subscription methods",
     "ServiceRolePaymentsModule": "Service role methods"
@@ -27,7 +27,6 @@
     ],
     [
       "ActorClient",
-      "ServiceRoleActorRef",
       "ActorRegistry",
       "ActorNameRegistry"
     ],

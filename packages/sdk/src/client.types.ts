@@ -142,7 +142,7 @@ export interface Base44Client {
   appLogs: AppLogsModule;
   /** {@link AppModule | App module} for reading the app's own public configuration. */
   app: AppModule;
-  /** {@link ActorsModule | Actors module} for connecting to actor sessions and exchanging messages with actors. */
+  /** {@link ActorsModule | Actors module} for connecting to actor sessions, exchanging messages, and calling an actor's methods. */
   actors: ActorsModule;
   /** {@link AuthModule | Auth module} for user authentication and management. */
   auth: AuthModule;
@@ -240,7 +240,7 @@ export interface Base44Client {
    * @throws {Error} When accessed without providing a serviceToken during client creation
    */
   readonly asServiceRole: {
-    /** {@link ServiceRoleActorsModule | Actors module} for sending requests to actor sessions as the app's server code. */
+    /** [Actors module](/developers/references/sdk/docs/type-aliases/actors) for calling an actor's methods as the app's server code. */
     actors: ServiceRoleActorsModule;
     /** {@link AgentsModule | Agents module} with elevated permissions. */
     agents: AgentsModule;
