@@ -1,12 +1,14 @@
 /**
- * Type-only base class for Actors.
+ * Type definitions for the actor base class.
  *
- * Import and extend this in your actor files:
- *   import { Actor } from "@base44/sdk";
- *   export class MyActor extends Actor { ... }
+ * Actor files don't import `Actor` from this package. They import it from the
+ * actor runtime instead:
+ *   import { Actor } from "base44:runtime/actors";
+ *   export default class MyActor extends Actor { ... }
  *
- * At deploy time the bundler replaces this import with the compiled
- * Cloudflare Durable Object implementation — this file provides types only.
+ * This class's runtime methods, such as `broadcast()` and `schedule()`, throw. An
+ * actor that imports `Actor` from `npm:@base44/sdk` bundles this class instead of
+ * the runtime's, and a bare `@base44/sdk` import fails to bundle.
  */
 
 import type { Base44Client } from "./client";
