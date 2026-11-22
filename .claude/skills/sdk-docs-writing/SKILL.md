@@ -1,6 +1,6 @@
 ---
 name: sdk-docs-writing
-description: Write JSDoc comments in the Base44 JavaScript SDK that produce good Mintlify reference docs. Use when adding or editing JSDoc on public types, interfaces, or methods in the SDK source, or when working on the doc generation pipeline.
+description: Write JSDoc comments in the Base44 JavaScript SDK that produce good Mintlify reference docs. Use when adding or editing JSDoc on public types, interfaces, or methods in the SDK source, including feature work that adds or changes a public method, type, or module, or when working on the doc generation pipeline.
 ---
 
 # Base44 SDK documentation guidelines
@@ -50,6 +50,8 @@ Rules for module descriptions:
 - First sentence: one-line summary of what the module does.
 - Follow with a list of key capabilities using markdown bullet points.
 - State which authentication modes the module supports (anonymous, user, service role) under a `## Authentication modes` heading at the end of the description. It renders as `### Authentication modes` on the page. Give the access path in parentheses, such as (`base44.asServiceRole.browser`). For a service-role-only module, link the mode to `/developers/references/sdk/getting-started/client#service-role`.
+  - For a module that works in one mode, write a single sentence, as in "This module is only available in user authentication mode (`base44.mcp`)."
+  - For a module that works with both a regular client and the service role, open with "This module is available to use with a client in all authentication modes:" and follow with one bullet per mode. Each bullet gives the bold mode name, the access path in parentheses, and what the module does in that mode, as in "- **Service role authentication** (`base44.asServiceRole.payments`): Creates checkouts, lists any purchase, and refunds payments."
 - Use `{@link ModuleName | display text}` to cross-reference other modules.
 
 ### Method documentation
@@ -82,6 +84,7 @@ Every public method needs: description, `@param` tags, `@returns`, and at least 
 - **State environment constraints** when a method is browser-only: "Requires a browser environment and can't be used in the backend."
 - **Document side effects** explicitly (e.g., "automatically sets the token for subsequent requests").
 - **Put errors under `@throws`, not in the description.** Keep "Rejects with..." sentences out of a method's description and list each error code with its own `@throws` tag. See [Documenting errors](references/jsdoc-tags.md#documenting-errors).
+- **Leave HTTP status codes out of descriptions.** Name the error in words, as in "Rejects with a permission error", not "Rejects with a 403" or "(HTTP 403)". This applies to every description, not only `@throws` tags.
 - **Give the real values.** When a method has a limit, a range, or a default, state the number, as in "Base44 clamps the value to between `60` and `900` seconds. Defaults to `300`." Don't write "Base44 sets minimum and maximum values" or "Session creation is rate limited". Confirm each value in the backend source rather than guessing. Don't describe how a limit is keyed when it's more complex than the reader needs.
 - **Link third-party tools at first mention.** The first time a page names a protocol or library, such as CDP or Playwright, link it to its official docs. Point at the API the reader needs from it, such as Playwright's `connectOverCDP()`, rather than the home page.
 - **Link method references.** When mentioning another SDK method or module by name in JSDoc prose, always use `{@link}` or `{@linkcode}` to create a cross-reference. There are two exceptions, where `{@link}` produces a broken or missing link, so write a markdown link instead:
@@ -90,7 +93,7 @@ Every public method needs: description, `@param` tags, `@returns`, and at least 
 - **Never use a colon as a sentence break.** Write "Use this when you sync data from another system. Name the field..." not "...another system: name the field...". Reserve colons for `label: description` bullet-list items, not prose sentences.
 - **Name the two SDKs.** Call `@base44/sdk` the "App SDK" and `@base44/platform` the "Platform SDK" wherever a page mentions both. Docs for only one package can say "the SDK".
 - **Use a serial comma.** Put a comma before the final "and" or "or" in every series of three or more, as in "snapshots, events, and errors".
-- **Never start a sentence with a lowercase inline-code term.** If the natural phrasing would open with one (e.g., "`week` is only supported on..."), restructure so a capitalized word leads instead (e.g., "Every date field supports `day`, `month` and `year`. The `created_date` and `updated_date` fields also support `week`.").
+- **Never start a sentence with a lowercase inline-code term.** If the natural phrasing would open with one (e.g., "`week` is only supported on..."), restructure so a capitalized word leads instead (e.g., "Every date field supports `day`, `month`, and `year`. The `created_date` and `updated_date` fields also support `week`.").
 - **Call the app user the client acts for "the current user".** Don't write "signed-in user" or "logged-in user". When the difference matters, say which authentication mode applies, as in "Requires user authentication, because a client in anonymous authentication mode has no current user."
 - **Name the place and the AI correctly.** Write "app editor" (lowercase) for the place where you build, and "the AI" or "the AI chat" for the assistant doing the work ("The AI inserts this ID", "ask the AI chat to fix it"). Never use "builder" for either. It stays only for the Builder plan, the Base44 Builder GitHub App, people who build apps ("builders", "app builders"), and exact UI labels or code names.
 
