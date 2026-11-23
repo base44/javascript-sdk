@@ -240,6 +240,10 @@ export interface Purchase {
   metadata?: Record<string, string> | null;
   /** ID of the subscription, for recurring purchases. */
   subscription_id?: string | null;
+  /** Current state of the subscription, for Base44 Payments subscription purchases: `active`, `paused` or `canceled`. `null` while the provider retries a renewal, or when the state couldn't be read. */
+  subscription_status?: "active" | "paused" | "canceled" | null;
+  /** When the paid period ends, as an ISO 8601 date, for an `active` Base44 Payments subscription. After a cancel at period end it's when access ends. `null` otherwise. */
+  paid_until?: string | null;
   /** Where the order ships, whether your app or the provider collected the address. Always `null` unless you call with the service role. Save it on your order record. */
   shipping_address?: ShippingAddress | null;
   /** Shipping fee in minor units, when the checkout charged one. */
@@ -465,7 +469,7 @@ export interface CheckoutMount {
  * | Embedded checkout | Yes | Yes, required | No |
  * | Refunds | Yes | Yes | Yes |
  * | Subscription cancellation | Yes, now or at period end | Yes, now only | Yes, now or at period end |
- * | Subscription pause and resume | Yes | Yes | No |
+ * | Subscription pause and resume | Yes | Yes | Yes |
  *
  * ## Authentication modes
  *
@@ -830,8 +834,6 @@ export interface ServiceRolePaymentsModule {
   /**
    * Pauses a subscription's billing.
    *
-   * Not supported for Base44 Payments.
-   *
    * @param subscriptionId - The `subscription_id` of the purchase.
    * @returns Promise resolving to the subscription's state.
    *
@@ -845,8 +847,6 @@ export interface ServiceRolePaymentsModule {
 
   /**
    * Resumes a paused subscription's billing.
-   *
-   * Not supported for Base44 Payments.
    *
    * @param subscriptionId - The `subscription_id` of the purchase.
    * @returns Promise resolving to the subscription's state.
