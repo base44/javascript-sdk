@@ -484,6 +484,8 @@ export interface CheckoutMount {
  *
  * ## Authentication modes
  *
+ * This module is available to use with a client in all authentication modes:
+ *
  * - **Anonymous or user authentication** (`base44.payments`): Preloads and mounts embedded checkouts, completes PayPal and embedded Base44 Payments checkouts, and lists the current user's own purchases.
  * - **Service role authentication** (`base44.asServiceRole.payments`): Creates checkouts, lists any purchase, refunds payments, and changes subscriptions. Use the [service role methods](#service-role-methods) in backend functions.
  *

@@ -54,7 +54,6 @@
   "PaymentsModule",
   "PaymentsRecurringFrequency",
   "PurchaseStatus",
-  "ServiceRoleActorRef",
   "ServiceRolePaymentsModule",
   "SortField",
   "SsoModule",
