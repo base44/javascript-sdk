@@ -7,12 +7,14 @@ import type {
   PayPalCheckoutOnClick,
   PayPalEmbeddedCheckout,
   StripeEmbeddedCheckout,
+  WixEmbeddedCheckout,
 } from "./payments.types.js";
 
 // The backend picks each script URL, but the script runs on the buyer's page, so only these hosts may load.
-const ALLOWED_SCRIPT_HOSTS: Record<"paypal" | "stripe", readonly string[]> = {
+const ALLOWED_SCRIPT_HOSTS: Record<"paypal" | "stripe" | "wix", readonly string[]> = {
   paypal: ["www.paypal.com", "www.sandbox.paypal.com"],
   stripe: ["js.stripe.com"],
+  wix: ["tpa.wixapps.net"],
 };
 
 interface PayPalSession {
@@ -73,6 +75,20 @@ interface StripeInstance {
 
 type StripeConstructor = (publishableKey: string) => StripeInstance;
 
+interface WixPaymentElement {
+  mount(element: CheckoutElement): Promise<void>;
+  // Resolves to "canceled" for a declined payment too.
+  confirmPayment(): Promise<string>;
+  destroy(): void;
+}
+
+type WixPaymentElements = (
+  clientId: string,
+  options: { locale: string }
+) => {
+  create(type: "checkout", options: { intentId: string }): WixPaymentElement;
+};
+
 /** @internal */
 export type LoadScript = (src: string) => Promise<void>;
 
@@ -87,6 +103,7 @@ export interface PaymentsCheckoutConfig {
     button?: PayPalButtonConfig | null;
   };
   stripe?: { script_url?: string };
+  wix?: { script_url?: string };
 }
 
 type PayPalButtonConfig = Pick<PayPalEmbeddedCheckout, "client_id" | "merchant_id" | "partner_attribution_id">;
@@ -99,7 +116,7 @@ export interface MountCheckoutDeps {
 }
 
 async function scriptUrlFor(
-  provider: "paypal" | "stripe",
+  provider: "paypal" | "stripe" | "wix",
   deps: Pick<MountCheckoutDeps, "getConfig">
 ): Promise<string> {
   const value = (await deps.getConfig())?.[provider]?.script_url;
@@ -117,14 +134,20 @@ async function scriptUrlFor(
     url.password !== "" ||
     !ALLOWED_SCRIPT_HOSTS[provider].includes(url.hostname)
   ) {
-    const name = provider === "paypal" ? "PayPal" : "Stripe";
+    const name = { paypal: "PayPal", stripe: "Stripe", wix: "Wix" }[provider];
     throw new Error(`The payments config has no valid ${name} script URL`);
   }
   return url.href;
 }
 
-function browserGlobals(): { paypal?: PayPalNamespace; Stripe?: StripeConstructor } {
-  return window as unknown as { paypal?: PayPalNamespace; Stripe?: StripeConstructor };
+interface BrowserGlobals {
+  paypal?: PayPalNamespace;
+  Stripe?: StripeConstructor;
+  wpe?: WixPaymentElements;
+}
+
+function browserGlobals(): BrowserGlobals {
+  return window as unknown as BrowserGlobals;
 }
 
 const scriptLoads = new Map<string, Promise<void>>();
@@ -366,6 +389,92 @@ async function mountPayPal(
   };
 }
 
+async function mountWix(
+  element: CheckoutElement,
+  scriptUrl: string,
+  checkoutId: string,
+  embedded: WixEmbeddedCheckout,
+  options: MountCheckoutOptions,
+  deps: MountCheckoutDeps
+): Promise<CheckoutMount> {
+  const wpe = await loadGlobal<WixPaymentElements>(
+    scriptUrl,
+    () => browserGlobals().wpe,
+    deps.loadScript
+  );
+  const locale = (document.documentElement?.lang || navigator.language || "en").split("-")[0];
+  const paymentElement = wpe(embedded.client_id, { locale }).create("checkout", {
+    intentId: embedded.order_id,
+  });
+  const box = document.createElement("div");
+  (element as unknown as HTMLElement).appendChild(box);
+  try {
+    await paymentElement.mount(box);
+  } catch (error) {
+    box.remove();
+    paymentElement.destroy();
+    throw error;
+  }
+
+  let destroyed = false;
+  let paying = false;
+  let paid = false;
+  // What the app last passed to setDisabled().
+  let disabled = false;
+  const notify = (callback: () => void) => {
+    if (destroyed) return;
+    try {
+      callback();
+    } catch (error) {
+      console.error("[Base44 SDK] A mountCheckout() callback threw", error);
+    }
+  };
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "base44-checkout-pay";
+  button.textContent = "Pay";
+
+  const onClick = () => {
+    if (paying || paid || disabled) return;
+    paying = true;
+    button.disabled = true;
+    // The executor runs now, so confirmPayment() is called inside the click, before any await.
+    new Promise<string>((resolve) => resolve(paymentElement.confirmPayment()))
+      .then(async (status) => {
+        if (status !== "succeeded") {
+          notify(() => options.onCancel?.());
+          return;
+        }
+        // Runs even after destroy(), so a paid order is still completed.
+        const result = await deps.completeCheckout(checkoutId);
+        paid = true;
+        notify(() => options.onComplete?.(result));
+      })
+      .catch((error: unknown) => notify(() => options.onError?.(error)))
+      .finally(() => {
+        paying = false;
+        button.disabled = paid || disabled;
+      });
+  };
+  button.addEventListener("click", onClick);
+  (element as unknown as HTMLElement).appendChild(button);
+
+  return {
+    destroy() {
+      if (destroyed) return;
+      destroyed = true;
+      button.removeEventListener("click", onClick);
+      button.remove();
+      box.remove();
+      paymentElement.destroy();
+    },
+    setDisabled(value) {
+      disabled = value;
+      if (!paying && !paid) button.disabled = value;
+    },
+  };
+}
+
 /** The new checkout's id, refused unless it is the checkout the button was drawn for. */
 function onClickCheckoutId(
   spec: PayPalCheckoutOnClick,
@@ -442,6 +551,15 @@ export async function mountCheckout(
         checkout.currency,
         embedded,
         checkout.checkout_id,
+        options,
+        deps
+      );
+    case "wix":
+      return mountWix(
+        element,
+        await scriptUrlFor("wix", deps),
+        checkout.checkout_id,
+        embedded,
         options,
         deps
       );

@@ -170,6 +170,7 @@ export type {
   PayPalCheckoutOnClick,
   PayPalEmbeddedCheckout,
   StripeEmbeddedCheckout,
+  WixEmbeddedCheckout,
   MountCheckoutOptions,
   ListPurchasesParams,
   ServiceRoleListPurchasesParams,
