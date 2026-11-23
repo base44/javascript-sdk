@@ -865,6 +865,25 @@ describe("mountCheckout", () => {
       expect(button.disabled).toBe(false);
     });
 
+    test("keeps the button off after a cancel while the element is down", async () => {
+      let cancel = (_result: { status: string }) => {};
+      const { ready, loadError } = installWix(
+        vi.fn(() => new Promise((resolve) => (cancel = resolve)))
+      );
+      await mountCheckout(container as any, wixCheckout(), {}, deps());
+      const button = container.children[1] as any;
+      ready();
+
+      button.click();
+      loadError();
+      cancel({ status: "canceled" });
+      await flush();
+      expect(button.disabled).toBe(true);
+
+      ready();
+      expect(button.disabled).toBe(false);
+    });
+
     test("rejects and cleans up when the element fails to mount", async () => {
       const { element } = installWix();
       element.mount.mockRejectedValue(new Error("auth failed"));

@@ -469,7 +469,7 @@ async function mountWix(
       })
       .finally(() => {
         paying = false;
-        button.disabled = finished || disabled;
+        button.disabled = !ready || finished || disabled;
       });
   };
   button.addEventListener("click", onClick);
