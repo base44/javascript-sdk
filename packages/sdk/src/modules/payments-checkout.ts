@@ -77,15 +77,13 @@ type StripeConstructor = (publishableKey: string) => StripeInstance;
 
 interface WixPaymentElement {
   mount(element: CheckoutElement): Promise<void>;
+  on(event: "ready", handler: () => void): void;
   // Resolves to "canceled" for a declined payment too.
-  confirmPayment(): Promise<string>;
+  confirmPayment(): Promise<{ status: string }>;
   destroy(): void;
 }
 
-type WixPaymentElements = (
-  clientId: string,
-  options: { locale: string }
-) => {
+type WixPaymentElements = (options: { clientId: string; locale: string }) => {
   create(type: "checkout", options: { intentId: string }): WixPaymentElement;
 };
 
@@ -397,28 +395,24 @@ async function mountWix(
   options: MountCheckoutOptions,
   deps: MountCheckoutDeps
 ): Promise<CheckoutMount> {
+  if (!embedded.client_id) {
+    throw new Error("This Base44 Payments checkout has no client ID to render with");
+  }
   const wpe = await loadGlobal<WixPaymentElements>(
     scriptUrl,
     () => browserGlobals().wpe,
     deps.loadScript
   );
   const locale = (document.documentElement?.lang || navigator.language || "en").split("-")[0];
-  const paymentElement = wpe(embedded.client_id, { locale }).create("checkout", {
-    intentId: embedded.order_id,
+  const paymentElement = wpe({ clientId: embedded.client_id, locale }).create("checkout", {
+    intentId: checkoutId,
   });
-  const box = document.createElement("div");
-  (element as unknown as HTMLElement).appendChild(box);
-  try {
-    await paymentElement.mount(box);
-  } catch (error) {
-    box.remove();
-    paymentElement.destroy();
-    throw error;
-  }
 
   let destroyed = false;
+  let ready = false;
   let paying = false;
-  let paid = false;
+  // Set once a payment succeeds or the element rejects one: either way it refuses another.
+  let finished = false;
   // What the app last passed to setDisabled().
   let disabled = false;
   const notify = (callback: () => void) => {
@@ -433,27 +427,46 @@ async function mountWix(
   button.type = "button";
   button.className = "base44-checkout-pay";
   button.textContent = "Pay";
+  // Off until the element can take the payment.
+  button.disabled = true;
+  paymentElement.on("ready", () => {
+    ready = true;
+    if (!paying && !finished) button.disabled = disabled;
+  });
+
+  const box = document.createElement("div");
+  (element as unknown as HTMLElement).appendChild(box);
+  try {
+    await paymentElement.mount(box);
+  } catch (error) {
+    box.remove();
+    paymentElement.destroy();
+    throw error;
+  }
 
   const onClick = () => {
-    if (paying || paid || disabled) return;
+    if (!ready || paying || finished || disabled) return;
     paying = true;
     button.disabled = true;
     // The executor runs now, so confirmPayment() is called inside the click, before any await.
-    new Promise<string>((resolve) => resolve(paymentElement.confirmPayment()))
-      .then(async (status) => {
+    new Promise<{ status: string }>((resolve) => resolve(paymentElement.confirmPayment()))
+      .then(async ({ status }) => {
         if (status !== "succeeded") {
           notify(() => options.onCancel?.());
           return;
         }
+        finished = true;
         // Runs even after destroy(), so a paid order is still completed.
         const result = await deps.completeCheckout(checkoutId);
-        paid = true;
         notify(() => options.onComplete?.(result));
       })
-      .catch((error: unknown) => notify(() => options.onError?.(error)))
+      .catch((error: unknown) => {
+        finished = true;
+        notify(() => options.onError?.(error));
+      })
       .finally(() => {
         paying = false;
-        button.disabled = paid || disabled;
+        button.disabled = finished || disabled;
       });
   };
   button.addEventListener("click", onClick);
@@ -470,7 +483,7 @@ async function mountWix(
     },
     setDisabled(value) {
       disabled = value;
-      if (!paying && !paid) button.disabled = value;
+      if (ready && !paying && !finished) button.disabled = value;
     },
   };
 }

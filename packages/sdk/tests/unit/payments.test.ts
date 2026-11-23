@@ -775,12 +775,17 @@ describe("mountCheckout", () => {
       embedded: {
         provider: "wix",
         client_id: "client-1",
-        order_id: "ORDER1",
       } satisfies WixEmbeddedCheckout,
     });
 
-    function installWix(confirmPayment = vi.fn().mockResolvedValue("succeeded")) {
-      const element = { mount: vi.fn().mockResolvedValue(undefined), confirmPayment, destroy: vi.fn() };
+    function installWix(confirmPayment = vi.fn().mockResolvedValue({ status: "succeeded" })) {
+      let onReady = () => {};
+      const element = {
+        mount: vi.fn().mockResolvedValue(undefined),
+        on: vi.fn((_event: string, handler: () => void) => (onReady = handler)),
+        confirmPayment,
+        destroy: vi.fn(),
+      };
       const create = vi.fn(() => element);
       const wpe = vi.fn(() => ({ create }));
       loadScript.mockImplementation(async () => {
@@ -790,7 +795,7 @@ describe("mountCheckout", () => {
         createElement: (tag: string) => new FakeElement(tag),
         documentElement: { lang: "de-DE" },
       });
-      return { wpe, create, element };
+      return { wpe, create, element, ready: () => onReady() };
     }
 
     const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -803,7 +808,7 @@ describe("mountCheckout", () => {
       expect(loadScript).toHaveBeenCalledWith(
         "https://tpa.wixapps.net/payment-elements/payment-elements.js"
       );
-      expect(wpe).toHaveBeenCalledWith("client-1", { locale: "de" });
+      expect(wpe).toHaveBeenCalledWith({ clientId: "client-1", locale: "de" });
       expect(create).toHaveBeenCalledWith("checkout", { intentId: "ORDER1" });
       const [box, button] = container.children;
       expect(element.mount).toHaveBeenCalledWith(box);
@@ -813,6 +818,30 @@ describe("mountCheckout", () => {
       mount.destroy();
       expect(container.children).toHaveLength(0);
       expect(element.destroy).toHaveBeenCalledTimes(1);
+    });
+
+    test("rejects a checkout without a client ID before loading the script", async () => {
+      installWix();
+      const checkout = { ...wixCheckout(), embedded: { provider: "wix" as const } };
+
+      await expect(mountCheckout(container as any, checkout, {}, deps())).rejects.toThrow(
+        "no client ID"
+      );
+      expect(loadScript).not.toHaveBeenCalled();
+    });
+
+    test("keeps the button off until the element is ready", async () => {
+      const { element, ready } = installWix();
+      const mount = await mountCheckout(container as any, wixCheckout(), {}, deps());
+      const button = container.children[1] as any;
+
+      mount.setDisabled(false);
+      button.click();
+      expect(button.disabled).toBe(true);
+      expect(element.confirmPayment).not.toHaveBeenCalled();
+
+      ready();
+      expect(button.disabled).toBe(false);
     });
 
     test("rejects and cleans up when the element fails to mount", async () => {
@@ -827,11 +856,12 @@ describe("mountCheckout", () => {
     });
 
     test("confirms inside the click, completes the checkout, and stays disabled once paid", async () => {
-      const { element } = installWix();
+      const { element, ready } = installWix();
       completeCheckout.mockResolvedValue({ checkout_id: "ORDER1", status: "paid" });
       const onComplete = vi.fn();
       const mount = await mountCheckout(container as any, wixCheckout(), { onComplete }, deps());
       const button = container.children[1] as any;
+      ready();
 
       button.click();
       expect(element.confirmPayment).toHaveBeenCalledTimes(1);
@@ -849,10 +879,11 @@ describe("mountCheckout", () => {
     });
 
     test("reports a canceled payment and lets the buyer try again", async () => {
-      installWix(vi.fn().mockResolvedValue("canceled"));
+      const { ready } = installWix(vi.fn().mockResolvedValue({ status: "canceled" }));
       const onCancel = vi.fn();
       await mountCheckout(container as any, wixCheckout(), { onCancel }, deps());
       const button = container.children[1] as any;
+      ready();
 
       button.click();
       await flush();
@@ -862,24 +893,30 @@ describe("mountCheckout", () => {
       expect(button.disabled).toBe(false);
     });
 
-    test("reports a failed payment and lets the buyer try again", async () => {
+    test("reports a failed payment and keeps the button off, since the element refuses another", async () => {
       const failure = new Error("frame gone");
-      installWix(vi.fn().mockRejectedValue(failure));
+      const { element, ready } = installWix(vi.fn().mockRejectedValue(failure));
       const onError = vi.fn();
-      await mountCheckout(container as any, wixCheckout(), { onError }, deps());
+      const mount = await mountCheckout(container as any, wixCheckout(), { onError }, deps());
       const button = container.children[1] as any;
+      ready();
 
       button.click();
       await flush();
+      mount.setDisabled(false);
+      ready();
+      button.click();
 
       expect(onError).toHaveBeenCalledWith(failure);
-      expect(button.disabled).toBe(false);
+      expect(button.disabled).toBe(true);
+      expect(element.confirmPayment).toHaveBeenCalledTimes(1);
     });
 
     test("ignores clicks while the app has it disabled", async () => {
-      const { element } = installWix();
+      const { element, ready } = installWix();
       const mount = await mountCheckout(container as any, wixCheckout(), {}, deps());
       const button = container.children[1] as any;
+      ready();
 
       mount.setDisabled(true);
       button.click();

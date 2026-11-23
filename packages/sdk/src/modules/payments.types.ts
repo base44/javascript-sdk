@@ -163,10 +163,8 @@ export interface PayPalEmbeddedCheckout {
 export interface WixEmbeddedCheckout {
   /** Payment provider. */
   provider: "wix";
-  /** Client ID the payment element signs in with. */
-  client_id: string;
-  /** ID of the order the buyer pays. */
-  order_id: string;
+  /** Client ID the payment element signs in with. May be absent, so don't rely on it. */
+  client_id?: string;
 }
 
 /**
@@ -405,7 +403,7 @@ export interface MountCheckoutOptions {
   /** Called when the buyer closes the PayPal window without paying, or when a Base44 Payments payment doesn't go through, a declined one included. The button stays mounted so the buyer can try again. */
   onCancel?: () => void;
   /**
-   * Called when a PayPal or Base44 Payments checkout fails after it's mounted. The button stays mounted so the buyer can try again. For PayPal this includes a declined payment with the [`payment_declined`](#paymentserrorcode) code. If it keeps failing with `payment_declined`, create a new checkout and mount it. A declined Base44 Payments payment calls `onCancel` instead. Stripe shows its own errors inside the checkout.
+   * Called when a PayPal or Base44 Payments checkout fails after it's mounted. PayPal's button stays mounted so the buyer can try again. The Base44 Payments button stays off, since the payment element refuses another payment, so create a new checkout and mount it. For PayPal this includes a declined payment with the [`payment_declined`](#paymentserrorcode) code. If it keeps failing with `payment_declined`, create a new checkout and mount it. A declined Base44 Payments payment calls `onCancel` instead. Stripe shows its own errors inside the checkout.
    *
    * The error is a `Base44Error` when completing the checkout fails, or the provider's own error object when the PayPal window or the Wix Payment Element fails.
    */
