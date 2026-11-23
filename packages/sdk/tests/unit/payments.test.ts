@@ -779,10 +779,10 @@ describe("mountCheckout", () => {
     });
 
     function installWix(confirmPayment = vi.fn().mockResolvedValue({ status: "succeeded" })) {
-      let onReady = () => {};
+      const handlers: Record<string, () => void> = {};
       const element = {
         mount: vi.fn().mockResolvedValue(undefined),
-        on: vi.fn((_event: string, handler: () => void) => (onReady = handler)),
+        on: vi.fn((event: string, handler: () => void) => (handlers[event] = handler)),
         confirmPayment,
         destroy: vi.fn(),
       };
@@ -795,7 +795,13 @@ describe("mountCheckout", () => {
         createElement: (tag: string) => new FakeElement(tag),
         documentElement: { lang: "de-DE" },
       });
-      return { wpe, create, element, ready: () => onReady() };
+      return {
+        wpe,
+        create,
+        element,
+        ready: () => handlers.ready(),
+        loadError: () => handlers.loaderror(),
+      };
     }
 
     const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -820,14 +826,14 @@ describe("mountCheckout", () => {
       expect(element.destroy).toHaveBeenCalledTimes(1);
     });
 
-    test("rejects a checkout without a client ID before loading the script", async () => {
+    test("rejects a checkout without a client ID before fetching the config", async () => {
       installWix();
       const checkout = { ...wixCheckout(), embedded: { provider: "wix" as const } };
 
       await expect(mountCheckout(container as any, checkout, {}, deps())).rejects.toThrow(
         "no client ID"
       );
-      expect(loadScript).not.toHaveBeenCalled();
+      expect(getConfig).not.toHaveBeenCalled();
     });
 
     test("keeps the button off until the element is ready", async () => {
@@ -836,6 +842,21 @@ describe("mountCheckout", () => {
       const button = container.children[1] as any;
 
       mount.setDisabled(false);
+      button.click();
+      expect(button.disabled).toBe(true);
+      expect(element.confirmPayment).not.toHaveBeenCalled();
+
+      ready();
+      expect(button.disabled).toBe(false);
+    });
+
+    test("turns the button off while the element is down, and back on when it recovers", async () => {
+      const { element, ready, loadError } = installWix();
+      await mountCheckout(container as any, wixCheckout(), {}, deps());
+      const button = container.children[1] as any;
+      ready();
+
+      loadError();
       button.click();
       expect(button.disabled).toBe(true);
       expect(element.confirmPayment).not.toHaveBeenCalled();

@@ -7,7 +7,6 @@ import type {
   PayPalCheckoutOnClick,
   PayPalEmbeddedCheckout,
   StripeEmbeddedCheckout,
-  WixEmbeddedCheckout,
 } from "./payments.types.js";
 
 // The backend picks each script URL, but the script runs on the buyer's page, so only these hosts may load.
@@ -75,11 +74,13 @@ interface StripeInstance {
 
 type StripeConstructor = (publishableKey: string) => StripeInstance;
 
+type WixPaymentResult = { status: "succeeded" | "canceled" };
+
 interface WixPaymentElement {
   mount(element: CheckoutElement): Promise<void>;
-  on(event: "ready", handler: () => void): void;
+  on(event: "ready" | "loaderror", handler: () => void): void;
   // Resolves to "canceled" for a declined payment too.
-  confirmPayment(): Promise<{ status: string }>;
+  confirmPayment(): Promise<WixPaymentResult>;
   destroy(): void;
 }
 
@@ -391,20 +392,17 @@ async function mountWix(
   element: CheckoutElement,
   scriptUrl: string,
   checkoutId: string,
-  embedded: WixEmbeddedCheckout,
+  clientId: string,
   options: MountCheckoutOptions,
   deps: MountCheckoutDeps
 ): Promise<CheckoutMount> {
-  if (!embedded.client_id) {
-    throw new Error("This Base44 Payments checkout has no client ID to render with");
-  }
   const wpe = await loadGlobal<WixPaymentElements>(
     scriptUrl,
     () => browserGlobals().wpe,
     deps.loadScript
   );
   const locale = (document.documentElement?.lang || navigator.language || "en").split("-")[0];
-  const paymentElement = wpe({ clientId: embedded.client_id, locale }).create("checkout", {
+  const paymentElement = wpe({ clientId, locale }).create("checkout", {
     intentId: checkoutId,
   });
 
@@ -433,6 +431,11 @@ async function mountWix(
     ready = true;
     if (!paying && !finished) button.disabled = disabled;
   });
+  // The element fires ready again once it recovers.
+  paymentElement.on("loaderror", () => {
+    ready = false;
+    button.disabled = true;
+  });
 
   const box = document.createElement("div");
   (element as unknown as HTMLElement).appendChild(box);
@@ -449,7 +452,7 @@ async function mountWix(
     paying = true;
     button.disabled = true;
     // The executor runs now, so confirmPayment() is called inside the click, before any await.
-    new Promise<{ status: string }>((resolve) => resolve(paymentElement.confirmPayment()))
+    new Promise<WixPaymentResult>((resolve) => resolve(paymentElement.confirmPayment()))
       .then(async ({ status }) => {
         if (status !== "succeeded") {
           notify(() => options.onCancel?.());
@@ -568,11 +571,14 @@ export async function mountCheckout(
         deps
       );
     case "wix":
+      if (!embedded.client_id) {
+        throw new Error("This Base44 Payments checkout has no client ID to render with");
+      }
       return mountWix(
         element,
         await scriptUrlFor("wix", deps),
         checkout.checkout_id,
-        embedded,
+        embedded.client_id,
         options,
         deps
       );

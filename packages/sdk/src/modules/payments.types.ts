@@ -454,7 +454,7 @@ export interface PayPalCheckoutOnClick {
 export interface CheckoutMount {
   /** Removes the checkout from the page. Call it when the component that holds it unmounts. For Stripe, mounting another checkout destroys this one for you. */
   destroy: () => void;
-  /** Grays out the PayPal or Base44 Payments button and ignores clicks, for example until a required form is filled in. After a payment completes the button stays off, so `setDisabled(false)` can't start a second payment. Stripe ignores it. */
+  /** Grays out the PayPal or Base44 Payments button and ignores clicks, for example until a required form is filled in. After a payment completes the button stays off, so `setDisabled(false)` can't start a second payment. The Base44 Payments button also stays off after the payment element rejects a payment. Stripe ignores it. */
   setDisabled: (disabled: boolean) => void;
 }
 
