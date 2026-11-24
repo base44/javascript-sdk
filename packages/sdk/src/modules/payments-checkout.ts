@@ -444,8 +444,10 @@ function wixVisitorAccessToken(clientId: string): WixGetAccessToken {
   return async ({ renew = false } = {}) => {
     const visitor = wixVisitors.get(clientId) ?? {};
     wixVisitors.set(clientId, visitor);
+    // Expired now, so other callers wait for the renewed token instead of getting this one.
+    if (renew && visitor.tokens) visitor.tokens = { ...visitor.tokens, expiresAt: 0 };
     const { tokens } = visitor;
-    if (tokens && !renew && tokens.expiresAt - WIX_TOKEN_MARGIN_MS > Date.now()) {
+    if (tokens && tokens.expiresAt - WIX_TOKEN_MARGIN_MS > Date.now()) {
       return tokens.accessToken;
     }
     visitor.pending ??= renewWixTokens(clientId, tokens)

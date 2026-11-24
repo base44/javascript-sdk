@@ -875,6 +875,18 @@ describe("mountCheckout", () => {
         ]);
       });
 
+      test("gives callers during a renewal the renewed token", async () => {
+        const { wpe } = installWix();
+        const first = await mountedGetAccessToken(wpe);
+        const second = await mountedGetAccessToken(wpe);
+        await first();
+
+        const renewing = first({ renew: true });
+        await expect(second()).resolves.toBe("access-2");
+        await expect(renewing).resolves.toBe("access-2");
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+      });
+
       test("mints a new visitor when the refresh fails", async () => {
         const getAccessToken = await mountedGetAccessToken();
         await getAccessToken();
