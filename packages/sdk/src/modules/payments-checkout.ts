@@ -84,7 +84,9 @@ interface WixPaymentElement {
   destroy(): void;
 }
 
-type WixPaymentElements = (options: { clientId: string; locale: string }) => {
+type WixGetAccessToken = (request?: { renew?: boolean }) => Promise<string>;
+
+type WixPaymentElements = (options: { getAccessToken: WixGetAccessToken; locale: string }) => {
   create(type: "checkout", options: { intentId: string }): WixPaymentElement;
 };
 
@@ -388,6 +390,71 @@ async function mountPayPal(
   };
 }
 
+const WIX_TOKEN_URL = "https://www.wixapis.com/oauth2/token";
+// Renewed this long before it expires, as the Payment Element does.
+const WIX_TOKEN_MARGIN_MS = 60_000;
+
+interface WixTokens {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+}
+
+// One visitor per client ID for the page, so remounts and other checkouts reuse its token.
+const wixVisitors = new Map<string, { tokens?: WixTokens; pending?: Promise<WixTokens> }>();
+
+async function requestWixTokens(
+  body:
+    | { clientId: string; grantType: "anonymous" }
+    | { refresh_token: string; grantType: "refresh_token" }
+): Promise<WixTokens> {
+  const response = await fetch(WIX_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(`The Wix ${body.grantType} token request failed with status ${response.status}`);
+  }
+  const data = (await response.json()) as {
+    access_token: string;
+    refresh_token: string;
+    expires_in: number;
+  };
+  return {
+    accessToken: data.access_token,
+    refreshToken: data.refresh_token,
+    expiresAt: Date.now() + data.expires_in * 1000,
+  };
+}
+
+async function renewWixTokens(clientId: string, tokens: WixTokens | undefined): Promise<WixTokens> {
+  if (tokens) {
+    try {
+      return await requestWixTokens({ refresh_token: tokens.refreshToken, grantType: "refresh_token" });
+    } catch {
+      // The refresh token expired or was revoked, so a new visitor is minted.
+    }
+  }
+  return requestWixTokens({ clientId, grantType: "anonymous" });
+}
+
+/** Gives the Payment Element an anonymous visitor's access token for the client. */
+function wixVisitorAccessToken(clientId: string): WixGetAccessToken {
+  return async ({ renew = false } = {}) => {
+    const visitor = wixVisitors.get(clientId) ?? {};
+    wixVisitors.set(clientId, visitor);
+    const { tokens } = visitor;
+    if (tokens && !renew && tokens.expiresAt - WIX_TOKEN_MARGIN_MS > Date.now()) {
+      return tokens.accessToken;
+    }
+    visitor.pending ??= renewWixTokens(clientId, tokens)
+      .then((renewed) => (visitor.tokens = renewed))
+      .finally(() => (visitor.pending = undefined));
+    return (await visitor.pending).accessToken;
+  };
+}
+
 async function mountWix(
   element: CheckoutElement,
   scriptUrl: string,
@@ -402,7 +469,8 @@ async function mountWix(
     deps.loadScript
   );
   const locale = (document.documentElement?.lang || navigator.language || "en").split("-")[0];
-  const paymentElement = wpe({ clientId, locale }).create("checkout", {
+  const getAccessToken = wixVisitorAccessToken(clientId);
+  const paymentElement = wpe({ getAccessToken, locale }).create("checkout", {
     intentId: checkoutId,
   });
 

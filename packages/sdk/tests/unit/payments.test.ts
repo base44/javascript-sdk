@@ -814,7 +814,7 @@ describe("mountCheckout", () => {
       expect(loadScript).toHaveBeenCalledWith(
         "https://tpa.wixapps.net/payment-elements/payment-elements.js"
       );
-      expect(wpe).toHaveBeenCalledWith({ clientId: "client-1", locale: "de" });
+      expect(wpe).toHaveBeenCalledWith({ getAccessToken: expect.any(Function), locale: "de" });
       expect(create).toHaveBeenCalledWith("checkout", { intentId: "ORDER1" });
       const [box, button] = container.children;
       expect(element.mount).toHaveBeenCalledWith(box);
@@ -824,6 +824,80 @@ describe("mountCheckout", () => {
       mount.destroy();
       expect(container.children).toHaveLength(0);
       expect(element.destroy).toHaveBeenCalledTimes(1);
+    });
+
+    describe("visitor access token", () => {
+      let fetchMock: ReturnType<typeof vi.fn>;
+      const tokenResponse = (n: number, expiresIn = 3600) => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: `access-${n}`, refresh_token: `refresh-${n}`, expires_in: expiresIn }),
+      });
+      const bodies = () => fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body));
+
+      beforeEach(() => {
+        let n = 0;
+        fetchMock = vi.fn(async () => tokenResponse(++n));
+        vi.stubGlobal("fetch", fetchMock);
+      });
+
+      async function mountedGetAccessToken(wpe = installWix().wpe) {
+        await mountCheckout(container as any, wixCheckout(), {}, deps());
+        return wpe.mock.calls.at(-1)![0].getAccessToken;
+      }
+
+      test("mints an anonymous visitor once and shares it across calls and mounts", async () => {
+        const { wpe } = installWix();
+        const first = await mountedGetAccessToken(wpe);
+        await expect(Promise.all([first(), first()])).resolves.toEqual(["access-1", "access-1"]);
+        const second = await mountedGetAccessToken(wpe);
+        await expect(second()).resolves.toBe("access-1");
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(fetchMock).toHaveBeenCalledWith("https://www.wixapis.com/oauth2/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clientId: "client-1", grantType: "anonymous" }),
+        });
+      });
+
+      test("renews through the refresh token when asked or when it expires", async () => {
+        const getAccessToken = await mountedGetAccessToken();
+        fetchMock.mockResolvedValueOnce(tokenResponse(1, 30));
+        await getAccessToken();
+
+        await expect(getAccessToken()).resolves.toBe("access-1");
+        await expect(getAccessToken({ renew: true })).resolves.toBe("access-2");
+
+        expect(bodies().slice(1)).toEqual([
+          { refresh_token: "refresh-1", grantType: "refresh_token" },
+          { refresh_token: "refresh-1", grantType: "refresh_token" },
+        ]);
+      });
+
+      test("mints a new visitor when the refresh fails", async () => {
+        const getAccessToken = await mountedGetAccessToken();
+        await getAccessToken();
+        fetchMock.mockResolvedValueOnce({ ok: false, status: 400 });
+
+        await expect(getAccessToken({ renew: true })).resolves.toBe("access-2");
+
+        expect(bodies().map((body) => body.grantType)).toEqual([
+          "anonymous",
+          "refresh_token",
+          "anonymous",
+        ]);
+      });
+
+      test("throws when the token can't be minted, and tries again on the next call", async () => {
+        const getAccessToken = await mountedGetAccessToken();
+        fetchMock.mockResolvedValueOnce({ ok: false, status: 503 });
+
+        await expect(getAccessToken()).rejects.toThrow(
+          "The Wix anonymous token request failed with status 503"
+        );
+        await expect(getAccessToken()).resolves.toBe("access-1");
+      });
     });
 
     test("rejects a checkout without a client ID before fetching the config", async () => {
