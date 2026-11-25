@@ -4,16 +4,21 @@ import type {
   CompleteCheckoutResult,
   MountableCheckout,
   MountCheckoutOptions,
+  PaddleEmbeddedCheckout,
   PayPalCheckoutOnClick,
   PayPalEmbeddedCheckout,
   StripeEmbeddedCheckout,
 } from "./payments.types.js";
 
+type ScriptProvider = "paypal" | "stripe" | "paddle";
+
 // The backend picks each script URL, but the script runs on the buyer's page, so only these hosts may load.
-const ALLOWED_SCRIPT_HOSTS: Record<"paypal" | "stripe", readonly string[]> = {
+const ALLOWED_SCRIPT_HOSTS: Record<ScriptProvider, readonly string[]> = {
   paypal: ["www.paypal.com", "www.sandbox.paypal.com"],
   stripe: ["js.stripe.com"],
+  paddle: ["cdn.paddle.com"],
 };
+const PROVIDER_NAMES: Record<ScriptProvider, string> = { paypal: "PayPal", stripe: "Stripe", paddle: "Paddle" };
 
 interface PayPalSession {
   start(
@@ -87,6 +92,7 @@ export interface PaymentsCheckoutConfig {
     button?: PayPalButtonConfig | null;
   };
   stripe?: { script_url?: string };
+  paddle?: { script_url?: string };
 }
 
 type PayPalButtonConfig = Pick<PayPalEmbeddedCheckout, "client_id" | "merchant_id" | "partner_attribution_id">;
@@ -99,7 +105,7 @@ export interface MountCheckoutDeps {
 }
 
 async function scriptUrlFor(
-  provider: "paypal" | "stripe",
+  provider: ScriptProvider,
   deps: Pick<MountCheckoutDeps, "getConfig">
 ): Promise<string> {
   const value = (await deps.getConfig())?.[provider]?.script_url;
@@ -117,14 +123,27 @@ async function scriptUrlFor(
     url.password !== "" ||
     !ALLOWED_SCRIPT_HOSTS[provider].includes(url.hostname)
   ) {
-    const name = provider === "paypal" ? "PayPal" : "Stripe";
-    throw new Error(`The payments config has no valid ${name} script URL`);
+    throw new Error(`The payments config has no valid ${PROVIDER_NAMES[provider]} script URL`);
   }
   return url.href;
 }
 
-function browserGlobals(): { paypal?: PayPalNamespace; Stripe?: StripeConstructor } {
-  return window as unknown as { paypal?: PayPalNamespace; Stripe?: StripeConstructor };
+function browserGlobals(): { paypal?: PayPalNamespace; Stripe?: StripeConstructor; Paddle?: PaddleNamespace } {
+  return window as unknown as { paypal?: PayPalNamespace; Stripe?: StripeConstructor; Paddle?: PaddleNamespace };
+}
+
+interface PaddleEvent {
+  name?: string;
+  error?: unknown;
+}
+
+interface PaddleNamespace {
+  Environment: { set(environment: "sandbox"): void };
+  Initialize(options: { token: string; eventCallback: (event: PaddleEvent) => void }): void;
+  Checkout: {
+    open(options: { transactionId: string; customer?: { email: string } }): void;
+    close(): void;
+  };
 }
 
 const scriptLoads = new Map<string, Promise<void>>();
@@ -366,6 +385,100 @@ async function mountPayPal(
   };
 }
 
+// Paddle.js takes one token per page and reports every checkout's events to the callback set then.
+let paddleToken: string | null = null;
+let onPaddleEvent: ((event: PaddleEvent) => void) | null = null;
+
+async function mountPaddle(
+  element: CheckoutElement,
+  scriptUrl: string,
+  embedded: PaddleEmbeddedCheckout,
+  checkoutId: string,
+  options: MountCheckoutOptions,
+  deps: MountCheckoutDeps
+): Promise<CheckoutMount> {
+  const Paddle = await loadGlobal<PaddleNamespace>(scriptUrl, () => browserGlobals().Paddle, deps.loadScript);
+  if (paddleToken === null) {
+    if (embedded.environment === "sandbox") Paddle.Environment.set("sandbox");
+    Paddle.Initialize({ token: embedded.client_token, eventCallback: (event) => onPaddleEvent?.(event) });
+    paddleToken = embedded.client_token;
+  } else if (paddleToken !== embedded.client_token) {
+    throw new Error("Paddle is already set up on this page for another seller. Reload the page to check out.");
+  }
+
+  let destroyed = false;
+  let open = false;
+  let completing = false;
+  // Set once the payment goes through: the transaction is paid, so the button stays off.
+  let paid = false;
+  const notify = (callback: () => void) => {
+    if (destroyed) return;
+    try {
+      callback();
+    } catch (error) {
+      console.error("[Base44 SDK] A mountCheckout() callback threw", error);
+    }
+  };
+  const handle = async (event: PaddleEvent) => {
+    if (event.name === "checkout.completed") {
+      completing = true;
+      button.disabled = true;
+      let result: CompleteCheckoutResult;
+      try {
+        // Paddle charged inside its own window; this asks the backend, which reads Paddle, whether it did.
+        result = await deps.completeCheckout(checkoutId);
+      } catch (error) {
+        completing = false;
+        button.disabled = false;
+        notify(() => options.onError?.(error));
+        return;
+      }
+      completing = false;
+      paid = true;
+      notify(() => options.onComplete?.(result));
+    } else if (event.name === "checkout.closed") {
+      open = false;
+      if (!paid && !completing) notify(() => options.onCancel?.());
+    } else if (event.name === "checkout.error") {
+      notify(() => options.onError?.(event.error ?? event));
+    }
+  };
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = "Pay";
+  button.setAttribute("data-base44-checkout", "paddle");
+  const onClick = () => {
+    if (paid || completing || open || button.disabled) return;
+    open = true;
+    onPaddleEvent = (event) => void handle(event);
+    try {
+      Paddle.Checkout.open({
+        transactionId: embedded.transaction_id,
+        ...(embedded.customer_email ? { customer: { email: embedded.customer_email } } : {}),
+      });
+    } catch (error) {
+      open = false;
+      notify(() => options.onError?.(error));
+    }
+  };
+  button.addEventListener("click", onClick);
+  (element as unknown as HTMLElement).appendChild(button);
+
+  return {
+    destroy() {
+      if (destroyed) return;
+      destroyed = true;
+      button.removeEventListener("click", onClick);
+      button.remove();
+      if (open) Paddle.Checkout.close();
+    },
+    setDisabled(disabled) {
+      if (!completing && !paid) button.disabled = disabled;
+    },
+  };
+}
+
 /** The new checkout's id, refused unless it is the checkout the button was drawn for. */
 function onClickCheckoutId(
   spec: PayPalCheckoutOnClick,
@@ -393,11 +506,12 @@ function onClickCheckoutId(
  * @internal
  */
 export async function preloadCheckout(
-  provider: "paypal" | "stripe",
+  provider: ScriptProvider,
   deps: Pick<MountCheckoutDeps, "getConfig" | "loadScript">
 ): Promise<void> {
   if (typeof window === "undefined" || typeof document === "undefined") return;
-  const read = () => (provider === "paypal" ? browserGlobals().paypal : browserGlobals().Stripe);
+  const read = () =>
+    provider === "paypal" ? browserGlobals().paypal : provider === "paddle" ? browserGlobals().Paddle : browserGlobals().Stripe;
   try {
     if (!read()) {
       await deps.loadScript(await scriptUrlFor(provider, deps));
@@ -445,6 +559,8 @@ export async function mountCheckout(
         options,
         deps
       );
+    case "paddle":
+      return mountPaddle(element, await scriptUrlFor("paddle", deps), embedded, checkout.checkout_id, options, deps);
     default:
       throw new Error(
         `Embedded checkout isn't supported for provider ${(embedded as { provider: string }).provider}`

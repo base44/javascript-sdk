@@ -158,9 +158,25 @@ export interface PayPalEmbeddedCheckout {
 }
 
 /**
+ * Data that Paddle's checkout needs to open.
+ */
+export interface PaddleEmbeddedCheckout {
+  /** Payment provider. */
+  provider: "paddle";
+  /** Paddle client-side token of the app's seller account. Public by design. */
+  client_token: string;
+  /** ID of the Paddle transaction the buyer pays. */
+  transaction_id: string;
+  /** Paddle environment the transaction lives in. */
+  environment: "sandbox" | "production";
+  /** Buyer email to prefill, when the checkout named one. */
+  customer_email?: string | null;
+}
+
+/**
  * Data that an embedded checkout needs to render, by provider.
  */
-export type EmbeddedCheckout = StripeEmbeddedCheckout | PayPalEmbeddedCheckout;
+export type EmbeddedCheckout = StripeEmbeddedCheckout | PayPalEmbeddedCheckout | PaddleEmbeddedCheckout;
 
 /**
  * Result of [`createCheckout()`](#createcheckout).
@@ -386,12 +402,12 @@ export type PaymentsErrorCode =
  */
 export interface MountCheckoutOptions {
   /**
-   * Called after the buyer approves a PayPal payment and the SDK completes the checkout. Use it to update the page, not to grant access.
+   * Called after the buyer approves a PayPal payment, or pays in Paddle's checkout, and the SDK completes the checkout. Use it to update the page, not to grant access.
    *
    * Stripe doesn't call this. After a Stripe payment, the buyer returns to the checkout's `success_path` with a `session_id` query parameter. That parameter is the `checkout_id`. Show the result there with [`listPurchases()`](#listpurchases).
    */
   onComplete?: (result: CompleteCheckoutResult) => void;
-  /** Called when the buyer closes the PayPal window without paying. The button stays mounted so the buyer can try again. */
+  /** Called when the buyer closes the PayPal or Paddle window without paying. The button stays mounted so the buyer can try again. */
   onCancel?: () => void;
   /**
    * Called when a PayPal checkout fails after it's mounted, including a declined payment with the [`payment_declined`](#paymentserrorcode) code. The button stays mounted so the buyer can try again. If it keeps failing with `payment_declined`, create a new checkout and mount it. Stripe shows its own errors inside the checkout.
@@ -445,7 +461,7 @@ export interface PayPalCheckoutOnClick {
 export interface CheckoutMount {
   /** Removes the checkout from the page. Call it when the component that holds it unmounts. For Stripe, mounting another checkout destroys this one for you. */
   destroy: () => void;
-  /** Grays out PayPal's button and ignores clicks, for example until a required form is filled in. After a payment completes the button stays off, so `setDisabled(false)` can't start a second payment. Stripe ignores it. */
+  /** Grays out PayPal's or Paddle's button and ignores clicks, for example until a required form is filled in. After a payment completes the button stays off, so `setDisabled(false)` can't start a second payment. Stripe ignores it. */
   setDisabled: (disabled: boolean) => void;
 }
 
@@ -498,7 +514,7 @@ export interface PaymentsModule {
    * base44.payments.preloadCheckout('paypal');
    * ```
    */
-  preloadCheckout(provider: "paypal" | "stripe"): Promise<void>;
+  preloadCheckout(provider: "paypal" | "stripe" | "paddle"): Promise<void>;
 
   /**
    * Renders an embedded checkout inside an element on the page.

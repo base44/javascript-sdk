@@ -3,6 +3,7 @@ import nock from "nock";
 import { Base44Error, createClient } from "../../src/index.ts";
 import type {
   MountableCheckout,
+  PaddleEmbeddedCheckout,
   PayPalEmbeddedCheckout,
   StripeEmbeddedCheckout,
 } from "../../src/modules/payments.types.ts";
@@ -268,6 +269,7 @@ describe("mountCheckout", () => {
   const config = {
     paypal: { script_url: "https://www.sandbox.paypal.com/web-sdk/v6/core" },
     stripe: { script_url: "https://js.stripe.com/v3/" },
+    paddle: { script_url: "https://cdn.paddle.com/paddle/v2/paddle.js" },
   };
   let getConfig: ReturnType<typeof vi.fn>;
   const deps = () => ({ completeCheckout, getConfig, loadScript });
@@ -572,6 +574,89 @@ describe("mountCheckout", () => {
     expect((sdk as any).createPayPalSubscriptionSession).toHaveBeenCalled();
   });
 
+  function installPaddle() {
+    let eventCallback: ((event: { name: string }) => void) | undefined;
+    const Paddle = {
+      Environment: { set: vi.fn() },
+      Initialize: vi.fn((options: { eventCallback: (event: { name: string }) => void }) => {
+        eventCallback = options.eventCallback;
+      }),
+      Checkout: { open: vi.fn(), close: vi.fn() },
+    };
+    loadScript.mockImplementation(async () => {
+      (window as any).Paddle = Paddle;
+    });
+    return { Paddle, emit: (name: string) => eventCallback?.({ name }) };
+  }
+
+  const paddleCheckout = (token = "test_token"): MountableCheckout => ({
+    checkout_id: "txn_1",
+    currency: "usd",
+    embedded: {
+      provider: "paddle",
+      client_token: token,
+      transaction_id: "txn_1",
+      environment: "sandbox",
+      customer_email: "buyer@example.com",
+    } satisfies PaddleEmbeddedCheckout,
+  });
+
+  test("opens Paddle's checkout for the transaction and completes it once Paddle reports payment", async () => {
+    const { Paddle, emit } = installPaddle();
+    completeCheckout.mockResolvedValue({ checkout_id: "txn_1", status: "paid" });
+    const onComplete = vi.fn();
+
+    await mountCheckout(container as any, paddleCheckout(), { onComplete }, deps());
+
+    expect(loadScript).toHaveBeenCalledWith("https://cdn.paddle.com/paddle/v2/paddle.js");
+    expect(Paddle.Environment.set).toHaveBeenCalledWith("sandbox");
+    expect(Paddle.Initialize).toHaveBeenCalledWith(expect.objectContaining({ token: "test_token" }));
+    container.children[0].click();
+    expect(Paddle.Checkout.open).toHaveBeenCalledWith({
+      transactionId: "txn_1",
+      customer: { email: "buyer@example.com" },
+    });
+
+    emit("checkout.completed");
+    await vi.waitFor(() => expect(onComplete).toHaveBeenCalledWith({ checkout_id: "txn_1", status: "paid" }));
+    expect(completeCheckout).toHaveBeenCalledWith("txn_1");
+    // Paid: another click must not open a second checkout.
+    container.children[0].click();
+    expect(Paddle.Checkout.open).toHaveBeenCalledTimes(1);
+  });
+
+  test("reports a closed Paddle checkout as a cancel and lets the buyer try again", async () => {
+    const { Paddle, emit } = installPaddle();
+    const onCancel = vi.fn();
+
+    await mountCheckout(container as any, paddleCheckout(), { onCancel }, deps());
+    container.children[0].click();
+    emit("checkout.closed");
+    container.children[0].click();
+
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(Paddle.Checkout.open).toHaveBeenCalledTimes(2);
+    expect(completeCheckout).not.toHaveBeenCalled();
+  });
+
+  test("refuses a second Paddle seller on the same page, since Paddle.js takes one token", async () => {
+    installPaddle();
+    await mountCheckout(container as any, paddleCheckout("test_a"), {}, deps());
+
+    await expect(mountCheckout(container as any, paddleCheckout("test_b"), {}, deps())).rejects.toThrow(
+      "another seller"
+    );
+  });
+
+  test("rejects a Paddle script URL off cdn.paddle.com", async () => {
+    getConfig.mockResolvedValue({ paddle: { script_url: "https://evil.example/paddle.js" } });
+
+    await expect(mountCheckout(container as any, paddleCheckout(), {}, deps())).rejects.toThrow(
+      "no valid Paddle script URL"
+    );
+    expect(loadScript).not.toHaveBeenCalled();
+  });
+
   test("mounts Stripe Embedded Checkout with the client secret", async () => {
     const embeddedCheckout = { mount: vi.fn(), destroy: vi.fn() };
     const stripe = { initEmbeddedCheckout: vi.fn().mockResolvedValue(embeddedCheckout) };
@@ -822,6 +907,7 @@ describe("payments config", () => {
   const config = {
     paypal: { script_url: "https://www.sandbox.paypal.com/web-sdk/v6/core" },
     stripe: { script_url: "https://js.stripe.com/v3/" },
+    paddle: { script_url: "https://cdn.paddle.com/paddle/v2/paddle.js" },
   };
   const checkout: MountableCheckout = {
     checkout_id: "cs_1",
