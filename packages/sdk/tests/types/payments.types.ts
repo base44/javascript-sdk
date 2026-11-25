@@ -37,15 +37,22 @@ base44.payments.mountCheckout(div, { provider: "stripe", currency: "usd", intent
 
 // The embedded data narrows by provider, and Base44 Payments renders the Wix Payment Element.
 if (checkout.embedded?.provider === "wix") {
-  checkout.embedded.order_id satisfies string;
+  checkout.embedded.client_id satisfies string | undefined;
   // @ts-expect-error Only PayPal has a merchant ID.
   checkout.embedded.merchant_id;
 }
 
 base44.payments.preloadCheckout("paypal");
 
-// @ts-expect-error Only connected checkout providers have a script to preload.
 base44.payments.preloadCheckout("wix");
+
+// @ts-expect-error Only supported checkout providers have a script to preload.
+base44.payments.preloadCheckout("square");
+
+// Base44 Payments pays from the app's own button, so pay() is optional on the mount.
+base44.payments
+  .mountCheckout(div, checkout, { onReadyChange: (ready: boolean) => ready })
+  .then((mount) => mount.pay?.() satisfies Promise<void> | undefined);
 
 base44.asServiceRole.payments.listPurchases({ buyer_email: "buyer@example.com" });
 

@@ -7,7 +7,6 @@ import type {
   PayPalCheckoutOnClick,
   PayPalEmbeddedCheckout,
   StripeEmbeddedCheckout,
-  WixEmbeddedCheckout,
 } from "./payments.types.js";
 
 // The backend picks each script URL, but the script runs on the buyer's page, so only these hosts may load.
@@ -75,17 +74,19 @@ interface StripeInstance {
 
 type StripeConstructor = (publishableKey: string) => StripeInstance;
 
+type WixPaymentResult = { status: "succeeded" | "canceled" };
+
 interface WixPaymentElement {
   mount(element: CheckoutElement): Promise<void>;
+  on(event: "ready" | "loaderror", handler: () => void): void;
   // Resolves to "canceled" for a declined payment too.
-  confirmPayment(): Promise<string>;
+  confirmPayment(): Promise<WixPaymentResult>;
   destroy(): void;
 }
 
-type WixPaymentElements = (
-  clientId: string,
-  options: { locale: string }
-) => {
+type WixGetAccessToken = (request?: { renew?: boolean }) => Promise<string>;
+
+type WixPaymentElements = (options: { getAccessToken: WixGetAccessToken; locale: string }) => {
   create(type: "checkout", options: { intentId: string }): WixPaymentElement;
 };
 
@@ -389,11 +390,78 @@ async function mountPayPal(
   };
 }
 
+const WIX_TOKEN_URL = "https://www.wixapis.com/oauth2/token";
+// Renewed this long before it expires, as the Payment Element does.
+const WIX_TOKEN_MARGIN_MS = 60_000;
+
+interface WixTokens {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+}
+
+// One visitor per client ID for the page, so remounts and other checkouts reuse its token.
+const wixVisitors = new Map<string, { tokens?: WixTokens; pending?: Promise<WixTokens> }>();
+
+async function requestWixTokens(
+  body:
+    | { clientId: string; grantType: "anonymous" }
+    | { refresh_token: string; grantType: "refresh_token" }
+): Promise<WixTokens> {
+  const response = await fetch(WIX_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(`The Wix ${body.grantType} token request failed with status ${response.status}`);
+  }
+  const data = (await response.json()) as {
+    access_token: string;
+    refresh_token: string;
+    expires_in: number;
+  };
+  return {
+    accessToken: data.access_token,
+    refreshToken: data.refresh_token,
+    expiresAt: Date.now() + data.expires_in * 1000,
+  };
+}
+
+async function renewWixTokens(clientId: string, tokens: WixTokens | undefined): Promise<WixTokens> {
+  if (tokens) {
+    try {
+      return await requestWixTokens({ refresh_token: tokens.refreshToken, grantType: "refresh_token" });
+    } catch {
+      // The refresh token expired or was revoked, so a new visitor is minted.
+    }
+  }
+  return requestWixTokens({ clientId, grantType: "anonymous" });
+}
+
+/** Gives the Payment Element an anonymous visitor's access token for the client. */
+function wixVisitorAccessToken(clientId: string): WixGetAccessToken {
+  return async ({ renew = false } = {}) => {
+    const visitor = wixVisitors.get(clientId) ?? {};
+    wixVisitors.set(clientId, visitor);
+    // Expired now, so other callers wait for the renewed token instead of getting this one.
+    if (renew && visitor.tokens) visitor.tokens = { ...visitor.tokens, expiresAt: 0 };
+    const { tokens } = visitor;
+    if (tokens && tokens.expiresAt - WIX_TOKEN_MARGIN_MS > Date.now()) {
+      return tokens.accessToken;
+    }
+    visitor.pending ??= renewWixTokens(clientId, tokens)
+      .then((renewed) => (visitor.tokens = renewed))
+      .finally(() => (visitor.pending = undefined));
+    return (await visitor.pending).accessToken;
+  };
+}
+
 async function mountWix(
   element: CheckoutElement,
   scriptUrl: string,
   checkoutId: string,
-  embedded: WixEmbeddedCheckout,
+  clientId: string,
   options: MountCheckoutOptions,
   deps: MountCheckoutDeps
 ): Promise<CheckoutMount> {
@@ -403,9 +471,34 @@ async function mountWix(
     deps.loadScript
   );
   const locale = (document.documentElement?.lang || navigator.language || "en").split("-")[0];
-  const paymentElement = wpe(embedded.client_id, { locale }).create("checkout", {
-    intentId: embedded.order_id,
+  const getAccessToken = wixVisitorAccessToken(clientId);
+  const paymentElement = wpe({ getAccessToken, locale }).create("checkout", {
+    intentId: checkoutId,
   });
+
+  let destroyed = false;
+  let ready = false;
+  let paying = false;
+  // Set once a payment succeeds or the element rejects one: either way it refuses another.
+  let finished = false;
+  const notify = (callback: () => void) => {
+    if (destroyed) return;
+    try {
+      callback();
+    } catch (error) {
+      console.error("[Base44 SDK] A mountCheckout() callback threw", error);
+    }
+  };
+  paymentElement.on("ready", () => {
+    ready = true;
+    notify(() => options.onReadyChange?.(true));
+  });
+  // The element fires ready again once it recovers.
+  paymentElement.on("loaderror", () => {
+    ready = false;
+    notify(() => options.onReadyChange?.(false));
+  });
+
   const box = document.createElement("div");
   (element as unknown as HTMLElement).appendChild(box);
   try {
@@ -416,62 +509,38 @@ async function mountWix(
     throw error;
   }
 
-  let destroyed = false;
-  let paying = false;
-  let paid = false;
-  // What the app last passed to setDisabled().
-  let disabled = false;
-  const notify = (callback: () => void) => {
-    if (destroyed) return;
-    try {
-      callback();
-    } catch (error) {
-      console.error("[Base44 SDK] A mountCheckout() callback threw", error);
-    }
-  };
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "base44-checkout-pay";
-  button.textContent = "Pay";
-
-  const onClick = () => {
-    if (paying || paid || disabled) return;
-    paying = true;
-    button.disabled = true;
-    // The executor runs now, so confirmPayment() is called inside the click, before any await.
-    new Promise<string>((resolve) => resolve(paymentElement.confirmPayment()))
-      .then(async (status) => {
-        if (status !== "succeeded") {
-          notify(() => options.onCancel?.());
-          return;
-        }
-        // Runs even after destroy(), so a paid order is still completed.
-        const result = await deps.completeCheckout(checkoutId);
-        paid = true;
-        notify(() => options.onComplete?.(result));
-      })
-      .catch((error: unknown) => notify(() => options.onError?.(error)))
-      .finally(() => {
-        paying = false;
-        button.disabled = paid || disabled;
-      });
-  };
-  button.addEventListener("click", onClick);
-  (element as unknown as HTMLElement).appendChild(button);
-
   return {
+    pay() {
+      if (destroyed || !ready || paying || finished) return Promise.resolve();
+      paying = true;
+      // The executor runs now, so confirmPayment() is called inside the app's click, before any await.
+      return new Promise<WixPaymentResult>((resolve) => resolve(paymentElement.confirmPayment()))
+        .then(async ({ status }) => {
+          if (status !== "succeeded") {
+            notify(() => options.onCancel?.());
+            return;
+          }
+          finished = true;
+          // Runs even after destroy(), so a paid order is still completed.
+          const result = await deps.completeCheckout(checkoutId);
+          notify(() => options.onComplete?.(result));
+        })
+        .catch((error: unknown) => {
+          finished = true;
+          notify(() => options.onError?.(error));
+        })
+        .finally(() => {
+          paying = false;
+        });
+    },
     destroy() {
       if (destroyed) return;
       destroyed = true;
-      button.removeEventListener("click", onClick);
-      button.remove();
       box.remove();
       paymentElement.destroy();
     },
-    setDisabled(value) {
-      disabled = value;
-      if (!paying && !paid) button.disabled = value;
-    },
+    // The app owns the Pay button, so it disables its own.
+    setDisabled: () => undefined,
   };
 }
 
@@ -502,11 +571,12 @@ function onClickCheckoutId(
  * @internal
  */
 export async function preloadCheckout(
-  provider: "paypal" | "stripe",
+  provider: "paypal" | "stripe" | "wix",
   deps: Pick<MountCheckoutDeps, "getConfig" | "loadScript">
 ): Promise<void> {
   if (typeof window === "undefined" || typeof document === "undefined") return;
-  const read = () => (provider === "paypal" ? browserGlobals().paypal : browserGlobals().Stripe);
+  const read = () =>
+    ({ paypal: browserGlobals().paypal, stripe: browserGlobals().Stripe, wix: browserGlobals().wpe })[provider];
   try {
     if (!read()) {
       await deps.loadScript(await scriptUrlFor(provider, deps));
@@ -555,11 +625,14 @@ export async function mountCheckout(
         deps
       );
     case "wix":
+      if (!embedded.client_id) {
+        throw new Error("This Base44 Payments checkout has no client ID to render with");
+      }
       return mountWix(
         element,
         await scriptUrlFor("wix", deps),
         checkout.checkout_id,
-        embedded,
+        embedded.client_id,
         options,
         deps
       );
