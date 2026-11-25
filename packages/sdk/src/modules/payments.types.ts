@@ -502,13 +502,13 @@ export interface CheckoutMount {
  */
 export interface PaymentsModule {
   /**
-   * Starts downloading the provider's JavaScript library, Stripe.js or the PayPal JavaScript SDK, before you mount a checkout, so the checkout appears faster.
+   * Starts downloading the provider's JavaScript library, Stripe.js, the PayPal JavaScript SDK or the Wix Payment Element, before you mount a checkout, so the checkout appears faster.
    *
    * Call it when the checkout page or form opens, while the buyer is still filling it in. {@linkcode mountCheckout | mountCheckout()} needs the library to render the checkout, and downloads it itself if you didn't preload it.
    *
    * It never rejects, so you don't need to await it or catch errors. If the library can't load, `mountCheckout()` tries again and rejects with the error. Loading the library requires a browser environment and is skipped in the backend.
    *
-   * @param provider - The provider the app is connected to.
+   * @param provider - The provider the app is connected to. Use `'wix'` for Base44 Payments.
    * @returns Promise resolving once the library has loaded or failed to load.
    *
    * @example
@@ -517,7 +517,7 @@ export interface PaymentsModule {
    * base44.payments.preloadCheckout('paypal');
    * ```
    */
-  preloadCheckout(provider: "paypal" | "stripe"): Promise<void>;
+  preloadCheckout(provider: "paypal" | "stripe" | "wix"): Promise<void>;
 
   /**
    * Renders an embedded checkout inside an element on the page.
@@ -529,7 +529,7 @@ export interface PaymentsModule {
    * - Stripe: Mounts Stripe Embedded Checkout. After paying, the buyer returns to the checkout's `success_path`. Stripe allows one embedded checkout per page, so mounting another Stripe checkout destroys the previous one.
    * - Base44 Payments: Renders the Wix Payment Element, with no button of its own. Add your own Pay button, enable it while `onReadyChange` reports the element is ready, and call the mount's `pay()` from its click handler. When the payment succeeds, the SDK calls {@linkcode completeCheckout | completeCheckout()} and then `onComplete`.
    *
-   * For PayPal and Stripe, to make the checkout appear faster, load the library ahead of time with [`preloadCheckout()`](#preloadcheckout) when the page opens.
+   * To make the checkout appear faster, load the library ahead of time with [`preloadCheckout()`](#preloadcheckout) when the page opens.
    *
    * Requires a browser environment and can't be used in the backend. Rejects when the checkout isn't embedded, when an on-click PayPal checkout is mounted before the app's PayPal can take payments, when the payments config can't be fetched or has no valid script URL for the provider, when the provider's library fails to load, or when PayPal isn't available for the checkout's currency.
    *

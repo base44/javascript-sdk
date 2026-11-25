@@ -1166,6 +1166,19 @@ describe("preloadCheckout", () => {
     expect(scope.isDone()).toBe(true);
   });
 
+  test("loads the Wix Payment Element script", async () => {
+    const { base44, scripts } = await setup();
+    const wixScript = "https://tpa.wixapps.net/payment-elements/payment-elements.js";
+    nock(serverUrl).get(configPath).reply(200, { wix: { script_url: wixScript } });
+
+    const preload = base44.payments.preloadCheckout("wix");
+    await vi.waitFor(() => expect(scripts).toHaveLength(1));
+    scripts[0].onload();
+
+    await expect(preload).resolves.toBeUndefined();
+    expect(scripts[0].src).toBe(wixScript);
+  });
+
   test("resolves without loading anything when the config has no valid script URL", async () => {
     const { base44, scripts } = await setup();
     nock(serverUrl).get(configPath).reply(200, { paypal: { script_url: "https://evil.example.com/sdk.js" } });

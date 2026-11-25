@@ -571,11 +571,12 @@ function onClickCheckoutId(
  * @internal
  */
 export async function preloadCheckout(
-  provider: "paypal" | "stripe",
+  provider: "paypal" | "stripe" | "wix",
   deps: Pick<MountCheckoutDeps, "getConfig" | "loadScript">
 ): Promise<void> {
   if (typeof window === "undefined" || typeof document === "undefined") return;
-  const read = () => (provider === "paypal" ? browserGlobals().paypal : browserGlobals().Stripe);
+  const read = () =>
+    ({ paypal: browserGlobals().paypal, stripe: browserGlobals().Stripe, wix: browserGlobals().wpe })[provider];
   try {
     if (!read()) {
       await deps.loadScript(await scriptUrlFor(provider, deps));

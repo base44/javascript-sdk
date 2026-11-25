@@ -44,8 +44,10 @@ if (checkout.embedded?.provider === "wix") {
 
 base44.payments.preloadCheckout("paypal");
 
-// @ts-expect-error Only connected checkout providers have a script to preload.
 base44.payments.preloadCheckout("wix");
+
+// @ts-expect-error Only supported checkout providers have a script to preload.
+base44.payments.preloadCheckout("square");
 
 // Base44 Payments pays from the app's own button, so pay() is optional on the mount.
 base44.payments
