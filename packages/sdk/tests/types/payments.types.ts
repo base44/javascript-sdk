@@ -47,6 +47,11 @@ base44.payments.preloadCheckout("paypal");
 // @ts-expect-error Only connected checkout providers have a script to preload.
 base44.payments.preloadCheckout("wix");
 
+// Base44 Payments pays from the app's own button, so pay() is optional on the mount.
+base44.payments
+  .mountCheckout(div, checkout, { onReadyChange: (ready: boolean) => ready })
+  .then((mount) => mount.pay?.() satisfies Promise<void> | undefined);
+
 base44.asServiceRole.payments.listPurchases({ buyer_email: "buyer@example.com" });
 
 // @ts-expect-error Only the service role can filter by another buyer's email.

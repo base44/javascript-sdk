@@ -481,8 +481,6 @@ async function mountWix(
   let paying = false;
   // Set once a payment succeeds or the element rejects one: either way it refuses another.
   let finished = false;
-  // What the app last passed to setDisabled().
-  let disabled = false;
   const notify = (callback: () => void) => {
     if (destroyed) return;
     try {
@@ -491,20 +489,14 @@ async function mountWix(
       console.error("[Base44 SDK] A mountCheckout() callback threw", error);
     }
   };
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "base44-checkout-pay";
-  button.textContent = "Pay";
-  // Off until the element can take the payment.
-  button.disabled = true;
   paymentElement.on("ready", () => {
     ready = true;
-    if (!paying && !finished) button.disabled = disabled;
+    notify(() => options.onReadyChange?.(true));
   });
   // The element fires ready again once it recovers.
   paymentElement.on("loaderror", () => {
     ready = false;
-    button.disabled = true;
+    notify(() => options.onReadyChange?.(false));
   });
 
   const box = document.createElement("div");
@@ -517,47 +509,38 @@ async function mountWix(
     throw error;
   }
 
-  const onClick = () => {
-    if (!ready || paying || finished || disabled) return;
-    paying = true;
-    button.disabled = true;
-    // The executor runs now, so confirmPayment() is called inside the click, before any await.
-    new Promise<WixPaymentResult>((resolve) => resolve(paymentElement.confirmPayment()))
-      .then(async ({ status }) => {
-        if (status !== "succeeded") {
-          notify(() => options.onCancel?.());
-          return;
-        }
-        finished = true;
-        // Runs even after destroy(), so a paid order is still completed.
-        const result = await deps.completeCheckout(checkoutId);
-        notify(() => options.onComplete?.(result));
-      })
-      .catch((error: unknown) => {
-        finished = true;
-        notify(() => options.onError?.(error));
-      })
-      .finally(() => {
-        paying = false;
-        button.disabled = !ready || finished || disabled;
-      });
-  };
-  button.addEventListener("click", onClick);
-  (element as unknown as HTMLElement).appendChild(button);
-
   return {
+    pay() {
+      if (destroyed || !ready || paying || finished) return Promise.resolve();
+      paying = true;
+      // The executor runs now, so confirmPayment() is called inside the app's click, before any await.
+      return new Promise<WixPaymentResult>((resolve) => resolve(paymentElement.confirmPayment()))
+        .then(async ({ status }) => {
+          if (status !== "succeeded") {
+            notify(() => options.onCancel?.());
+            return;
+          }
+          finished = true;
+          // Runs even after destroy(), so a paid order is still completed.
+          const result = await deps.completeCheckout(checkoutId);
+          notify(() => options.onComplete?.(result));
+        })
+        .catch((error: unknown) => {
+          finished = true;
+          notify(() => options.onError?.(error));
+        })
+        .finally(() => {
+          paying = false;
+        });
+    },
     destroy() {
       if (destroyed) return;
       destroyed = true;
-      button.removeEventListener("click", onClick);
-      button.remove();
       box.remove();
       paymentElement.destroy();
     },
-    setDisabled(value) {
-      disabled = value;
-      if (ready && !paying && !finished) button.disabled = value;
-    },
+    // The app owns the Pay button, so it disables its own.
+    setDisabled: () => undefined,
   };
 }
 
