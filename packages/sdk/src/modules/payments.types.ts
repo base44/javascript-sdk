@@ -240,6 +240,10 @@ export interface Purchase {
   metadata?: Record<string, string> | null;
   /** ID of the subscription, for recurring purchases. */
   subscription_id?: string | null;
+  /** Current state of the subscription, for Base44 Payments subscription purchases: `active`, `paused` or `canceled`. `null` while the provider retries a renewal, or when the state couldn't be read. */
+  subscription_status?: "active" | "paused" | "canceled" | null;
+  /** When the paid period ends, as an ISO 8601 date, for an `active` Base44 Payments subscription. After a cancel at period end it's when access ends. `null` otherwise. */
+  paid_until?: string | null;
   /** Where the order ships, whether your app or the provider collected the address. Always `null` unless you call with the service role. Save it on your order record. */
   shipping_address?: ShippingAddress | null;
   /** Shipping fee in minor units, when the checkout charged one. */
@@ -463,9 +467,9 @@ export interface CheckoutMount {
  * | :- | :- | :- | :- |
  * | Redirect checkout | Yes | No | Yes |
  * | Embedded checkout | Yes | Yes, required | No |
- * | Refunds | Yes | Yes | No |
- * | Subscription cancellation | Yes, now or at period end | Yes, now only | No |
- * | Subscription pause and resume | Yes | Yes | No |
+ * | Refunds | Yes | Yes | Yes |
+ * | Subscription cancellation | Yes, now or at period end | Yes, now only | Yes, now or at period end |
+ * | Subscription pause and resume | Yes | Yes | Yes |
  *
  * ## Authentication modes
  *
@@ -789,8 +793,6 @@ export interface ServiceRolePaymentsModule {
    *
    * Retrying with the same `idempotency_key` and `amount` returns the original refund instead of refunding twice. When the call rejects with [`refund_failed`](#paymentserrorcode), the outcome is unknown, so retry it with the same values.
    *
-   * Not supported for Base44 Payments.
-   *
    * @param params - The payment, amount, and idempotency key.
    * @returns Promise resolving to the refund.
    *
@@ -812,7 +814,7 @@ export interface ServiceRolePaymentsModule {
   /**
    * Cancels a subscription, now or at the end of the current billing period.
    *
-   * Not supported for Base44 Payments. PayPal supports canceling now only.
+   * Stripe and Base44 Payments can cancel now or at the end of the period. PayPal can only cancel immediately, so `at_period_end` isn't supported there.
    *
    * @param subscriptionId - The `subscription_id` of the purchase.
    * @param options - When to cancel.
@@ -834,8 +836,6 @@ export interface ServiceRolePaymentsModule {
   /**
    * Pauses a subscription's billing.
    *
-   * Not supported for Base44 Payments.
-   *
    * @param subscriptionId - The `subscription_id` of the purchase.
    * @returns Promise resolving to the subscription's state.
    *
@@ -849,8 +849,6 @@ export interface ServiceRolePaymentsModule {
 
   /**
    * Resumes a paused subscription's billing.
-   *
-   * Not supported for Base44 Payments.
    *
    * @param subscriptionId - The `subscription_id` of the purchase.
    * @returns Promise resolving to the subscription's state.
