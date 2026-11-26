@@ -6,6 +6,7 @@
   "AppPublicSettingsResponse",
   "BrowserSession",
   "BrowserSessionOptions",
+  "ConnectorApiQueryValue",
   "ConnectorApiRequest",
   "ConnectorApiResponse",
   "DeleteManyResult",
