@@ -170,6 +170,7 @@ export type {
   PayPalCheckoutOnClick,
   PaddleCheckoutOnClick,
   CheckoutOnClick,
+  CheckoutTotals,
   PayPalEmbeddedCheckout,
   StripeEmbeddedCheckout,
   MountCheckoutOptions,

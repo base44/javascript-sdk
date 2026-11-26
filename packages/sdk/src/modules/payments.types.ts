@@ -407,7 +407,7 @@ export interface MountCheckoutOptions {
    * Stripe doesn't call this. After a Stripe payment, the buyer returns to the checkout's `success_path` with a `session_id` query parameter. That parameter is the `checkout_id`. Show the result there with [`listPurchases()`](#listpurchases).
    */
   onComplete?: (result: CompleteCheckoutResult) => void;
-  /** Called when the buyer closes the PayPal or Paddle window without paying. The button stays mounted so the buyer can try again. */
+  /** Called when the buyer closes the PayPal window without paying. The button stays mounted so the buyer can try again. */
   onCancel?: () => void;
   /**
    * Called when a PayPal checkout fails after it's mounted, including a declined payment with the [`payment_declined`](#paymentserrorcode) code. The button stays mounted so the buyer can try again. If it keeps failing with `payment_declined`, create a new checkout and mount it. Stripe shows its own errors inside the checkout.
@@ -415,6 +415,24 @@ export interface MountCheckoutOptions {
    * The error is a `Base44Error` when completing the checkout fails, or PayPal's own error object when the PayPal window fails.
    */
   onError?: (error: unknown) => void;
+  /**
+   * Paddle only. Called when Paddle's checkout loads and whenever its amounts change, for example when the buyer picks a country and Paddle works out the tax. Paddle's checkout shows no order summary of its own, and Paddle requires the page to show the subtotal, tax and total, so render them from this.
+   */
+  onTotalsChange?: (totals: CheckoutTotals) => void;
+}
+
+/**
+ * Amounts of the checkout the buyer is paying, in the currency's smallest unit, as [`onTotalsChange`](#mountcheckoutoptions) reports them. Prices include tax, so `total` is the app's amount less any discount.
+ */
+export interface CheckoutTotals {
+  /** Lowercase ISO 4217 currency code. */
+  currency: string;
+  /** Before tax and discount. */
+  subtotal: number;
+  discount: number;
+  tax: number;
+  /** What the buyer pays. */
+  total: number;
 }
 
 /**
@@ -456,7 +474,7 @@ export interface PayPalCheckoutOnClick {
 }
 
 /**
- * A Paddle checkout that [`mountCheckout()`](#mountcheckout) creates when the buyer clicks Paddle's button, so the buyer clicks once and no checkout is created for visitors who don't buy.
+ * A Paddle checkout that [`mountCheckout()`](#mountcheckout) creates when the buyer clicks its "Buy now" button. The SDK then renders Paddle's checkout in place of the button, and no checkout is created for visitors who don't buy.
  */
 export interface PaddleCheckoutOnClick {
   /** Payment provider. */
@@ -540,6 +558,7 @@ export interface PaymentsModule {
    *
    * The SDK loads the provider's library and renders the checkout for you:
    * - PayPal: Renders a PayPal button. When the buyer approves the payment, the SDK calls {@linkcode completeCheckout | completeCheckout()} and then `onComplete`.
+   * - Paddle: Renders Paddle's one-page checkout in the element, in the page's language when Paddle supports it. When the buyer pays, the SDK calls {@linkcode completeCheckout | completeCheckout()} and then `onComplete`. Show the order summary from `onTotalsChange`.
    * - Stripe: Mounts Stripe Embedded Checkout. After paying, the buyer returns to the checkout's `success_path`. Stripe allows one embedded checkout per page, so mounting another Stripe checkout destroys the previous one.
    *
    * To make the checkout appear faster, load the library ahead of time with [`preloadCheckout()`](#preloadcheckout) when the page opens.

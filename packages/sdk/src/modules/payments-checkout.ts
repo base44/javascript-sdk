@@ -1,6 +1,7 @@
 import type {
   CheckoutElement,
   CheckoutMount,
+  CheckoutTotals,
   CompleteCheckoutResult,
   MountableCheckout,
   MountCheckoutOptions,
@@ -136,13 +137,24 @@ function browserGlobals(): { paypal?: PayPalNamespace; Stripe?: StripeConstructo
 interface PaddleEvent {
   name?: string;
   error?: unknown;
+  data?: { currency_code?: string; totals?: { subtotal?: number; discount?: number; tax?: number; total?: number } };
+}
+
+interface PaddleCheckoutSettings {
+  displayMode: "inline";
+  frameTarget: string;
+  frameInitialHeight: string;
+  frameStyle: string;
+  variant: "one-page";
+  showAddDiscounts: boolean;
+  locale?: string;
 }
 
 interface PaddleNamespace {
   Environment: { set(environment: "sandbox"): void };
   Initialize(options: { token: string; eventCallback: (event: PaddleEvent) => void }): void;
   Checkout: {
-    open(options: { transactionId: string; settings?: { showAddDiscounts?: boolean; variant?: "one-page" | "multi-page" }; customer?: { email: string } }): void;
+    open(options: { transactionId: string; settings: PaddleCheckoutSettings; customer?: { email: string } }): void;
     close(): void;
   };
 }
@@ -403,17 +415,45 @@ function initializePaddle(Paddle: PaddleNamespace, embedded: PaddleEmbeddedCheck
 
 type PaddleTarget = { checkoutId: string; embedded: PaddleEmbeddedCheckout };
 
+const PADDLE_LOCALES = ["ar", "zh-Hans", "zh-TW", "da", "nl", "en", "fr", "de", "it", "ja", "ko", "no", "pl", "pt", "pt-BR", "tr", "ru", "es", "sv"];
+let paddleFrames = 0;
+
+/** The page's language when Paddle has it, so the checkout reads like the app; otherwise Paddle uses the browser's. */
+function paddleLocale(): string | undefined {
+  const lang = document.documentElement.lang;
+  if (!lang) return undefined;
+  return PADDLE_LOCALES.find((locale) => locale.toLowerCase() === lang.toLowerCase())
+    ?? PADDLE_LOCALES.find((locale) => locale === lang.split("-")[0].toLowerCase());
+}
+
+/** Paddle.js sends amounts in major units; the Payments API speaks minor units. */
+function paddleTotals(event: PaddleEvent): CheckoutTotals | undefined {
+  const totals = event.data?.totals;
+  const currency = event.data?.currency_code;
+  if (!totals || !currency) return undefined;
+  const digits = new Intl.NumberFormat("en", { style: "currency", currency }).resolvedOptions().maximumFractionDigits ?? 2;
+  const minor = (value?: number) => Math.round((value ?? 0) * 10 ** digits);
+  return {
+    currency: currency.toLowerCase(),
+    subtotal: minor(totals.subtotal),
+    discount: minor(totals.discount),
+    tax: minor(totals.tax),
+    total: minor(totals.total),
+  };
+}
+
 /**
- * Draws a pay button that opens Paddle's checkout. `resolve` is the checkout itself, or what an
- * on-click checkout calls inside the click to create it: Paddle's checkout opens in the page, not a
- * popup, so it can open after the checkout is created and the buyer still clicks once.
+ * Renders Paddle's one-page checkout inside `element`, like Stripe's embedded checkout. A created
+ * checkout renders at once; an on-click one draws a button first and creates the checkout when the
+ * buyer clicks it. Paddle's frame shows no order summary, so the page shows it from `onTotalsChange`.
  */
 async function mountPaddle(
   element: CheckoutElement,
   scriptUrl: string,
   resolve: () => Promise<PaddleTarget>,
   options: MountCheckoutOptions,
-  deps: MountCheckoutDeps
+  deps: MountCheckoutDeps,
+  onClick: boolean
 ): Promise<CheckoutMount> {
   const Paddle = await loadGlobal<PaddleNamespace>(scriptUrl, () => browserGlobals().Paddle, deps.loadScript);
 
@@ -433,6 +473,8 @@ async function mountPaddle(
     }
   };
   const handle = async (event: PaddleEvent) => {
+    const totals = paddleTotals(event);
+    if (totals && options.onTotalsChange) notify(() => options.onTotalsChange?.(totals));
     if (event.name === "checkout.completed") {
       completing = true;
       button.disabled = true;
@@ -458,11 +500,15 @@ async function mountPaddle(
     }
   };
 
+  const host = element as unknown as HTMLElement;
+  const frame = document.createElement("div");
+  frame.className = `base44-paddle-checkout-${++paddleFrames}`;
+  frame.setAttribute("data-base44-checkout-frame", "paddle");
   const button = document.createElement("button");
   button.type = "button";
-  button.textContent = "Pay";
+  button.textContent = "Buy now";
   button.setAttribute("data-base44-checkout", "paddle");
-  const onClick = async () => {
+  const start = async () => {
     if (paid || completing || open || starting || button.disabled) return;
     starting = true;
     try {
@@ -471,22 +517,37 @@ async function mountPaddle(
       checkoutId = target.checkoutId;
       onPaddleEvent = (event) => void handle(event);
       open = true;
+      button.remove();
+      host.appendChild(frame);
+      const locale = paddleLocale();
       Paddle.Checkout.open({
         transactionId: target.embedded.transaction_id,
-        // The app prices discounts itself through createCheckout, so Paddle's own coupon field would be a second one.
-        settings: { showAddDiscounts: false, variant: "one-page" },
+        settings: {
+          displayMode: "inline",
+          frameTarget: frame.className,
+          frameInitialHeight: "450",
+          // Paddle needs at least 312px and its footer in view.
+          frameStyle: "width: 100%; min-width: 312px; background-color: transparent; border: none;",
+          variant: "one-page",
+          // The app prices discounts itself through createCheckout, so Paddle's own coupon field would be a second one.
+          showAddDiscounts: false,
+          ...(locale ? { locale } : {}),
+        },
         ...(target.embedded.customer_email ? { customer: { email: target.embedded.customer_email } } : {}),
       });
     } catch (error) {
       open = false;
+      frame.remove();
+      if (onClick && !destroyed) host.appendChild(button);
       notify(() => options.onError?.(error));
     } finally {
       starting = false;
     }
   };
-  const listener = () => void onClick();
+  const listener = () => void start();
   button.addEventListener("click", listener);
-  (element as unknown as HTMLElement).appendChild(button);
+  if (onClick) host.appendChild(button);
+  else await start();
 
   return {
     destroy() {
@@ -495,6 +556,7 @@ async function mountPaddle(
       button.removeEventListener("click", listener);
       button.remove();
       if (open) Paddle.Checkout.close();
+      frame.remove();
     },
     setDisabled(disabled) {
       if (!completing && !paid) button.disabled = disabled;
@@ -572,7 +634,7 @@ export async function mountCheckout(
     if (checkout.provider === "paddle") {
       if (typeof checkout.createCheckout !== "function") throw new Error("A Paddle checkout on click needs createCheckout()");
       const create = checkout.createCheckout;
-      return mountPaddle(element, await scriptUrlFor("paddle", deps), async () => paddleTarget(await create()), options, deps);
+      return mountPaddle(element, await scriptUrlFor("paddle", deps), async () => paddleTarget(await create()), options, deps, true);
     }
     return mountPayPalOnClick(element, checkout, options, deps);
   }
@@ -597,7 +659,7 @@ export async function mountCheckout(
       );
     case "paddle": {
       const target = paddleTarget(checkout);
-      return mountPaddle(element, await scriptUrlFor("paddle", deps), () => Promise.resolve(target), options, deps);
+      return mountPaddle(element, await scriptUrlFor("paddle", deps), () => Promise.resolve(target), options, deps, false);
     }
     default:
       throw new Error(
