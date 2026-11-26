@@ -142,7 +142,7 @@ interface PaddleNamespace {
   Environment: { set(environment: "sandbox"): void };
   Initialize(options: { token: string; eventCallback: (event: PaddleEvent) => void }): void;
   Checkout: {
-    open(options: { transactionId: string; settings?: { showAddDiscounts?: boolean }; customer?: { email: string } }): void;
+    open(options: { transactionId: string; settings?: { showAddDiscounts?: boolean; variant?: "one-page" | "multi-page" }; customer?: { email: string } }): void;
     close(): void;
   };
 }
@@ -474,7 +474,7 @@ async function mountPaddle(
       Paddle.Checkout.open({
         transactionId: target.embedded.transaction_id,
         // The app prices discounts itself through createCheckout, so Paddle's own coupon field would be a second one.
-        settings: { showAddDiscounts: false },
+        settings: { showAddDiscounts: false, variant: "one-page" },
         ...(target.embedded.customer_email ? { customer: { email: target.embedded.customer_email } } : {}),
       });
     } catch (error) {

@@ -612,7 +612,7 @@ describe("mountCheckout", () => {
     container.children[0].click();
     await vi.waitFor(() => expect(Paddle.Checkout.open).toHaveBeenCalledWith({
       transactionId: "txn_1",
-      settings: { showAddDiscounts: false },
+      settings: { showAddDiscounts: false, variant: "one-page" },
       customer: { email: "buyer@example.com" },
     }));
     expect(Paddle.Environment.set).toHaveBeenCalledWith("sandbox");
@@ -666,7 +666,7 @@ describe("mountCheckout", () => {
 
     container.children[0].click();
     await vi.waitFor(() => expect(Paddle.Checkout.open).toHaveBeenCalledWith(
-      expect.objectContaining({ transactionId: "txn_1", settings: { showAddDiscounts: false } })
+      expect.objectContaining({ transactionId: "txn_1", settings: { showAddDiscounts: false, variant: "one-page" } })
     ));
     expect(createCheckout).toHaveBeenCalledTimes(1);
     expect(Paddle.Initialize).toHaveBeenCalledWith(expect.objectContaining({ token: "test_token" }));
