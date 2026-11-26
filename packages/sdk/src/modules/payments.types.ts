@@ -94,6 +94,14 @@ export interface CheckoutShipping {
 }
 
 /**
+ * Billing address for a checkout.
+ */
+export interface CheckoutBilling {
+  /** Buyer's billing address. */
+  address?: ShippingAddress;
+}
+
+/**
  * How the buyer pays.
  *
  * - `'redirect'`: The buyer leaves the app for the provider's hosted checkout page at `redirect_url`.
@@ -119,7 +127,7 @@ export interface CreateCheckoutParams {
   metadata?: Record<string, string>;
   /** Key that makes retries return the same checkout instead of creating another, 1 to 200 characters. Not supported for Base44 Payments or PayPal subscriptions. */
   idempotency_key?: string;
-  /** How the buyer pays. Defaults to `'redirect'`. PayPal apps must pass `'embedded'`, and Base44 Payments supports only `'redirect'`. */
+  /** How the buyer pays. Defaults to `'redirect'`. PayPal apps must pass `'embedded'`. */
   presentation?: CheckoutPresentation;
   /**
    * Shipping address and fee. Allowed only when at least one item is `shippable`. Supported for PayPal one-time checkouts only. Other providers and subscriptions reject it with [`invalid_request`](#paymentserrorcode).
@@ -127,6 +135,10 @@ export interface CreateCheckoutParams {
    * Compute the fee in a backend function, never in the browser. When the fee depends on the address, such as by distance or zone, collect the address in your app and pass it in `address`. PayPal shows the address to the buyer locked, so the order ships to the address you computed the fee for. When the fee doesn't depend on the address, pass only `amount` and PayPal asks the buyer for the address.
    */
   shipping?: CheckoutShipping;
+  /**
+   * Buyer's billing address. Supported only by Base44 Payments (Wix) embedded checkouts; other providers reject it with [`invalid_request`](#paymentserrorcode).
+   */
+  billing?: CheckoutBilling;
 }
 
 /**
@@ -158,9 +170,22 @@ export interface PayPalEmbeddedCheckout {
 }
 
 /**
+ * Data that the Wix Payment Element needs to render, for Base44 Payments.
+ */
+export interface WixEmbeddedCheckout {
+  /** Payment provider. */
+  provider: "wix";
+  /** Client ID the payment element signs in with. May be absent, so don't rely on it. */
+  client_id?: string;
+}
+
+/**
  * Data that an embedded checkout needs to render, by provider.
  */
-export type EmbeddedCheckout = StripeEmbeddedCheckout | PayPalEmbeddedCheckout;
+export type EmbeddedCheckout =
+  | StripeEmbeddedCheckout
+  | PayPalEmbeddedCheckout
+  | WixEmbeddedCheckout;
 
 /**
  * Result of [`createCheckout()`](#createcheckout).
@@ -386,19 +411,23 @@ export type PaymentsErrorCode =
  */
 export interface MountCheckoutOptions {
   /**
-   * Called after the buyer approves a PayPal payment and the SDK completes the checkout. Use it to update the page, not to grant access.
+   * Called after the buyer approves a PayPal payment, or pays with Base44 Payments, and the SDK completes the checkout. Use it to update the page, not to grant access.
    *
    * Stripe doesn't call this. After a Stripe payment, the buyer returns to the checkout's `success_path` with a `session_id` query parameter. That parameter is the `checkout_id`. Show the result there with [`listPurchases()`](#listpurchases).
    */
   onComplete?: (result: CompleteCheckoutResult) => void;
-  /** Called when the buyer closes the PayPal window without paying. The button stays mounted so the buyer can try again. */
+  /** Called when the buyer closes the PayPal window without paying, or when a Base44 Payments payment doesn't go through, a declined one included. The buyer can try again: PayPal's button stays mounted, and for Base44 Payments call `pay()` again. */
   onCancel?: () => void;
   /**
-   * Called when a PayPal checkout fails after it's mounted, including a declined payment with the [`payment_declined`](#paymentserrorcode) code. The button stays mounted so the buyer can try again. If it keeps failing with `payment_declined`, create a new checkout and mount it. Stripe shows its own errors inside the checkout.
+   * Called when a PayPal or Base44 Payments checkout fails after it's mounted. PayPal's button stays mounted so the buyer can try again. For Base44 Payments, `pay()` does nothing after this, since the payment element refuses another payment, so create a new checkout and mount it. For PayPal this includes a declined payment with the [`payment_declined`](#paymentserrorcode) code. If it keeps failing with `payment_declined`, create a new checkout and mount it. A declined Base44 Payments payment calls `onCancel` instead. Stripe shows its own errors inside the checkout.
    *
-   * The error is a `Base44Error` when completing the checkout fails, or PayPal's own error object when the PayPal window fails.
+   * The error is a `Base44Error` when completing the checkout fails, or the provider's own error object when the PayPal window or the Wix Payment Element fails.
    */
   onError?: (error: unknown) => void;
+  /**
+   * Base44 Payments only. Called with `true` when the payment element can take a payment, and with `false` if it stops loading. It can be called again with `true` once the element recovers. Enable your Pay button only while it's ready.
+   */
+  onReadyChange?: (ready: boolean) => void;
 }
 
 /**
@@ -445,8 +474,16 @@ export interface PayPalCheckoutOnClick {
 export interface CheckoutMount {
   /** Removes the checkout from the page. Call it when the component that holds it unmounts. For Stripe, mounting another checkout destroys this one for you. */
   destroy: () => void;
-  /** Grays out PayPal's button and ignores clicks, for example until a required form is filled in. After a payment completes the button stays off, so `setDisabled(false)` can't start a second payment. Stripe ignores it. */
+  /** Grays out the PayPal button and ignores clicks, for example until a required form is filled in. After a payment completes the button stays off, so `setDisabled(false)` can't start a second payment. Stripe and Base44 Payments ignore it: Base44 Payments uses your own button, so disable that instead. */
   setDisabled: (disabled: boolean) => void;
+  /**
+   * Base44 Payments only. Pays with what the buyer entered in the payment element. Call it from your own Pay button's click handler, synchronously and before any `await`, so the payment can open any window it needs.
+   *
+   * When the payment succeeds, the SDK calls {@linkcode PaymentsModule.completeCheckout | completeCheckout()} and then `onComplete`. Otherwise it calls `onCancel` or `onError`. It does nothing while the element isn't ready, while a payment is in progress, or after a payment succeeded or failed, so a second click can't charge twice.
+   *
+   * @returns Promise resolving once the payment and its callbacks finish. It never rejects.
+   */
+  pay?: () => Promise<void>;
 }
 
 /**
@@ -466,7 +503,7 @@ export interface CheckoutMount {
  * | | Stripe | PayPal | Base44 Payments |
  * | :- | :- | :- | :- |
  * | Redirect checkout | Yes | No | Yes |
- * | Embedded checkout | Yes | Yes, required | No |
+ * | Embedded checkout | Yes | Yes, required | Yes |
  * | Refunds | Yes | Yes | Yes |
  * | Subscription cancellation | Yes, now or at period end | Yes, now only | Yes, now or at period end |
  * | Subscription pause and resume | Yes | Yes | Yes |
@@ -475,7 +512,7 @@ export interface CheckoutMount {
  *
  * This module is available to use with a client in all authentication modes:
  *
- * - **Anonymous or user authentication** (`base44.payments`): Preloads and mounts embedded checkouts, completes PayPal checkouts, and lists the current user's own purchases.
+ * - **Anonymous or user authentication** (`base44.payments`): Preloads and mounts embedded checkouts, completes PayPal and embedded Base44 Payments checkouts, and lists the current user's own purchases.
  * - **Service role authentication** (`base44.asServiceRole.payments`): Creates checkouts, lists any purchase, refunds payments, and changes subscriptions. Use the [service role methods](#service-role-methods) in backend functions.
  *
  * @groupDescription Methods
@@ -483,13 +520,13 @@ export interface CheckoutMount {
  */
 export interface PaymentsModule {
   /**
-   * Starts downloading the provider's JavaScript library, Stripe.js or the PayPal JavaScript SDK, before you mount a checkout, so the checkout appears faster.
+   * Starts downloading the provider's JavaScript library, Stripe.js, the PayPal JavaScript SDK or the Wix Payment Element, before you mount a checkout, so the checkout appears faster.
    *
    * Call it when the checkout page or form opens, while the buyer is still filling it in. {@linkcode mountCheckout | mountCheckout()} needs the library to render the checkout, and downloads it itself if you didn't preload it.
    *
    * It never rejects, so you don't need to await it or catch errors. If the library can't load, `mountCheckout()` tries again and rejects with the error. Loading the library requires a browser environment and is skipped in the backend.
    *
-   * @param provider - The provider the app is connected to.
+   * @param provider - The provider the app is connected to. Use `'wix'` for Base44 Payments.
    * @returns Promise resolving once the library has loaded or failed to load.
    *
    * @example
@@ -498,7 +535,7 @@ export interface PaymentsModule {
    * base44.payments.preloadCheckout('paypal');
    * ```
    */
-  preloadCheckout(provider: "paypal" | "stripe"): Promise<void>;
+  preloadCheckout(provider: "paypal" | "stripe" | "wix"): Promise<void>;
 
   /**
    * Renders an embedded checkout inside an element on the page.
@@ -508,6 +545,7 @@ export interface PaymentsModule {
    * The SDK loads the provider's library and renders the checkout for you:
    * - PayPal: Renders a PayPal button. When the buyer approves the payment, the SDK calls {@linkcode completeCheckout | completeCheckout()} and then `onComplete`.
    * - Stripe: Mounts Stripe Embedded Checkout. After paying, the buyer returns to the checkout's `success_path`. Stripe allows one embedded checkout per page, so mounting another Stripe checkout destroys the previous one.
+   * - Base44 Payments: Renders the Wix Payment Element, with no button of its own. Add your own Pay button, enable it while `onReadyChange` reports the element is ready, and call the mount's `pay()` from its click handler. When the payment succeeds, the SDK calls {@linkcode completeCheckout | completeCheckout()} and then `onComplete`.
    *
    * To make the checkout appear faster, load the library ahead of time with [`preloadCheckout()`](#preloadcheckout) when the page opens.
    *
@@ -559,6 +597,27 @@ export interface PaymentsModule {
    * ```
    *
    * @example
+   * ```typescript
+   * // Base44 Payments with your own Pay button
+   * const payButton = document.getElementById('pay') as HTMLButtonElement;
+   * payButton.disabled = true;
+   * const mount = await base44.payments.mountCheckout(
+   *   document.getElementById('checkout')!,
+   *   checkout,
+   *   {
+   *     onReadyChange: (ready) => (payButton.disabled = !ready),
+   *     onComplete: () => navigate('/thank-you'),
+   *     onCancel: () => (payButton.disabled = false),
+   *   }
+   * );
+   *
+   * payButton.addEventListener('click', () => {
+   *   payButton.disabled = true;
+   *   mount.pay?.();
+   * });
+   * ```
+   *
+   * @example
    * ```tsx
    * // React component
    * function Checkout({ checkout }: { checkout: CreateCheckoutResult }) {
@@ -588,11 +647,11 @@ export interface PaymentsModule {
   ): Promise<CheckoutMount>;
 
   /**
-   * Completes a PayPal checkout after the buyer approves it.
+   * Completes a PayPal or embedded Base44 Payments checkout after the buyer pays.
    *
    * When you use {@linkcode mountCheckout | mountCheckout()}, it calls this for you. Call it directly only if you render your own PayPal button. Calling it again for the same checkout returns the same result.
    *
-   * Only PayPal checkouts need completing. Other providers reject with [`complete_not_supported`](#paymentserrorcode).
+   * Only PayPal and embedded Base44 Payments checkouts need completing. Other checkouts reject with [`complete_not_supported`](#paymentserrorcode).
    *
    * To complete the checkout from a backend function instead, use [`completeCheckout()`](#service-role-methods) with the service role.
    *
@@ -726,11 +785,11 @@ export interface ServiceRolePaymentsModule {
   createCheckout(params: CreateCheckoutParams): Promise<CreateCheckoutResult>;
 
   /**
-   * Completes a PayPal checkout from a backend function, after the buyer approves it.
+   * Completes a PayPal or embedded Base44 Payments checkout from a backend function, after the buyer pays.
    *
    * Use it when you render your own PayPal button and its `onApprove` handler sends the checkout ID to your backend. Calling it again for the same checkout returns the same result.
    *
-   * Only PayPal checkouts need completing. Other providers reject with [`complete_not_supported`](#paymentserrorcode).
+   * Only PayPal and embedded Base44 Payments checkouts need completing. Other checkouts reject with [`complete_not_supported`](#paymentserrorcode).
    *
    * @param checkoutId - The `checkout_id` from {@linkcode createCheckout | createCheckout()}.
    * @returns Promise resolving to the checkout's payment status.

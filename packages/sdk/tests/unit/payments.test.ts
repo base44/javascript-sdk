@@ -5,6 +5,7 @@ import type {
   MountableCheckout,
   PayPalEmbeddedCheckout,
   StripeEmbeddedCheckout,
+  WixEmbeddedCheckout,
 } from "../../src/modules/payments.types.ts";
 
 describe("Payments module", () => {
@@ -268,6 +269,7 @@ describe("mountCheckout", () => {
   const config = {
     paypal: { script_url: "https://www.sandbox.paypal.com/web-sdk/v6/core" },
     stripe: { script_url: "https://js.stripe.com/v3/" },
+    wix: { script_url: "https://tpa.wixapps.net/payment-elements/payment-elements.js" },
   };
   let getConfig: ReturnType<typeof vi.fn>;
   const deps = () => ({ completeCheckout, getConfig, loadScript });
@@ -766,6 +768,259 @@ describe("mountCheckout", () => {
     expect(loadScript).not.toHaveBeenCalled();
   });
 
+  describe("Wix Payment Element", () => {
+    const wixCheckout = (): MountableCheckout => ({
+      checkout_id: "ORDER1",
+      currency: "usd",
+      embedded: {
+        provider: "wix",
+        client_id: "client-1",
+      } satisfies WixEmbeddedCheckout,
+    });
+
+    function installWix(confirmPayment = vi.fn().mockResolvedValue({ status: "succeeded" })) {
+      const handlers: Record<string, () => void> = {};
+      const element = {
+        mount: vi.fn().mockResolvedValue(undefined),
+        on: vi.fn((event: string, handler: () => void) => (handlers[event] = handler)),
+        confirmPayment,
+        destroy: vi.fn(),
+      };
+      const create = vi.fn(() => element);
+      const wpe = vi.fn(() => ({ create }));
+      loadScript.mockImplementation(async () => {
+        (window as any).wpe = wpe;
+      });
+      vi.stubGlobal("document", {
+        createElement: (tag: string) => new FakeElement(tag),
+        documentElement: { lang: "de-DE" },
+      });
+      return {
+        wpe,
+        create,
+        element,
+        ready: () => handlers.ready(),
+        loadError: () => handlers.loaderror(),
+      };
+    }
+
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+    test("mounts the element with no button of its own, and destroy removes it", async () => {
+      const { wpe, create, element } = installWix();
+
+      const mount = await mountCheckout(container as any, wixCheckout(), {}, deps());
+
+      expect(loadScript).toHaveBeenCalledWith(
+        "https://tpa.wixapps.net/payment-elements/payment-elements.js"
+      );
+      expect(wpe).toHaveBeenCalledWith({ getAccessToken: expect.any(Function), locale: "de" });
+      expect(create).toHaveBeenCalledWith("checkout", { intentId: "ORDER1" });
+      expect(container.children).toHaveLength(1);
+      expect(element.mount).toHaveBeenCalledWith(container.children[0]);
+
+      mount.destroy();
+      mount.destroy();
+      expect(container.children).toHaveLength(0);
+      expect(element.destroy).toHaveBeenCalledTimes(1);
+    });
+
+    describe("visitor access token", () => {
+      let fetchMock: ReturnType<typeof vi.fn>;
+      const tokenResponse = (n: number, expiresIn = 3600) => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: `access-${n}`, refresh_token: `refresh-${n}`, expires_in: expiresIn }),
+      });
+      const bodies = () => fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body));
+
+      beforeEach(() => {
+        let n = 0;
+        fetchMock = vi.fn(async () => tokenResponse(++n));
+        vi.stubGlobal("fetch", fetchMock);
+      });
+
+      async function mountedGetAccessToken(wpe = installWix().wpe) {
+        await mountCheckout(container as any, wixCheckout(), {}, deps());
+        return wpe.mock.calls.at(-1)![0].getAccessToken;
+      }
+
+      test("mints an anonymous visitor once and shares it across calls and mounts", async () => {
+        const { wpe } = installWix();
+        const first = await mountedGetAccessToken(wpe);
+        await expect(Promise.all([first(), first()])).resolves.toEqual(["access-1", "access-1"]);
+        const second = await mountedGetAccessToken(wpe);
+        await expect(second()).resolves.toBe("access-1");
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(fetchMock).toHaveBeenCalledWith("https://www.wixapis.com/oauth2/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clientId: "client-1", grantType: "anonymous" }),
+        });
+      });
+
+      test("renews through the refresh token when asked or when it expires", async () => {
+        const getAccessToken = await mountedGetAccessToken();
+        fetchMock.mockResolvedValueOnce(tokenResponse(1, 30));
+        await getAccessToken();
+
+        await expect(getAccessToken()).resolves.toBe("access-1");
+        await expect(getAccessToken({ renew: true })).resolves.toBe("access-2");
+
+        expect(bodies().slice(1)).toEqual([
+          { refresh_token: "refresh-1", grantType: "refresh_token" },
+          { refresh_token: "refresh-1", grantType: "refresh_token" },
+        ]);
+      });
+
+      test("gives callers during a renewal the renewed token", async () => {
+        const { wpe } = installWix();
+        const first = await mountedGetAccessToken(wpe);
+        const second = await mountedGetAccessToken(wpe);
+        await first();
+
+        const renewing = first({ renew: true });
+        await expect(second()).resolves.toBe("access-2");
+        await expect(renewing).resolves.toBe("access-2");
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+      });
+
+      test("mints a new visitor when the refresh fails", async () => {
+        const getAccessToken = await mountedGetAccessToken();
+        await getAccessToken();
+        fetchMock.mockResolvedValueOnce({ ok: false, status: 400 });
+
+        await expect(getAccessToken({ renew: true })).resolves.toBe("access-2");
+
+        expect(bodies().map((body) => body.grantType)).toEqual([
+          "anonymous",
+          "refresh_token",
+          "anonymous",
+        ]);
+      });
+
+      test("throws when the token can't be minted, and tries again on the next call", async () => {
+        const getAccessToken = await mountedGetAccessToken();
+        fetchMock.mockResolvedValueOnce({ ok: false, status: 503 });
+
+        await expect(getAccessToken()).rejects.toThrow(
+          "The Wix anonymous token request failed with status 503"
+        );
+        await expect(getAccessToken()).resolves.toBe("access-1");
+      });
+    });
+
+    test("rejects a checkout without a client ID before fetching the config", async () => {
+      installWix();
+      const checkout = { ...wixCheckout(), embedded: { provider: "wix" as const } };
+
+      await expect(mountCheckout(container as any, checkout, {}, deps())).rejects.toThrow(
+        "no client ID"
+      );
+      expect(getConfig).not.toHaveBeenCalled();
+    });
+
+    test("reports readiness and ignores pay() until the element is ready", async () => {
+      const { element, ready, loadError } = installWix();
+      const onReadyChange = vi.fn();
+      const mount = await mountCheckout(container as any, wixCheckout(), { onReadyChange }, deps());
+
+      await mount.pay!();
+      expect(element.confirmPayment).not.toHaveBeenCalled();
+
+      ready();
+      loadError();
+      await mount.pay!();
+      expect(element.confirmPayment).not.toHaveBeenCalled();
+      ready();
+      expect(onReadyChange.mock.calls).toEqual([[true], [false], [true]]);
+    });
+
+    test("rejects and cleans up when the element fails to mount", async () => {
+      const { element } = installWix();
+      element.mount.mockRejectedValue(new Error("auth failed"));
+
+      await expect(mountCheckout(container as any, wixCheckout(), {}, deps())).rejects.toThrow(
+        "auth failed"
+      );
+      expect(container.children).toHaveLength(0);
+      expect(element.destroy).toHaveBeenCalledTimes(1);
+    });
+
+    test("confirms inside the call, completes the checkout, and refuses to pay twice", async () => {
+      const { element, ready } = installWix();
+      completeCheckout.mockResolvedValue({ checkout_id: "ORDER1", status: "paid" });
+      const onComplete = vi.fn();
+      const mount = await mountCheckout(container as any, wixCheckout(), { onComplete }, deps());
+      ready();
+
+      const paying = mount.pay!();
+      expect(element.confirmPayment).toHaveBeenCalledTimes(1);
+      await mount.pay!();
+      await paying;
+
+      expect(element.confirmPayment).toHaveBeenCalledTimes(1);
+      expect(completeCheckout).toHaveBeenCalledWith("ORDER1");
+      expect(onComplete).toHaveBeenCalledWith({ checkout_id: "ORDER1", status: "paid" });
+      await mount.pay!();
+      expect(element.confirmPayment).toHaveBeenCalledTimes(1);
+    });
+
+    test("doesn't charge again when completing the checkout fails after the payment", async () => {
+      const { element, ready } = installWix();
+      const failure = new Error("network");
+      completeCheckout.mockRejectedValue(failure);
+      const onError = vi.fn();
+      const mount = await mountCheckout(container as any, wixCheckout(), { onError }, deps());
+      ready();
+
+      await mount.pay!();
+      await mount.pay!();
+
+      expect(onError).toHaveBeenCalledWith(failure);
+      expect(element.confirmPayment).toHaveBeenCalledTimes(1);
+    });
+
+    test("reports a canceled payment and lets the buyer try again", async () => {
+      const { element, ready } = installWix(vi.fn().mockResolvedValue({ status: "canceled" }));
+      const onCancel = vi.fn();
+      const mount = await mountCheckout(container as any, wixCheckout(), { onCancel }, deps());
+      ready();
+
+      await mount.pay!();
+      await mount.pay!();
+
+      expect(onCancel).toHaveBeenCalledTimes(2);
+      expect(completeCheckout).not.toHaveBeenCalled();
+      expect(element.confirmPayment).toHaveBeenCalledTimes(2);
+    });
+
+    test("reports a failed payment and refuses another, since the element does", async () => {
+      const failure = new Error("frame gone");
+      const { element, ready } = installWix(vi.fn().mockRejectedValue(failure));
+      const onError = vi.fn();
+      const mount = await mountCheckout(container as any, wixCheckout(), { onError }, deps());
+      ready();
+
+      await mount.pay!();
+      await mount.pay!();
+
+      expect(onError).toHaveBeenCalledWith(failure);
+      expect(element.confirmPayment).toHaveBeenCalledTimes(1);
+    });
+
+    test("rejects a script URL from another host and adds no script", async () => {
+      installWix();
+      getConfig.mockResolvedValue({ ...config, wix: { script_url: "https://js.stripe.com/v3/" } });
+
+      await expect(mountCheckout(container as any, wixCheckout(), {}, deps())).rejects.toThrow(
+        "no valid Wix script URL"
+      );
+      expect(loadScript).not.toHaveBeenCalled();
+    });
+  });
+
   test("rejects a redirect checkout", async () => {
     const checkout = { checkout_id: "cs_1", currency: "usd", embedded: null };
 
@@ -909,6 +1164,19 @@ describe("preloadCheckout", () => {
     expect(scripts[0].src).toBe(scriptUrl);
     expect(scripts).toHaveLength(1);
     expect(scope.isDone()).toBe(true);
+  });
+
+  test("loads the Wix Payment Element script", async () => {
+    const { base44, scripts } = await setup();
+    const wixScript = "https://tpa.wixapps.net/payment-elements/payment-elements.js";
+    nock(serverUrl).get(configPath).reply(200, { wix: { script_url: wixScript } });
+
+    const preload = base44.payments.preloadCheckout("wix");
+    await vi.waitFor(() => expect(scripts).toHaveLength(1));
+    scripts[0].onload();
+
+    await expect(preload).resolves.toBeUndefined();
+    expect(scripts[0].src).toBe(wixScript);
   });
 
   test("resolves without loading anything when the config has no valid script URL", async () => {
