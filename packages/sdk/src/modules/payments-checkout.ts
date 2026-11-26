@@ -140,6 +140,11 @@ interface PaddleEvent {
   data?: { currency_code?: string; totals?: { subtotal?: number; discount?: number; tax?: number; total?: number } };
 }
 
+interface PaddleCustomer {
+  email: string;
+  address?: { countryCode: string; postalCode?: string };
+}
+
 interface PaddleCheckoutSettings {
   displayMode: "inline";
   frameTarget: string;
@@ -154,7 +159,7 @@ interface PaddleNamespace {
   Environment: { set(environment: "sandbox"): void };
   Initialize(options: { token: string; eventCallback: (event: PaddleEvent) => void }): void;
   Checkout: {
-    open(options: { transactionId: string; settings: PaddleCheckoutSettings; customer?: { email: string } }): void;
+    open(options: { transactionId: string; settings: PaddleCheckoutSettings; customer?: PaddleCustomer }): void;
     close(): void;
   };
 }
@@ -426,6 +431,19 @@ function paddleLocale(): string | undefined {
     ?? PADDLE_LOCALES.find((locale) => locale === lang.split("-")[0].toLowerCase());
 }
 
+/** The buyer Paddle opens with; with a country it shows only the card. Paddle takes an address only with an email. */
+function paddleCustomer(embedded: PaddleEmbeddedCheckout): PaddleCustomer | undefined {
+  if (!embedded.customer_email) return undefined;
+  if (!embedded.customer_country) return { email: embedded.customer_email };
+  return {
+    email: embedded.customer_email,
+    address: {
+      countryCode: embedded.customer_country,
+      ...(embedded.customer_postal_code ? { postalCode: embedded.customer_postal_code } : {}),
+    },
+  };
+}
+
 /** Paddle.js sends amounts in major units; the Payments API speaks minor units. */
 function paddleTotals(event: PaddleEvent): CheckoutTotals | undefined {
   const totals = event.data?.totals;
@@ -520,6 +538,7 @@ async function mountPaddle(
       button.remove();
       host.appendChild(frame);
       const locale = paddleLocale();
+      const customer = paddleCustomer(target.embedded);
       Paddle.Checkout.open({
         transactionId: target.embedded.transaction_id,
         settings: {
@@ -533,7 +552,7 @@ async function mountPaddle(
           showAddDiscounts: false,
           ...(locale ? { locale } : {}),
         },
-        ...(target.embedded.customer_email ? { customer: { email: target.embedded.customer_email } } : {}),
+        ...(customer ? { customer } : {}),
       });
     } catch (error) {
       open = false;

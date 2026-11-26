@@ -643,6 +643,18 @@ describe("mountCheckout", () => {
     expect(onTotalsChange).toHaveBeenNthCalledWith(2, { currency: "jpy", subtotal: 900, discount: 0, tax: 82, total: 982 });
   });
 
+  test("opens Paddle on the card step with the buyer's country and postal code the backend returned", async () => {
+    const { Paddle } = installPaddle();
+    const checkout = paddleCheckout();
+    Object.assign(checkout.embedded!, { customer_country: "DE", customer_postal_code: "10115" });
+
+    await mountCheckout(container as any, checkout, {}, deps());
+
+    expect(Paddle.Checkout.open).toHaveBeenCalledWith(expect.objectContaining({
+      customer: { email: "buyer@example.com", address: { countryCode: "DE", postalCode: "10115" } },
+    }));
+  });
+
   test("destroy closes Paddle's checkout and removes its frame", async () => {
     const { Paddle } = installPaddle();
     const mount = await mountCheckout(container as any, paddleCheckout(), {}, deps());

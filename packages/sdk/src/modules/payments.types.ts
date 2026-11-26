@@ -61,6 +61,10 @@ export interface CheckoutBuyer {
   last_name?: string;
   /** Buyer's phone number. */
   phone?: string;
+  /** Buyer's billing country, an ISO 3166-1 alpha-2 code such as `"DE"`. Paddle works out tax from it and, with `email`, opens its checkout straight on the card. Other providers ask the buyer themselves. */
+  country?: string;
+  /** Buyer's billing postal code. Pass it with `country` where the country has postal codes; Paddle needs it to work out tax there. */
+  postal_code?: string;
 }
 
 /**
@@ -171,6 +175,10 @@ export interface PaddleEmbeddedCheckout {
   environment: "sandbox" | "production";
   /** Buyer email to prefill, when the checkout named one. */
   customer_email?: string | null;
+  /** Buyer country to prefill, when the checkout named one with an email. */
+  customer_country?: string | null;
+  /** Buyer postal code to prefill, when the checkout named one with a country. */
+  customer_postal_code?: string | null;
 }
 
 /**
