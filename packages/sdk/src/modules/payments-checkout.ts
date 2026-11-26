@@ -4,6 +4,7 @@ import type {
   CompleteCheckoutResult,
   MountableCheckout,
   MountCheckoutOptions,
+  CheckoutOnClick,
   PaddleEmbeddedCheckout,
   PayPalCheckoutOnClick,
   PayPalEmbeddedCheckout,
@@ -141,7 +142,7 @@ interface PaddleNamespace {
   Environment: { set(environment: "sandbox"): void };
   Initialize(options: { token: string; eventCallback: (event: PaddleEvent) => void }): void;
   Checkout: {
-    open(options: { transactionId: string; customer?: { email: string } }): void;
+    open(options: { transactionId: string; settings?: { showAddDiscounts?: boolean }; customer?: { email: string } }): void;
     close(): void;
   };
 }
@@ -389,15 +390,8 @@ async function mountPayPal(
 let paddleToken: string | null = null;
 let onPaddleEvent: ((event: PaddleEvent) => void) | null = null;
 
-async function mountPaddle(
-  element: CheckoutElement,
-  scriptUrl: string,
-  embedded: PaddleEmbeddedCheckout,
-  checkoutId: string,
-  options: MountCheckoutOptions,
-  deps: MountCheckoutDeps
-): Promise<CheckoutMount> {
-  const Paddle = await loadGlobal<PaddleNamespace>(scriptUrl, () => browserGlobals().Paddle, deps.loadScript);
+/** Sets Paddle.js up for this seller on first use; a page serves one seller's token. */
+function initializePaddle(Paddle: PaddleNamespace, embedded: PaddleEmbeddedCheckout): void {
   if (paddleToken === null) {
     if (embedded.environment === "sandbox") Paddle.Environment.set("sandbox");
     Paddle.Initialize({ token: embedded.client_token, eventCallback: (event) => onPaddleEvent?.(event) });
@@ -405,12 +399,31 @@ async function mountPaddle(
   } else if (paddleToken !== embedded.client_token) {
     throw new Error("Paddle is already set up on this page for another seller. Reload the page to check out.");
   }
+}
+
+type PaddleTarget = { checkoutId: string; embedded: PaddleEmbeddedCheckout };
+
+/**
+ * Draws a pay button that opens Paddle's checkout. `resolve` is the checkout itself, or what an
+ * on-click checkout calls inside the click to create it: Paddle's checkout opens in the page, not a
+ * popup, so it can open after the checkout is created and the buyer still clicks once.
+ */
+async function mountPaddle(
+  element: CheckoutElement,
+  scriptUrl: string,
+  resolve: () => Promise<PaddleTarget>,
+  options: MountCheckoutOptions,
+  deps: MountCheckoutDeps
+): Promise<CheckoutMount> {
+  const Paddle = await loadGlobal<PaddleNamespace>(scriptUrl, () => browserGlobals().Paddle, deps.loadScript);
 
   let destroyed = false;
   let open = false;
+  let starting = false;
   let completing = false;
   // Set once the payment goes through: the transaction is paid, so the button stays off.
   let paid = false;
+  let checkoutId: string | undefined;
   const notify = (callback: () => void) => {
     if (destroyed) return;
     try {
@@ -425,6 +438,7 @@ async function mountPaddle(
       button.disabled = true;
       let result: CompleteCheckoutResult;
       try {
+        if (!checkoutId) throw new Error("Paddle completed a checkout that wasn't created");
         // Paddle charged inside its own window; this asks the backend, which reads Paddle, whether it did.
         result = await deps.completeCheckout(checkoutId);
       } catch (error) {
@@ -448,28 +462,37 @@ async function mountPaddle(
   button.type = "button";
   button.textContent = "Pay";
   button.setAttribute("data-base44-checkout", "paddle");
-  const onClick = () => {
-    if (paid || completing || open || button.disabled) return;
-    open = true;
-    onPaddleEvent = (event) => void handle(event);
+  const onClick = async () => {
+    if (paid || completing || open || starting || button.disabled) return;
+    starting = true;
     try {
+      const target = await resolve();
+      initializePaddle(Paddle, target.embedded);
+      checkoutId = target.checkoutId;
+      onPaddleEvent = (event) => void handle(event);
+      open = true;
       Paddle.Checkout.open({
-        transactionId: embedded.transaction_id,
-        ...(embedded.customer_email ? { customer: { email: embedded.customer_email } } : {}),
+        transactionId: target.embedded.transaction_id,
+        // The app prices discounts itself through createCheckout, so Paddle's own coupon field would be a second one.
+        settings: { showAddDiscounts: false },
+        ...(target.embedded.customer_email ? { customer: { email: target.embedded.customer_email } } : {}),
       });
     } catch (error) {
       open = false;
       notify(() => options.onError?.(error));
+    } finally {
+      starting = false;
     }
   };
-  button.addEventListener("click", onClick);
+  const listener = () => void onClick();
+  button.addEventListener("click", listener);
   (element as unknown as HTMLElement).appendChild(button);
 
   return {
     destroy() {
       if (destroyed) return;
       destroyed = true;
-      button.removeEventListener("click", onClick);
+      button.removeEventListener("click", listener);
       button.remove();
       if (open) Paddle.Checkout.close();
     },
@@ -477,6 +500,14 @@ async function mountPaddle(
       if (!completing && !paid) button.disabled = disabled;
     },
   };
+}
+
+function paddleTarget(checkout: MountableCheckout | null | undefined): PaddleTarget {
+  const embedded = checkout?.embedded;
+  if (!checkout || embedded?.provider !== "paddle") {
+    throw new Error("createCheckout() returned a checkout that isn't an embedded Paddle checkout.");
+  }
+  return { checkoutId: checkout.checkout_id, embedded };
 }
 
 /** The new checkout's id, refused unless it is the checkout the button was drawn for. */
@@ -527,7 +558,7 @@ export async function preloadCheckout(
  */
 export async function mountCheckout(
   element: CheckoutElement,
-  checkout: MountableCheckout | PayPalCheckoutOnClick,
+  checkout: MountableCheckout | CheckoutOnClick,
   options: MountCheckoutOptions,
   deps: MountCheckoutDeps
 ): Promise<CheckoutMount> {
@@ -538,6 +569,11 @@ export async function mountCheckout(
     throw new Error("mountCheckout() requires an element to render in");
   }
   if ("createCheckout" in checkout) {
+    if (checkout.provider === "paddle") {
+      if (typeof checkout.createCheckout !== "function") throw new Error("A Paddle checkout on click needs createCheckout()");
+      const create = checkout.createCheckout;
+      return mountPaddle(element, await scriptUrlFor("paddle", deps), async () => paddleTarget(await create()), options, deps);
+    }
     return mountPayPalOnClick(element, checkout, options, deps);
   }
   const embedded = checkout?.embedded;
@@ -559,8 +595,10 @@ export async function mountCheckout(
         options,
         deps
       );
-    case "paddle":
-      return mountPaddle(element, await scriptUrlFor("paddle", deps), embedded, checkout.checkout_id, options, deps);
+    case "paddle": {
+      const target = paddleTarget(checkout);
+      return mountPaddle(element, await scriptUrlFor("paddle", deps), () => Promise.resolve(target), options, deps);
+    }
     default:
       throw new Error(
         `Embedded checkout isn't supported for provider ${(embedded as { provider: string }).provider}`

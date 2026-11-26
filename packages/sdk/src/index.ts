@@ -168,6 +168,8 @@ export type {
   CompleteCheckoutResult,
   EmbeddedCheckout,
   PayPalCheckoutOnClick,
+  PaddleCheckoutOnClick,
+  CheckoutOnClick,
   PayPalEmbeddedCheckout,
   StripeEmbeddedCheckout,
   MountCheckoutOptions,

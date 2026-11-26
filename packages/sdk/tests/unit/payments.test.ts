@@ -609,13 +609,14 @@ describe("mountCheckout", () => {
     await mountCheckout(container as any, paddleCheckout(), { onComplete }, deps());
 
     expect(loadScript).toHaveBeenCalledWith("https://cdn.paddle.com/paddle/v2/paddle.js");
+    container.children[0].click();
+    await vi.waitFor(() => expect(Paddle.Checkout.open).toHaveBeenCalledWith({
+      transactionId: "txn_1",
+      settings: { showAddDiscounts: false },
+      customer: { email: "buyer@example.com" },
+    }));
     expect(Paddle.Environment.set).toHaveBeenCalledWith("sandbox");
     expect(Paddle.Initialize).toHaveBeenCalledWith(expect.objectContaining({ token: "test_token" }));
-    container.children[0].click();
-    expect(Paddle.Checkout.open).toHaveBeenCalledWith({
-      transactionId: "txn_1",
-      customer: { email: "buyer@example.com" },
-    });
 
     emit("checkout.completed");
     await vi.waitFor(() => expect(onComplete).toHaveBeenCalledWith({ checkout_id: "txn_1", status: "paid" }));
@@ -631,21 +632,56 @@ describe("mountCheckout", () => {
 
     await mountCheckout(container as any, paddleCheckout(), { onCancel }, deps());
     container.children[0].click();
+    await vi.waitFor(() => expect(Paddle.Checkout.open).toHaveBeenCalledTimes(1));
     emit("checkout.closed");
     container.children[0].click();
 
     expect(onCancel).toHaveBeenCalledTimes(1);
-    expect(Paddle.Checkout.open).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(Paddle.Checkout.open).toHaveBeenCalledTimes(2));
     expect(completeCheckout).not.toHaveBeenCalled();
   });
 
   test("refuses a second Paddle seller on the same page, since Paddle.js takes one token", async () => {
-    installPaddle();
-    await mountCheckout(container as any, paddleCheckout("test_a"), {}, deps());
+    const { Paddle } = installPaddle();
+    const onError = vi.fn();
+    const first = new FakeElement("div");
+    await mountCheckout(first as any, paddleCheckout("test_a"), {}, deps());
+    first.children[0].click();
+    await vi.waitFor(() => expect(Paddle.Checkout.open).toHaveBeenCalledTimes(1));
 
-    await expect(mountCheckout(container as any, paddleCheckout("test_b"), {}, deps())).rejects.toThrow(
-      "another seller"
-    );
+    await mountCheckout(container as any, paddleCheckout("test_b"), { onError }, deps());
+    container.children[0].click();
+
+    await vi.waitFor(() => expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining("another seller") })));
+    expect(Paddle.Checkout.open).toHaveBeenCalledTimes(1);
+  });
+
+  test("shows Paddle's button at once and creates the checkout inside the click", async () => {
+    const { Paddle } = installPaddle();
+    const createCheckout = vi.fn().mockResolvedValue(paddleCheckout());
+
+    await mountCheckout(container as any, { provider: "paddle", createCheckout }, {}, deps());
+    expect(createCheckout).not.toHaveBeenCalled();
+    expect(Paddle.Initialize).not.toHaveBeenCalled();
+
+    container.children[0].click();
+    await vi.waitFor(() => expect(Paddle.Checkout.open).toHaveBeenCalledWith(
+      expect.objectContaining({ transactionId: "txn_1", settings: { showAddDiscounts: false } })
+    ));
+    expect(createCheckout).toHaveBeenCalledTimes(1);
+    expect(Paddle.Initialize).toHaveBeenCalledWith(expect.objectContaining({ token: "test_token" }));
+  });
+
+  test("reports a click-created checkout that isn't Paddle's instead of opening it", async () => {
+    const { Paddle } = installPaddle();
+    const onError = vi.fn();
+    const createCheckout = vi.fn().mockResolvedValue(stripeCheckout());
+
+    await mountCheckout(container as any, { provider: "paddle", createCheckout }, { onError }, deps());
+    container.children[0].click();
+
+    await vi.waitFor(() => expect(onError).toHaveBeenCalled());
+    expect(Paddle.Checkout.open).not.toHaveBeenCalled();
   });
 
   test("rejects a Paddle script URL off cdn.paddle.com", async () => {

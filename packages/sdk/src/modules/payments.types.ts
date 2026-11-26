@@ -456,6 +456,23 @@ export interface PayPalCheckoutOnClick {
 }
 
 /**
+ * A Paddle checkout that [`mountCheckout()`](#mountcheckout) creates when the buyer clicks Paddle's button, so the buyer clicks once and no checkout is created for visitors who don't buy.
+ */
+export interface PaddleCheckoutOnClick {
+  /** Payment provider. */
+  provider: "paddle";
+  /**
+   * Creates the checkout when the buyer clicks, usually by calling the backend function that calls [`createCheckout()`](#createcheckout). Resolve with its result, an embedded Paddle checkout. Reject to stop; `onError` receives the error.
+   */
+  createCheckout: () => Promise<MountableCheckout>;
+}
+
+/**
+ * A checkout that [`mountCheckout()`](#mountcheckout) creates when the buyer clicks: PayPal or Paddle.
+ */
+export type CheckoutOnClick = PayPalCheckoutOnClick | PaddleCheckoutOnClick;
+
+/**
  * A mounted embedded checkout.
  */
 export interface CheckoutMount {
@@ -519,7 +536,7 @@ export interface PaymentsModule {
   /**
    * Renders an embedded checkout inside an element on the page.
    *
-   * Pass the result of a {@linkcode ServiceRolePaymentsModule.createCheckout | createCheckout()} call made with `presentation: 'embedded'`. Because only the service role can create checkouts, create it in a backend function and return the result to the page. For PayPal, you can instead pass a {@linkcode PayPalCheckoutOnClick} to show the button before any checkout exists. The SDK creates the checkout only when the buyer clicks the button, so visitors who don't buy don't leave unused checkouts behind.
+   * Pass the result of a {@linkcode ServiceRolePaymentsModule.createCheckout | createCheckout()} call made with `presentation: 'embedded'`. Because only the service role can create checkouts, create it in a backend function and return the result to the page. For PayPal or Paddle, you can instead pass a {@linkcode PayPalCheckoutOnClick} or {@linkcode PaddleCheckoutOnClick} to show the button before any checkout exists. The SDK creates the checkout only when the buyer clicks the button, so visitors who don't buy don't leave unused checkouts behind.
    *
    * The SDK loads the provider's library and renders the checkout for you:
    * - PayPal: Renders a PayPal button. When the buyer approves the payment, the SDK calls {@linkcode completeCheckout | completeCheckout()} and then `onComplete`.
@@ -532,7 +549,7 @@ export interface PaymentsModule {
    * The checkout's callbacks run in the buyer's browser, where they can be faked. Grant access to what the buyer paid for only after your backend confirms the purchase, for example with [`listPurchases()`](#service-role-methods) in a backend function.
    *
    * @param element - Element to render the checkout in. It should be empty.
-   * @param checkout - The result of {@linkcode ServiceRolePaymentsModule.createCheckout | createCheckout()}, or for PayPal a {@linkcode PayPalCheckoutOnClick} that creates it when the buyer clicks.
+   * @param checkout - The result of {@linkcode ServiceRolePaymentsModule.createCheckout | createCheckout()}, or for PayPal or Paddle a {@linkcode CheckoutOnClick} that creates it when the buyer clicks.
    * @param options - Callbacks for the checkout's outcome.
    * @returns Promise resolving to the mounted checkout once it renders.
    *
@@ -599,7 +616,7 @@ export interface PaymentsModule {
    */
   mountCheckout(
     element: CheckoutElement,
-    checkout: MountableCheckout | PayPalCheckoutOnClick,
+    checkout: MountableCheckout | CheckoutOnClick,
     options?: MountCheckoutOptions
   ): Promise<CheckoutMount>;
 
