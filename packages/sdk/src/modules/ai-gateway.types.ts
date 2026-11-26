@@ -67,7 +67,7 @@ export interface AiGatewayModuleConfig {
  *
  * You can use any of the [models available through `InvokeLLM`](/developers/references/sdk/docs/type-aliases/integrations#invokellm).
  * Pass `'automatic'` to let Base44 choose one, or pin a specific model such
- * as `'claude_sonnet_4_6'`, `'gpt_5_5'`, or `'gemini_3_1_pro'`.
+ * as `'claude_fable_5_2'`, `'gpt_6_2_sol'`, or `'gemini_3_8_flash'`.
  *
  * ## Images
  *

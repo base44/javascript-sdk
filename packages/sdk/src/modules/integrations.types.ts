@@ -48,9 +48,9 @@ export interface InvokeLLMParams {
   prompt: string;
   /** Optionally specify a model to override the app-level model setting for this specific call.
    *
-   * Options: `"gemini_3_8_flash"`, `"gpt_6_luna"`, `"claude-sonnet-5"`, `"claude_opus_5_5"`, `"gpt_6_sol"`, `"gpt_6_astra"`, `"claude_fable_5_1"`, `"glm_5_2"`, `"gemini_3_1_pro"`, `"gpt_5_4"`, `"claude_sonnet_4_6"`, `"claude_opus_4_6"`, `"claude_opus_4_7"`, `"claude_opus_4_8"`, `"claude_opus_5"`, `"gpt_5_6_terra"`, `"gpt_5_6_sol"`, `"gpt_5_6_luna"`
+   * Options: `"gemini_3_8_flash"`, `"gpt_6_luna"`, `"claude-sonnet-5"`, `"claude_opus_5_5"`, `"gpt_6_sol"`, `"gpt_6_astra"`, `"claude_fable_5_1"`, `"glm_5_2"`, `"claude_fable_5_2"`, `"gpt_6_2_sol"`, `"gpt_6_2_astra"`, `"gemini_3_1_pro"`, `"gpt_5_4"`, `"claude_sonnet_4_6"`, `"claude_opus_4_6"`, `"claude_opus_4_7"`, `"claude_opus_4_8"`, `"claude_opus_5"`, `"gpt_5_6_terra"`, `"gpt_5_6_sol"`, `"gpt_5_6_luna"`
    */
-  model?: 'gemini_3_8_flash' | 'gpt_6_luna' | 'claude-sonnet-5' | 'claude_opus_5_5' | 'gpt_6_sol' | 'gpt_6_astra' | 'claude_fable_5_1' | 'glm_5_2' | 'gemini_3_1_pro' | 'gpt_5_4' | 'claude_sonnet_4_6' | 'claude_opus_4_6' | 'claude_opus_4_7' | 'claude_opus_4_8' | 'claude_opus_5' | 'gpt_5_6_terra' | 'gpt_5_6_sol' | 'gpt_5_6_luna';
+  model?: 'gemini_3_8_flash' | 'gpt_6_luna' | 'claude-sonnet-5' | 'claude_opus_5_5' | 'gpt_6_sol' | 'gpt_6_astra' | 'claude_fable_5_1' | 'glm_5_2' | 'claude_fable_5_2' | 'gpt_6_2_sol' | 'gpt_6_2_astra' | 'gemini_3_1_pro' | 'gpt_5_4' | 'claude_sonnet_4_6' | 'claude_opus_4_6' | 'claude_opus_4_7' | 'claude_opus_4_8' | 'claude_opus_5' | 'gpt_5_6_terra' | 'gpt_5_6_sol' | 'gpt_5_6_luna';
   /** If set to `true`, the LLM will use Google Search, Maps, and News to gather real-time context before answering.
    * @default false
    */
