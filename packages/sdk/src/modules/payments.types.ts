@@ -94,6 +94,14 @@ export interface CheckoutShipping {
 }
 
 /**
+ * Billing address for a checkout.
+ */
+export interface CheckoutBilling {
+  /** Buyer's billing address. */
+  address?: ShippingAddress;
+}
+
+/**
  * How the buyer pays.
  *
  * - `'redirect'`: The buyer leaves the app for the provider's hosted checkout page at `redirect_url`.
@@ -122,11 +130,15 @@ export interface CreateCheckoutParams {
   /** How the buyer pays. Defaults to `'redirect'`. PayPal apps must pass `'embedded'`. */
   presentation?: CheckoutPresentation;
   /**
-   * Shipping address and fee. Allowed only when at least one item is `shippable`. Supported for PayPal one-time checkouts only. Other providers and subscriptions reject it with [`invalid_request`](#paymentserrorcode).
+   * Shipping address and fee. Allowed only when at least one item is `shippable`. Supported for PayPal one-time checkouts, and for Base44 Payments (Wix) embedded checkouts with `address` only: no `amount` yet. Other providers and subscriptions reject it with [`invalid_request`](#paymentserrorcode).
    *
    * Compute the fee in a backend function, never in the browser. When the fee depends on the address, such as by distance or zone, collect the address in your app and pass it in `address`. PayPal shows the address to the buyer locked, so the order ships to the address you computed the fee for. When the fee doesn't depend on the address, pass only `amount` and PayPal asks the buyer for the address.
    */
   shipping?: CheckoutShipping;
+  /**
+   * Buyer's billing address. Supported only by Base44 Payments (Wix) embedded checkouts; other providers reject it with [`invalid_request`](#paymentserrorcode).
+   */
+  billing?: CheckoutBilling;
 }
 
 /**

@@ -1,5 +1,6 @@
 import type {
   Base44Client,
+  CheckoutBilling,
   CheckoutElement,
   CreateCheckoutResult,
   MountableCheckout,
@@ -58,3 +59,13 @@ base44.asServiceRole.payments.listPurchases({ buyer_email: "buyer@example.com" }
 
 // @ts-expect-error Only the service role can filter by another buyer's email.
 base44.payments.listPurchases({ buyer_email: "buyer@example.com" });
+
+// Base44 Payments takes a billing address in the same shape as a shipping address.
+const billing: CheckoutBilling = { address: { name: "Ada Lovelace", line1: "1 Main St", country: "US" } };
+base44.asServiceRole.payments.createCheckout({ items: [], success_path: "/thank-you", presentation: "embedded", billing });
+
+// @ts-expect-error A billing address needs a name, like a shipping address.
+base44.asServiceRole.payments.createCheckout({ items: [], success_path: "/thank-you", billing: { address: { line1: "1 Main St", country: "US" } } });
+
+// @ts-expect-error A billing address needs a country, like a shipping address.
+base44.asServiceRole.payments.createCheckout({ items: [], success_path: "/thank-you", billing: { address: { name: "Ada Lovelace", line1: "1 Main St" } } });

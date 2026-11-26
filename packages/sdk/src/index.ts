@@ -154,6 +154,7 @@ export type {
   ServiceRolePaymentsModule,
   PaymentsErrorCode,
   PaymentsRecurringFrequency,
+  CheckoutBilling,
   CheckoutBuyer,
   CheckoutFreeTrial,
   CheckoutItem,
