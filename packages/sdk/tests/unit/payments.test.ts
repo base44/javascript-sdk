@@ -3,6 +3,7 @@ import nock from "nock";
 import { Base44Error, createClient } from "../../src/index.ts";
 import type {
   MountableCheckout,
+  PaddleEmbeddedCheckout,
   PayPalEmbeddedCheckout,
   StripeEmbeddedCheckout,
 } from "../../src/modules/payments.types.ts";
@@ -225,6 +226,7 @@ describe("mountCheckout", () => {
     container = new FakeElement("div");
     vi.stubGlobal("document", {
       createElement: (tag: string) => new FakeElement(tag),
+      documentElement: { lang: "", classList: { contains: () => false }, dataset: {} },
     });
     vi.stubGlobal("window", {});
     loadScript = vi.fn().mockResolvedValue(undefined);
@@ -268,6 +270,7 @@ describe("mountCheckout", () => {
   const config = {
     paypal: { script_url: "https://www.sandbox.paypal.com/web-sdk/v6/core" },
     stripe: { script_url: "https://js.stripe.com/v3/" },
+    paddle: { script_url: "https://cdn.paddle.com/paddle/v2/paddle.js" },
   };
   let getConfig: ReturnType<typeof vi.fn>;
   const deps = () => ({ completeCheckout, getConfig, loadScript });
@@ -572,6 +575,146 @@ describe("mountCheckout", () => {
     expect((sdk as any).createPayPalSubscriptionSession).toHaveBeenCalled();
   });
 
+  function installPaddle() {
+    let eventCallback: ((event: object) => void) | undefined;
+    const Paddle = {
+      Environment: { set: vi.fn() },
+      Initialize: vi.fn((options: { eventCallback: (event: object) => void }) => {
+        eventCallback = options.eventCallback;
+      }),
+      Checkout: { open: vi.fn(), close: vi.fn() },
+    };
+    loadScript.mockImplementation(async () => {
+      (window as any).Paddle = Paddle;
+    });
+    return { Paddle, emit: (name: string, data?: object) => eventCallback?.({ name, data }) };
+  }
+
+  const paddleCheckout = (token = "test_token"): MountableCheckout => ({
+    checkout_id: "txn_1",
+    currency: "usd",
+    embedded: {
+      provider: "paddle",
+      client_token: token,
+      transaction_id: "txn_1",
+      environment: "sandbox",
+      customer_email: "buyer@example.com",
+    } satisfies PaddleEmbeddedCheckout,
+  });
+
+  const frameOf = (element: FakeElement) => element.children.find((c) => c.attributes["data-base44-checkout-frame"]);
+
+  test("renders Paddle's one-page checkout in the element and completes it once Paddle reports payment", async () => {
+    const { Paddle, emit } = installPaddle();
+    completeCheckout.mockResolvedValue({ checkout_id: "txn_1", status: "paid" });
+    const onComplete = vi.fn();
+
+    await mountCheckout(container as any, paddleCheckout(), { onComplete }, deps());
+
+    expect(loadScript).toHaveBeenCalledWith("https://cdn.paddle.com/paddle/v2/paddle.js");
+    const frame = frameOf(container) as unknown as { className: string };
+    expect(Paddle.Checkout.open).toHaveBeenCalledWith({
+      transactionId: "txn_1",
+      settings: expect.objectContaining({
+        displayMode: "inline",
+        frameTarget: frame.className,
+        variant: "one-page",
+        showAddDiscounts: false,
+      }),
+      customer: { email: "buyer@example.com" },
+    });
+    expect(Paddle.Environment.set).toHaveBeenCalledWith("sandbox");
+    expect(Paddle.Initialize).toHaveBeenCalledWith(expect.objectContaining({ token: "test_token" }));
+
+    emit("checkout.completed");
+    await vi.waitFor(() => expect(onComplete).toHaveBeenCalledWith({ checkout_id: "txn_1", status: "paid" }));
+    expect(completeCheckout).toHaveBeenCalledWith("txn_1");
+  });
+
+  test("reports Paddle's totals in the currency's smallest unit, for the page's order summary", async () => {
+    const { emit } = installPaddle();
+    const onTotalsChange = vi.fn();
+    await mountCheckout(container as any, paddleCheckout(), { onTotalsChange }, deps());
+
+    emit("checkout.updated", { currency_code: "USD", totals: { subtotal: 7.56, discount: 0, tax: 1.44, total: 9 } });
+    emit("checkout.updated", { currency_code: "JPY", totals: { subtotal: 900, discount: 0, tax: 82, total: 982 } });
+
+    expect(onTotalsChange).toHaveBeenNthCalledWith(1, { currency: "usd", subtotal: 756, discount: 0, tax: 144, total: 900 });
+    expect(onTotalsChange).toHaveBeenNthCalledWith(2, { currency: "jpy", subtotal: 900, discount: 0, tax: 82, total: 982 });
+  });
+
+  test("opens Paddle on the card step with the buyer's country and postal code the backend returned", async () => {
+    const { Paddle } = installPaddle();
+    const checkout = paddleCheckout();
+    Object.assign(checkout.embedded!, { customer_country: "DE", customer_postal_code: "10115" });
+
+    await mountCheckout(container as any, checkout, {}, deps());
+
+    expect(Paddle.Checkout.open).toHaveBeenCalledWith(expect.objectContaining({
+      customer: { email: "buyer@example.com", address: { countryCode: "DE", postalCode: "10115" } },
+    }));
+  });
+
+  test("destroy closes Paddle's checkout and removes its frame", async () => {
+    const { Paddle } = installPaddle();
+    const mount = await mountCheckout(container as any, paddleCheckout(), {}, deps());
+
+    mount.destroy();
+
+    expect(Paddle.Checkout.close).toHaveBeenCalled();
+    expect(container.children).toHaveLength(0);
+  });
+
+  test("refuses a second Paddle seller on the same page, since Paddle.js takes one token", async () => {
+    const { Paddle } = installPaddle();
+    const onError = vi.fn();
+    await mountCheckout(new FakeElement("div") as any, paddleCheckout("test_a"), {}, deps());
+
+    await mountCheckout(container as any, paddleCheckout("test_b"), { onError }, deps());
+
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining("another seller") }));
+    expect(Paddle.Checkout.open).toHaveBeenCalledTimes(1);
+  });
+
+  test("shows a button at once, then creates the checkout and renders it in place of the button", async () => {
+    const { Paddle } = installPaddle();
+    (document as any).documentElement.lang = "de-DE";
+    const createCheckout = vi.fn().mockResolvedValue(paddleCheckout());
+
+    await mountCheckout(container as any, { provider: "paddle", createCheckout }, {}, deps());
+    expect(createCheckout).not.toHaveBeenCalled();
+    expect(Paddle.Initialize).not.toHaveBeenCalled();
+
+    container.children[0].click();
+    await vi.waitFor(() => expect(Paddle.Checkout.open).toHaveBeenCalledWith(
+      expect.objectContaining({ transactionId: "txn_1", settings: expect.objectContaining({ displayMode: "inline", locale: "de" }) })
+    ));
+    expect(createCheckout).toHaveBeenCalledTimes(1);
+    expect(container.children).toHaveLength(1);
+    expect(frameOf(container)).toBeDefined();
+  });
+
+  test("reports a click-created checkout that isn't Paddle's instead of opening it", async () => {
+    const { Paddle } = installPaddle();
+    const onError = vi.fn();
+    const createCheckout = vi.fn().mockResolvedValue(stripeCheckout());
+
+    await mountCheckout(container as any, { provider: "paddle", createCheckout }, { onError }, deps());
+    container.children[0].click();
+
+    await vi.waitFor(() => expect(onError).toHaveBeenCalled());
+    expect(Paddle.Checkout.open).not.toHaveBeenCalled();
+  });
+
+  test("rejects a Paddle script URL off cdn.paddle.com", async () => {
+    getConfig.mockResolvedValue({ paddle: { script_url: "https://evil.example/paddle.js" } });
+
+    await expect(mountCheckout(container as any, paddleCheckout(), {}, deps())).rejects.toThrow(
+      "no valid Paddle script URL"
+    );
+    expect(loadScript).not.toHaveBeenCalled();
+  });
+
   test("mounts Stripe Embedded Checkout with the client secret", async () => {
     const embeddedCheckout = { mount: vi.fn(), destroy: vi.fn() };
     const stripe = { initEmbeddedCheckout: vi.fn().mockResolvedValue(embeddedCheckout) };
@@ -822,6 +965,7 @@ describe("payments config", () => {
   const config = {
     paypal: { script_url: "https://www.sandbox.paypal.com/web-sdk/v6/core" },
     stripe: { script_url: "https://js.stripe.com/v3/" },
+    paddle: { script_url: "https://cdn.paddle.com/paddle/v2/paddle.js" },
   };
   const checkout: MountableCheckout = {
     checkout_id: "cs_1",

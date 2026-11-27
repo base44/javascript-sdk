@@ -61,6 +61,10 @@ export interface CheckoutBuyer {
   last_name?: string;
   /** Buyer's phone number. */
   phone?: string;
+  /** Buyer's billing country, an ISO 3166-1 alpha-2 code such as `"DE"`. Paddle works out tax from it and, with `email`, opens its checkout straight on the card. Other providers ask the buyer themselves. */
+  country?: string;
+  /** Buyer's billing postal code. Pass it with `country` where the country has postal codes; Paddle needs it to work out tax there. */
+  postal_code?: string;
 }
 
 /**
@@ -158,9 +162,29 @@ export interface PayPalEmbeddedCheckout {
 }
 
 /**
+ * Data that Paddle's checkout needs to open.
+ */
+export interface PaddleEmbeddedCheckout {
+  /** Payment provider. */
+  provider: "paddle";
+  /** Paddle client-side token of the app's seller account. Public by design. */
+  client_token: string;
+  /** ID of the Paddle transaction the buyer pays. */
+  transaction_id: string;
+  /** Paddle environment the transaction lives in. */
+  environment: "sandbox" | "production";
+  /** Buyer email to prefill, when the checkout named one. */
+  customer_email?: string | null;
+  /** Buyer country to prefill, when the checkout named one with an email. */
+  customer_country?: string | null;
+  /** Buyer postal code to prefill, when the checkout named one with a country. */
+  customer_postal_code?: string | null;
+}
+
+/**
  * Data that an embedded checkout needs to render, by provider.
  */
-export type EmbeddedCheckout = StripeEmbeddedCheckout | PayPalEmbeddedCheckout;
+export type EmbeddedCheckout = StripeEmbeddedCheckout | PayPalEmbeddedCheckout | PaddleEmbeddedCheckout;
 
 /**
  * Result of [`createCheckout()`](#createcheckout).
@@ -386,7 +410,7 @@ export type PaymentsErrorCode =
  */
 export interface MountCheckoutOptions {
   /**
-   * Called after the buyer approves a PayPal payment and the SDK completes the checkout. Use it to update the page, not to grant access.
+   * Called after the buyer approves a PayPal payment, or pays in Paddle's checkout, and the SDK completes the checkout. Use it to update the page, not to grant access.
    *
    * Stripe doesn't call this. After a Stripe payment, the buyer returns to the checkout's `success_path` with a `session_id` query parameter. That parameter is the `checkout_id`. Show the result there with [`listPurchases()`](#listpurchases).
    */
@@ -399,6 +423,24 @@ export interface MountCheckoutOptions {
    * The error is a `Base44Error` when completing the checkout fails, or PayPal's own error object when the PayPal window fails.
    */
   onError?: (error: unknown) => void;
+  /**
+   * Paddle only. Called when Paddle's checkout loads and whenever its amounts change, for example when the buyer picks a country and Paddle works out the tax. Paddle's checkout shows no order summary of its own, and Paddle requires the page to show the subtotal, tax and total, so render them from this.
+   */
+  onTotalsChange?: (totals: CheckoutTotals) => void;
+}
+
+/**
+ * Amounts of the checkout the buyer is paying, in the currency's smallest unit, as [`onTotalsChange`](#mountcheckoutoptions) reports them. Prices include tax, so `total` is the app's amount less any discount.
+ */
+export interface CheckoutTotals {
+  /** Lowercase ISO 4217 currency code. */
+  currency: string;
+  /** Before tax and discount. */
+  subtotal: number;
+  discount: number;
+  tax: number;
+  /** What the buyer pays. */
+  total: number;
 }
 
 /**
@@ -440,12 +482,29 @@ export interface PayPalCheckoutOnClick {
 }
 
 /**
+ * A Paddle checkout that [`mountCheckout()`](#mountcheckout) creates when the buyer clicks its "Buy now" button. The SDK then renders Paddle's checkout in place of the button, and no checkout is created for visitors who don't buy.
+ */
+export interface PaddleCheckoutOnClick {
+  /** Payment provider. */
+  provider: "paddle";
+  /**
+   * Creates the checkout when the buyer clicks, usually by calling the backend function that calls [`createCheckout()`](#createcheckout). Resolve with its result, an embedded Paddle checkout. Reject to stop; `onError` receives the error.
+   */
+  createCheckout: () => Promise<MountableCheckout>;
+}
+
+/**
+ * A checkout that [`mountCheckout()`](#mountcheckout) creates when the buyer clicks: PayPal or Paddle.
+ */
+export type CheckoutOnClick = PayPalCheckoutOnClick | PaddleCheckoutOnClick;
+
+/**
  * A mounted embedded checkout.
  */
 export interface CheckoutMount {
   /** Removes the checkout from the page. Call it when the component that holds it unmounts. For Stripe, mounting another checkout destroys this one for you. */
   destroy: () => void;
-  /** Grays out PayPal's button and ignores clicks, for example until a required form is filled in. After a payment completes the button stays off, so `setDisabled(false)` can't start a second payment. Stripe ignores it. */
+  /** Grays out PayPal's or Paddle's button and ignores clicks, for example until a required form is filled in. After a payment completes the button stays off, so `setDisabled(false)` can't start a second payment. Stripe ignores it. */
   setDisabled: (disabled: boolean) => void;
 }
 
@@ -498,15 +557,16 @@ export interface PaymentsModule {
    * base44.payments.preloadCheckout('paypal');
    * ```
    */
-  preloadCheckout(provider: "paypal" | "stripe"): Promise<void>;
+  preloadCheckout(provider: "paypal" | "stripe" | "paddle"): Promise<void>;
 
   /**
    * Renders an embedded checkout inside an element on the page.
    *
-   * Pass the result of a {@linkcode ServiceRolePaymentsModule.createCheckout | createCheckout()} call made with `presentation: 'embedded'`. Because only the service role can create checkouts, create it in a backend function and return the result to the page. For PayPal, you can instead pass a {@linkcode PayPalCheckoutOnClick} to show the button before any checkout exists. The SDK creates the checkout only when the buyer clicks the button, so visitors who don't buy don't leave unused checkouts behind.
+   * Pass the result of a {@linkcode ServiceRolePaymentsModule.createCheckout | createCheckout()} call made with `presentation: 'embedded'`. Because only the service role can create checkouts, create it in a backend function and return the result to the page. For PayPal or Paddle, you can instead pass a {@linkcode PayPalCheckoutOnClick} or {@linkcode PaddleCheckoutOnClick} to show the button before any checkout exists. The SDK creates the checkout only when the buyer clicks the button, so visitors who don't buy don't leave unused checkouts behind.
    *
    * The SDK loads the provider's library and renders the checkout for you:
    * - PayPal: Renders a PayPal button. When the buyer approves the payment, the SDK calls {@linkcode completeCheckout | completeCheckout()} and then `onComplete`.
+   * - Paddle: Renders Paddle's one-page checkout in the element, in the page's language when Paddle supports it. When the buyer pays, the SDK calls {@linkcode completeCheckout | completeCheckout()} and then `onComplete`. Show the order summary from `onTotalsChange`.
    * - Stripe: Mounts Stripe Embedded Checkout. After paying, the buyer returns to the checkout's `success_path`. Stripe allows one embedded checkout per page, so mounting another Stripe checkout destroys the previous one.
    *
    * To make the checkout appear faster, load the library ahead of time with [`preloadCheckout()`](#preloadcheckout) when the page opens.
@@ -516,7 +576,7 @@ export interface PaymentsModule {
    * The checkout's callbacks run in the buyer's browser, where they can be faked. Grant access to what the buyer paid for only after your backend confirms the purchase, for example with [`listPurchases()`](#service-role-methods) in a backend function.
    *
    * @param element - Element to render the checkout in. It should be empty.
-   * @param checkout - The result of {@linkcode ServiceRolePaymentsModule.createCheckout | createCheckout()}, or for PayPal a {@linkcode PayPalCheckoutOnClick} that creates it when the buyer clicks.
+   * @param checkout - The result of {@linkcode ServiceRolePaymentsModule.createCheckout | createCheckout()}, or for PayPal or Paddle a {@linkcode CheckoutOnClick} that creates it when the buyer clicks.
    * @param options - Callbacks for the checkout's outcome.
    * @returns Promise resolving to the mounted checkout once it renders.
    *
@@ -583,7 +643,7 @@ export interface PaymentsModule {
    */
   mountCheckout(
     element: CheckoutElement,
-    checkout: MountableCheckout | PayPalCheckoutOnClick,
+    checkout: MountableCheckout | CheckoutOnClick,
     options?: MountCheckoutOptions
   ): Promise<CheckoutMount>;
 
