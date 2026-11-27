@@ -64,6 +64,22 @@ export interface CheckoutBuyer {
 }
 
 /**
+ * Ad-click match keys for one checkout. The platform keeps them with the checkout and adds them to the
+ * Purchase event it sends to Meta when the payment completes, so the sale is matched to the ad click.
+ * Every field is optional, and a value in the wrong format is rejected.
+ */
+export interface CheckoutAttribution {
+  /** Meta browser ID, the `_fbp` cookie, such as `'fb.1.1700000000000.1234567890'`. */
+  fbp?: string;
+  /** Meta click ID, the `_fbc` cookie or one built from the landing page's `fbclid`, such as `'fb.1.1700000000000.AbCdEf'`. */
+  fbc?: string;
+  /** Buyer's public IP address. The platform never reads it from the request, so pass it only when your app has it. */
+  client_ip_address?: string;
+  /** Buyer's browser user agent, up to 512 characters. */
+  client_user_agent?: string;
+}
+
+/**
  * A shipping address. Returned on a purchase whether your app or the provider collected it.
  */
 export interface ShippingAddress {
@@ -127,6 +143,11 @@ export interface CreateCheckoutParams {
    * Compute the fee in a backend function, never in the browser. When the fee depends on the address, such as by distance or zone, collect the address in your app and pass it in `address`. PayPal shows the address to the buyer locked, so the order ships to the address you computed the fee for. When the fee doesn't depend on the address, pass only `amount` and PayPal asks the buyer for the address.
    */
   shipping?: CheckoutShipping;
+  /**
+   * Ad-click match keys for the buyer, kept with the checkout and sent with the Purchase event the platform reports to Meta.
+   * Call `createCheckout` from a backend function and pass the values the browser sent you.
+   */
+  attribution?: CheckoutAttribution;
 }
 
 /**

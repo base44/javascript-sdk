@@ -155,6 +155,7 @@ export type {
   PaymentsErrorCode,
   PaymentsRecurringFrequency,
   CheckoutBuyer,
+  CheckoutAttribution,
   CheckoutFreeTrial,
   CheckoutItem,
   CheckoutItemRecurring,
