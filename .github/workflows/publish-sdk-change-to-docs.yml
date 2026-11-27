@@ -1,0 +1,280 @@
+name: Publish SDK Change to Docs
+
+# Opens a mintlify-docs PR with the docs impact of one SDK commit: regenerates the
+# reference before and after it, and applies only that diff to the published pages
+# (English and locale mirrors). Runs when a drift PR (bot/drift/*, opened by the
+# base44-github-actions app) merges; can be dispatched for any commit.
+#
+# The docs PR is marked as waiting for the SDK release that contains the commit, so
+# mintlify-docs' release gate holds it until then.
+#
+# Triggered by the push to main rather than the PR event so it runs on main and can use
+# the `drift` environment, which holds the docs bot key and only main can use.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      head_sha:
+        description: "javascript-sdk commit whose docs impact to publish (default: main)"
+        required: false
+        default: ""
+        type: string
+      base_sha:
+        description: "Commit to compare against (default: first parent of head)"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-sdk-change-to-docs-${{ inputs.head_sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  DOCS_REPO: base44-dev/mintlify-docs
+  DOCS_DIR: mintlify-docs
+  SDK_BOT: base44-github-actions[bot]
+
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.pr.outputs.publish }}
+      url: ${{ steps.pr.outputs.url }}
+    steps:
+      - name: Checkout for wix gateway proxy
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          sparse-checkout: .github
+
+      - name: Wix gateway proxy (mandatory)
+        uses: ./.github/actions/wix-gateway-proxy
+
+      # Branch names aren't proof of anything, so the PR's author must be the bot too.
+      - name: Was this a drift PR?
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = workflow_dispatch ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          pr=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" \
+            --jq "[.[] | select(.merged_at != null and (.head.ref | startswith(\"bot/drift/\")) and .user.login == \"${SDK_BOT}\")][0] // empty")
+          if [ -z "$pr" ]; then
+            echo "Not a merged drift PR; nothing to publish."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "url=$(jq -r .html_url <<< "$pr")" >> "$GITHUB_OUTPUT"
+          fi
+
+  publish:
+    needs: source
+    if: needs.source.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    environment: drift
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - name: Checkout javascript-sdk
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Wix gateway proxy (mandatory)
+        uses: ./.github/actions/wix-gateway-proxy
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20.x"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Resolve commit range
+        id: range
+        env:
+          INPUT_HEAD: ${{ inputs.head_sha }}
+          INPUT_BASE: ${{ inputs.base_sha }}
+          # On a push, everything it brought, so a PR merged as several commits publishes whole.
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          head="$(git rev-parse --verify "${INPUT_HEAD:-HEAD}^{commit}")"
+          base="$(git rev-parse --verify "${INPUT_BASE:-${PUSH_BEFORE:-${head}^1}}^{commit}")"
+          # Only code already on main runs here, next to the docs bot key.
+          for sha in "$head" "$base"; do
+            git merge-base --is-ancestor "$sha" origin/main || { echo "::error::${sha} is not on main"; exit 1; }
+          done
+          git merge-base --is-ancestor "$base" "$head" || { echo "::error::${base} is not an ancestor of ${head}"; exit 1; }
+          # Both regenerations use this checkout's node_modules, so neither side may differ from it.
+          deps=(package.json package-lock.json packages/sdk/package.json)
+          if ! git diff --quiet "$base" "$head" -- "${deps[@]}" || ! git diff --quiet HEAD "$head" -- "${deps[@]}"; then
+            echo "::error::Dependencies differ between ${base:0:7}, ${head:0:7} and this checkout; regenerate with create-docs-local by hand"
+            exit 1
+          fi
+          subject="$(git log -1 --format=%s "$head")"
+          # "fix(types): do X (#12)" -> "do X"
+          plain="$(printf '%s' "$subject" | sed -E 's/^[a-z]+(\([^)]*\))?!?: //; s/ \(#[0-9]+\)$//')"
+          {
+            echo "head=${head}"
+            echo "short=${head:0:7}"
+            echo "base=${base}"
+            echo "subject=${subject}"
+            echo "plain_subject=${plain}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Publishing docs impact of ${base:0:7}..${head:0:7}: ${subject}"
+
+      - name: Generate reference before and after
+        env:
+          BASE: ${{ steps.range.outputs.base }}
+          HEAD: ${{ steps.range.outputs.head }}
+        run: |
+          set -euo pipefail
+          for side in base head; do
+            sha="$BASE"; [ "$side" = head ] && sha="$HEAD"
+            git worktree add --detach "$RUNNER_TEMP/$side" "$sha"
+            ln -s "$GITHUB_WORKSPACE/node_modules" "$RUNNER_TEMP/$side/node_modules"
+            npm run --prefix "$RUNNER_TEMP/$side/packages/sdk" create-docs
+            test -d "$RUNNER_TEMP/$side/packages/sdk/docs/content"
+          done
+
+      - name: mintlify-docs write token
+        id: docs-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ vars.DOCS_BOT_APP_ID }}
+          private-key: ${{ secrets.DOCS_BOT_PRIVATE_KEY }}
+          owner: base44-dev
+          repositories: mintlify-docs
+          permission-contents: write
+          permission-pull-requests: write
+
+      # The docs PR waits for the SDK release only if mintlify-docs main requires the
+      # release gate's status. Without that rule, a reviewer could merge it early.
+      - name: Check mintlify-docs holds waiting PRs
+        env:
+          GH_TOKEN: ${{ steps.docs-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          ruleset="$(gh api "repos/${DOCS_REPO}/rules/branches/main" --jq '[.[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context] | index("SDK released") != null')"
+          classic="$(gh api "repos/${DOCS_REPO}/branches/main" --jq '((.protection.required_status_checks.contexts // []) | index("SDK released")) != null')"
+          if [ "$ruleset" != true ] && [ "$classic" != true ]; then
+            echo "::error::mintlify-docs main doesn't require the 'SDK released' status, so a docs PR waiting for this release could merge early. Add that required check first."
+            exit 1
+          fi
+
+      - name: Checkout mintlify-docs
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: ${{ env.DOCS_REPO }}
+          ref: main
+          token: ${{ steps.docs-token.outputs.token }}
+          path: ${{ env.DOCS_DIR }}
+
+      - name: Apply only this change to the published docs
+        id: patch
+        run: |
+          set -euo pipefail
+          node packages/sdk/scripts/drift/scoped-docs-patch.mjs \
+            --base "$RUNNER_TEMP/base/packages/sdk/docs/content" \
+            --head "$RUNNER_TEMP/head/packages/sdk/docs/content" \
+            --target "$GITHUB_WORKSPACE/$DOCS_DIR" \
+            --apply \
+            --summary "$RUNNER_TEMP/summary.md"
+
+      - name: Compose PR body
+        env:
+          HEAD: ${{ steps.range.outputs.head }}
+          SHORT: ${{ steps.range.outputs.short }}
+          BASE: ${{ steps.range.outputs.base }}
+          SUBJECT: ${{ steps.range.outputs.subject }}
+          SOURCE_PR: ${{ needs.source.outputs.url }}
+        run: |
+          set -euo pipefail
+          {
+            echo "Docs impact of [\`base44/javascript-sdk@${SHORT}\`](https://github.com/base44/javascript-sdk/commit/${HEAD}), compared against \`${BASE:0:7}\`:"
+            echo
+            echo '```'
+            echo "$SUBJECT"
+            echo '```'
+            if [ -n "$SOURCE_PR" ]; then
+              echo
+              echo "Source PR: ${SOURCE_PR}"
+            fi
+            echo
+            cat "$RUNNER_TEMP/summary.md"
+            echo
+            echo "This PR waits for the SDK release that includes \`${SHORT}\`: the \"SDK released\" check stays pending until then. Approve it and enable auto-merge, and it merges once the release is out."
+            echo
+            echo "<!-- waits-for-sdk-commit: ${HEAD} -->"
+            echo
+            echo "_Opened by the \`publish-sdk-change-to-docs\` workflow in javascript-sdk. Generated output: review the rendered page, not the raw diff._"
+          } > "$RUNNER_TEMP/pr-body.md"
+
+      # One branch per source commit.
+      - name: Open pull request
+        id: pr
+        uses: ./.github/actions/open-or-update-pr
+        with:
+          path: ${{ env.DOCS_DIR }}
+          token: ${{ steps.docs-token.outputs.token }}
+          bot-slug: ${{ steps.docs-token.outputs.app-slug }}
+          add-paths: |
+            developers/references/sdk/docs
+            */developers/references/sdk/docs/*
+          branch: bot/sdk-docs/${{ steps.range.outputs.short }}
+          base: main
+          title: "docs(sdk): ${{ steps.range.outputs.plain_subject }} (javascript-sdk@${{ steps.range.outputs.short }})"
+          body-path: ${{ runner.temp }}/pr-body.md
+          commit-message: |
+            docs(sdk): ${{ steps.range.outputs.plain_subject }}
+
+            Source: https://github.com/base44/javascript-sdk/commit/${{ steps.range.outputs.head }}
+          labels: drift, waits-for:sdk-release
+
+      - name: Report
+        env:
+          CHANGED: ${{ steps.patch.outputs.changed }}
+          OPERATION: ${{ steps.pr.outputs.operation }}
+          URL: ${{ steps.pr.outputs.url }}
+        run: |
+          {
+            echo "## Publish SDK Change to Docs"
+            echo
+            echo "- Docs changed: \`${CHANGED}\`"
+            echo "- Pull request: \`${OPERATION:-none}\` ${URL}"
+            echo
+            cat "$RUNNER_TEMP/summary.md"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The usual cause is a published page that's behind its generated source in the same
+      # lines; the SDK regeneration drift check (check 8) brings it level at the next release.
+      - name: Open or comment on the failure issue
+        if: ${{ failure() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Publishing an SDK change to the docs failed"
+          gh label create drift --color 0E8A16 --description "Opened by the docs drift workflows" --force
+          issue=$(gh issue list --state open --label drift --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -1)
+          if [ -n "$issue" ]; then
+            gh issue comment "$issue" --body "Failed again: $RUN_URL"
+          else
+            gh issue create --title "$title" --label drift --body "Opening the docs PR for an SDK drift change failed: $RUN_URL
+
+          Close this issue once it's fixed; the next failure opens a new one."
+          fi
