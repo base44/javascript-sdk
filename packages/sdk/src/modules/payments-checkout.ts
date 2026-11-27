@@ -152,6 +152,7 @@ interface PaddleCheckoutSettings {
   frameStyle: string;
   variant: "one-page";
   showAddDiscounts: boolean;
+  theme: "light" | "dark";
   locale?: string;
 }
 
@@ -431,6 +432,12 @@ function paddleLocale(): string | undefined {
     ?? PADDLE_LOCALES.find((locale) => locale === lang.split("-")[0].toLowerCase());
 }
 
+/** Paddle has a light and a dark look per seller, and picks one only when told; apps mark dark mode on <html>. */
+function paddleTheme(): "light" | "dark" {
+  const root = document.documentElement;
+  return root.classList.contains("dark") || root.dataset.theme === "dark" ? "dark" : "light";
+}
+
 /** The buyer Paddle opens with; with a country it shows only the card. Paddle takes an address only with an email. */
 function paddleCustomer(embedded: PaddleEmbeddedCheckout): PaddleCustomer | undefined {
   if (!embedded.customer_email) return undefined;
@@ -550,6 +557,7 @@ async function mountPaddle(
           variant: "one-page",
           // The app prices discounts itself through createCheckout, so Paddle's own coupon field would be a second one.
           showAddDiscounts: false,
+          theme: paddleTheme(),
           ...(locale ? { locale } : {}),
         },
         ...(customer ? { customer } : {}),

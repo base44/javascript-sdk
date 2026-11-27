@@ -226,7 +226,7 @@ describe("mountCheckout", () => {
     container = new FakeElement("div");
     vi.stubGlobal("document", {
       createElement: (tag: string) => new FakeElement(tag),
-      documentElement: { lang: "" },
+      documentElement: { lang: "", classList: { contains: () => false }, dataset: {} },
     });
     vi.stubGlobal("window", {});
     loadScript = vi.fn().mockResolvedValue(undefined);
