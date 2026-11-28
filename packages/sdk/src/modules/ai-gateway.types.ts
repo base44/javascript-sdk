@@ -100,6 +100,17 @@ export interface AiGatewayModuleConfig {
  * request options, the model list, and limits, see
  * [Generate music with the AI Gateway](/developers/references/sdk/getting-started/ai-gateway-music).
  *
+ * ## 3D models
+ *
+ * The gateway also serves a 3D model endpoint, `/3d-models`, so you can turn a
+ * text prompt or an image of one object into a textured 3D model. OpenAI has no
+ * 3D endpoint, so the request format is Base44's own. 3D generation is
+ * synchronous. The request returns the stored GLB file's `url` once the model is
+ * ready, which usually takes one to three minutes. Pass `'automatic'` or pin
+ * `'hunyuan_3d_v3_1_pro'`, which `automatic` always uses. For request options,
+ * the model list, and limits, see
+ * [Generate 3D models with the AI Gateway](/developers/references/sdk/getting-started/ai-gateway-3d-models).
+ *
  * ## Structured evaluations
  *
  * The `typesafe` provider runs the `jev` evaluation model through
