@@ -218,3 +218,18 @@ export function getLoginUrl(nextUrl: string, options: GetLoginUrlOptions) {
   );
   return `${serverUrl}${loginPath}?from_url=${encodedRedirectUrl}&app_id=${appId}`;
 }
+
+// appBaseUrl becomes a navigation target, so only http(s) values may pass.
+export function sanitizeAppBaseUrl(value: unknown): string {
+  if (typeof value !== "string") return "";
+  try {
+    const base =
+      typeof window !== "undefined" && window.location?.origin
+        ? window.location.origin
+        : "http://localhost";
+    const { protocol } = new URL(value, base);
+    return protocol === "http:" || protocol === "https:" ? value : "";
+  } catch {
+    return "";
+  }
+}
